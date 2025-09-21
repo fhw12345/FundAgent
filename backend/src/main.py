@@ -13,6 +13,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from .api.health import router as health_router
 from .api.analysis import router as analysis_router
+from .api.market_data import router as market_data_router
 from .core.config import get_settings
 from .database.mongodb import MongoDB
 from .database.redis import RedisCache
@@ -99,6 +100,7 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(health_router, prefix="/api", tags=["health"])
     app.include_router(analysis_router)
+    app.include_router(market_data_router)
 
     @app.get("/")
     async def root():

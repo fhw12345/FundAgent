@@ -80,6 +80,10 @@ async def fibonacci_analysis(
         # Validate date range first
         validate_date_range(request.start_date, request.end_date)
 
+        # Require both start and end dates for Fibonacci analysis
+        if not request.start_date or not request.end_date:
+            raise ValueError("Both start_date and end_date are required for Fibonacci analysis")
+
         # Check cache first
         cache_key = f"fibonacci:{request.symbol}:{request.start_date}:{request.end_date}"
         cached_result = await redis_cache.get(cache_key)

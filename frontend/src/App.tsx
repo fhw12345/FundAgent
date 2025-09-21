@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { HealthCheck } from './components/HealthCheck'
-import { ChatInterface } from './components/ChatInterface'
+import { EnhancedChatInterface } from './components/EnhancedChatInterface'
 import './App.css'
 
 function App() {
@@ -38,7 +38,7 @@ function App() {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                Chat Interface
+                Trading Platform
               </button>
             </nav>
           </div>
@@ -67,14 +67,15 @@ function App() {
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  Financial Analysis Chat
+                  Interactive Trading Platform
                 </h2>
                 <p className="text-gray-600 mb-6">
-                  Conversational interface for financial analysis requests.
-                  Ask for Fibonacci analysis, market structure, or macro sentiment.
+                  Professional trading interface with smart symbol search, interactive TradingView charts,
+                  and AI-powered analysis. Click on charts to select date ranges, search companies by name,
+                  and get instant financial insights.
                 </p>
               </div>
-              <ChatInterface />
+              <EnhancedChatInterface />
             </div>
           )}
         </div>

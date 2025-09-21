@@ -137,10 +137,19 @@ export function ChatInterface() {
           if (!intent.symbol) {
             throw new Error('Please specify a stock symbol for Fibonacci analysis (e.g., "Show Fibonacci analysis for AAPL")')
           }
+
+          // Ensure we have dates for Fibonacci analysis
+          const startDate = intent.start_date
+          const endDate = intent.end_date
+
+          // If no date range specified, default to last 6 months
+          const finalStartDate = startDate || (new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+          const finalEndDate = endDate || (new Date().toISOString().split('T')[0])
+
           const fibResult = await analysisService.fibonacciAnalysis({
             symbol: intent.symbol,
-            start_date: intent.start_date,
-            end_date: intent.end_date,
+            start_date: finalStartDate,
+            end_date: finalEndDate,
             include_chart: true,
           })
           return {
