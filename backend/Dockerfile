@@ -22,9 +22,12 @@ FROM python:3.12-slim as production
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app
 
-# Install runtime dependencies only
+# Install runtime dependencies including CA certificates for SSL/TLS
 RUN apt-get update && apt-get install -y \
-    && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
 # Set working directory
 WORKDIR /app
@@ -35,6 +38,10 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY src/ ./src/
+
+# Set SSL environment variables
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 # Change ownership to app user
 RUN chown -R app:app /app

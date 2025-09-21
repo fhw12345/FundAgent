@@ -1,30 +1,206 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Send, BarChart3, TrendingUp, DollarSign, Loader2 } from 'lucide-react'
+import { Send, BarChart3, TrendingUp, DollarSign, Loader2, LineChart } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { chatService } from '../services/api'
+import { analysisService } from '../services/analysis'
 import type { ChatMessage } from '../types/api'
+import type { FibonacciAnalysisResponse, MacroSentimentResponse, StockFundamentalsResponse } from '../services/analysis'
+
+// Formatting functions for analysis responses
+function formatFibonacciResponse(result: FibonacciAnalysisResponse): string {
+  const keyLevels = result.fibonacci_levels.filter(level => level.is_key_level)
+
+  return `## Fibonacci Analysis - ${result.symbol}
+
+**Current Price:** $${result.current_price.toFixed(2)}
+**Trend Direction:** ${result.market_structure.trend_direction}
+**Confidence Score:** ${(result.confidence_score * 100).toFixed(1)}%
+
+### Key Fibonacci Levels:
+${keyLevels.map(level =>
+  `• **${level.percentage}** - $${level.price.toFixed(2)}`
+).join('\n')}
+
+### Market Structure:
+• **Swing High:** $${result.market_structure.swing_high.price.toFixed(2)} (${result.market_structure.swing_high.date})
+• **Swing Low:** $${result.market_structure.swing_low.price.toFixed(2)} (${result.market_structure.swing_low.date})
+• **Structure Quality:** ${result.market_structure.structure_quality}
+
+### Analysis Summary:
+${result.analysis_summary}
+
+### Key Insights:
+${result.key_insights.map(insight => `• ${insight}`).join('\n')}
+`
+}
+
+function formatMacroResponse(result: MacroSentimentResponse): string {
+  const topSectors = Object.entries(result.sector_performance)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 3)
+
+  const bottomSectors = Object.entries(result.sector_performance)
+    .sort(([,a], [,b]) => a - b)
+    .slice(0, 3)
+
+  return `## Macro Market Sentiment Analysis
+
+**Overall Sentiment:** ${result.market_sentiment.toUpperCase()}
+**VIX Level:** ${result.vix_level.toFixed(2)} (${result.vix_interpretation})
+**Fear/Greed Score:** ${result.fear_greed_score}/100
+
+### Major Indices Performance:
+${Object.entries(result.major_indices).map(([index, change]) =>
+  `• **${index}:** ${change > 0 ? '+' : ''}${change.toFixed(2)}%`
+).join('\n')}
+
+### Top Performing Sectors:
+${topSectors.map(([sector, change]) =>
+  `• **${sector}:** +${change.toFixed(2)}%`
+).join('\n')}
+
+### Bottom Performing Sectors:
+${bottomSectors.map(([sector, change]) =>
+  `• **${sector}:** ${change.toFixed(2)}%`
+).join('\n')}
+
+### Market Outlook:
+${result.market_outlook}
+
+### Key Factors:
+${result.key_factors.map(factor => `• ${factor}`).join('\n')}
+`
+}
+
+function formatFundamentalsResponse(result: StockFundamentalsResponse): string {
+  const priceChange = result.price_change_percent > 0 ? '+' : ''
+
+  return `## Stock Fundamentals - ${result.symbol}
+
+**Company:** ${result.company_name}
+**Current Price:** $${result.current_price.toFixed(2)} (${priceChange}${result.price_change_percent.toFixed(2)}%)
+**Market Cap:** $${(result.market_cap / 1_000_000_000).toFixed(2)}B
+
+### Valuation Metrics:
+${result.pe_ratio ? `• **P/E Ratio:** ${result.pe_ratio.toFixed(2)}` : ''}
+${result.pb_ratio ? `• **P/B Ratio:** ${result.pb_ratio.toFixed(2)}` : ''}
+${result.dividend_yield ? `• **Dividend Yield:** ${result.dividend_yield.toFixed(2)}%` : ''}
+${result.beta ? `• **Beta:** ${result.beta.toFixed(2)}` : ''}
+
+### Trading Data:
+• **Volume:** ${result.volume.toLocaleString()} (Avg: ${result.avg_volume.toLocaleString()})
+• **52-Week High:** $${result.fifty_two_week_high.toFixed(2)}
+• **52-Week Low:** $${result.fifty_two_week_low.toFixed(2)}
+
+### Summary:
+${result.fundamental_summary}
+
+### Key Metrics:
+${result.key_metrics.map(metric => `• ${metric}`).join('\n')}
+`
+}
 
 export function ChatInterface() {
   const [message, setMessage] = useState('')
+  const [currentSymbol, setCurrentSymbol] = useState('')
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - 6) // Default to 6 months ago
+    return date.toISOString().split('T')[0]
+  })
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0] // Default to today
+  })
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
       content: `Hello! I'm your AI financial analysis assistant. I can help you with:
 
-• **Fibonacci Analysis** - Technical retracement levels for any stock
-• **Market Structure** - Swing points and trend analysis
-• **Macro Analysis** - VIX, market sentiment, and sector rotation
-• **Stock Fundamentals** - Company metrics and valuation data
+• **📈 Fibonacci Analysis** - Technical retracement levels and swing points
+• **🌍 Macro Sentiment** - VIX, market sentiment, and sector rotation
+• **📊 Stock Fundamentals** - Company metrics and valuation data
+• **📉 Chart Generation** - Visual analysis with technical indicators
 
-Try asking something like "Show me Fibonacci analysis for AAPL" or click one of the quick actions below.`,
+**Quick Start:** Enter a stock symbol below (e.g., AAPL), select date range, then click any analysis button. Or type your request naturally in the chat.`,
       timestamp: new Date().toISOString(),
     },
   ])
 
-  const chatMutation = useMutation({
-    mutationFn: chatService.sendMessage,
+  const analysisMutation = useMutation({
+    mutationFn: async (userMessage: string) => {
+      // Parse user intent
+      const intent = analysisService.parseAnalysisIntent(userMessage)
+
+      switch (intent.type) {
+        case 'fibonacci':
+          if (!intent.symbol) {
+            throw new Error('Please specify a stock symbol for Fibonacci analysis (e.g., "Show Fibonacci analysis for AAPL")')
+          }
+          const fibResult = await analysisService.fibonacciAnalysis({
+            symbol: intent.symbol,
+            start_date: intent.start_date,
+            end_date: intent.end_date,
+            include_chart: true,
+          })
+          return {
+            type: 'fibonacci',
+            content: formatFibonacciResponse(fibResult),
+            analysis_data: fibResult,
+          }
+
+        case 'macro':
+          const macroResult = await analysisService.macroSentimentAnalysis({
+            include_sectors: true,
+            include_indices: true,
+          })
+          return {
+            type: 'macro',
+            content: formatMacroResponse(macroResult),
+            analysis_data: macroResult,
+          }
+
+        case 'fundamentals':
+          if (!intent.symbol) {
+            throw new Error('Please specify a stock symbol for fundamental analysis (e.g., "Give me fundamentals for TSLA")')
+          }
+          const fundResult = await analysisService.stockFundamentals({
+            symbol: intent.symbol,
+          })
+          return {
+            type: 'fundamentals',
+            content: formatFundamentalsResponse(fundResult),
+            analysis_data: fundResult,
+          }
+
+        case 'chart':
+          if (!intent.symbol) {
+            throw new Error('Please specify a stock symbol for chart generation (e.g., "Show chart for AAPL")')
+          }
+          const chartResult = await analysisService.generateChart({
+            symbol: intent.symbol,
+            start_date: intent.start_date,
+            end_date: intent.end_date,
+            chart_type: 'fibonacci',
+            include_indicators: true,
+          })
+          return {
+            type: 'chart',
+            content: `Generated ${chartResult.chart_type} chart for ${chartResult.symbol}`,
+            analysis_data: chartResult,
+            chart_url: chartResult.chart_url,
+          }
+
+        default:
+          throw new Error(`I can help you with:
+• **Fibonacci Analysis** - "Show Fibonacci analysis for AAPL"
+• **Macro Sentiment** - "What's the current market sentiment?"
+• **Stock Fundamentals** - "Give me fundamentals for TSLA"
+• **Chart Generation** - "Show chart for NVDA"
+
+Please specify a stock symbol and analysis type.`)
+      }
+    },
     onMutate: async (newMessage) => {
       // Optimistically add user message
       const userMessage: ChatMessage = {
@@ -40,18 +216,38 @@ Try asking something like "Show me Fibonacci analysis for AAPL" or click one of 
       // Add assistant response
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: response.response,
+        content: response.content,
         timestamp: new Date().toISOString(),
         chart_url: response.chart_url,
         analysis_data: response.analysis_data,
       }
       setMessages(prev => [...prev, assistantMessage])
     },
-    onError: (error) => {
-      // Add error message
+    onError: (error: any) => {
+      // Extract specific error message from API response
+      let errorContent = 'Unknown error occurred. Please try again.'
+
+      if (error?.response?.data?.detail) {
+        // FastAPI validation error or custom error message
+        errorContent = error.response.data.detail
+      } else if (error?.response?.status === 400) {
+        // Bad request - likely invalid symbol
+        if (error?.response?.data?.detail) {
+          errorContent = error.response.data.detail
+        } else {
+          errorContent = 'Invalid request. Please check your input and try again.'
+        }
+      } else if (error?.response?.status === 500) {
+        // Server error
+        errorContent = 'Server error occurred. The analysis service may be temporarily unavailable.'
+      } else if (error?.message) {
+        // Axios error or other error with message
+        errorContent = error.message
+      }
+
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        content: `❌ **Error**: ${errorContent}`,
         timestamp: new Date().toISOString(),
       }
       setMessages(prev => [...prev, errorMessage])
@@ -60,11 +256,64 @@ Try asking something like "Show me Fibonacci analysis for AAPL" or click one of 
 
   const handleSendMessage = () => {
     if (!message.trim()) return
-    chatMutation.mutate(message)
+    analysisMutation.mutate(message)
   }
 
   const handleQuickAction = (action: string) => {
-    chatMutation.mutate(action)
+    analysisMutation.mutate(action)
+  }
+
+  const handleDirectAction = (actionType: 'fibonacci' | 'fundamentals' | 'chart' | 'macro') => {
+    if (actionType === 'macro') {
+      // Macro analysis doesn't need a symbol
+      analysisMutation.mutate('What is the current macro market sentiment?')
+      return
+    }
+
+    if (!currentSymbol.trim()) {
+      // Focus on symbol input if empty
+      const symbolInput = document.getElementById('symbol-input')
+      symbolInput?.focus()
+      return
+    }
+
+    // Basic symbol validation
+    const symbol = currentSymbol.trim().toUpperCase()
+    if (symbol.length < 1 || symbol.length > 10) {
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: '❌ **Error**: Stock symbol must be between 1-10 characters (e.g., AAPL, TSLA, MSFT)',
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, errorMessage])
+      return
+    }
+
+    // Check for invalid characters
+    if (!/^[A-Z0-9.-]+$/.test(symbol)) {
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: '❌ **Error**: Stock symbol contains invalid characters. Use only letters, numbers, dots, and hyphens.',
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, errorMessage])
+      return
+    }
+
+    let query = ''
+    switch (actionType) {
+      case 'fibonacci':
+        query = `Show me Fibonacci analysis for ${currentSymbol.toUpperCase()} from ${startDate} to ${endDate}`
+        break
+      case 'fundamentals':
+        query = `Give me fundamental info for ${currentSymbol.toUpperCase()}`
+        break
+      case 'chart':
+        query = `Show chart for ${currentSymbol.toUpperCase()} from ${startDate} to ${endDate}`
+        break
+    }
+
+    analysisMutation.mutate(query)
   }
 
   const formatTimestamp = (timestamp: string) => {
@@ -138,7 +387,7 @@ Try asking something like "Show me Fibonacci analysis for AAPL" or click one of 
         ))}
 
         {/* Loading indicator */}
-        {chatMutation.isPending && (
+        {analysisMutation.isPending && (
           <div className="flex justify-start">
             <div className="bg-gray-100 px-4 py-2 rounded-lg">
               <div className="flex items-center space-x-2">
@@ -150,34 +399,162 @@ Try asking something like "Show me Fibonacci analysis for AAPL" or click one of 
         )}
       </div>
 
-      {/* Quick Actions */}
+      {/* Analysis Controls */}
       <div className="border-t p-4">
-        <div className="mb-3">
-          <p className="text-xs text-gray-500 mb-2">Quick Actions:</p>
-          <div className="flex flex-wrap gap-2">
+        {/* Symbol and Date Range Inputs */}
+        <div className="mb-4 space-y-3">
+          <div className="flex space-x-3">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Stock Symbol
+              </label>
+              <input
+                id="symbol-input"
+                type="text"
+                value={currentSymbol}
+                onChange={(e) => setCurrentSymbol(e.target.value.toUpperCase())}
+                placeholder="e.g., AAPL, TSLA, MSFT"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                maxLength={10}
+              />
+            </div>
+            <div className="w-36">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                From Date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div className="w-36">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                To Date
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Quick Date Range Buttons */}
+          <div className="flex space-x-2">
+            <span className="text-xs text-gray-500">Quick ranges:</span>
             <button
-              onClick={() => handleQuickAction('Show me Fibonacci analysis for AAPL')}
-              disabled={chatMutation.isPending}
-              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 disabled:opacity-50"
+              onClick={() => {
+                const end = new Date()
+                const start = new Date()
+                start.setMonth(start.getMonth() - 1)
+                setStartDate(start.toISOString().split('T')[0])
+                setEndDate(end.toISOString().split('T')[0])
+              }}
+              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
             >
-              <BarChart3 className="h-3 w-3 mr-1" />
-              Fibonacci AAPL
+              1M
             </button>
             <button
-              onClick={() => handleQuickAction('What is the current macro market sentiment?')}
-              disabled={chatMutation.isPending}
+              onClick={() => {
+                const end = new Date()
+                const start = new Date()
+                start.setMonth(start.getMonth() - 3)
+                setStartDate(start.toISOString().split('T')[0])
+                setEndDate(end.toISOString().split('T')[0])
+              }}
+              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+            >
+              3M
+            </button>
+            <button
+              onClick={() => {
+                const end = new Date()
+                const start = new Date()
+                start.setMonth(start.getMonth() - 6)
+                setStartDate(start.toISOString().split('T')[0])
+                setEndDate(end.toISOString().split('T')[0])
+              }}
+              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+            >
+              6M
+            </button>
+            <button
+              onClick={() => {
+                const end = new Date()
+                const start = new Date()
+                start.setFullYear(start.getFullYear() - 1)
+                setStartDate(start.toISOString().split('T')[0])
+                setEndDate(end.toISOString().split('T')[0])
+              }}
+              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+            >
+              1Y
+            </button>
+            <button
+              onClick={() => {
+                const end = new Date()
+                const start = new Date()
+                start.setFullYear(start.getFullYear() - 2)
+                setStartDate(start.toISOString().split('T')[0])
+                setEndDate(end.toISOString().split('T')[0])
+              }}
+              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+            >
+              2Y
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-3">
+          <p className="text-xs text-gray-500 mb-2">Quick Analysis:</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleDirectAction('fibonacci')}
+              disabled={analysisMutation.isPending}
+              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
+                currentSymbol.trim()
+                  ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              <BarChart3 className="h-3 w-3 mr-1" />
+              Fibonacci
+            </button>
+            <button
+              onClick={() => handleDirectAction('macro')}
+              disabled={analysisMutation.isPending}
               className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-50"
             >
               <TrendingUp className="h-3 w-3 mr-1" />
-              Macro Sentiment
+              Macro
             </button>
             <button
-              onClick={() => handleQuickAction('Give me fundamental info for TSLA')}
-              disabled={chatMutation.isPending}
-              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 hover:bg-purple-200 disabled:opacity-50"
+              onClick={() => handleDirectAction('fundamentals')}
+              disabled={analysisMutation.isPending}
+              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
+                currentSymbol.trim()
+                  ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
             >
               <DollarSign className="h-3 w-3 mr-1" />
-              Fundamentals TSLA
+              Fundamentals
+            </button>
+            <button
+              onClick={() => handleDirectAction('chart')}
+              disabled={analysisMutation.isPending}
+              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
+                currentSymbol.trim()
+                  ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              <LineChart className="h-3 w-3 mr-1" />
+              Chart
             </button>
           </div>
         </div>
@@ -190,15 +567,15 @@ Try asking something like "Show me Fibonacci analysis for AAPL" or click one of 
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
             placeholder="Ask about stocks, Fibonacci analysis, market sentiment..."
-            disabled={chatMutation.isPending}
+            disabled={analysisMutation.isPending}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
           />
           <button
             onClick={handleSendMessage}
-            disabled={!message.trim() || chatMutation.isPending}
+            disabled={!message.trim() || analysisMutation.isPending}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {chatMutation.isPending ? (
+            {analysisMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />

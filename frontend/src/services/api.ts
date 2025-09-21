@@ -10,6 +10,9 @@ const api = axios.create({
   },
 })
 
+// Export the configured axios instance for use in other services
+export const apiClient = api
+
 // Request interceptor for authentication (future)
 api.interceptors.request.use(
   (config) => {
