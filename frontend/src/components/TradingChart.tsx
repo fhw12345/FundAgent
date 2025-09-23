@@ -15,6 +15,38 @@ import { useChartData } from './chart/useChartData'
 
 type SupportedTimezone = 'US/Eastern' | 'UTC' | 'Asia/Shanghai' | 'Europe/London' | 'Asia/Tokyo'
 
+interface FibonacciLevel {
+  level: number
+  price: number
+  percentage: string
+  is_key_level: boolean
+}
+
+interface PressureZone {
+  center_price: number
+  upper_bound: number
+  lower_bound: number
+  zone_width: number
+}
+
+interface TopTrend {
+  rank: number
+  type: string
+  period: string
+  magnitude: number
+  high: number
+  low: number
+}
+
+interface FibonacciAnalysisData {
+  fibonacci_levels: FibonacciLevel[]
+  pressure_zone: PressureZone | null
+  raw_data?: {
+    top_trends?: TopTrend[]
+    pressure_zones?: Array<PressureZone & { trend_type: string }>
+  }
+}
+
 interface TradingChartProps {
   symbol: string
   data: PriceDataPoint[]
@@ -23,17 +55,19 @@ interface TradingChartProps {
   onIntervalChange?: (interval: TimeInterval) => void
   onDateRangeSelect?: (startDate: string, endDate: string) => void
   highlightDateRange?: { start: string; end: string }
+  fibonacciAnalysis?: FibonacciAnalysisData | null
   className?: string
 }
 
 export const TradingChart: React.FC<TradingChartProps> = ({
   symbol,
   data,
-  chartType = 'line',
+  chartType = 'candlestick',
   interval,
   onIntervalChange,
   onDateRangeSelect,
   highlightDateRange,
+  fibonacciAnalysis,
   className = ''
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null)
@@ -51,7 +85,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     onDateRangeSelect?.(startDate, endDate);
   };
 
-  const { chartRef, seriesRef, setChartData } = useChart(chartContainerRef, chartType, handleDateRangeSelect, setTooltip, interval);
+  const { chartRef, seriesRef, setChartData } = useChart(chartContainerRef, chartType, handleDateRangeSelect, setTooltip, interval, fibonacciAnalysis);
   const { convertToChartData } = useChartData(data, chartType, selectedTimezone);
 
   React.useEffect(() => {

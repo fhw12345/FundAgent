@@ -5,6 +5,7 @@ Following Factor 11/12: Triggerable & Stateless design.
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+import logging
 
 import structlog
 from fastapi import FastAPI
@@ -17,6 +18,9 @@ from .api.market_data import router as market_data_router
 from .core.config import get_settings
 from .database.mongodb import MongoDB
 from .database.redis import RedisCache
+
+# Set the root logger level to INFO so we can see detailed logs
+logging.basicConfig(level=logging.INFO)
 
 # Configure structured logging
 structlog.configure(

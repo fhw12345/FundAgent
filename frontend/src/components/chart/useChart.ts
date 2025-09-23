@@ -6,19 +6,41 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { createChart, IChartApi, ISeriesApi, MouseEventParams, CandlestickData, LineData } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, MouseEventParams, CandlestickData, LineData, IPriceLine } from 'lightweight-charts'
 
 type ChartType = 'line' | 'candlestick'
+
+interface FibonacciLevel {
+  level: number
+  price: number
+  percentage: string
+  is_key_level: boolean
+}
+
+interface PressureZone {
+  center_price: number
+  upper_bound: number
+  lower_bound: number
+  zone_width: number
+}
+
+interface FibonacciAnalysisData {
+  fibonacci_levels: FibonacciLevel[]
+  pressure_zone: PressureZone | null
+  raw_data?: any
+}
 
 export const useChart = (
     chartContainerRef: React.RefObject<HTMLDivElement>,
     chartType: ChartType,
     onDateRangeSelect?: (startDate: string, endDate: string) => void,
     setTooltip?: (tooltip: any) => void,
-    interval?: string
+    interval?: string,
+    fibonacciAnalysis?: FibonacciAnalysisData | null
 ) => {
     const chartRef = useRef<IChartApi | null>(null)
     const seriesRef = useRef<ISeriesApi<'Line' | 'Candlestick'> | null>(null)
+    const fibonacciLinesRef = useRef<IPriceLine[]>([])
 
     useEffect(() => {
         if (!chartContainerRef.current) return
@@ -166,6 +188,77 @@ export const useChart = (
         }
     }, [onDateRangeSelect, setTooltip, interval]);
 
+    // Effect to handle Fibonacci analysis updates
+    useEffect(() => {
+        if (!chartRef.current || !seriesRef.current) return;
+
+        // Clear existing Fibonacci lines
+        fibonacciLinesRef.current.forEach(line => {
+            seriesRef.current?.removePriceLine(line);
+        });
+        fibonacciLinesRef.current = [];
+
+        if (!fibonacciAnalysis) return;
+
+        // Get the top trends from raw data
+        const topTrends = fibonacciAnalysis.raw_data?.top_trends || [];
+
+        // For the biggest trend (#1): show only 61.8% line
+        if (topTrends.length > 0) {
+            const mainTrend = topTrends[0];
+
+            // Calculate 61.8% level for the biggest trend
+            const high = mainTrend['high'];
+            const low = mainTrend['low'];
+            const isUptrend = mainTrend['type'].includes('Uptrend');
+
+            // Calculate 61.8% retracement level
+            const level618Price = isUptrend
+                ? high - (high - low) * 0.618  // Retracement from high in uptrend
+                : low + (high - low) * 0.618;  // Extension from low in downtrend
+
+            // Determine arrow direction
+            const arrow = isUptrend ? '↑' : '↓';
+
+            // Add single 61.8% line for biggest trend
+            const line618 = seriesRef.current.createPriceLine({
+                price: level618Price,
+                color: '#FF6B6B',
+                lineWidth: 1,
+                lineStyle: 0,
+                axisLabelVisible: true,
+                title: `1${arrow}`,
+            });
+            fibonacciLinesRef.current.push(line618);
+        }
+
+        // For trends #2 and #3: show only 61.8% level calculated for each trend
+        topTrends.slice(1, 3).forEach((trend: any, index: number) => {
+            const trendNumber = index + 2; // 2 or 3
+
+            // Calculate 61.8% retracement level for this specific trend
+            const high = trend['high']; // Use correct field name from backend
+            const low = trend['low'];   // Use correct field name from backend
+            const level618Price = trend['type'].includes('Uptrend')
+                ? high - (high - low) * 0.618  // Retracement from high in uptrend
+                : low + (high - low) * 0.618;  // Extension from low in downtrend
+
+            if (seriesRef.current) {
+                const arrow = trend['type'].includes('Uptrend') ? '↑' : '↓';
+                // Different colors for trends 2 and 3
+                const color = trendNumber === 2 ? '#4CAF50' : '#FF9800'; // Green for trend 2, Orange for trend 3
+                const line = seriesRef.current.createPriceLine({
+                    price: level618Price,
+                    color: color,
+                    lineWidth: 1,
+                    lineStyle: 1, // Dashed
+                    axisLabelVisible: true,
+                    title: `${trendNumber}${arrow}`,
+                });
+                fibonacciLinesRef.current.push(line);
+            }
+        });
+    }, [fibonacciAnalysis]);
 
     const setChartData = (data: (LineData | CandlestickData)[], highlightDateRange?: { start: string, end: string }) => {
         if (seriesRef.current) {

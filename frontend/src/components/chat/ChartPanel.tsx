@@ -9,6 +9,7 @@ import { SymbolSearch } from '../SymbolSearch'
 import { TradingChart } from '../TradingChart'
 import { BarChart3, TrendingUp, DollarSign, Loader2, LineChart, Zap } from 'lucide-react'
 import { TimeInterval, PriceDataPoint } from '../../services/market'
+import type { FibonacciAnalysisResponse } from '../../services/analysis'
 
 interface ChartPanelProps {
     currentSymbol: string;
@@ -17,6 +18,7 @@ interface ChartPanelProps {
     selectedInterval: TimeInterval;
     selectedDateRange: { start: string; end: string };
     analysisMutation: any;
+    fibonacciAnalysis: FibonacciAnalysisResponse | null;
     handleSymbolSelect: (symbol: string, name: string) => void;
     handleIntervalChange: (interval: TimeInterval) => void;
     handleDateRangeSelect: (startDate: string, endDate: string) => void;
@@ -30,6 +32,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({
     selectedInterval,
     selectedDateRange,
     analysisMutation,
+    fibonacciAnalysis,
     handleSymbolSelect,
     handleIntervalChange,
     handleDateRangeSelect,
@@ -137,6 +140,7 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({
                             onIntervalChange={handleIntervalChange}
                             onDateRangeSelect={handleDateRangeSelect}
                             highlightDateRange={selectedDateRange.start && selectedDateRange.end ? selectedDateRange : undefined}
+                            fibonacciAnalysis={fibonacciAnalysis}
                             className="bg-white rounded-lg border h-full"
                         />
                         {selectedDateRange.start && selectedDateRange.end && (
