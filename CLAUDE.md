@@ -18,6 +18,7 @@
 * **File Size Limit**: Maximum 500 lines per file - split into modules when exceeded
 * **Documentation**: Descriptive docstrings at top of every file explaining purpose and context
 * **Comments**: Rich comments required for all key business logic - explain "why", not "what"
+* **No Duplication**: DRY principle - centralize shared logic in utils modules, avoid duplicate code
 
 ## API Validation Patterns
 * **Symbol Validation**: Test `ticker.history(period="5d")` before suggesting symbols

@@ -61,7 +61,7 @@ export const TIME_INTERVALS = {
   // Daily+ intervals
   '1d': '1 Day',
   '5d': '5 Days',
-  '1wk': '1 Week',
+  '1w': '1 Week',
   '1mo': '1 Month'
 } as const
 
@@ -165,8 +165,8 @@ export const marketService = {
       '3mo': '1d',
       '6mo': '1d',
       '1y': '1d',
-      '2y': '1wk',
-      '5y': '1wk',
+      '2y': '1w',
+      '5y': '1w',
       'ytd': '1d',
       'max': '1mo'
     }

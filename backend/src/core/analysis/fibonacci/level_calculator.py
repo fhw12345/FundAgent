@@ -159,7 +159,7 @@ class LevelCalculator:
         magnitude_pct = (magnitude / current_price) * 100
 
         # Base confidence from trend magnitude
-        base_confidence = min(magnitude_pct / 30, 0.7)  # Cap at 70% from magnitude
+        base_confidence = min(magnitude_pct / 40, 0.8)  # Cap at 80% from magnitude
 
         # Boost confidence if multiple significant trends detected
         if len(trends) >= 3:

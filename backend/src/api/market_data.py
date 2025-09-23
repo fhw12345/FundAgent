@@ -10,6 +10,8 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ..core.utils import map_timeframe_to_yfinance_interval, get_valid_frontend_intervals
+
 router = APIRouter(prefix="/api/market", tags=["Market Data"])
 
 
@@ -269,10 +271,13 @@ async def get_price_data(
         if not symbol:
             raise ValueError("Symbol is required")
 
-        # Validate interval
-        valid_intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo']
+        # Validate interval using centralized utility
+        valid_intervals = get_valid_frontend_intervals()
         if interval not in valid_intervals:
             raise ValueError(f"Invalid interval. Must be one of: {valid_intervals}")
+
+        # Convert to yfinance format using centralized utility
+        yfinance_interval = map_timeframe_to_yfinance_interval(interval)
 
         # Get ticker
         ticker = yf.Ticker(symbol)
@@ -286,14 +291,14 @@ async def get_price_data(
             except ValueError:
                 raise ValueError("Dates must be in YYYY-MM-DD format")
 
-            data = ticker.history(start=start_date, end=end_date, interval=interval)
+            data = ticker.history(start=start_date, end=end_date, interval=yfinance_interval)
         else:
             # Use relative period
             valid_periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
             if period not in valid_periods:
                 raise ValueError(f"Invalid period. Must be one of: {valid_periods}")
 
-            data = ticker.history(period=period, interval=interval)
+            data = ticker.history(period=period, interval=yfinance_interval)
 
         if data.empty:
             suggestions = []

@@ -10,6 +10,7 @@ from typing import Optional
 import structlog
 
 from ....api.models import FibonacciAnalysisResponse
+from ...utils import map_timeframe_to_yfinance_interval
 from .config import TimeframeConfigs
 from .trend_detector import TrendDetector
 from .level_calculator import LevelCalculator
@@ -126,13 +127,8 @@ class FibonacciAnalyzer:
         try:
             ticker = yf.Ticker(self.symbol)
 
-            # Use timeframe-specific interval for data fetching
-            interval_map = {
-                '1d': '1d',
-                '1w': '1wk',
-                '1M': '1mo'
-            }
-            interval = interval_map.get(self.timeframe, '1d')
+            # Convert our timeframe to yfinance-compatible interval
+            interval = map_timeframe_to_yfinance_interval(self.timeframe)
 
             if start_date and end_date:
                 data = ticker.history(start=start_date, end=end_date, interval=interval)

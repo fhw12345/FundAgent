@@ -21,7 +21,7 @@ const TIMEZONE_OPTIONS: { value: SupportedTimezone; label: string }[] = [
 const INTERVAL_BUTTONS: { key: TimeInterval; label: string; period: string }[] = [
     { key: '1h', label: '1H', period: '1mo' },
     { key: '1d', label: '1D', period: '6mo' },
-    { key: '1wk', label: '1W', period: '1y' },
+    { key: '1w', label: '1W', period: '1y' },
     { key: '1mo', label: '1M', period: '2y' }
 ]
 

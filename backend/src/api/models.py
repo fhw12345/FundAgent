@@ -17,7 +17,7 @@ class PricePoint(BaseModel):
 
 class FibonacciLevel(BaseModel):
     """Fibonacci retracement level."""
-    level: float = Field(..., description="Fibonacci ratio (e.g., 0.618)")
+    level: float = Field(..., ge=0, description="Fibonacci ratio (e.g., 0.618)")
     price: float = Field(..., description="Price at this level")
     percentage: str = Field(..., description="Percentage string (e.g., '61.8%')")
     is_key_level: bool = Field(default=False, description="Whether this is a key level (38.2%, 50%, 61.8%)")
@@ -40,7 +40,7 @@ class FibonacciAnalysisResponse(BaseModel):
     end_date: Optional[str] = Field(None, description="Analysis end date (YYYY-MM-DD)")
     timeframe: str = Field(..., description="Analysis timeframe (1d, 1w, 1M)")
     current_price: float = Field(..., description="Current stock price")
-    analysis_date: str = Field(..., description="Analysis date in ISO format")
+    analysis_date: str = Field(default_factory=lambda: datetime.utcnow().isoformat(), description="Analysis date in ISO format")
 
     # Core Fibonacci data
     fibonacci_levels: List[FibonacciLevel] = Field(..., description="All Fibonacci retracement levels")
@@ -61,7 +61,7 @@ class FibonacciAnalysisResponse(BaseModel):
 
 class MacroSentimentResponse(BaseModel):
     """Macro market sentiment analysis response."""
-    analysis_date: str = Field(..., description="Analysis date in ISO format")
+    analysis_date: str = Field(default_factory=lambda: datetime.utcnow().isoformat(), description="Analysis date in ISO format")
 
     # VIX analysis
     vix_level: float = Field(..., description="Current VIX level")
@@ -86,7 +86,7 @@ class StockFundamentalsResponse(BaseModel):
     """Stock fundamentals and company information."""
     symbol: str = Field(..., description="Stock symbol")
     company_name: str = Field(..., description="Company name")
-    analysis_date: str = Field(..., description="Analysis date in ISO format")
+    analysis_date: str = Field(default_factory=lambda: datetime.utcnow().isoformat(), description="Analysis date in ISO format")
 
     # Price data
     current_price: float = Field(..., description="Current stock price")
@@ -101,7 +101,7 @@ class StockFundamentalsResponse(BaseModel):
     # Valuation metrics
     pe_ratio: Optional[float] = Field(None, description="Price-to-earnings ratio")
     pb_ratio: Optional[float] = Field(None, description="Price-to-book ratio")
-    dividend_yield: Optional[float] = Field(None, description="Dividend yield percentage")
+    dividend_yield: Optional[float] = Field(None, ge=0, le=25, description="Dividend yield percentage. We cap at 25% to reject unrealistic data.")
 
     # Financial health
     beta: Optional[float] = Field(None, description="Stock beta (volatility vs market)")
@@ -130,7 +130,7 @@ class FibonacciAnalysisRequest(BaseModel):
     symbol: str = Field(..., description="Stock symbol to analyze", example="AAPL")
     start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)", example="2024-01-01")
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)", example="2024-12-31")
-    timeframe: str = Field(default="1d", description="Analysis timeframe (1d, 1w, 1M)", example="1d")
+    timeframe: Literal["1d", "1w", "1M"] = Field(default="1d", description="Analysis timeframe (1d, 1w, 1M)", example="1d")
     include_chart: bool = Field(default=True, description="Whether to generate a chart")
 
 
@@ -142,7 +142,7 @@ class MacroAnalysisRequest(BaseModel):
 
 class StockFundamentalsRequest(BaseModel):
     """Request model for stock fundamentals."""
-    symbol: str = Field(..., description="Stock symbol to analyze", example="AAPL")
+    symbol: str = Field(..., min_length=1, pattern=r"^\S+$", description="Stock symbol to analyze", example="AAPL")
 
 
 class ChartRequest(BaseModel):

@@ -17,22 +17,23 @@ export function EnhancedChatInterface() {
 
     const { messages, setMessages } = useChatManager();
 
-    // Extract the latest Fibonacci analysis for the current symbol
+    // Extract Fibonacci analysis for the current symbol AND timeframe
     const currentFibonacciAnalysis = useMemo(() => {
         if (!currentSymbol) return null;
 
-        // Find the most recent Fibonacci analysis message for the current symbol
+        // Find the most recent Fibonacci analysis for current symbol AND timeframe
         const fibMessage = [...messages]
             .reverse()
             .find(msg =>
                 msg.role === 'assistant' &&
                 msg.analysis_data &&
                 msg.analysis_data.symbol === currentSymbol &&
-                msg.analysis_data.fibonacci_levels
+                msg.analysis_data.fibonacci_levels &&
+                msg.analysis_data.timeframe === selectedInterval  // Match timeframe!
             );
 
         return fibMessage?.analysis_data as FibonacciAnalysisResponse | null;
-    }, [messages, currentSymbol]);
+    }, [messages, currentSymbol, selectedInterval]);  // Add selectedInterval dependency
     const analysisMutation = useAnalysis(currentSymbol, selectedDateRange, setMessages, setSelectedDateRange, selectedInterval);
 
 
@@ -40,7 +41,7 @@ export function EnhancedChatInterface() {
         switch (interval) {
             case '1h': return '1mo';
             case '1d': return '6mo';
-            case '1wk': return '1y';
+            case '1w': return '1y';
             case '1mo': return '2y';
             default: return '6mo';
         }
@@ -110,7 +111,7 @@ export function EnhancedChatInterface() {
                         periodsBack = new Date(today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
                         periodDescription = "last 6 months";
                         break;
-                    case '1wk':
+                    case '1w':
                         periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
                         periodDescription = "last 1 year";
                         break;
