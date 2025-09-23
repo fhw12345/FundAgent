@@ -15,6 +15,9 @@
 * Python: Modern syntax (`|` unions, `match/case`, f-strings, `@dataclass`)
 * TypeScript: ES modules, optional chaining, `satisfies` operator
 * Quality gates: `make fmt && make test && make lint`
+* **File Size Limit**: Maximum 500 lines per file - split into modules when exceeded
+* **Documentation**: Descriptive docstrings at top of every file explaining purpose and context
+* **Comments**: Rich comments required for all key business logic - explain "why", not "what"
 
 ## API Validation Patterns
 * **Symbol Validation**: Test `ticker.history(period="5d")` before suggesting symbols
@@ -57,3 +60,31 @@ const mutation = useMutation({
 2. Check Redis cache keys: `docker-compose exec redis redis-cli keys "fibonacci:*"`
 3. Add structured logging: `logging.basicConfig(level=logging.INFO)`
 4. Use "zero-closure" patterns for complex state dependencies
+
+## Docker Hot Reload Rules
+
+### When Restart Required ❌
+- **New dependencies**: `pip install` / `npm install`
+- **Global/module-level objects**: DB connections, clients, constants, decorators
+- **Docker config changes**: docker-compose.yml, Dockerfile
+- **When hot reload visibly fails**: Old behavior persists despite code changes
+
+### When Hot Reload Works ✅
+- **Function/method logic**: Business rules, calculations, API logic
+- **New routes/endpoints**: Adding FastAPI routes, React components
+- **Local variables/operations**: Any code inside functions
+- **UI changes**: CSS, HTML, component updates
+
+### Development Workflow
+1. **Make change**
+2. **Test immediately**
+3. **If old behavior persists** → `docker-compose restart [service]`
+
+### Quick Test
+```python
+print(f"🔄 Code updated: {datetime.now()}")
+```
+No print = restart needed.
+
+### Golden Rule
+**Hot reload works for ~90% of changes. When in doubt, restart - 10 seconds vs 10 minutes debugging.**

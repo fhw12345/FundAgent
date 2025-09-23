@@ -105,7 +105,14 @@ ${result.key_factors.map(factor => `• ${factor}`).join('\n')}
 }
 
 function formatFundamentalsResponse(result: StockFundamentalsResponse): string {
+    const analysisDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
     return `## Fundamental Analysis - ${result.symbol}
+*Analysis Date: ${analysisDate}*
 
 **Company:** ${result.company_name}
 **Current Price:** $${result.current_price.toFixed(2)} (${result.price_change >= 0 ? '+' : ''}${result.price_change_percent.toFixed(2)}%)
@@ -118,17 +125,11 @@ ${result.dividend_yield ? `• **Dividend Yield:** ${result.dividend_yield.toFix
 ### Financial Health:
 • **Market Cap:** $${(result.market_cap / 1e9).toFixed(2)}B
 • **Volume:** ${result.volume.toLocaleString()} (Avg: ${result.avg_volume.toLocaleString()})
-${result.beta ? `• **Beta:** ${result.beta.toFixed(2)}` : ''}
+${result.beta ? `• **Beta:** ${result.beta.toFixed(2)} (volatility vs market)` : ''}
 
 ### Price Range:
 • **52-Week High:** $${result.fifty_two_week_high.toFixed(2)}
 • **52-Week Low:** $${result.fifty_two_week_low.toFixed(2)}
-
-### Summary:
-${result.fundamental_summary}
-
-### Key Metrics:
-${result.key_metrics.map(metric => `• ${metric}`).join('\n')}
 `
 }
 
