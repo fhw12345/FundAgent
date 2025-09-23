@@ -83,7 +83,7 @@ class MacroAnalyzer:
         """Analyze VIX for fear/greed sentiment."""
         try:
             vix_ticker = yf.Ticker("^VIX")
-            vix_data = vix_ticker.history(period="5d")
+            vix_data = vix_ticker.history(period="2d")  # Reduce to 2 days for faster fetch
 
             if vix_data.empty:
                 # Fallback values if VIX data unavailable
@@ -121,7 +121,7 @@ class MacroAnalyzer:
         for name, symbol in indices.items():
             try:
                 ticker = yf.Ticker(symbol)
-                data = ticker.history(period="5d")
+                data = ticker.history(period="2d")  # Reduce to 2 days for faster fetch
 
                 if not data.empty and len(data) >= 2:
                     change = ((data['Close'].iloc[-1] - data['Close'].iloc[-2]) / data['Close'].iloc[-2]) * 100
@@ -142,7 +142,7 @@ class MacroAnalyzer:
             "Healthcare": "XLV",
             "Financial": "XLF",
             "Energy": "XLE",
-            "Consumer Discretionary": "XLY",
+            "Consumer Discretionary": "FDIS",
             "Industrials": "XLI",
             "Communication": "XLC",
             "Consumer Staples": "XLP",
@@ -154,7 +154,7 @@ class MacroAnalyzer:
         for name, symbol in sectors.items():
             try:
                 ticker = yf.Ticker(symbol)
-                data = ticker.history(period="5d")
+                data = ticker.history(period="2d")  # Reduce to 2 days for faster fetch
 
                 if not data.empty and len(data) >= 2:
                     change = ((data['Close'].iloc[-1] - data['Close'].iloc[-2]) / data['Close'].iloc[-2]) * 100
