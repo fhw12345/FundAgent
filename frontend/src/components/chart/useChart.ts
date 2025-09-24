@@ -5,7 +5,7 @@
  * It handles chart creation, series management, data updates, event handling, and resizing.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { createChart, IChartApi, ISeriesApi, MouseEventParams, CandlestickData, LineData, IPriceLine } from 'lightweight-charts'
 
 type ChartType = 'line' | 'candlestick'
@@ -41,6 +41,15 @@ export const useChart = (
     const chartRef = useRef<IChartApi | null>(null)
     const seriesRef = useRef<ISeriesApi<'Line' | 'Candlestick'> | null>(null)
     const fibonacciLinesRef = useRef<IPriceLine[]>([])
+    const onDateRangeSelectRef = useRef(onDateRangeSelect)
+    const setTooltipRef = useRef(setTooltip)
+    const lastTooltipRef = useRef<any>(null)
+
+    // Update refs when props change
+    useEffect(() => {
+        onDateRangeSelectRef.current = onDateRangeSelect
+        setTooltipRef.current = setTooltip
+    }, [onDateRangeSelect, setTooltip])
 
     useEffect(() => {
         if (!chartContainerRef.current) return
@@ -131,20 +140,26 @@ export const useChart = (
                 const finalStartDate = startDate <= endDate ? startDate : endDate;
                 const finalEndDate = startDate <= endDate ? endDate : startDate;
 
-                onDateRangeSelect?.(finalStartDate, finalEndDate);
+                onDateRangeSelectRef.current?.(finalStartDate, finalEndDate);
                 dateSelection = { startDate: null, endDate: null, clickCount: 0 };
             }
         }
 
         const handleCrosshairMove = (param: MouseEventParams) => {
-            if (!param.point || !param.time || !seriesRef.current || !setTooltip) {
-                setTooltip({ visible: false })
+            if (!param.point || !param.time || !seriesRef.current || !setTooltipRef.current) {
+                if (lastTooltipRef.current?.visible !== false) {
+                    lastTooltipRef.current = { visible: false }
+                    setTooltipRef.current?.({ visible: false })
+                }
                 return
             }
 
             const data = param.seriesData.get(seriesRef.current)
             if (!data) {
-                setTooltip({ visible: false })
+                if (lastTooltipRef.current?.visible !== false) {
+                    lastTooltipRef.current = { visible: false }
+                    setTooltipRef.current?.({ visible: false })
+                }
                 return
             }
 
@@ -166,7 +181,7 @@ export const useChart = (
                 })
             }
 
-            setTooltip({
+            const newTooltip = {
                 visible: true,
                 x: param.point.x,
                 y: param.point.y,
@@ -174,7 +189,18 @@ export const useChart = (
                 price: price,
                 volume,
                 isGreen
-            })
+            }
+
+            // Only update if tooltip data has actually changed
+            if (!lastTooltipRef.current ||
+                lastTooltipRef.current.x !== newTooltip.x ||
+                lastTooltipRef.current.y !== newTooltip.y ||
+                lastTooltipRef.current.price !== newTooltip.price ||
+                lastTooltipRef.current.time !== newTooltip.time) {
+
+                lastTooltipRef.current = newTooltip
+                setTooltipRef.current?.(newTooltip)
+            }
         }
 
         chartRef.current.subscribeClick(handleClick)
@@ -186,7 +212,7 @@ export const useChart = (
                 chartRef.current.unsubscribeCrosshairMove(handleCrosshairMove);
             }
         }
-    }, [onDateRangeSelect, setTooltip, interval]);
+    }, [interval]);
 
     // Effect to handle Fibonacci analysis updates
     useEffect(() => {
