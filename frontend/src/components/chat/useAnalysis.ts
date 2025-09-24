@@ -67,7 +67,7 @@ ${fibSection}${pressureInfo}`;
 
     return `## 📊 Fibonacci Analysis - ${result.symbol}
 
-**Analysis Period:** ${result.start_date} to ${result.end_date} (${result.timeframe === '1d' ? 'Daily' : result.timeframe === '1w' ? 'Weekly' : result.timeframe === '1M' ? 'Monthly' : result.timeframe} timeframe)
+**Analysis Period:** ${result.start_date} to ${result.end_date} (${result.timeframe === '1h' ? 'Hourly' : result.timeframe === '1d' ? 'Daily' : result.timeframe === '1w' ? 'Weekly' : result.timeframe === '1M' ? 'Monthly' : result.timeframe} timeframe)
 **Current Price:** $${result.current_price.toFixed(2)}
 **Trend Direction:** ${result.market_structure.trend_direction}
 **Confidence Score:** ${(result.confidence_score * 100).toFixed(1)}%
@@ -159,8 +159,13 @@ export const useAnalysis = (
                     let startDate = intent.start_date;
                     let endDate = intent.end_date;
 
+                    console.log('🔍 MUTATION DEBUG - Intent object:', intent);
+                    console.log('🔍 MUTATION DEBUG - Initial dates from intent:', startDate, 'to', endDate);
+
                     // Extract timeframe from user message patterns
-                    if (userMessage.includes('1wk analysis') || userMessage.includes('Weekly analysis')) {
+                    if (userMessage.includes('1h analysis') || userMessage.includes('Hourly analysis')) {
+                        timeframe = "1h";
+                    } else if (userMessage.includes('1wk analysis') || userMessage.includes('Weekly analysis')) {
                         timeframe = "1w";
                     } else if (userMessage.includes('1mo analysis') || userMessage.includes('Monthly analysis')) {
                         timeframe = "1M";
@@ -172,11 +177,22 @@ export const useAnalysis = (
                     console.log('🔍 MUTATION DEBUG - Parsed timeframe:', timeframe);
                     console.log('🔍 MUTATION DEBUG - Parsed dates:', startDate, 'to', endDate);
 
-                    // Extract dates from user message if present
+                    // Extract dates from user message if present (flexible pattern)
+                    // Handles formats like: "2025-08-24 to 2025-09-23" anywhere in the message
                     const dateMatch = userMessage.match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/);
                     if (dateMatch) {
                         startDate = dateMatch[1];
                         endDate = dateMatch[2];
+                        console.log('🔍 MUTATION DEBUG - Regex matched dates:', startDate, 'to', endDate);
+                    } else {
+                        console.log('🔍 MUTATION DEBUG - No date regex match for message:', userMessage);
+                        // Try a more flexible approach
+                        const flexibleMatch = userMessage.match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/);
+                        if (flexibleMatch && flexibleMatch[1] !== flexibleMatch[2]) {
+                            startDate = flexibleMatch[1];
+                            endDate = flexibleMatch[2];
+                            console.log('🔍 MUTATION DEBUG - Flexible regex matched dates:', startDate, 'to', endDate);
+                        }
                     }
 
                     // If no dates found, calculate based on timeframe

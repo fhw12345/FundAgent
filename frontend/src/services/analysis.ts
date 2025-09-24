@@ -10,6 +10,7 @@ export interface FibonacciAnalysisRequest {
   symbol: string
   start_date?: string
   end_date?: string
+  timeframe?: '1h' | '1d' | '1w' | '1M'
   include_chart?: boolean
 }
 

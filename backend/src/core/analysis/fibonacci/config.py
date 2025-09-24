@@ -47,6 +47,7 @@ class TimeframeConfigs:
 
     # Configurations adapted for different market scales and volatility
     CONFIGS: Dict[str, TimeframeConfig] = {
+        '1h': TimeframeConfig('1h', 5, 0.3, 10, 15, 20),      # Hourly: more sensitive to micro moves
         '1d': TimeframeConfig('1d', 3, 0.5, 15, 10, 25),      # Daily: sensitive to short-term moves
         '1w': TimeframeConfig('1wk', 2, 1.0, 20, 10, 30),     # Weekly: very sensitive
         '1M': TimeframeConfig('1mo', 1, 1.5, 15, 4, 25)       # Monthly: very sensitive

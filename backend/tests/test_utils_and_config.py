@@ -116,7 +116,7 @@ class TestTimeframeConfiguration:
 
     def test_timeframe_config_completeness(self):
         """Test that all required timeframes have configurations."""
-        required_timeframes = ['1d', '1w', '1M']
+        required_timeframes = ['1h', '1d', '1w', '1M']
 
         for timeframe in required_timeframes:
             config = TimeframeConfigs.get_config(timeframe)

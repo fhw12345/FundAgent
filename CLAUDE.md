@@ -1,5 +1,7 @@
 # Financial Agent Development Guide
 
+> **RULE**: Only concise, actionable rules here. No details, no repetition. Organize and consolidate related content.
+
 ## Tech Stack
 * **Backend**: Python 3.12 + FastAPI + MongoDB + Redis
 * **Frontend**: React 18 + TypeScript 5 + Vite + TailwindCSS
@@ -89,3 +91,21 @@ No print = restart needed.
 
 ### Golden Rule
 **Hot reload works for ~90% of changes. When in doubt, restart - 10 seconds vs 10 minutes debugging.**
+
+## Data Contract Synchronization Rules
+
+### Critical Rule: Any Logic Change Must Check Data Contracts
+When modifying **any** frontend or backend logic, always verify data contract alignment across all layers.
+
+### 🔄 4-Layer Contract Checklist
+1. **Backend Pydantic Models** - `Literal["value1", "NEW_VALUE"]`
+2. **Frontend TypeScript** - `'value1' | 'NEW_VALUE'` (must mirror backend)
+3. **User Input Parsing** - Handle new patterns in messages/UI
+4. **Business Logic** - Process new values appropriately
+
+### 🚨 Common Failures & Quick Debug
+- **422 errors** → Backend model rejects frontend data
+- **Silent fallbacks** → Frontend parsing fails, uses defaults
+- **Type misalignment** → TS types ≠ Pydantic models
+
+**Debug**: Check Pydantic validation, frontend parsing, backend processing

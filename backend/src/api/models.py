@@ -130,7 +130,7 @@ class FibonacciAnalysisRequest(BaseModel):
     symbol: str = Field(..., description="Stock symbol to analyze", example="AAPL")
     start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)", example="2024-01-01")
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)", example="2024-12-31")
-    timeframe: Literal["1d", "1w", "1M"] = Field(default="1d", description="Analysis timeframe (1d, 1w, 1M)", example="1d")
+    timeframe: Literal["1h", "1d", "1w", "1M"] = Field(default="1d", description="Analysis timeframe (1h, 1d, 1w, 1M)", example="1d")
     include_chart: bool = Field(default=True, description="Whether to generate a chart")
 
 

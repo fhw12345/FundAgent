@@ -39,7 +39,7 @@ class FibonacciAnalyzer:
             symbol: Stock symbol to analyze
             start_date: Start date for analysis (YYYY-MM-DD format)
             end_date: End date for analysis (YYYY-MM-DD format)
-            timeframe: Timeframe for analysis ('1d', '1w', '1M')
+            timeframe: Timeframe for analysis ('1h', '1d', '1w', '1M')
 
         Returns:
             FibonacciAnalysisResponse with advanced pressure level analysis
@@ -135,6 +135,7 @@ class FibonacciAnalyzer:
             else:
                 # Default periods for different timeframes
                 period_map = {
+                    '1h': '60d',  # 60 days max for hourly data
                     '1d': '6mo',
                     '1w': '2y',
                     '1M': '5y'
