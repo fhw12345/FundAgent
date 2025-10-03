@@ -7,9 +7,11 @@ import pytest
 import pandas as pd
 import numpy as np
 from datetime import datetime, date
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, Mock, AsyncMock
 
 from src.core.analysis.stochastic_analyzer import StochasticAnalyzer
+from src.core.data.ticker_data_service import TickerDataService
+from src.database.redis import RedisCache
 from src.api.models import (
     StochasticAnalysisRequest,
     StochasticAnalysisResponse,
@@ -17,12 +19,20 @@ from src.api.models import (
 )
 
 
+@pytest.fixture
+def mock_ticker_data_service():
+    """Create a mock TickerDataService for testing."""
+    service = Mock(spec=TickerDataService)
+    service.get_ticker_history = AsyncMock(return_value=pd.DataFrame())
+    return service
+
+
 class TestStochasticCalculations:
     """Test core stochastic oscillator calculations."""
 
-    def test_stochastic_calculation_accuracy(self):
+    def test_stochastic_calculation_accuracy(self, mock_ticker_data_service):
         """Test that stochastic calculations are mathematically correct."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Create test data with sufficient points (30 data points for 14-period stochastic)
         np.random.seed(42)  # For reproducible results
@@ -62,9 +72,9 @@ class TestStochasticCalculations:
             if not np.isnan(k_std) and not np.isnan(d_std):
                 assert d_std <= k_std + 1, "D% should generally be smoother than K%"  # Allow small tolerance
 
-    def test_stochastic_edge_case_all_same_prices(self):
+    def test_stochastic_edge_case_all_same_prices(self, mock_ticker_data_service):
         """Test stochastic calculation when all prices are the same (edge case)."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # All prices the same - should result in 50% stochastic (or handle division by zero)
         test_data = pd.DataFrame({
@@ -82,9 +92,9 @@ class TestStochasticCalculations:
             # If values exist, they should be valid numbers (not NaN or inf)
             assert all(np.isfinite(k) for k in k_values)
 
-    def test_stochastic_insufficient_data(self):
+    def test_stochastic_insufficient_data(self, mock_ticker_data_service):
         """Test behavior with insufficient data points."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Only 5 data points, requesting 14-period stochastic
         test_data = pd.DataFrame({
@@ -106,9 +116,9 @@ class TestStochasticCalculations:
 class TestStochasticSignalDetection:
     """Test signal detection logic."""
 
-    def test_signal_determination_boundaries(self):
+    def test_signal_determination_boundaries(self, mock_ticker_data_service):
         """Test overbought/oversold signal boundaries."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Test boundary conditions
         assert analyzer._determine_signal(85.0) == "overbought"
@@ -122,9 +132,9 @@ class TestStochasticSignalDetection:
         assert analyzer._determine_signal(50.0) == "neutral"
         assert analyzer._determine_signal(65.0) == "neutral"
 
-    def test_crossover_detection_accuracy(self):
+    def test_crossover_detection_accuracy(self, mock_ticker_data_service):
         """Test that crossover signals are detected correctly."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Create data with clear crossover pattern
         test_data = pd.DataFrame({
@@ -148,9 +158,9 @@ class TestStochasticSignalDetection:
             assert 'description' in signal
             assert signal['type'] in ['buy', 'sell']
 
-    def test_divergence_detection_basic(self):
+    def test_divergence_detection_basic(self, mock_ticker_data_service):
         """Test basic divergence detection functionality."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Create data with potential divergence pattern
         test_data = pd.DataFrame({
@@ -291,9 +301,9 @@ class TestStochasticAnalysisIntegration:
     """Test full analysis workflow and error handling."""
 
     @pytest.mark.asyncio
-    async def test_analyzer_with_valid_symbol(self):
+    async def test_analyzer_with_valid_symbol(self, mock_ticker_data_service):
         """Test analyzer with valid symbol and mock data."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Mock yfinance data
         mock_data = pd.DataFrame({
@@ -326,9 +336,9 @@ class TestStochasticAnalysisIntegration:
             assert len(result.analysis_summary) > 0
 
     @pytest.mark.asyncio
-    async def test_analyzer_with_insufficient_data(self):
+    async def test_analyzer_with_insufficient_data(self, mock_ticker_data_service):
         """Test analyzer behavior with insufficient data."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Mock minimal data (insufficient for 14-period stochastic)
         mock_data = pd.DataFrame({
@@ -350,9 +360,9 @@ class TestStochasticAnalysisIntegration:
                 )
 
     @pytest.mark.asyncio
-    async def test_analyzer_with_invalid_symbol(self):
+    async def test_analyzer_with_invalid_symbol(self, mock_ticker_data_service):
         """Test analyzer with invalid/delisted symbol."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         with patch.object(analyzer, '_fetch_stock_data') as mock_fetch:
             mock_fetch.return_value = pd.DataFrame()  # Empty data
@@ -364,9 +374,9 @@ class TestStochasticAnalysisIntegration:
                 )
 
     @pytest.mark.asyncio
-    async def test_analyzer_different_timeframes(self):
+    async def test_analyzer_different_timeframes(self, mock_ticker_data_service):
         """Test analyzer with different timeframes."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Mock data for different timeframes
         mock_data = pd.DataFrame({
@@ -397,9 +407,9 @@ class TestStochasticErrorHandling:
     """Test error handling and edge cases."""
 
     @pytest.mark.asyncio
-    async def test_network_error_handling(self):
+    async def test_network_error_handling(self, mock_ticker_data_service):
         """Test handling of network errors during data fetch."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         with patch.object(analyzer, '_fetch_stock_data') as mock_fetch:
             mock_fetch.side_effect = Exception("Network error")
@@ -407,9 +417,9 @@ class TestStochasticErrorHandling:
             with pytest.raises(Exception):
                 await analyzer.analyze(symbol="AAPL", timeframe="1d")
 
-    def test_empty_dataframe_handling(self):
+    def test_empty_dataframe_handling(self, mock_ticker_data_service):
         """Test handling of empty DataFrames."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         empty_df = pd.DataFrame()
         result = analyzer._calculate_stochastic(empty_df)
@@ -417,9 +427,9 @@ class TestStochasticErrorHandling:
         # Should handle gracefully
         assert isinstance(result, pd.DataFrame)
 
-    def test_malformed_data_handling(self):
+    def test_malformed_data_handling(self, mock_ticker_data_service):
         """Test handling of malformed price data."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Missing required columns
         bad_data = pd.DataFrame({
@@ -431,9 +441,9 @@ class TestStochasticErrorHandling:
         result = analyzer._calculate_stochastic(bad_data)
         assert result.empty
 
-    def test_extreme_parameter_values(self):
+    def test_extreme_parameter_values(self, mock_ticker_data_service):
         """Test analyzer with extreme parameter values."""
-        analyzer = StochasticAnalyzer()
+        analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         test_data = pd.DataFrame({
             'High': [110] * 100,

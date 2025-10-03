@@ -168,7 +168,7 @@ class FibonacciAnalysisRequest(BaseModel):
     symbol: str = Field(..., description="Stock symbol to analyze", example="AAPL")
     start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)", example="2024-01-01")
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)", example="2024-12-31")
-    timeframe: Literal["1h", "1d", "1w", "1M"] = Field(default="1d", description="Analysis timeframe (1h, 1d, 1w, 1M)", example="1d")
+    timeframe: Literal["1h", "1d", "1w", "1mo", "1M"] = Field(default="1d", description="Analysis timeframe (1h, 1d, 1w, 1mo)", example="1d")
     include_chart: bool = Field(default=True, description="Whether to generate a chart")
 
 
@@ -197,7 +197,7 @@ class StochasticAnalysisRequest(BaseModel):
     symbol: str = Field(..., min_length=1, pattern=r"^\S+$", description="Stock symbol to analyze", example="AAPL")
     start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)", example="2024-01-01")
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)", example="2024-12-31")
-    timeframe: Literal["1h", "1d", "1w", "1M"] = Field(default="1d", description="Analysis timeframe (1h, 1d, 1w, 1M)", example="1d")
+    timeframe: Literal["1h", "1d", "1w", "1mo", "1M"] = Field(default="1d", description="Analysis timeframe (1h, 1d, 1w, 1mo)", example="1d")
     k_period: int = Field(default=14, ge=5, le=50, description="K% period for stochastic calculation", example=14)
     d_period: int = Field(default=3, ge=2, le=20, description="D% period for signal line smoothing", example=3)
 

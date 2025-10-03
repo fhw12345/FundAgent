@@ -67,7 +67,7 @@ ${fibSection}${pressureInfo}`;
 
     return `## 📊 Fibonacci Analysis - ${result.symbol}
 
-**Analysis Period:** ${result.start_date} to ${result.end_date} (${result.timeframe === '1h' ? 'Hourly' : result.timeframe === '1d' ? 'Daily' : result.timeframe === '1w' ? 'Weekly' : result.timeframe === '1M' ? 'Monthly' : result.timeframe} timeframe)
+**Analysis Period:** ${result.start_date} to ${result.end_date} (${result.timeframe === '1h' ? 'Hourly' : result.timeframe === '1d' ? 'Daily' : result.timeframe === '1w' ? 'Weekly' : result.timeframe === '1mo' ? 'Monthly' : result.timeframe} timeframe)
 **Current Price:** $${result.current_price.toFixed(2)}
 **Trend Direction:** ${result.market_structure.trend_direction}
 **Confidence Score:** ${(result.confidence_score * 100).toFixed(1)}%
@@ -205,7 +205,7 @@ export const useAnalysis = (
                     } else if (userMessage.includes('1wk analysis') || userMessage.includes('Weekly analysis')) {
                         timeframe = "1w";
                     } else if (userMessage.includes('1mo analysis') || userMessage.includes('Monthly analysis')) {
-                        timeframe = "1M";
+                        timeframe = "1mo";
                     } else if (userMessage.includes('Daily analysis')) {
                         timeframe = "1d";
                     }
@@ -247,7 +247,7 @@ export const useAnalysis = (
                             case '1w':
                                 periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000); // 1 year
                                 break;
-                            case '1M':
+                            case '1mo':
                                 periodsBack = new Date(today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000); // 2 years
                                 break;
                             default:
@@ -289,7 +289,7 @@ export const useAnalysis = (
                     } else if (userMessage.includes('1wk analysis') || userMessage.includes('Weekly analysis')) {
                         stochTimeframe = "1w";
                     } else if (userMessage.includes('1mo analysis') || userMessage.includes('Monthly analysis')) {
-                        stochTimeframe = "1M";
+                        stochTimeframe = "1mo";
                     } else if (userMessage.includes('Daily analysis')) {
                         stochTimeframe = "1d";
                     }
@@ -322,7 +322,7 @@ export const useAnalysis = (
                             case '1w':
                                 periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000); // 1 year
                                 break;
-                            case '1M':
+                            case '1mo':
                                 periodsBack = new Date(today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000); // 2 years
                                 break;
                             default:
@@ -337,7 +337,7 @@ export const useAnalysis = (
                         symbol: analysisSymbol,
                         start_date: stochStartDate,
                         end_date: stochEndDate,
-                        timeframe: stochTimeframe as '1h' | '1d' | '1w' | '1M',
+                        timeframe: stochTimeframe as '1h' | '1d' | '1w' | '1mo',
                         k_period: 14,
                         d_period: 3
                     });

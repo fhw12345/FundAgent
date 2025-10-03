@@ -29,11 +29,11 @@ export function EnhancedChatInterface() {
                 msg.analysis_data &&
                 msg.analysis_data.symbol === currentSymbol &&
                 msg.analysis_data.fibonacci_levels &&
-                msg.analysis_data.timeframe === selectedInterval  // Match timeframe!
+                msg.analysis_data.timeframe === selectedInterval
             );
 
         return fibMessage?.analysis_data as FibonacciAnalysisResponse | null;
-    }, [messages, currentSymbol, selectedInterval]);  // Add selectedInterval dependency
+    }, [messages, currentSymbol, selectedInterval]);
     const analysisMutation = useAnalysis(currentSymbol, selectedDateRange, setMessages, setSelectedDateRange, selectedInterval);
 
 

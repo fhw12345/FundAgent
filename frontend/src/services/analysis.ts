@@ -10,7 +10,7 @@ export interface FibonacciAnalysisRequest {
   symbol: string
   start_date?: string
   end_date?: string
-  timeframe?: '1h' | '1d' | '1w' | '1M'
+  timeframe?: '1h' | '1d' | '1w' | '1mo'
   include_chart?: boolean
 }
 
@@ -18,7 +18,7 @@ export interface StochasticAnalysisRequest {
   symbol: string
   start_date?: string
   end_date?: string
-  timeframe?: '1h' | '1d' | '1w' | '1M'
+  timeframe?: '1h' | '1d' | '1w' | '1mo'
   k_period?: number
   d_period?: number
 }

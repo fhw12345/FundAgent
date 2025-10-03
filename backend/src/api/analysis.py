@@ -340,7 +340,11 @@ async def stochastic_analysis(
             d_period=request.d_period
         )
 
-        analyzer = StochasticAnalyzer()
+        # Initialize TickerDataService and analyzer
+        from ..core.data.ticker_data_service import TickerDataService
+        ticker_service = TickerDataService(redis_cache)
+        analyzer = StochasticAnalyzer(ticker_service)
+
         result = await analyzer.analyze(
             symbol=request.symbol,
             start_date=request.start_date,

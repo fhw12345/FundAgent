@@ -4,7 +4,6 @@ Provides technical analysis using the Stochastic Oscillator to identify overboug
 crossover signals, and potential reversals in stock price movements.
 """
 
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -13,7 +12,7 @@ from scipy.signal import find_peaks
 import structlog
 
 from ...api.models import StochasticAnalysisResponse, StochasticLevel
-from ..utils import map_timeframe_to_yfinance_interval
+from ..data.ticker_data_service import TickerDataService
 
 logger = structlog.get_logger()
 
@@ -21,8 +20,14 @@ logger = structlog.get_logger()
 class StochasticAnalyzer:
     """Stochastic Oscillator technical analysis engine."""
 
-    def __init__(self):
-        """Initialize analyzer with default parameters."""
+    def __init__(self, ticker_data_service: TickerDataService):
+        """
+        Initialize analyzer with ticker data service.
+
+        Args:
+            ticker_data_service: Service for fetching and caching ticker data
+        """
+        self.ticker_data_service = ticker_data_service
         self.data: Optional[pd.DataFrame] = None
         self.symbol: str = ""
         self.timeframe: str = "1d"
@@ -119,17 +124,23 @@ class StochasticAnalyzer:
             raise
 
     async def _fetch_stock_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> pd.DataFrame:
-        """Fetch stock data with timeframe-appropriate interval."""
+        """
+        Fetch stock data using TickerDataService.
+
+        Uses the centralized ticker data service for intelligent caching
+        and deduplication of API calls.
+        """
         try:
-            ticker = yf.Ticker(self.symbol)
-
-            # Convert our timeframe to yfinance-compatible interval
-            interval = map_timeframe_to_yfinance_interval(self.timeframe)
-
             if start_date and end_date:
-                data = ticker.history(start=start_date, end=end_date, interval=interval)
+                # Use explicit date range
+                data = await self.ticker_data_service.get_ticker_history(
+                    symbol=self.symbol,
+                    interval=self.timeframe,
+                    start_date=start_date,
+                    end_date=end_date
+                )
             else:
-                # Default periods for different timeframes
+                # Use period-based fetch (will be normalized to dates by service)
                 period_map = {
                     '1h': '60d',  # 60 days max for hourly data
                     '1d': '6mo',
@@ -137,13 +148,17 @@ class StochasticAnalyzer:
                     '1M': '5y'
                 }
                 period = period_map.get(self.timeframe, '6mo')
-                data = ticker.history(period=period, interval=interval)
+                data = await self.ticker_data_service.get_ticker_history(
+                    symbol=self.symbol,
+                    interval=self.timeframe,
+                    period=period
+                )
 
             if data.empty:
                 logger.error("No data returned for symbol", symbol=self.symbol)
                 return pd.DataFrame()
 
-            logger.info("Fetched stock data",
+            logger.info("Fetched stock data via TickerDataService",
                        symbol=self.symbol, timeframe=self.timeframe,
                        data_points=len(data), start=data.index[0], end=data.index[-1])
 
