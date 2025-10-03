@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Security
     secret_key: str = "dev-secret-key-change-in-production"
-    allowed_hosts: list[str] = ["localhost", "127.0.0.1", "0.0.0.0"]
+    allowed_hosts: list[str] = ["localhost", "127.0.0.1", "0.0.0.0", "testserver"]
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # LangSmith configuration (Factor 2: Own Your Prompts)

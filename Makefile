@@ -56,7 +56,7 @@ lint-backend:
 
 test-backend:
 	@echo "🧪 Running backend tests..."
-	cd backend && python -m pytest tests/ --cov=src --cov-report=term-missing
+	docker-compose exec backend /home/app/.local/bin/pytest tests/ --cov=src --cov-report=term-missing
 	@echo "✅ Backend tests complete"
 
 # Code Quality - Frontend

@@ -46,7 +46,7 @@ class TestDividendYieldCalculation:
             'marketCap': 2750000000000,  # 2.75T
             'trailingPE': 25.5,
             'priceToBook': 5.2,
-            'dividendYield': 0.41,  # This is 0.41% in yfinance format
+            'dividendYield': 0.0047,  # This is 0.47% in decimal format (realistic for AAPL)
             'beta': 1.1,
             'fiftyTwoWeekHigh': 198.23,
             'fiftyTwoWeekLow': 124.17,
@@ -56,11 +56,12 @@ class TestDividendYieldCalculation:
         }
 
     @pytest.mark.asyncio
-    async def test_dividend_yield_not_multiplied_by_100(self, stock_analyzer, mock_yfinance_info):
+    async def test_dividend_yield_decimal_to_percentage_conversion(self, stock_analyzer, mock_yfinance_info):
         """
-        CRITICAL REGRESSION TEST: Ensure dividend yield is not incorrectly multiplied.
+        Test dividend yield conversion from decimal to percentage format.
 
-        As per code comments, yfinance already provides percentage format.
+        yfinance returns dividend yield as decimal (0.41 = 0.41% in decimal),
+        we convert to percentage format for storage.
         """
         with patch('yfinance.Ticker') as mock_ticker:
             mock_instance = Mock()
@@ -73,7 +74,8 @@ class TestDividendYieldCalculation:
 
             result = await stock_analyzer.get_fundamentals('AAPL')
 
-            assert result.dividend_yield == 0.41, f"Dividend yield should be 0.41, got: {result.dividend_yield}"
+            # 0.0047 decimal should become 0.47 percentage
+            assert abs(result.dividend_yield - 0.47) < 0.01, f"Expected 0.47%, got {result.dividend_yield}%"
             assert 0 < result.dividend_yield < 10, f"Dividend yield {result.dividend_yield}% is unreasonable."
 
     @pytest.mark.asyncio

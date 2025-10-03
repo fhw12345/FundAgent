@@ -10,7 +10,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, HTTPException, Depends
 
-from ..core.financial_analysis import FibonacciAnalyzer, MacroAnalyzer, StockAnalyzer
+from ..core.financial_analysis import FibonacciAnalyzer, MacroAnalyzer, StockAnalyzer, StochasticAnalyzer
 from ..database.redis import RedisCache
 from .health import get_redis
 from .models import (
@@ -20,6 +20,8 @@ from .models import (
     MacroSentimentResponse,
     StockFundamentalsRequest,
     StockFundamentalsResponse,
+    StochasticAnalysisRequest,
+    StochasticAnalysisResponse,
     ChartRequest,
     ChartGenerationResponse,
     ErrorResponse,
@@ -267,6 +269,136 @@ async def stock_fundamentals(
         raise HTTPException(status_code=400, detail=f"Invalid symbol: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fundamentals analysis failed: {str(e)}")
+
+
+@router.post("/stochastic", response_model=StochasticAnalysisResponse)
+async def stochastic_analysis(
+    request: StochasticAnalysisRequest,
+    redis_cache: RedisCache = Depends(get_redis),
+) -> StochasticAnalysisResponse:
+    """
+    Perform Stochastic Oscillator technical analysis on a stock symbol.
+
+    Analyzes overbought/oversold conditions, crossover signals, and potential
+    reversals using the Stochastic Oscillator indicator.
+    """
+    request_start_time = time.time()
+
+    # Log incoming request details
+    logger.info(
+        "Stochastic analysis request received",
+        symbol=request.symbol,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        timeframe=request.timeframe,
+        k_period=request.k_period,
+        d_period=request.d_period
+    )
+
+    try:
+        # Validate date range if provided
+        validate_date_range(request.start_date, request.end_date)
+
+        # Check cache first
+        cache_start_time = time.time()
+        cache_key = f"stochastic:{request.symbol}:{request.start_date}:{request.end_date}:{request.timeframe}:{request.k_period}:{request.d_period}"
+
+        logger.info(
+            "Checking cache for Stochastic analysis",
+            cache_key=cache_key,
+            symbol=request.symbol
+        )
+
+        cached_result = await redis_cache.get(cache_key)
+        cache_check_duration = time.time() - cache_start_time
+
+        if cached_result:
+            total_duration = time.time() - request_start_time
+            logger.info(
+                "Stochastic analysis cache HIT - returning cached result",
+                symbol=request.symbol,
+                cache_key=cache_key,
+                cache_check_duration_ms=round(cache_check_duration * 1000, 2),
+                total_duration_ms=round(total_duration * 1000, 2)
+            )
+            return StochasticAnalysisResponse.model_validate(cached_result)
+
+        logger.info(
+            "Stochastic analysis cache MISS - proceeding with calculation",
+            symbol=request.symbol,
+            cache_key=cache_key,
+            cache_check_duration_ms=round(cache_check_duration * 1000, 2)
+        )
+
+        # Perform analysis
+        analysis_start_time = time.time()
+        logger.info(
+            "Starting Stochastic analysis calculation",
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            k_period=request.k_period,
+            d_period=request.d_period
+        )
+
+        analyzer = StochasticAnalyzer()
+        result = await analyzer.analyze(
+            symbol=request.symbol,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            timeframe=request.timeframe,
+            k_period=request.k_period,
+            d_period=request.d_period
+        )
+
+        analysis_duration = time.time() - analysis_start_time
+        logger.info(
+            "Stochastic analysis calculation completed",
+            symbol=result.symbol,
+            timeframe=result.timeframe,
+            current_signal=result.current_signal,
+            k_value=result.current_k,
+            d_value=result.current_d,
+            analysis_duration_ms=round(analysis_duration * 1000, 2)
+        )
+
+        # Cache the result for 5 minutes (same as technical indicators)
+        cache_store_start_time = time.time()
+        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=300)
+        cache_store_duration = time.time() - cache_store_start_time
+
+        total_duration = time.time() - request_start_time
+        logger.info(
+            "Stochastic analysis request completed successfully",
+            symbol=result.symbol,
+            cache_key=cache_key,
+            cache_stored=True,
+            cache_ttl_seconds=300,
+            cache_store_duration_ms=round(cache_store_duration * 1000, 2),
+            analysis_duration_ms=round(analysis_duration * 1000, 2),
+            total_duration_ms=round(total_duration * 1000, 2)
+        )
+
+        return result
+
+    except ValueError as e:
+        total_duration = time.time() - request_start_time
+        logger.error(
+            "Stochastic analysis request failed - invalid input",
+            symbol=request.symbol,
+            error=str(e),
+            total_duration_ms=round(total_duration * 1000, 2)
+        )
+        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
+    except Exception as e:
+        total_duration = time.time() - request_start_time
+        logger.error(
+            "Stochastic analysis request failed - unexpected error",
+            symbol=request.symbol,
+            error=str(e),
+            error_type=type(e).__name__,
+            total_duration_ms=round(total_duration * 1000, 2)
+        )
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 @router.post("/chart", response_model=ChartGenerationResponse)

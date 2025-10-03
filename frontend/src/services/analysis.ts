@@ -14,6 +14,15 @@ export interface FibonacciAnalysisRequest {
   include_chart?: boolean
 }
 
+export interface StochasticAnalysisRequest {
+  symbol: string
+  start_date?: string
+  end_date?: string
+  timeframe?: '1h' | '1d' | '1w' | '1M'
+  k_period?: number
+  d_period?: number
+}
+
 export interface MacroAnalysisRequest {
   include_sectors?: boolean
   include_indices?: boolean
@@ -63,6 +72,32 @@ export interface FibonacciAnalysisResponse {
   confidence_score: number
   pressure_zone?: Record<string, number>
   trend_strength: string
+  analysis_summary: string
+  key_insights: string[]
+  raw_data: Record<string, any>
+}
+
+export interface StochasticLevel {
+  timestamp: string
+  k_percent: number
+  d_percent: number
+  signal: 'overbought' | 'oversold' | 'neutral'
+}
+
+export interface StochasticAnalysisResponse {
+  symbol: string
+  start_date?: string
+  end_date?: string
+  timeframe: string
+  current_price: number
+  analysis_date: string
+  k_period: number
+  d_period: number
+  current_k: number
+  current_d: number
+  current_signal: 'overbought' | 'oversold' | 'neutral'
+  stochastic_levels: StochasticLevel[]
+  signal_changes: Array<Record<string, any>>
   analysis_summary: string
   key_insights: string[]
   raw_data: Record<string, any>
@@ -146,6 +181,14 @@ export const analysisService = {
   },
 
   /**
+   * Perform Stochastic Oscillator analysis
+   */
+  async stochasticAnalysis(request: StochasticAnalysisRequest): Promise<StochasticAnalysisResponse> {
+    const response = await apiClient.post<StochasticAnalysisResponse>('/api/analysis/stochastic', request)
+    return response.data
+  },
+
+  /**
    * Generate financial chart
    */
   async generateChart(request: ChartRequest): Promise<ChartGenerationResponse> {
@@ -176,7 +219,7 @@ export const analysisService = {
    * Parse user message and determine analysis intent
    */
   parseAnalysisIntent(message: string): {
-    type: 'fibonacci' | 'macro' | 'fundamentals' | 'chart' | 'unknown'
+    type: 'fibonacci' | 'macro' | 'fundamentals' | 'chart' | 'stochastic' | 'unknown'
     symbol?: string
     start_date?: string
     end_date?: string
@@ -233,6 +276,11 @@ export const analysisService = {
         lowerMessage.includes('company') || lowerMessage.includes('valuation') ||
         lowerMessage.includes('earnings') || lowerMessage.includes('dividend')) {
       return { type: 'fundamentals', symbol }
+    }
+
+    if (lowerMessage.includes('stochastic') || lowerMessage.includes('oscillator') ||
+        lowerMessage.includes('overbought') || lowerMessage.includes('oversold')) {
+      return { type: 'stochastic', symbol, start_date, end_date }
     }
 
     if (lowerMessage.includes('chart') || lowerMessage.includes('graph') ||

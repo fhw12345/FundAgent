@@ -124,6 +124,44 @@ class ChartGenerationResponse(BaseModel):
     error_message: Optional[str] = Field(None, description="Error message if generation failed")
 
 
+class StochasticLevel(BaseModel):
+    """Stochastic oscillator level reading."""
+    timestamp: str = Field(..., description="Timestamp for this reading")
+    k_percent: float = Field(..., ge=0, le=100, description="%K line value")
+    d_percent: float = Field(..., ge=0, le=100, description="%D line value")
+    signal: Literal["overbought", "oversold", "neutral"] = Field(..., description="Signal interpretation")
+
+
+class StochasticAnalysisResponse(BaseModel):
+    """Complete stochastic oscillator analysis response."""
+    symbol: str = Field(..., description="Stock symbol analyzed")
+    start_date: Optional[str] = Field(None, description="Analysis start date (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(None, description="Analysis end date (YYYY-MM-DD)")
+    timeframe: str = Field(..., description="Analysis timeframe (1h, 1d, 1w, 1M)")
+    current_price: float = Field(..., description="Current stock price")
+    analysis_date: str = Field(default_factory=lambda: datetime.utcnow().isoformat(), description="Analysis date in ISO format")
+
+    # Stochastic parameters
+    k_period: int = Field(..., description="K% period used")
+    d_period: int = Field(..., description="D% period used")
+
+    # Current readings
+    current_k: float = Field(..., ge=0, le=100, description="Current %K value")
+    current_d: float = Field(..., ge=0, le=100, description="Current %D value")
+    current_signal: Literal["overbought", "oversold", "neutral"] = Field(..., description="Current signal interpretation")
+
+    # Analysis results
+    stochastic_levels: List[StochasticLevel] = Field(..., description="Historical stochastic levels")
+    signal_changes: List[Dict[str, Any]] = Field(..., description="Signal change events (crossovers)")
+
+    # Insights
+    analysis_summary: str = Field(..., description="Human-readable analysis summary")
+    key_insights: List[str] = Field(..., description="List of key insights from the analysis")
+
+    # Metadata for debugging and advanced features
+    raw_data: Dict[str, Any] = Field(..., description="Raw calculation data for debugging")
+
+
 # Request models
 class FibonacciAnalysisRequest(BaseModel):
     """Request model for Fibonacci analysis."""
@@ -152,6 +190,16 @@ class ChartRequest(BaseModel):
     end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)", example="2024-12-31")
     chart_type: Literal["price", "fibonacci", "volume"] = Field(default="fibonacci", description="Type of chart to generate")
     include_indicators: bool = Field(default=True, description="Include technical indicators")
+
+
+class StochasticAnalysisRequest(BaseModel):
+    """Request model for stochastic oscillator analysis."""
+    symbol: str = Field(..., min_length=1, pattern=r"^\S+$", description="Stock symbol to analyze", example="AAPL")
+    start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)", example="2024-01-01")
+    end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)", example="2024-12-31")
+    timeframe: Literal["1h", "1d", "1w", "1M"] = Field(default="1d", description="Analysis timeframe (1h, 1d, 1w, 1M)", example="1d")
+    k_period: int = Field(default=14, ge=5, le=50, description="K% period for stochastic calculation", example=14)
+    d_period: int = Field(default=3, ge=2, le=20, description="D% period for signal line smoothing", example=3)
 
 
 # Error response model

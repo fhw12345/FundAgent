@@ -7,7 +7,7 @@
 import React from 'react'
 import { SymbolSearch } from '../SymbolSearch'
 import { TradingChart } from '../TradingChart'
-import { BarChart3, TrendingUp, DollarSign, Loader2, LineChart, Zap } from 'lucide-react'
+import { BarChart3, TrendingUp, DollarSign, Loader2, LineChart, Zap, Activity } from 'lucide-react'
 import { TimeInterval, PriceDataPoint } from '../../services/market'
 import type { FibonacciAnalysisResponse } from '../../services/analysis'
 
@@ -22,7 +22,7 @@ interface ChartPanelProps {
     handleSymbolSelect: (symbol: string, name: string) => void;
     handleIntervalChange: (interval: TimeInterval) => void;
     handleDateRangeSelect: (startDate: string, endDate: string) => void;
-    handleQuickAnalysis: (type: 'fibonacci' | 'fundamentals' | 'macro') => void;
+    handleQuickAnalysis: (type: 'fibonacci' | 'fundamentals' | 'macro' | 'stochastic') => void;
 }
 
 export const ChartPanel: React.FC<ChartPanelProps> = ({
@@ -90,6 +90,14 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({
                         >
                             <TrendingUp className="h-4 w-4" />
                             Macro
+                        </button>
+                        <button
+                            onClick={() => handleQuickAnalysis('stochastic')}
+                            disabled={analysisMutation.isPending}
+                            className="flex items-center gap-2 px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 text-sm"
+                        >
+                            <Activity className="h-4 w-4" />
+                            Stochastic
                         </button>
                         {selectedDateRange.start && selectedDateRange.end && (
                             <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm">

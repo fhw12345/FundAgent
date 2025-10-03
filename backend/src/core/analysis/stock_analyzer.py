@@ -82,8 +82,8 @@ class StockAnalyzer:
             pe_ratio = safe_float(info.get('trailingPE')) if info.get('trailingPE') is not None else None
             pb_ratio = safe_float(info.get('priceToBook')) if info.get('priceToBook') is not None else None
             dividend_yield_raw = safe_float(info.get('dividendYield')) if info.get('dividendYield') is not None else None
-            # yfinance already returns dividendYield as percentage (0.41 for 0.41%), no need to multiply by 100
-            dividend_yield = dividend_yield_raw if dividend_yield_raw and dividend_yield_raw > 0 else None
+            # yfinance returns dividendYield as decimal (0.025 for 2.5%), so convert to percentage
+            dividend_yield = dividend_yield_raw * 100 if dividend_yield_raw and dividend_yield_raw > 0 else None
 
             # Risk metrics
             beta = safe_float(info.get('beta')) if info.get('beta') is not None else None

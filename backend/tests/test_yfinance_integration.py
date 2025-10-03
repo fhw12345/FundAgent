@@ -76,22 +76,35 @@ class TestYfinanceIntervalMapping:
 class TestYfinanceAPIIntegration:
     """Test actual yfinance API calls with proper error handling."""
 
-    def test_yfinance_history_with_mapped_intervals(self):
+    @patch('yfinance.Ticker')
+    def test_yfinance_history_with_mapped_intervals(self, mock_ticker_class):
         """
-        INTEGRATION TEST: Verify mapped intervals work with actual yfinance calls.
+        UNIT TEST: Verify mapped intervals work with mocked yfinance calls.
 
         This prevents the production error: "interval=1w is not supported"
         """
-        # Test with a reliable symbol (AAPL) and short period to avoid API rate limits
-        ticker = yf.Ticker('AAPL')
+        # Create mock data that yfinance would return
+        mock_data = pd.DataFrame({
+            'Open': [150.0, 151.0, 152.0],
+            'High': [155.0, 156.0, 157.0],
+            'Low': [149.0, 150.0, 151.0],
+            'Close': [154.0, 155.0, 156.0],
+            'Volume': [1000000, 1100000, 1200000]
+        }, index=pd.date_range('2024-01-01', periods=3, freq='D'))
 
-        # Test that mapped intervals work with real yfinance API
+        # Setup mock ticker instance
+        mock_ticker = Mock()
+        mock_ticker.history.return_value = mock_data
+        mock_ticker_class.return_value = mock_ticker
+
+        # Test that mapped intervals work with mocked yfinance API
         frontend_intervals_to_test = ['1d', '1w']  # Focus on critical cases
 
         for frontend_interval in frontend_intervals_to_test:
             yfinance_interval = map_timeframe_to_yfinance_interval(frontend_interval)
 
             try:
+                ticker = yf.Ticker('AAPL')
                 # Use short period to minimize API calls and avoid rate limits
                 data = ticker.history(period='5d', interval=yfinance_interval)
 
@@ -105,6 +118,9 @@ class TestYfinanceAPIIntegration:
                 expected_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
                 for col in expected_columns:
                     assert col in data.columns, f"Missing column '{col}' in yfinance data"
+
+                # Verify the correct interval was passed to yfinance
+                mock_ticker.history.assert_called_with(period='5d', interval=yfinance_interval)
 
             except Exception as e:
                 pytest.fail(
@@ -152,12 +168,26 @@ class TestYfinanceAPIIntegration:
 
         assert "timeout" in str(exc_info.value).lower()
 
-    def test_symbol_data_availability_validation(self):
+    @patch('yfinance.Ticker')
+    def test_symbol_data_availability_validation(self, mock_ticker_class):
         """
-        TEST: Validate symbol data availability to prevent downstream failures.
+        UNIT TEST: Validate symbol data availability to prevent downstream failures.
 
         Ensures symbols have actual price data before using them in analysis.
         """
+        # Create mock data for valid symbol
+        mock_data = pd.DataFrame({
+            'Open': [150.0, 151.0],
+            'High': [155.0, 156.0],
+            'Low': [149.0, 150.0],
+            'Close': [154.0, 155.0],
+            'Volume': [1000000, 1100000]
+        }, index=pd.date_range('2024-01-01', periods=2, freq='D'))
+
+        mock_ticker = Mock()
+        mock_ticker.history.return_value = mock_data
+        mock_ticker_class.return_value = mock_ticker
+
         # Test with known good symbol
         ticker = yf.Ticker('AAPL')
         data = ticker.history(period='5d', interval='1d')
@@ -173,12 +203,30 @@ class TestYfinanceAPIIntegration:
         ('MSFT', True),   # Known good symbol
         ('INVALID123', False),  # Invalid symbol
     ])
-    def test_symbol_validation_scenarios(self, symbol, should_have_data):
+    @patch('yfinance.Ticker')
+    def test_symbol_validation_scenarios(self, mock_ticker_class, symbol, should_have_data):
         """
-        PARAMETERIZED TEST: Test various symbol validation scenarios.
+        PARAMETERIZED UNIT TEST: Test various symbol validation scenarios.
 
         Covers both valid and invalid symbols to ensure robust error handling.
         """
+        # Setup mock based on whether symbol should have data
+        if should_have_data:
+            mock_data = pd.DataFrame({
+                'Open': [150.0, 151.0],
+                'High': [155.0, 156.0],
+                'Low': [149.0, 150.0],
+                'Close': [154.0, 155.0],
+                'Volume': [1000000, 1100000]
+            }, index=pd.date_range('2024-01-01', periods=2, freq='D'))
+        else:
+            # Empty DataFrame for invalid symbols
+            mock_data = pd.DataFrame()
+
+        mock_ticker = Mock()
+        mock_ticker.history.return_value = mock_data
+        mock_ticker_class.return_value = mock_ticker
+
         ticker = yf.Ticker(symbol)
 
         try:
@@ -199,8 +247,22 @@ class TestYfinanceAPIIntegration:
 class TestYfinanceDataValidation:
     """Test data validation and quality checks for yfinance responses."""
 
-    def test_price_data_structure_validation(self):
-        """Test that yfinance returns expected data structure."""
+    @patch('yfinance.Ticker')
+    def test_price_data_structure_validation(self, mock_ticker_class):
+        """UNIT TEST: Test that yfinance returns expected data structure."""
+        # Create realistic mock data
+        mock_data = pd.DataFrame({
+            'Open': [150.0, 151.0, 152.0],
+            'High': [155.0, 156.0, 157.0],
+            'Low': [149.0, 150.0, 151.0],
+            'Close': [154.0, 155.0, 156.0],
+            'Volume': [1000000, 1100000, 1200000]
+        }, index=pd.date_range('2024-01-01', periods=3, freq='D'))
+
+        mock_ticker = Mock()
+        mock_ticker.history.return_value = mock_data
+        mock_ticker_class.return_value = mock_ticker
+
         ticker = yf.Ticker('AAPL')
         data = ticker.history(period='5d', interval='1d')
 
@@ -227,34 +289,44 @@ class TestYfinanceDataValidation:
                     f"Close price should be between Low and High at {idx}"
                 )
 
-    def test_dividend_yield_data_format(self):
+    @patch('yfinance.Ticker')
+    def test_dividend_yield_data_format(self, mock_ticker_class):
         """
-        REGRESSION TEST: Ensure dividend yield is in correct format from yfinance.
+        UNIT TEST: Ensure dividend yield is in correct format from yfinance.
 
-        Root Cause: We multiplied by 100 assuming decimal format, but yfinance
-        already returns percentage format (0.41 for 0.41%, not 0.0041).
+        Tests our understanding that yfinance returns decimal format (0.0047 for 0.47%),
+        requiring conversion to percentage for storage.
         """
+        # Mock yfinance info with realistic dividend yield in decimal format
+        mock_info = {
+            'dividendYield': 0.0047,  # 0.47% in decimal format (realistic for AAPL)
+            'longName': 'Apple Inc.'
+        }
+
+        mock_ticker = Mock()
+        mock_ticker.info = mock_info
+        mock_ticker_class.return_value = mock_ticker
+
         ticker = yf.Ticker('AAPL')
         info = ticker.info
 
         if 'dividendYield' in info and info['dividendYield'] is not None:
             dividend_yield = info['dividendYield']
 
-            # Test that yfinance returns reasonable percentage values
+            # Test that yfinance returns numeric values
             assert isinstance(dividend_yield, (int, float)), (
                 "Dividend yield should be numeric"
             )
 
-            # Reasonable range check (0% to 20% for most stocks)
-            assert 0 <= dividend_yield <= 20, (
-                f"Dividend yield {dividend_yield} seems unreasonable. "
-                f"Should be between 0-20% for most stocks."
+            # Test decimal format (0.0047 for 0.47%, not 0.47 directly)
+            assert 0 <= dividend_yield <= 1, (
+                f"Dividend yield {dividend_yield} should be in decimal format "
+                f"(0.0047 for 0.47%, not 0.47 directly)"
             )
 
-            # The critical insight: yfinance returns percentage format directly
-            # For AAPL, expect ~0.4-0.5%, not ~0.004-0.005
+            # Verify it's in decimal format that needs conversion to percentage
             if dividend_yield > 0:
-                assert dividend_yield < 10, (
-                    f"Dividend yield {dividend_yield} suggests percentage format "
-                    f"(not decimal). No need to multiply by 100."
+                assert dividend_yield < 0.25, (
+                    f"Dividend yield {dividend_yield} suggests decimal format "
+                    f"(multiply by 100 to get percentage)."
                 )

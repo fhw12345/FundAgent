@@ -8,7 +8,7 @@
 
 import { useMutation } from '@tanstack/react-query'
 import { analysisService } from '../../services/analysis'
-import type { FibonacciAnalysisResponse, MacroSentimentResponse, StockFundamentalsResponse } from '../../services/analysis'
+import type { FibonacciAnalysisResponse, MacroSentimentResponse, StockFundamentalsResponse, StochasticAnalysisResponse } from '../../services/analysis'
 
 // Formatting functions
 function formatFibonacciResponse(result: FibonacciAnalysisResponse): string {
@@ -133,6 +133,43 @@ ${result.beta ? `• **Beta:** ${result.beta.toFixed(2)} (volatility vs market)`
 `
 }
 
+function formatStochasticResponse(result: StochasticAnalysisResponse): string {
+    const signalEmoji = result.current_signal === 'overbought' ? '📈' :
+                       result.current_signal === 'oversold' ? '📉' : '➡️';
+
+    const analysisDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+
+    // Get recent signals (last 7 days)
+    const recentSignals = result.signal_changes.slice(-3); // Show last 3 signals
+
+    return `## ${signalEmoji} Stochastic Oscillator Analysis - ${result.symbol}
+*Analysis Date: ${analysisDate}*
+
+**Analysis Period:** ${result.start_date || 'Dynamic'} to ${result.end_date || 'Current'} (${result.timeframe} timeframe)
+**Current Price:** $${result.current_price.toFixed(2)}
+**Parameters:** %K(${result.k_period}) %D(${result.d_period})
+
+### Current Readings:
+• **%K Line:** ${result.current_k.toFixed(2)}%
+• **%D Line:** ${result.current_d.toFixed(2)}%
+• **Signal:** ${result.current_signal.toUpperCase()} ${signalEmoji}
+
+${recentSignals.length > 0 ? `### Recent Signals:
+${recentSignals.map(signal => `• **${signal.type.toUpperCase()}**: ${signal.description}`).join('\n')}
+` : ''}
+
+### Analysis Summary:
+${result.analysis_summary}
+
+### Key Insights:
+${result.key_insights.map(insight => `• ${insight}`).join('\n')}
+`;
+}
+
 
 export const useAnalysis = (
     currentSymbol: string | null,
@@ -238,8 +275,76 @@ export const useAnalysis = (
                     const fundResult = await analysisService.stockFundamentals({ symbol: analysisSymbol });
                     return { type: 'fundamentals', content: formatFundamentalsResponse(fundResult), analysis_data: fundResult };
 
+                case 'stochastic':
+                    if (!analysisSymbol) throw new Error('Please select a stock symbol first.');
+
+                    // Parse timeframe and dates from the user message to avoid closure issues
+                    let stochTimeframe = "1d";
+                    let stochStartDate = intent.start_date;
+                    let stochEndDate = intent.end_date;
+
+                    // Extract timeframe from user message patterns
+                    if (userMessage.includes('1h analysis') || userMessage.includes('Hourly analysis')) {
+                        stochTimeframe = "1h";
+                    } else if (userMessage.includes('1wk analysis') || userMessage.includes('Weekly analysis')) {
+                        stochTimeframe = "1w";
+                    } else if (userMessage.includes('1mo analysis') || userMessage.includes('Monthly analysis')) {
+                        stochTimeframe = "1M";
+                    } else if (userMessage.includes('Daily analysis')) {
+                        stochTimeframe = "1d";
+                    }
+
+                    // Extract dates from user message if present (flexible pattern)
+                    const stochDateMatch = userMessage.match(/(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/);
+                    if (stochDateMatch) {
+                        stochStartDate = stochDateMatch[1];
+                        stochEndDate = stochDateMatch[2];
+                    } else {
+                        const flexibleMatch = userMessage.match(/(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/);
+                        if (flexibleMatch && flexibleMatch[1] !== flexibleMatch[2]) {
+                            stochStartDate = flexibleMatch[1];
+                            stochEndDate = flexibleMatch[2];
+                        }
+                    }
+
+                    // If no dates found, calculate based on timeframe
+                    if (!stochStartDate || !stochEndDate) {
+                        const today = new Date();
+                        let periodsBack;
+
+                        switch (stochTimeframe) {
+                            case '1h':
+                                periodsBack = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000); // 1 month
+                                break;
+                            case '1d':
+                                periodsBack = new Date(today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000); // 6 months
+                                break;
+                            case '1w':
+                                periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000); // 1 year
+                                break;
+                            case '1M':
+                                periodsBack = new Date(today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000); // 2 years
+                                break;
+                            default:
+                                periodsBack = new Date(today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000); // 6 months
+                        }
+
+                        stochStartDate = periodsBack.toISOString().split('T')[0];
+                        stochEndDate = today.toISOString().split('T')[0];
+                    }
+
+                    const stochResult = await analysisService.stochasticAnalysis({
+                        symbol: analysisSymbol,
+                        start_date: stochStartDate,
+                        end_date: stochEndDate,
+                        timeframe: stochTimeframe as '1h' | '1d' | '1w' | '1M',
+                        k_period: 14,
+                        d_period: 3
+                    });
+                    return { type: 'stochastic', content: formatStochasticResponse(stochResult), analysis_data: stochResult };
+
                 default:
-                    throw new Error("I can help with Fibonacci, Macro, and Fundamentals analysis.");
+                    throw new Error("I can help with Fibonacci, Macro, Fundamentals, and Stochastic analysis.");
             }
         },
         onMutate: (newMessage) => {

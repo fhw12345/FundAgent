@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Send, BarChart3, TrendingUp, DollarSign, Loader2, LineChart } from 'lucide-react'
+import { Send, BarChart3, TrendingUp, DollarSign, Loader2, LineChart, Activity } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { analysisService } from '../services/analysis'
 import type { ChatMessage } from '../types/api'
-import type { FibonacciAnalysisResponse, MacroSentimentResponse, StockFundamentalsResponse } from '../services/analysis'
+import type { FibonacciAnalysisResponse, MacroSentimentResponse, StockFundamentalsResponse, StochasticAnalysisResponse } from '../services/analysis'
 
 // Formatting functions for analysis responses
 function formatFibonacciResponse(result: FibonacciAnalysisResponse): string {
@@ -101,6 +101,36 @@ ${result.key_metrics.map(metric => `• ${metric}`).join('\n')}
 `
 }
 
+function formatStochasticResponse(result: StochasticAnalysisResponse): string {
+  const signalEmoji = result.current_signal === 'overbought' ? '📈' :
+                     result.current_signal === 'oversold' ? '📉' : '➡️';
+
+  // Get recent signals (last 3 signals)
+  const recentSignals = result.signal_changes.slice(-3);
+
+  return `## ${signalEmoji} Stochastic Oscillator Analysis - ${result.symbol}
+
+**Current Price:** $${result.current_price.toFixed(2)}
+**Analysis Period:** ${result.start_date || 'Dynamic'} to ${result.end_date || 'Current'} (${result.timeframe} timeframe)
+**Parameters:** %K(${result.k_period}) %D(${result.d_period})
+
+### Current Readings:
+• **%K Line:** ${result.current_k.toFixed(2)}%
+• **%D Line:** ${result.current_d.toFixed(2)}%
+• **Signal:** ${result.current_signal.toUpperCase()} ${signalEmoji}
+
+${recentSignals.length > 0 ? `### Recent Signals:
+${recentSignals.map(signal => `• **${signal.type.toUpperCase()}**: ${signal.description}`).join('\n')}
+` : ''}
+
+### Analysis Summary:
+${result.analysis_summary}
+
+### Key Insights:
+${result.key_insights.map(insight => `• ${insight}`).join('\n')}
+`
+}
+
 export function ChatInterface() {
   const [message, setMessage] = useState('')
   const [currentSymbol, setCurrentSymbol] = useState('')
@@ -120,6 +150,7 @@ export function ChatInterface() {
 • **📈 Fibonacci Analysis** - Technical retracement levels and swing points
 • **🌍 Macro Sentiment** - VIX, market sentiment, and sector rotation
 • **📊 Stock Fundamentals** - Company metrics and valuation data
+• **⚡ Stochastic Oscillator** - Overbought/oversold conditions and momentum
 • **📉 Chart Generation** - Visual analysis with technical indicators
 
 **Quick Start:** Enter a stock symbol below (e.g., AAPL), select date range, then click any analysis button. Or type your request naturally in the chat.`,
@@ -206,6 +237,7 @@ export function ChatInterface() {
 • **Macro Sentiment** - "What's the current market sentiment?"
 • **Stock Fundamentals** - "Give me fundamentals for TSLA"
 • **Chart Generation** - "Show chart for NVDA"
+• **Stochastic Analysis** - Use the Stochastic button below
 
 Please specify a stock symbol and analysis type.`)
       }
@@ -272,10 +304,112 @@ Please specify a stock symbol and analysis type.`)
     analysisMutation.mutate(action)
   }
 
-  const handleDirectAction = (actionType: 'fibonacci' | 'fundamentals' | 'chart' | 'macro') => {
+  // Direct action mutation for button-based analyses
+  const directActionMutation = useMutation({
+    mutationFn: async (actionData: { type: string; symbol?: string; startDate?: string; endDate?: string }) => {
+      const { type, symbol, startDate, endDate } = actionData
+
+      switch (type) {
+        case 'fibonacci':
+          const fibResult = await analysisService.fibonacciAnalysis({
+            symbol: symbol!,
+            start_date: startDate,
+            end_date: endDate,
+            include_chart: true,
+          })
+          return {
+            type: 'fibonacci',
+            content: formatFibonacciResponse(fibResult),
+            analysis_data: fibResult,
+          }
+
+        case 'macro':
+          const macroResult = await analysisService.macroSentimentAnalysis({
+            include_sectors: true,
+            include_indices: true,
+          })
+          return {
+            type: 'macro',
+            content: formatMacroResponse(macroResult),
+            analysis_data: macroResult,
+          }
+
+        case 'fundamentals':
+          const fundResult = await analysisService.stockFundamentals({
+            symbol: symbol!,
+          })
+          return {
+            type: 'fundamentals',
+            content: formatFundamentalsResponse(fundResult),
+            analysis_data: fundResult,
+          }
+
+        case 'stochastic':
+          const stochResult = await analysisService.stochasticAnalysis({
+            symbol: symbol!,
+            start_date: startDate,
+            end_date: endDate,
+            timeframe: '1d', // Default timeframe
+            k_period: 14,
+            d_period: 3
+          })
+          return {
+            type: 'stochastic',
+            content: formatStochasticResponse(stochResult),
+            analysis_data: stochResult,
+          }
+
+        case 'chart':
+          const chartResult = await analysisService.generateChart({
+            symbol: symbol!,
+            start_date: startDate,
+            end_date: endDate,
+            chart_type: 'fibonacci',
+            include_indicators: true,
+          })
+          return {
+            type: 'chart',
+            content: `Generated ${chartResult.chart_type} chart for ${chartResult.symbol}`,
+            analysis_data: chartResult,
+            chart_url: chartResult.chart_url,
+          }
+
+        default:
+          throw new Error(`Unknown action type: ${type}`)
+      }
+    },
+    onMutate: (actionData) => {
+      // Add a user message showing what action was requested
+      const actionName = actionData.type.charAt(0).toUpperCase() + actionData.type.slice(1)
+      const symbolPart = actionData.symbol ? ` for ${actionData.symbol}` : ''
+      setMessages(prev => [...prev, {
+        role: 'user',
+        content: `${actionName} Analysis${symbolPart}`,
+        timestamp: new Date().toISOString()
+      }])
+    },
+    onSuccess: (response) => {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: response.content,
+        timestamp: new Date().toISOString(),
+        analysis_data: response.analysis_data
+      }])
+    },
+    onError: (error: any) => {
+      const errorContent = error?.response?.data?.detail || error.message || 'Unknown error'
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `❌ **Error**: ${errorContent}`,
+        timestamp: new Date().toISOString()
+      }])
+    },
+  })
+
+  const handleDirectAction = (actionType: 'fibonacci' | 'fundamentals' | 'chart' | 'macro' | 'stochastic') => {
     if (actionType === 'macro') {
       // Macro analysis doesn't need a symbol
-      analysisMutation.mutate('What is the current macro market sentiment?')
+      directActionMutation.mutate({ type: 'macro' })
       return
     }
 
@@ -309,20 +443,13 @@ Please specify a stock symbol and analysis type.`)
       return
     }
 
-    let query = ''
-    switch (actionType) {
-      case 'fibonacci':
-        query = `Show me Fibonacci analysis for ${currentSymbol.toUpperCase()} from ${startDate} to ${endDate}`
-        break
-      case 'fundamentals':
-        query = `Give me fundamental info for ${currentSymbol.toUpperCase()}`
-        break
-      case 'chart':
-        query = `Show chart for ${currentSymbol.toUpperCase()} from ${startDate} to ${endDate}`
-        break
-    }
-
-    analysisMutation.mutate(query)
+    // Execute direct action with current UI state
+    directActionMutation.mutate({
+      type: actionType,
+      symbol,
+      startDate,
+      endDate
+    })
   }
 
   const formatTimestamp = (timestamp: string) => {
@@ -396,7 +523,7 @@ Please specify a stock symbol and analysis type.`)
         ))}
 
         {/* Loading indicator */}
-        {analysisMutation.isPending && (
+        {(analysisMutation.isPending || directActionMutation.isPending) && (
           <div className="flex justify-start">
             <div className="bg-gray-100 px-4 py-2 rounded-lg">
               <div className="flex items-center space-x-2">
@@ -523,7 +650,7 @@ Please specify a stock symbol and analysis type.`)
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => handleDirectAction('fibonacci')}
-              disabled={analysisMutation.isPending}
+              disabled={directActionMutation.isPending}
               className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
                 currentSymbol.trim()
                   ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
@@ -535,7 +662,7 @@ Please specify a stock symbol and analysis type.`)
             </button>
             <button
               onClick={() => handleDirectAction('macro')}
-              disabled={analysisMutation.isPending}
+              disabled={directActionMutation.isPending}
               className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-50"
             >
               <TrendingUp className="h-3 w-3 mr-1" />
@@ -543,7 +670,7 @@ Please specify a stock symbol and analysis type.`)
             </button>
             <button
               onClick={() => handleDirectAction('fundamentals')}
-              disabled={analysisMutation.isPending}
+              disabled={directActionMutation.isPending}
               className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
                 currentSymbol.trim()
                   ? 'bg-purple-100 text-purple-800 hover:bg-purple-200'
@@ -555,7 +682,7 @@ Please specify a stock symbol and analysis type.`)
             </button>
             <button
               onClick={() => handleDirectAction('chart')}
-              disabled={analysisMutation.isPending}
+              disabled={directActionMutation.isPending}
               className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
                 currentSymbol.trim()
                   ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
@@ -564,6 +691,18 @@ Please specify a stock symbol and analysis type.`)
             >
               <LineChart className="h-3 w-3 mr-1" />
               Chart
+            </button>
+            <button
+              onClick={() => handleDirectAction('stochastic')}
+              disabled={directActionMutation.isPending}
+              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
+                currentSymbol.trim()
+                  ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              <Activity className="h-3 w-3 mr-1" />
+              Stochastic
             </button>
           </div>
         </div>
@@ -576,15 +715,15 @@ Please specify a stock symbol and analysis type.`)
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
             placeholder="Ask about stocks, Fibonacci analysis, market sentiment..."
-            disabled={analysisMutation.isPending}
+            disabled={analysisMutation.isPending || directActionMutation.isPending}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
           />
           <button
             onClick={handleSendMessage}
-            disabled={!message.trim() || analysisMutation.isPending}
+            disabled={!message.trim() || analysisMutation.isPending || directActionMutation.isPending}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {analysisMutation.isPending ? (
+            {(analysisMutation.isPending || directActionMutation.isPending) ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />

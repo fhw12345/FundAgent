@@ -76,7 +76,7 @@ export function EnhancedChatInterface() {
         setSelectedDateRange({ start: startDate, end: endDate });
     };
 
-    const handleQuickAnalysis = (type: 'fibonacci' | 'fundamentals' | 'macro') => {
+    const handleQuickAnalysis = (type: 'fibonacci' | 'fundamentals' | 'macro' | 'stochastic') => {
         if (type === 'macro') {
             analysisMutation.mutate('What is the current macro market sentiment?');
             return;
@@ -128,6 +128,54 @@ export function EnhancedChatInterface() {
                 const autoEndDate = today.toISOString().split('T')[0];
 
                 queryWithTimeframe = `Show me Fibonacci analysis for ${currentSymbol} (${timeframeDisplay} analysis for ${periodDescription}: ${autoStartDate} to ${autoEndDate})`;
+            }
+
+            analysisMutation.mutate(queryWithTimeframe);
+            return;
+        }
+
+        if (type === 'stochastic') {
+            // Create timeframe-specific message with current state values (not closure)
+            const timeframeDisplay = selectedInterval === '1d' ? 'Daily' :
+                                   selectedInterval === '1w' ? 'Weekly' :
+                                   selectedInterval === '1M' ? 'Monthly' : selectedInterval;
+
+            let queryWithTimeframe: string;
+
+            if (selectedDateRange.start && selectedDateRange.end) {
+                queryWithTimeframe = `Show me Stochastic analysis for ${currentSymbol} (${timeframeDisplay} analysis: ${selectedDateRange.start} to ${selectedDateRange.end})`;
+            } else {
+                // Calculate the expected date range based on current interval
+                const today = new Date();
+                let periodsBack: Date;
+                let periodDescription: string;
+
+                switch (selectedInterval) {
+                    case '1h':
+                        periodsBack = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        periodDescription = "last 30 days";
+                        break;
+                    case '1d':
+                        periodsBack = new Date(today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
+                        periodDescription = "last 6 months";
+                        break;
+                    case '1w':
+                        periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
+                        periodDescription = "last 1 year";
+                        break;
+                    case '1mo':
+                        periodsBack = new Date(today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000);
+                        periodDescription = "last 2 years";
+                        break;
+                    default:
+                        periodsBack = new Date(today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
+                        periodDescription = "last 6 months";
+                }
+
+                const autoStartDate = periodsBack.toISOString().split('T')[0];
+                const autoEndDate = today.toISOString().split('T')[0];
+
+                queryWithTimeframe = `Show me Stochastic analysis for ${currentSymbol} (${timeframeDisplay} analysis for ${periodDescription}: ${autoStartDate} to ${autoEndDate})`;
             }
 
             analysisMutation.mutate(queryWithTimeframe);
