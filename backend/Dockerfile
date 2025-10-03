@@ -43,8 +43,10 @@ COPY src/ ./src/
 ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
-# Change ownership to app user
-RUN chown -R app:app /app
+# Change ownership to app user and create .local directory
+RUN chown -R app:app /app && \
+    mkdir -p /home/app/.local && \
+    chown -R app:app /home/app/.local
 
 # Switch to non-root user
 USER app

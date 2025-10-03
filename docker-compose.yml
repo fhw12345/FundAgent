@@ -17,6 +17,7 @@ services:
       - redis
     volumes:
       - ./backend:/app
+      - backend_deps:/home/app/.local  # Persist pip user install packages
     restart: unless-stopped
 
   frontend:
@@ -53,3 +54,4 @@ services:
 volumes:
   mongodb_data:
   redis_data:
+  backend_deps:  # Persist Python packages across restarts
