@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: financial-agent-dev
+
+# Base configuration
+resources:
+- ../../base
+- alibaba-config.yaml
+- secrets.yaml
+
+# Dev environment overrides
+patchesStrategicMerge:
+- backend-dev-patch.yaml
+- frontend-dev-patch.yaml
+
+# Environment-specific labels
+commonLabels:
+  environment: dev
+
+# Dev-specific image tags
+images:
+- name: financial-agent/backend
+  newTag: dev-latest
+- name: financial-agent/frontend
+  newTag: dev-latest
+
+# Resource limits for dev
+replicas:
+- name: backend
+  count: 1
+- name: frontend
+  count: 1

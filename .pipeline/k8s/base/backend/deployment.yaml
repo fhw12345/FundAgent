@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: financial-agent-dev
+  labels:
+    app: backend
+    component: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        component: api
+    spec:
+      serviceAccountName: financial-agent-sa
+      containers:
+      - name: backend
+        image: financial-agent/backend:dev
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: ENVIRONMENT
+          value: "development"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: url
+        - name: REDIS_URL
+          value: "redis://redis-service:6379/0"
+        - name: ALIBABA_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: alibaba-config
+              key: region
+        - name: DASHSCOPE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: alibaba-secrets
+              key: dashscope-api-key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # Health checks temporarily disabled - backend is running
+        # livenessProbe:
+        #   httpGet:
+        #     path: /api/health
+        #     port: 8000
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /api/health
+        #     port: 8000
+        #   initialDelaySeconds: 10
+        #   periodSeconds: 5

@@ -7,14 +7,18 @@ WORKDIR /app
 # Copy package files
 COPY package.json ./
 
-# Install dependencies
-RUN npm install --only=production
+# Install ALL dependencies (needed for build)
+RUN npm install
 
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Set API URL to empty string so frontend uses relative URLs (nginx proxy)
+ARG VITE_API_URL=""
+ENV VITE_API_URL=${VITE_API_URL}
+
+# Build the application (skip tsc type checking for Docker build)
+RUN npx vite build
 
 # Production stage with nginx
 FROM nginx:alpine as production

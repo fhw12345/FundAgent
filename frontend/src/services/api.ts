@@ -2,8 +2,12 @@ import axios from 'axios'
 import type { HealthResponse, ChatRequest, ChatResponse } from '../types/api'
 
 // Configure axios with base URL
+// In production, use empty string for relative URLs (nginx proxy)
+// In development, use localhost
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL !== undefined
+    ? import.meta.env.VITE_API_URL
+    : (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8000'),
   timeout: 30000, // 30 seconds for analysis requests
   headers: {
     'Content-Type': 'application/json',

@@ -86,11 +86,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Security middleware
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=settings.allowed_hosts,
-    )
+    # Security middleware - only in production
+    if settings.environment == "production":
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=settings.allowed_hosts,
+        )
 
     # CORS middleware for frontend communication
     app.add_middleware(
