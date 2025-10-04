@@ -70,11 +70,11 @@ class ChatAgent:
             # Prepare conversation history for LLM
             conversation_history = self._prepare_conversation_history(session)
 
-            # Get LLM response
+            # Get LLM response (increased to 3000 tokens for comprehensive analysis)
             response = await self.llm_client.achat(
                 messages=conversation_history,
                 temperature=0.7,
-                max_tokens=2000,
+                max_tokens=3000,
             )
 
             # Add assistant response to session
@@ -94,6 +94,75 @@ class ChatAgent:
         except Exception as e:
             error_msg = f"Failed to process chat message: {str(e)}"
             logger.error("Chat processing failed", session_id=session_id, error=str(e))
+
+            # Add error message to session for context
+            session.add_message(
+                "system",
+                f"Error occurred: {error_msg}",
+            )
+            self.session_manager.update_session(session)
+
+            raise
+
+    async def stream_chat(self, session_id: str, user_message: str):
+        """
+        Process a user message and stream response chunks.
+
+        Args:
+            session_id: Chat session identifier
+            user_message: User's message
+
+        Yields:
+            str: Response content chunks as they arrive
+
+        Raises:
+            ValueError: If session not found
+        """
+        # Get session
+        session = self.session_manager.get_session(session_id)
+        if session is None:
+            raise ValueError(f"Session {session_id} not found or expired")
+
+        # Add user message to session
+        session.add_message("user", user_message)
+
+        logger.info(
+            "Processing streaming chat message",
+            session_id=session_id,
+            message_count=len(session.messages),
+        )
+
+        try:
+            # Prepare conversation history for LLM
+            conversation_history = self._prepare_conversation_history(session)
+
+            # Stream LLM response
+            full_response = ""
+            async for chunk in self.llm_client.astream_chat(
+                messages=conversation_history,
+                temperature=0.7,
+                max_tokens=3000,
+            ):
+                full_response += chunk
+                yield chunk
+
+            # Add complete assistant response to session
+            session.add_message("assistant", full_response)
+
+            # Update session in manager
+            self.session_manager.update_session(session)
+
+            logger.info(
+                "Streaming chat message completed",
+                session_id=session_id,
+                response_length=len(full_response),
+            )
+
+        except Exception as e:
+            error_msg = f"Failed to process streaming chat: {str(e)}"
+            logger.error(
+                "Streaming chat processing failed", session_id=session_id, error=str(e)
+            )
 
             # Add error message to session for context
             session.add_message(

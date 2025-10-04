@@ -3,8 +3,11 @@ Chat API endpoint for conversational financial analysis.
 Following Factor 11 & 12: Triggerable via API, Stateless Service.
 """
 
+import json
+
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..agent.chat_agent import ChatAgent
@@ -157,6 +160,106 @@ async def chat(
             status_code=500,
             detail="Failed to process chat request. Please try again.",
         ) from e
+
+
+@router.post("/stream")
+async def chat_stream(
+    request: ChatRequest,
+    agent: ChatAgent = Depends(get_chat_agent),
+) -> StreamingResponse:
+    """
+    Send a message and receive streaming response from financial analysis agent.
+
+    Returns Server-Sent Events (SSE) stream with response chunks.
+
+    **Example:**
+    ```json
+    {
+      "message": "Should I buy AAPL based on the Fibonacci levels?",
+      "session_id": "a1b2c3d4-..."
+    }
+    ```
+
+    **Response:** Stream of Server-Sent Events with incremental content
+    """
+
+    async def generate_stream():
+        """Generate SSE stream from LLM response."""
+        try:
+            # Create new session or retrieve existing
+            if request.session_id:
+                session = agent.get_session(request.session_id)
+                if session is None:
+                    # Send error event
+                    error_data = {
+                        "error": f"Session {request.session_id} not found or expired. Please start a new conversation."
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    return
+                session_id = request.session_id
+            else:
+                # Create new session
+                session = await agent.create_session()
+                session_id = session.session_id
+                logger.info("New streaming chat session created", session_id=session_id)
+
+                # Send session info to client
+                session_data = {"session_id": session_id, "type": "session_created"}
+                yield f"data: {json.dumps(session_data)}\n\n"
+
+            # Stream response chunks
+            import asyncio
+
+            async for chunk in agent.stream_chat(
+                session_id=session_id, user_message=request.message
+            ):
+                chunk_data = {"content": chunk, "type": "content"}
+                yield f"data: {json.dumps(chunk_data)}\n\n"
+                # Yield control to event loop to flush HTTP buffer immediately
+                # Without this, uvicorn batches all chunks until generator completes
+                await asyncio.sleep(0)
+
+            # Send completion event
+            updated_session = agent.get_session(session_id)
+            message_count = len(updated_session.messages) if updated_session else 0
+
+            completion_data = {
+                "type": "done",
+                "session_id": session_id,
+                "message_count": message_count,
+            }
+            yield f"data: {json.dumps(completion_data)}\n\n"
+
+            logger.info(
+                "Streaming chat completed",
+                session_id=session_id,
+                message_count=message_count,
+            )
+
+        except HTTPException as e:
+            error_data = {"error": e.detail, "type": "error"}
+            yield f"data: {json.dumps(error_data)}\n\n"
+        except ValueError as e:
+            logger.error("Streaming validation error", error=str(e))
+            error_data = {"error": str(e), "type": "error"}
+            yield f"data: {json.dumps(error_data)}\n\n"
+        except Exception as e:
+            logger.error("Streaming chat failed", error=str(e))
+            error_data = {
+                "error": "Failed to process streaming chat. Please try again.",
+                "type": "error",
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        },
+    )
 
 
 @router.get("/sessions/{session_id}", response_model=dict)

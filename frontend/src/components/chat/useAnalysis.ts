@@ -6,6 +6,7 @@
  * - Button clicks → Direct analysis endpoints
  */
 
+import { flushSync } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import { analysisService } from "../../services/analysis";
 import { chatService } from "../../services/api";
@@ -184,7 +185,7 @@ ${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
 `;
 }
 
-// Chat hook - all user messages go to LLM
+// Chat hook - streams LLM responses in real-time
 export const useAnalysis = (
   currentSymbol: string | null,
   selectedDateRange: { start: string; end: string },
@@ -197,48 +198,76 @@ export const useAnalysis = (
   return useMutation({
     mutationKey: ["chat", sessionId],
     mutationFn: async (userMessage: string) => {
-      const chatResponse = await chatService.sendMessage(
-        userMessage,
-        sessionId || undefined,
-      );
+      // Add user message immediately
+      const userMessageObj = {
+        role: "user" as const,
+        content: userMessage,
+        timestamp: new Date().toISOString(),
+      };
 
-      if (setSessionId && chatResponse.session_id !== sessionId) {
-        setSessionId(chatResponse.session_id);
-      }
+      // Create placeholder for streaming assistant message
+      const assistantMessageId = Date.now();
+      const assistantMessageObj = {
+        role: "assistant" as const,
+        content: "",
+        timestamp: new Date().toISOString(),
+        _id: assistantMessageId,
+      };
 
-      return { type: "chat", content: chatResponse.response };
-    },
-    onMutate: (newMessage) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "user",
-          content: newMessage,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    },
-    onSuccess: (response) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: response.content,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    },
-    onError: (error: any) => {
-      const errorContent =
-        error?.response?.data?.detail || error.message || "Unknown error";
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: `❌ **Error**: ${errorContent}`,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
+      setMessages((prev) => [...prev, userMessageObj, assistantMessageObj]);
+
+      // Stream response (returns cleanup function)
+      return new Promise((resolve, reject) => {
+        const cleanup = chatService.sendMessageStream(
+          userMessage,
+          sessionId || null,
+          (chunk: string) => {
+            // Use flushSync to force immediate render of each chunk
+            flushSync(() => {
+              setMessages((prev) =>
+                prev.map((msg: any) =>
+                  msg._id === assistantMessageId
+                    ? { ...msg, content: msg.content + chunk }
+                    : msg,
+                ),
+              );
+            });
+            // Force browser to repaint by reading layout (this triggers reflow)
+            document.body.offsetHeight;
+          },
+          (newSessionId: string) => {
+            // Session created callback
+            if (setSessionId) {
+              setSessionId(newSessionId);
+            }
+          },
+          (finalSessionId: string, messageCount: number) => {
+            // Stream complete
+
+            // Resolve the promise with final content
+            setMessages((prev) => {
+              const msg = prev.find((m: any) => m._id === assistantMessageId);
+              resolve({ type: "chat", content: msg?.content || "" });
+              return prev;
+            });
+          },
+          (error: string) => {
+            // Error callback
+            console.error("❌ Streaming error:", error);
+            setMessages((prev) =>
+              prev.map((msg: any) =>
+                msg._id === assistantMessageId
+                  ? {
+                      ...msg,
+                      content: `❌ **Error**: ${error}`,
+                    }
+                  : msg,
+              ),
+            );
+            reject(new Error(error));
+          },
+        );
+      });
     },
   });
 };

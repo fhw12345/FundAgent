@@ -134,6 +134,119 @@ export const chatService = {
     });
     return response.data;
   },
+
+  /**
+   * Send message with streaming response using EventSource (Server-Sent Events)
+   *
+   * @param message User message
+   * @param sessionId Optional session ID
+   * @param onChunk Callback for each content chunk
+   * @param onSessionCreated Callback when session is created
+   * @param onDone Callback when streaming completes
+   * @param onError Callback for errors
+   */
+  sendMessageStream(
+    message: string,
+    sessionId: string | null,
+    onChunk: (content: string) => void,
+    onSessionCreated?: (sessionId: string) => void,
+    onDone?: (sessionId: string, messageCount: number) => void,
+    onError?: (error: string) => void,
+  ): () => void {
+    const baseURL =
+      import.meta.env.VITE_API_URL !== undefined
+        ? import.meta.env.VITE_API_URL
+        : import.meta.env.MODE === "production"
+          ? ""
+          : "http://localhost:8000";
+
+    // EventSource doesn't support POST, so we use POST via fetch to initiate,
+    // then use EventSource with a session token if needed
+    // For simplicity with SSE + POST body, we'll stick with fetch but use a cleaner approach
+
+    // Actually, let's use fetch with ReadableStream but process it like EventSource
+    const url = `${baseURL}/api/chat/stream`;
+
+    const controller = new AbortController();
+
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(localStorage.getItem("auth_token")
+          ? { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
+          : {}),
+      },
+      body: JSON.stringify({
+        message,
+        session_id: sessionId,
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error("Response body is not readable");
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          // Decode chunk and add to buffer
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete SSE messages (delimited by \n\n)
+          const messages = buffer.split("\n\n");
+          buffer = messages.pop() || ""; // Keep incomplete message in buffer
+
+          for (const message of messages) {
+            if (message.startsWith("data: ")) {
+              const data = JSON.parse(message.slice(6));
+
+              if (data.type === "session_created" && onSessionCreated) {
+                onSessionCreated(data.session_id);
+              } else if (data.type === "content") {
+                onChunk(data.content);
+                // Yield to browser to paint (important for real-time streaming)
+                await new Promise((resolve) => setTimeout(resolve, 0));
+              } else if (data.type === "done" && onDone) {
+                onDone(data.session_id, data.message_count);
+              } else if (data.type === "error" && onError) {
+                console.error("SSE error:", data.error);
+                onError(data.error);
+              }
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          if (onError) {
+            onError(
+              error instanceof Error
+                ? error.message
+                : "Unknown streaming error",
+            );
+          }
+        }
+      });
+
+    // Return cleanup function
+    return () => {
+      controller.abort();
+    };
+  },
 };
 
 // Analysis service (future implementation)
