@@ -18,12 +18,12 @@ resources:
 
 commonLabels:
   app.kubernetes.io/name: financial-agent
-  app.kubernetes.io/version: dev
+  app.kubernetes.io/version: "0.1.0"
 
 images:
 - name: financial-agent/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/financial-agent/backend
-  newTag: dev-latest
+  newTag: "0.1.0"
 - name: financial-agent/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/financial-agent/frontend
-  newTag: dev-latest
+  newTag: "0.1.0"

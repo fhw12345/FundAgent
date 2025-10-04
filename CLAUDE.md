@@ -31,7 +31,12 @@ docs/
 │   └── verification.md         # Health checks & validation
 │
 ├── project/              # Project management
-│   └── specifications.md       # Requirements & roadmap
+│   ├── specifications.md       # Requirements & roadmap
+│   └── versions/              # 📦 Version management
+│       ├── README.md              # Versioning guidelines
+│       ├── VERSION_MATRIX.md      # Compatibility matrix
+│       ├── backend/CHANGELOG.md   # Backend version history
+│       └── frontend/CHANGELOG.md  # Frontend version history
 │
 └── troubleshooting/      # 🐛 Bug fixes & common issues
     ├── README.md                   # Troubleshooting index
@@ -62,18 +67,29 @@ cd backend && make test && make lint
 cd frontend && npm test && npm run lint
 ```
 
-### 2. Deploy to Dev
+### 2. Bump Version (Required)
 ```bash
-# Build images in Azure Container Registry
+# Every commit must increment at least one version
+./scripts/bump-version.sh backend patch   # 0.1.0 → 0.1.1
+./scripts/bump-version.sh frontend minor  # 0.1.0 → 0.2.0
+
+# Pre-commit hook validates version increment
+```
+
+### 3. Deploy to Dev
+```bash
+# Build versioned images in Azure Container Registry
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+
 az acr build --registry financialAgent \
-  --image financial-agent/backend:dev-latest \
+  --image financial-agent/backend:${BACKEND_VERSION}-dev \
   --file backend/Dockerfile backend/
 
 # Restart pods (with imagePullPolicy: Always)
 kubectl delete pod -l app=backend -n financial-agent-dev
 ```
 
-### 3. Verify
+### 4. Verify
 ```bash
 # Check deployment
 kubectl get pods -n financial-agent-dev
@@ -83,6 +99,7 @@ curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health
 ```
 
 **See [docs/deployment/workflow.md](docs/deployment/workflow.md) for complete procedures**
+**See [docs/project/versions/README.md](docs/project/versions/README.md) for versioning system**
 
 ## Code Standards
 
@@ -188,6 +205,8 @@ if "1 hour" in message: interval = "1h"
 
 ### Project Management
 - [Technical Specifications](docs/project/specifications.md) - Features & roadmap
+- [Versioning System](docs/project/versions/README.md) - Version management & workflow
+- [Version Matrix](docs/project/versions/VERSION_MATRIX.md) - Component compatibility
 
 ### Troubleshooting
 - [Troubleshooting Index](docs/troubleshooting/README.md) - Bug fixes & common issues
@@ -222,6 +241,7 @@ curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health
 
 ### ⚠️ Before Committing
 - [ ] Run `make fmt && make test && make lint`
+- [ ] **Bump version** (required): `./scripts/bump-version.sh [component] [patch|minor|major]`
 - [ ] Check data contracts (Pydantic ↔ TypeScript)
 - [ ] Verify no secrets in code
 - [ ] Test locally first

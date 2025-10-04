@@ -19,12 +19,12 @@ patchesStrategicMerge:
 commonLabels:
   environment: dev
 
-# Dev-specific image tags
+# Dev-specific image tags (version + dev suffix)
 images:
 - name: financial-agent/backend
-  newTag: dev-latest
+  newTag: "0.1.0-dev"
 - name: financial-agent/frontend
-  newTag: dev-latest
+  newTag: "0.1.0-dev"
 
 # Resource limits for dev
 replicas:
