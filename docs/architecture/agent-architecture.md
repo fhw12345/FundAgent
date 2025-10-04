@@ -52,21 +52,6 @@ class AIAnalysisService(ABC):
     async def interpret_chart(self, chart_url: str, context: dict) -> str: ...
 ```
 
-### Factor 4: Environment Parity
-```python
-# Docker Compose for dev/staging/prod consistency
-services:
-  backend:
-    image: financial-agent:${VERSION:-latest}
-    environment:
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
-  mongodb:
-    image: mongo:7.0
-  redis:
-    image: redis:7.2-alpine
-```
-
 ### Factor 5: Unified State Management
 ```python
 from dataclasses import dataclass
@@ -386,4 +371,4 @@ class FinancialToolRegistry:
         return list(self.tools.keys())
 ```
 
-This architecture ensures the financial agent follows all 12 factors while maintaining the sophisticated analysis capabilities of the original CLI tool, enhanced with conversational AI and production-ready observability.
+This architecture ensures the financial agent follows all 12 factors while maintaining sophisticated analysis capabilities, enhanced with conversational AI and production-ready observability.
