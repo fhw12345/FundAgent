@@ -11,22 +11,25 @@ This project transforms a sophisticated CLI financial analysis tool into a produ
 **Backend:**
 - FastAPI (Python 3.12) with async/await
 - MongoDB for document storage
-- Redis for caching
-- LangChain + LangGraph for AI agent orchestration
-- LangSmith for observability
+- Redis for caching and ticker data
+- DashScope Qwen LLM with streaming support
+- yfinance for market data
+- pandas/numpy for analysis
 
 **Frontend:**
 - React 18 with TypeScript 5.x
 - Vite for build tooling
-- TailwindCSS for styling
+- TailwindCSS with glassmorphism design
 - React Query for state management
-- Modern chat interface
+- Lightweight Charts for interactive charting
+- Server-Sent Events (SSE) for streaming
 
 **Infrastructure:**
 - Docker Compose for local development
-- Kubernetes for production deployment
+- Kubernetes (Azure AKS) for production deployment
 - GitHub Actions for CI/CD
-- Alibaba Cloud for hosting
+- Azure Container Registry for image hosting
+- Azure DNS for domain management
 
 ## 🚀 Quick Start
 
@@ -82,19 +85,25 @@ make clean        # Clean up Docker resources
 
 ## 📊 Financial Analysis Features
 
-### Current CLI Capabilities (Being Transformed)
-- **Fibonacci Analysis**: Retracement levels with confidence scoring
+### Technical Analysis (Production)
+- **Fibonacci Retracement**: Multi-trend detection with confidence scoring and customizable levels
+- **Stochastic Oscillator**: K%/D% signals with overbought/oversold detection
 - **Market Structure**: Swing point detection and trend analysis
-- **Macro Analysis**: VIX sentiment, sector rotation, Buffett Indicator
-- **Chart Generation**: Professional matplotlib visualizations
-- **Fundamentals**: Stock metrics and valuation data
+- **Interactive Charts**: Lightweight Charts with date range selection and Fibonacci overlays
+- **Data Caching**: Redis-based ticker data with consistent timeframe formatting
 
-### Web Platform Enhancements
-- **Conversational Interface**: Natural language financial queries
-- **AI Chart Interpretation**: Qwen-VL model for visual analysis
-- **Real-time Updates**: Live data streaming and caching
-- **User Management**: Authentication and session persistence
-- **Cloud Storage**: Chart images stored in Alibaba OSS
+### AI-Powered Analysis (Production)
+- **Conversational Interface**: Natural language financial queries via chat
+- **Real-Time Streaming**: Token-by-token LLM responses with SSE
+- **Wall Street Analyst Persona**: Expert insights with "Compact Logic Book" structure
+- **Session Management**: Context-aware chat conversations
+- **Symbol Search**: Smart search with yfinance validation
+
+### Platform Features
+- **Modern UI**: Glassmorphism design with gradient accents
+- **Responsive Layout**: Full-width trading interface with 60/40 chat/chart split
+- **Health Monitoring**: Real-time status of MongoDB, Redis, and backend services
+- **Development Workflow**: Hot reload, pre-commit hooks, automated testing
 
 ## 🤖 Agent Architecture (12-Factor Design)
 
@@ -186,22 +195,41 @@ helm install financial-agent infra/helm/financials/
 - **Automated deployment** to Alibaba Cloud ACK
 - **Progressive rollouts** with health checks
 
-## 🎯 Current Status: Walking Skeleton ✅
+## 🎯 Current Status: Production-Ready Platform ✅
 
-**Milestone 1 Complete:**
+**Milestone 1 Complete: Walking Skeleton**
 - [x] Docker Compose infrastructure
 - [x] FastAPI backend with health endpoints
 - [x] React frontend with health monitoring
 - [x] MongoDB and Redis connectivity
 - [x] End-to-end request flow verified
 
+**Milestone 2 Complete: Financial Analysis Engine**
+- [x] Fibonacci retracement analysis with multi-trend detection
+- [x] Stochastic oscillator with 100% test coverage
+- [x] Interactive TradingView charts with date range selection
+- [x] Unified ticker data caching system
+- [x] Symbol search with yfinance validation
+
+**Milestone 3 Complete: AI Integration (v0.3.0)**
+- [x] DashScope Qwen LLM integration with streaming
+- [x] Real-time token-by-token response streaming (SSE)
+- [x] Wall Street analyst persona with "Compact Logic Book" structure
+- [x] Session-based chat management
+- [x] Modern glassmorphism UI design
+
+**Milestone 4 Complete: Cloud Deployment**
+- [x] Azure AKS Kubernetes infrastructure
+- [x] CI/CD pipeline with GitHub Actions
+- [x] Azure Container Registry integration
+- [x] Automated deployment workflows
+- [x] Production-grade monitoring and health checks
+
 **Next Milestones:**
-- [ ] LangChain agent integration
-- [ ] Financial analysis API endpoints
-- [ ] Authentication and user management
+- [ ] Authentication and user management (OAuth2/OIDC)
 - [ ] Chart generation and OSS storage
-- [ ] AI model integration
-- [ ] Production deployment pipeline
+- [ ] Multi-user session isolation
+- [ ] Advanced analytics and insights
 
 ## 🤝 Contributing
 
