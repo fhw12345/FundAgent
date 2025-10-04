@@ -273,41 +273,46 @@ export function EnhancedChatInterface() {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border flex h-screen max-h-screen">
-      <div className="flex flex-col w-1/2 border-r">
-        <div className="border-b p-4 bg-gray-50">
-          <h3 className="text-lg font-medium text-gray-900">
-            Financial Analysis Chat
-          </h3>
-          <p className="text-sm text-gray-500">
-            Ask questions and request analysis
-          </p>
+    <div className="bg-white">
+      {/* Full-width trading interface */}
+      <div className="mx-auto">
+        <div className="overflow-hidden">
+          <div className="flex h-[calc(100vh-10rem)]">
+            {/* Chat Panel - Wider for better readability */}
+            <div className="flex flex-col w-full lg:w-3/5 border-r border-gray-200">
+              <ChatMessages
+                messages={messages}
+                isAnalysisPending={
+                  chatMutation.isPending || buttonMutation.isPending
+                }
+              />
+
+              <ChatInput
+                message={message}
+                setMessage={setMessage}
+                onSendMessage={handleSendMessage}
+                isPending={chatMutation.isPending || buttonMutation.isPending}
+                currentSymbol={currentSymbol}
+              />
+            </div>
+
+            {/* Chart Panel - Optimized width */}
+            <ChartPanel
+              currentSymbol={currentSymbol}
+              currentCompanyName={currentCompanyName}
+              priceDataQuery={priceDataQuery}
+              selectedInterval={selectedInterval}
+              selectedDateRange={selectedDateRange}
+              analysisMutation={buttonMutation}
+              fibonacciAnalysis={currentFibonacciAnalysis}
+              handleSymbolSelect={handleSymbolSelect}
+              handleIntervalChange={handleIntervalChange}
+              handleDateRangeSelect={handleDateRangeSelect}
+              handleQuickAnalysis={handleQuickAnalysis}
+            />
+          </div>
         </div>
-        <ChatMessages
-          messages={messages}
-          isAnalysisPending={chatMutation.isPending || buttonMutation.isPending}
-        />
-        <ChatInput
-          message={message}
-          setMessage={setMessage}
-          onSendMessage={handleSendMessage}
-          isPending={chatMutation.isPending || buttonMutation.isPending}
-          currentSymbol={currentSymbol}
-        />
       </div>
-      <ChartPanel
-        currentSymbol={currentSymbol}
-        currentCompanyName={currentCompanyName}
-        priceDataQuery={priceDataQuery}
-        selectedInterval={selectedInterval}
-        selectedDateRange={selectedDateRange}
-        analysisMutation={buttonMutation}
-        fibonacciAnalysis={currentFibonacciAnalysis}
-        handleSymbolSelect={handleSymbolSelect}
-        handleIntervalChange={handleIntervalChange}
-        handleDateRangeSelect={handleDateRangeSelect}
-        handleQuickAnalysis={handleQuickAnalysis}
-      />
     </div>
   );
 }

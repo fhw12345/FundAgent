@@ -12,15 +12,11 @@ import type { ChatMessage } from "../../types/api";
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
     role: "assistant",
-    content: `Hello! I'm your AI financial analysis assistant with enhanced charting capabilities.
+    content: `## Welcome to Financial Agent 👋
 
-🚀 **New Features:**
-• **Smart Symbol Search** - Type "Apple" or "AAPL" to find stocks instantly
-• **Interactive Charts** - Click once for start date, click again for end date
-• **Real-time Data** - Professional TradingView charts with live price feeds
-• **Multiple Timeframes** - 1H, 1D, 1W, 1M views for different analysis perspectives
+**Get Started:** Search for a stock symbol on the right (e.g., "AAPL" or "Apple") to begin your analysis.
 
-**Get Started:** Search for a stock symbol above to see its chart and start your analysis!`,
+> *Professional trading interface with AI-powered insights, interactive charts, and real-time data.*`,
     timestamp: new Date().toISOString(),
   },
 ];
