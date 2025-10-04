@@ -9,6 +9,7 @@ services:
       - ENVIRONMENT=development
       - MONGODB_URL=mongodb://mongodb:27017/financial_agent
       - REDIS_URL=redis://redis:6379
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
       - LANGSMITH_TRACING_V2=true
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY:-}
       - LANGSMITH_PROJECT=financial-agent-dev

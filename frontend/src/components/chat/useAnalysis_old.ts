@@ -1,9 +1,9 @@
 /**
  * useAnalysis Hook
  *
- * SIMPLIFIED VERSION:
- * - User chat messages → LLM (no pattern matching)
- * - Button clicks → Direct analysis endpoints
+ * This hook manages the logic for making analysis requests to the backend.
+ * It uses react-query's useMutation to handle the asynchronous nature of
+ * API calls, including loading, success, and error states.
  */
 
 import { useMutation } from "@tanstack/react-query";
@@ -35,7 +35,13 @@ ${result.raw_data.top_trends
     const magnitude = (trend.magnitude || 0).toFixed(1);
     const isMainTrend = index === 0;
 
+    // Format Fibonacci levels for this trend
     const fibLevels = trend.fibonacci_levels || [];
+
+    // Debug: log what we're receiving
+    console.log(`Trend ${index + 1}:`, trend);
+    console.log(`Fibonacci levels:`, fibLevels);
+
     const keyFibLevels = fibLevels.filter((level: any) => level.is_key_level);
 
     let fibSection = "";
@@ -46,17 +52,23 @@ ${result.raw_data.top_trends
             `   • **${level.percentage}** - $${level.price.toFixed(2)}`,
         )
         .join("\n");
-    } else if (fibLevels.length > 0) {
-      fibSection = fibLevels
-        .map(
-          (level: any) =>
-            `   • **${level.percentage}** - $${level.price.toFixed(2)}${level.is_key_level ? " 🌟" : ""}`,
-        )
-        .join("\n");
     } else {
-      fibSection = "   • No levels calculated";
+      // Debug: show all levels if no key levels found
+      if (fibLevels.length > 0) {
+        fibSection = fibLevels
+          .map(
+            (level: any) =>
+              `   • **${level.percentage}** - $${level.price.toFixed(2)}${level.is_key_level ? " 🌟" : ""}`,
+          )
+          .join("\n");
+      } else {
+        fibSection =
+          "   • No levels calculated at all - Debug: " +
+          JSON.stringify(Object.keys(trend));
+      }
     }
 
+    // Add pressure zone info for the biggest trend only
     let pressureInfo = "";
     if (isMainTrend && result.pressure_zone) {
       pressureInfo = `\n   • **Golden Zone:** $${result.pressure_zone.lower_bound.toFixed(2)} - $${result.pressure_zone.upper_bound.toFixed(2)}`;
@@ -154,7 +166,8 @@ function formatStochasticResponse(result: StochasticAnalysisResponse): string {
     day: "numeric",
   });
 
-  const recentSignals = result.signal_changes.slice(-3);
+  // Get recent signals (last 7 days)
+  const recentSignals = result.signal_changes.slice(-3); // Show last 3 signals
 
   return `## ${signalEmoji} Stochastic Oscillator Analysis - ${result.symbol}
 *Analysis Date: ${analysisDate}*
@@ -184,7 +197,6 @@ ${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
 `;
 }
 
-// Chat hook - all user messages go to LLM
 export const useAnalysis = (
   currentSymbol: string | null,
   selectedDateRange: { start: string; end: string },
@@ -197,11 +209,14 @@ export const useAnalysis = (
   return useMutation({
     mutationKey: ["chat", sessionId],
     mutationFn: async (userMessage: string) => {
+      // All user chat messages go directly to LLM
+      // Analysis is triggered via buttons which call specific endpoints
       const chatResponse = await chatService.sendMessage(
         userMessage,
         sessionId || undefined,
       );
 
+      // Update session ID if new session created
       if (setSessionId && chatResponse.session_id !== sessionId) {
         setSessionId(chatResponse.session_id);
       }
@@ -243,15 +258,13 @@ export const useAnalysis = (
   });
 };
 
-// Button analysis hook - direct API calls
+// Analysis functions for button-triggered actions
 export const useButtonAnalysis = (
   currentSymbol: string | null,
   selectedDateRange: { start: string; end: string },
   setMessages: (updater: (prevMessages: any[]) => any[]) => void,
   setSelectedDateRange: (range: { start: string; end: string }) => void,
   selectedInterval?: string,
-  sessionId?: string | null,
-  setSessionId?: (id: string) => void,
 ) => {
   return useMutation({
     mutationKey: [
@@ -264,191 +277,277 @@ export const useButtonAnalysis = (
     mutationFn: async (
       analysisType: "fibonacci" | "macro" | "fundamentals" | "stochastic",
     ) => {
-      let response;
-      let currentSessionId = sessionId;
-
-      // Create session if it doesn't exist yet (fast, no LLM call)
-      if (!currentSessionId) {
-        console.log(
-          "🆕 No session exists, creating one for algorithm results...",
-        );
-        try {
-          const sessionResponse = await chatService.createSession();
-          currentSessionId = sessionResponse.session_id;
-          if (setSessionId) {
-            setSessionId(currentSessionId);
-          }
-          console.log("✅ Session created:", currentSessionId);
-        } catch (error) {
-          console.error("❌ Failed to create session:", error);
-          // Continue without session - results will still show but won't be in LLM context
-        }
-      }
-
       switch (analysisType) {
-        case "fibonacci": {
+        case "fibonacci":
           if (!currentSymbol)
             throw new Error("Please select a stock symbol first.");
 
+          // Use current state directly (no message parsing)
           let startDate = selectedDateRange.start;
           let endDate = selectedDateRange.end;
 
-          // Calculate dates if not set
+          console.log("🔍 MUTATION DEBUG - Intent object:", intent);
+          console.log(
+            "🔍 MUTATION DEBUG - Initial dates from intent:",
+            startDate,
+            "to",
+            endDate,
+          );
+
+          // Extract timeframe from user message patterns
+          if (
+            userMessage.includes("1h analysis") ||
+            userMessage.includes("Hourly analysis")
+          ) {
+            timeframe = "1h";
+          } else if (
+            userMessage.includes("1wk analysis") ||
+            userMessage.includes("Weekly analysis")
+          ) {
+            timeframe = "1w";
+          } else if (
+            userMessage.includes("1mo analysis") ||
+            userMessage.includes("Monthly analysis")
+          ) {
+            timeframe = "1mo";
+          } else if (userMessage.includes("Daily analysis")) {
+            timeframe = "1d";
+          }
+
+          // DEBUG: Log parsed values
+          console.log("🔍 MUTATION DEBUG - Parsed timeframe:", timeframe);
+          console.log(
+            "🔍 MUTATION DEBUG - Parsed dates:",
+            startDate,
+            "to",
+            endDate,
+          );
+
+          // Extract dates from user message if present (flexible pattern)
+          // Handles formats like: "2025-08-24 to 2025-09-23" anywhere in the message
+          const dateMatch = userMessage.match(
+            /(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/,
+          );
+          if (dateMatch) {
+            startDate = dateMatch[1];
+            endDate = dateMatch[2];
+            console.log(
+              "🔍 MUTATION DEBUG - Regex matched dates:",
+              startDate,
+              "to",
+              endDate,
+            );
+          } else {
+            console.log(
+              "🔍 MUTATION DEBUG - No date regex match for message:",
+              userMessage,
+            );
+            // Try a more flexible approach
+            const flexibleMatch = userMessage.match(
+              /(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/,
+            );
+            if (flexibleMatch && flexibleMatch[1] !== flexibleMatch[2]) {
+              startDate = flexibleMatch[1];
+              endDate = flexibleMatch[2];
+              console.log(
+                "🔍 MUTATION DEBUG - Flexible regex matched dates:",
+                startDate,
+                "to",
+                endDate,
+              );
+            }
+          }
+
+          // If no dates found, calculate based on timeframe
           if (!startDate || !endDate) {
             const today = new Date();
-            let periodsBack: Date;
+            let periodsBack;
 
-            switch (selectedInterval) {
+            switch (timeframe) {
               case "1h":
                 periodsBack = new Date(
                   today.getTime() - 30 * 24 * 60 * 60 * 1000,
-                );
+                ); // 1 month
+                break;
+              case "1d":
+                periodsBack = new Date(
+                  today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
+                ); // 6 months
                 break;
               case "1w":
                 periodsBack = new Date(
                   today.getTime() - 365 * 24 * 60 * 60 * 1000,
-                );
+                ); // 1 year
                 break;
               case "1mo":
                 periodsBack = new Date(
                   today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000,
-                );
+                ); // 2 years
                 break;
               default:
                 periodsBack = new Date(
                   today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-                );
+                ); // 6 months
             }
 
             startDate = periodsBack.toISOString().split("T")[0];
             endDate = today.toISOString().split("T")[0];
           }
 
-          const result = await analysisService.fibonacciAnalysis({
-            symbol: currentSymbol,
+          const fibResult = await analysisService.fibonacciAnalysis({
+            symbol: analysisSymbol,
             start_date: startDate,
             end_date: endDate,
-            timeframe: selectedInterval || "1d",
+            timeframe: timeframe,
           });
-          response = {
+          return {
             type: "fibonacci",
-            content: formatFibonacciResponse(result),
-            analysis_data: result,
+            content: formatFibonacciResponse(fibResult),
+            analysis_data: fibResult,
           };
-          break;
-        }
 
-        case "macro": {
-          const result = await analysisService.macroSentimentAnalysis({});
-          response = { type: "macro", content: formatMacroResponse(result) };
-          break;
-        }
+        case "macro":
+          const macroResult = await analysisService.macroSentimentAnalysis({});
+          return {
+            type: "macro",
+            content: formatMacroResponse(macroResult),
+            analysis_data: macroResult,
+          };
 
-        case "fundamentals": {
-          if (!currentSymbol)
+        case "fundamentals":
+          if (!analysisSymbol)
             throw new Error("Please select a stock symbol first.");
-          const result = await analysisService.stockFundamentals({
-            symbol: currentSymbol,
+          const fundResult = await analysisService.stockFundamentals({
+            symbol: analysisSymbol,
           });
-          response = {
+          return {
             type: "fundamentals",
-            content: formatFundamentalsResponse(result),
+            content: formatFundamentalsResponse(fundResult),
+            analysis_data: fundResult,
           };
-          break;
-        }
 
-        case "stochastic": {
-          if (!currentSymbol)
+        case "stochastic":
+          if (!analysisSymbol)
             throw new Error("Please select a stock symbol first.");
 
-          let startDate = selectedDateRange.start;
-          let endDate = selectedDateRange.end;
+          // Parse timeframe and dates from the user message to avoid closure issues
+          let stochTimeframe = "1d";
+          let stochStartDate = intent.start_date;
+          let stochEndDate = intent.end_date;
 
-          if (!startDate || !endDate) {
+          // Extract timeframe from user message patterns
+          if (
+            userMessage.includes("1h analysis") ||
+            userMessage.includes("Hourly analysis")
+          ) {
+            stochTimeframe = "1h";
+          } else if (
+            userMessage.includes("1wk analysis") ||
+            userMessage.includes("Weekly analysis")
+          ) {
+            stochTimeframe = "1w";
+          } else if (
+            userMessage.includes("1mo analysis") ||
+            userMessage.includes("Monthly analysis")
+          ) {
+            stochTimeframe = "1mo";
+          } else if (userMessage.includes("Daily analysis")) {
+            stochTimeframe = "1d";
+          }
+
+          // Extract dates from user message if present (flexible pattern)
+          const stochDateMatch = userMessage.match(
+            /(\d{4}-\d{2}-\d{2})\s+to\s+(\d{4}-\d{2}-\d{2})/,
+          );
+          if (stochDateMatch) {
+            stochStartDate = stochDateMatch[1];
+            stochEndDate = stochDateMatch[2];
+          } else {
+            const flexibleMatch = userMessage.match(
+              /(\d{4}-\d{2}-\d{2}).*?(\d{4}-\d{2}-\d{2})/,
+            );
+            if (flexibleMatch && flexibleMatch[1] !== flexibleMatch[2]) {
+              stochStartDate = flexibleMatch[1];
+              stochEndDate = flexibleMatch[2];
+            }
+          }
+
+          // If no dates found, calculate based on timeframe
+          if (!stochStartDate || !stochEndDate) {
             const today = new Date();
-            let periodsBack: Date;
+            let periodsBack;
 
-            switch (selectedInterval) {
+            switch (stochTimeframe) {
               case "1h":
                 periodsBack = new Date(
                   today.getTime() - 30 * 24 * 60 * 60 * 1000,
-                );
+                ); // 1 month
+                break;
+              case "1d":
+                periodsBack = new Date(
+                  today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
+                ); // 6 months
                 break;
               case "1w":
                 periodsBack = new Date(
                   today.getTime() - 365 * 24 * 60 * 60 * 1000,
-                );
+                ); // 1 year
                 break;
               case "1mo":
                 periodsBack = new Date(
                   today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000,
-                );
+                ); // 2 years
                 break;
               default:
                 periodsBack = new Date(
                   today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-                );
+                ); // 6 months
             }
 
-            startDate = periodsBack.toISOString().split("T")[0];
-            endDate = today.toISOString().split("T")[0];
+            stochStartDate = periodsBack.toISOString().split("T")[0];
+            stochEndDate = today.toISOString().split("T")[0];
           }
 
-          const result = await analysisService.stochasticAnalysis({
-            symbol: currentSymbol,
-            start_date: startDate,
-            end_date: endDate,
-            timeframe: (selectedInterval as "1h" | "1d" | "1w" | "1mo") || "1d",
+          const stochResult = await analysisService.stochasticAnalysis({
+            symbol: analysisSymbol,
+            start_date: stochStartDate,
+            end_date: stochEndDate,
+            timeframe: stochTimeframe as "1h" | "1d" | "1w" | "1mo",
             k_period: 14,
             d_period: 3,
           });
-          response = {
+          return {
             type: "stochastic",
-            content: formatStochasticResponse(result),
-            analysis_data: result,
+            content: formatStochasticResponse(stochResult),
+            analysis_data: stochResult,
           };
-          break;
-        }
+
+        default:
+          // Fall back to general chat API
+          const chatResponse = await chatService.sendMessage(
+            userMessage,
+            sessionId || undefined,
+          );
+
+          // Update session ID if new session created
+          if (setSessionId && chatResponse.session_id !== sessionId) {
+            setSessionId(chatResponse.session_id);
+          }
+
+          return { type: "chat", content: chatResponse.response };
       }
-
-      // Sync to backend session BEFORE returning (inside mutationFn)
-      console.log("🔍 Checking session for context sync:", {
-        currentSessionId,
-        hasResponse: !!response,
-        responseType: response?.type,
-        contentLength: response?.content?.length,
-      });
-
-      if (currentSessionId && response) {
-        try {
-          console.log(
-            "📤 Sending context to backend session:",
-            currentSessionId,
-          );
-          await chatService.addContextToSession(
-            currentSessionId,
-            response.content,
-          );
-          console.log(
-            "✅ Context synced to backend session:",
-            currentSessionId,
-          );
-        } catch (error) {
-          console.error("❌ Failed to sync context to backend:", error);
-          // Non-critical error - continue anyway
-        }
-      } else {
-        console.warn("⚠️ Skipping context sync:", {
-          reason: !currentSessionId ? "No session ID" : "No response",
-          currentSessionId,
-          response: !!response,
-        });
-      }
-
-      return response;
+    },
+    onMutate: (newMessage) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "user",
+          content: newMessage,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
     },
     onSuccess: (response) => {
-      // Add to frontend messages
       setMessages((prev) => [
         ...prev,
         {

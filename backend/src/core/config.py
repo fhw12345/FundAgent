@@ -28,7 +28,9 @@ class Settings(BaseSettings):
 
     # Security
     secret_key: str = "dev-secret-key-change-in-production"
-    allowed_hosts: list[str] = ["*"]  # Allow all hosts (override via ALLOWED_HOSTS env var)
+    allowed_hosts: list[str] = [
+        "*"
+    ]  # Allow all hosts (override via ALLOWED_HOSTS env var)
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
     # LangSmith configuration (Factor 2: Own Your Prompts)
@@ -38,7 +40,8 @@ class Settings(BaseSettings):
 
     # External APIs
     openai_api_key: str = ""
-    qwen_api_key: str = ""
+    qwen_api_key: str = ""  # Legacy - use dashscope_api_key instead
+    dashscope_api_key: str = ""  # Alibaba Cloud DashScope API key
 
     # Cloud storage (Alibaba OSS)
     oss_access_key: str = ""

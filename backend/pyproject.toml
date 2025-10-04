@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "financial-agent-backend"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI-Enhanced Financial Analysis Platform Backend"
 authors = [
     {name = "Financial Agent Team", email = "team@financialagent.com"},
@@ -18,10 +18,12 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "motor>=3.3.0",           # Async MongoDB driver
     "redis>=5.0.0",
-    "langchain>=0.1.0",
-    "langchain-openai>=0.0.8",
-    "langgraph>=0.0.40",
-    "langsmith>=0.0.70",
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langgraph>=0.2.0",
+    "langsmith>=0.2.0",
+    "dashscope>=1.20.0",      # Alibaba Cloud Qwen API
     "yfinance>=0.2.0",
     "pandas>=2.1.0",
     "matplotlib>=3.8.0",
