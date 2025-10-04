@@ -28,16 +28,19 @@ if [[ "$BUMP_TYPE" != "major" ]] && [[ "$BUMP_TYPE" != "minor" ]] && [[ "$BUMP_T
     exit 1
 fi
 
-# Get current version
+# Get current version from git HEAD (last committed version)
+# This prevents version increment on failed commits
 if [[ "$COMPONENT" == "backend" ]]; then
     VERSION_FILE="backend/pyproject.toml"
-    CURRENT_VERSION=$(grep '^version = ' "$VERSION_FILE" | sed 's/version = "\(.*\)"/\1/')
+    # Try to get version from git HEAD, fall back to current file if not in git
+    CURRENT_VERSION=$(git show HEAD:"$VERSION_FILE" 2>/dev/null | grep '^version = ' | sed 's/version = "\(.*\)"/\1/' || grep '^version = ' "$VERSION_FILE" | sed 's/version = "\(.*\)"/\1/')
 else
     VERSION_FILE="frontend/package.json"
-    CURRENT_VERSION=$(node -p "require('./frontend/package.json').version")
+    # Try to get version from git HEAD, fall back to current file if not in git
+    CURRENT_VERSION=$(git show HEAD:"$VERSION_FILE" 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version" || node -p "require('./frontend/package.json').version")
 fi
 
-echo "Current $COMPONENT version: $CURRENT_VERSION"
+echo "Last committed $COMPONENT version: $CURRENT_VERSION"
 
 # Parse version
 IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
