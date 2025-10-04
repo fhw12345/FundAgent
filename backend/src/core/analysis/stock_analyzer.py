@@ -83,7 +83,18 @@ class StockAnalyzer:
             pb_ratio = safe_float(info.get('priceToBook')) if info.get('priceToBook') is not None else None
             dividend_yield_raw = safe_float(info.get('dividendYield')) if info.get('dividendYield') is not None else None
             # yfinance returns dividendYield as decimal (0.025 for 2.5%), so convert to percentage
-            dividend_yield = dividend_yield_raw * 100 if dividend_yield_raw and dividend_yield_raw > 0 else None
+            # But handle edge cases where it might already be a percentage or invalid
+            if dividend_yield_raw is not None and dividend_yield_raw > 0:
+                # If value is > 1, assume it's already a percentage (yfinance inconsistency)
+                if dividend_yield_raw > 1:
+                    dividend_yield = dividend_yield_raw
+                else:
+                    dividend_yield = dividend_yield_raw * 100
+                # Cap at reasonable max to reject bad data (max dividend yield typically < 20%)
+                if dividend_yield > 25:
+                    dividend_yield = None  # Reject unrealistic data
+            else:
+                dividend_yield = None
 
             # Risk metrics
             beta = safe_float(info.get('beta')) if info.get('beta') is not None else None
