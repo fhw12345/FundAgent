@@ -2,7 +2,11 @@
 
 ## Overview
 
-This document describes the complete workflow for deploying code changes to the Financial Agent application on Azure Kubernetes Service (AKS).
+This document describes the complete workflow for deploying code changes to the Financial Agent test environment on Azure Kubernetes Service (AKS).
+
+**Environment**: Test (`klinematrix-test` namespace)
+**Domain**: https://klinematrix.com
+**Users**: 10 beta testers
 
 ## Current Deployment Method: Manual
 
@@ -21,17 +25,23 @@ git push origin main
 
 ### Step 2: Build and Push Docker Images
 
+**Image Naming**: Use `klinematrix/` prefix with versioned tags (e.g., `test-v0.3.0`)
+
 #### Option A: Build Both Images Together
 
 ```bash
+# Get current version
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+FRONTEND_VERSION=$(grep '^version = ' frontend/package.json | sed 's/.*"version": "\(.*\)".*/\1/')
+
 # Build backend
 az acr build --registry financialAgent \
-  --image financial-agent/backend:dev-latest \
+  --image klinematrix/backend:test-v${BACKEND_VERSION} \
   --file backend/Dockerfile backend/
 
 # Build frontend
 az acr build --registry financialAgent \
-  --image financial-agent/frontend:dev-latest \
+  --image klinematrix/frontend:test-v${FRONTEND_VERSION} \
   --target production \
   --file frontend/Dockerfile frontend/
 ```
@@ -40,22 +50,33 @@ az acr build --registry financialAgent \
 
 **If you only changed backend code:**
 ```bash
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
 az acr build --registry financialAgent \
-  --image financial-agent/backend:dev-latest \
+  --image klinematrix/backend:test-v${BACKEND_VERSION} \
   --file backend/Dockerfile backend/
 ```
 
 **If you only changed frontend code:**
 ```bash
+FRONTEND_VERSION=$(grep '^version = ' frontend/package.json | sed 's/.*"version": "\(.*\)".*/\1/')
 az acr build --registry financialAgent \
-  --image financial-agent/frontend:dev-latest \
+  --image klinematrix/frontend:test-v${FRONTEND_VERSION} \
   --target production \
   --file frontend/Dockerfile frontend/
 ```
 
 **Build time**: ~2-3 minutes per image
 
-### Step 3: Deploy to Kubernetes
+### Step 3: Update Image Tags
+
+After building new images, update the tag in base kustomization:
+
+```bash
+# Edit .pipeline/k8s/base/kustomization.yaml
+# Update newTag to match the version you just built
+```
+
+### Step 4: Deploy to Kubernetes
 
 #### Option A: Restart Pods (Fastest - Recommended)
 
@@ -63,14 +84,14 @@ If your Kubernetes manifests haven't changed, just restart the pods to pull new 
 
 ```bash
 # Restart backend (if backend image was rebuilt)
-kubectl delete pod -l app=backend -n financial-agent-dev
+kubectl delete pod -l app=backend -n klinematrix-test
 
 # Restart frontend (if frontend image was rebuilt)
-kubectl delete pod -l app=frontend -n financial-agent-dev
+kubectl delete pod -l app=frontend -n klinematrix-test
 
 # Or use rollout restart
-kubectl rollout restart deployment/backend -n financial-agent-dev
-kubectl rollout restart deployment/frontend -n financial-agent-dev
+kubectl rollout restart deployment/backend -n klinematrix-test
+kubectl rollout restart deployment/frontend -n klinematrix-test
 ```
 
 **Note**: This works because `imagePullPolicy: Always` is set on both deployments.
@@ -80,16 +101,16 @@ kubectl rollout restart deployment/frontend -n financial-agent-dev
 If you modified Kubernetes manifests in `.pipeline/k8s/`:
 
 ```bash
-kubectl apply -k .pipeline/k8s/overlays/dev/
+kubectl apply -k .pipeline/k8s/overlays/test/
 ```
 
-### Step 4: Verify Deployment
+### Step 5: Verify Deployment
 
 #### Check Pod Status
 
 ```bash
 # Watch pods until they're all Running
-kubectl get pods -n financial-agent-dev
+kubectl get pods -n klinematrix-test
 
 # Expected output:
 # NAME                        READY   STATUS    RESTARTS   AGE
@@ -104,7 +125,7 @@ Wait until all pods show `1/1` in the `READY` column and `Running` in `STATUS`.
 
 ```bash
 # Backend logs
-kubectl logs -f deployment/backend -n financial-agent-dev
+kubectl logs -f deployment/backend -n klinematrix-test
 
 # Look for:
 # - "Starting Financial Agent Backend"
@@ -112,24 +133,24 @@ kubectl logs -f deployment/backend -n financial-agent-dev
 # - No errors
 
 # Frontend logs (nginx access logs)
-kubectl logs deployment/frontend -n financial-agent-dev --tail=20
+kubectl logs deployment/frontend -n klinematrix-test --tail=20
 ```
 
 #### Test Application Endpoints
 
 ```bash
 # 1. Test backend health
-curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health
+curl https://klinematrix.com/api/health
 
-# Expected: JSON with status "ok"
+# Expected: JSON with status "ok", environment "test"
 
 # 2. Test frontend
-curl -I https://financial-agent-dev.koreacentral.cloudapp.azure.com/
+curl -I https://klinematrix.com/
 
 # Expected: HTTP/2 200
 
 # 3. Test in browser
-# Open: https://financial-agent-dev.koreacentral.cloudapp.azure.com/
+# Open: https://klinematrix.com/
 # - Page loads without errors
 # - Can search for symbols
 # - Backend health shows "Connected"
@@ -146,27 +167,35 @@ git add backend/
 git commit -m "fix: Handle empty search results gracefully"
 git push origin main
 
-# 2. Build new backend image
+# 2. Bump version (required for every commit)
+./scripts/bump-version.sh backend patch  # 0.3.0 → 0.3.1
+
+# 3. Build new backend image
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
 az acr build --registry financialAgent \
-  --image financial-agent/backend:dev-latest \
+  --image klinematrix/backend:test-v${BACKEND_VERSION} \
   --file backend/Dockerfile backend/
 
 # Wait for build to complete (~2-3 minutes)
 
-# 3. Restart backend pods
-kubectl delete pod -l app=backend -n financial-agent-dev
+# 4. Update image tag in kustomization
+vim .pipeline/k8s/base/kustomization.yaml
+# Update: newTag: "test-v0.3.1"
 
-# 4. Verify new pod is running
-kubectl get pods -n financial-agent-dev -w
+# 5. Apply changes
+kubectl apply -k .pipeline/k8s/overlays/test/
+
+# 6. Verify new pod is running
+kubectl get pods -n klinematrix-test -w
 # Press Ctrl+C when backend pod shows 1/1 Running
 
-# 5. Check logs for startup
-kubectl logs deployment/backend -n financial-agent-dev --tail=30
+# 7. Check logs for startup
+kubectl logs deployment/backend -n klinematrix-test --tail=30
 
-# 6. Test the fix
-curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/market/search?q=test
+# 8. Test the fix
+curl https://klinematrix.com/api/market/search?q=test
 
-# 7. Verify in browser
+# 9. Verify in browser
 ```
 
 ## Troubleshooting Deployment Issues
@@ -175,12 +204,12 @@ curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/market/sear
 
 ```bash
 # Check pod events
-kubectl describe pod -l app=backend -n financial-agent-dev
+kubectl describe pod -l app=backend -n klinematrix-test
 
 # Common causes:
 # 1. Image doesn't exist in ACR
 #    Solution: Verify image was pushed
-az acr repository show-tags --name financialAgent --repository financial-agent/backend
+az acr repository show-tags --name financialAgent --repository klinematrix/backend
 
 # 2. ACR not attached to AKS
 #    Solution: Re-attach ACR
@@ -191,27 +220,27 @@ az aks update --resource-group FinancialAgent --name FinancialAgent-AKS --attach
 
 ```bash
 # Check logs for error
-kubectl logs deployment/backend -n financial-agent-dev --previous
+kubectl logs deployment/backend -n klinematrix-test --previous
 
 # Common causes:
 # 1. Database connection failure
-kubectl get externalsecret -n financial-agent-dev
-kubectl describe externalsecret database-secrets -n financial-agent-dev
+kubectl get secret app-secrets -n klinematrix-test
+kubectl describe secret app-secrets -n klinematrix-test
 
 # 2. Missing environment variables
-kubectl get configmap -n financial-agent-dev
-kubectl get secret -n financial-agent-dev
+kubectl get configmap -n klinematrix-test
+kubectl get secret -n klinematrix-test
 ```
 
 ### Issue: `502 Bad Gateway` from nginx
 
 ```bash
 # Backend might not be ready
-kubectl get pods -n financial-agent-dev
-kubectl logs deployment/backend -n financial-agent-dev
+kubectl get pods -n klinematrix-test
+kubectl logs deployment/backend -n klinematrix-test
 
 # Test backend directly
-kubectl exec -n financial-agent-dev deployment/backend -- curl -s http://localhost:8000/api/health
+kubectl exec -n klinematrix-test deployment/backend -- curl -s http://localhost:8000/api/health
 ```
 
 ### Issue: Changes not reflected after deployment
@@ -219,14 +248,14 @@ kubectl exec -n financial-agent-dev deployment/backend -- curl -s http://localho
 ```bash
 # 1. Verify new image was built
 az acr repository show-tags --name financialAgent \
-  --repository financial-agent/backend --orderby time_desc --output table
+  --repository klinematrix/backend --orderby time_desc --output table
 
 # 2. Verify pod is using new image
-kubectl get pod -l app=backend -n financial-agent-dev \
+kubectl get pod -l app=backend -n klinematrix-test \
   -o jsonpath='{.items[0].status.containerStatuses[0].imageID}'
 
 # 3. Force complete recreate
-kubectl delete pod -l app=backend -n financial-agent-dev
+kubectl delete pod -l app=backend -n klinematrix-test
 ```
 
 ## Deployment Checklist
@@ -270,11 +299,11 @@ If a deployment causes issues:
 
 ```bash
 # Rollback to previous deployment
-kubectl rollout undo deployment/backend -n financial-agent-dev
+kubectl rollout undo deployment/backend -n klinematrix-test
 
 # Or rollback to specific revision
-kubectl rollout history deployment/backend -n financial-agent-dev
-kubectl rollout undo deployment/backend -n financial-agent-dev --to-revision=2
+kubectl rollout history deployment/backend -n klinematrix-test
+kubectl rollout undo deployment/backend -n klinematrix-test --to-revision=2
 ```
 
 ### Full Rollback (Re-build previous version)
@@ -284,13 +313,15 @@ kubectl rollout undo deployment/backend -n financial-agent-dev --to-revision=2
 git log --oneline  # Find commit hash
 git checkout <previous-commit-hash>
 
-# 2. Rebuild images
+# 2. Rebuild images with previous version
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
 az acr build --registry financialAgent \
-  --image financial-agent/backend:dev-latest \
+  --image klinematrix/backend:test-v${BACKEND_VERSION} \
   --file backend/Dockerfile backend/
 
-# 3. Restart pods
-kubectl delete pod -l app=backend -n financial-agent-dev
+# 3. Update kustomization and apply
+vim .pipeline/k8s/base/kustomization.yaml  # Update newTag
+kubectl apply -k .pipeline/k8s/overlays/test/
 
 # 4. Return to main branch
 git checkout main
@@ -298,12 +329,13 @@ git checkout main
 
 ## Best Practices
 
-1. **Always test locally first** before building images
-2. **Use descriptive commit messages** for tracking
-3. **Deploy during low-traffic periods** when possible (pod restart causes ~5-10s downtime)
-4. **Monitor logs after deployment** for 5-10 minutes
-5. **Keep images tagged properly** (current: `:dev-latest`, future: semantic versioning)
-6. **Document issues** if rollback needed
+1. **Always test locally first** with Docker Compose before building images
+2. **Bump version** for every commit (enforced by pre-commit hook)
+3. **Use versioned tags** (e.g., `test-v0.3.0`) for test stability
+4. **Deploy during low-traffic periods** when possible (pod restart causes ~5-10s downtime)
+5. **Monitor logs after deployment** for 5-10 minutes
+6. **Update kustomization tags** after building new images
+7. **Document issues** if rollback needed
 
 ## Useful Aliases
 
@@ -312,17 +344,23 @@ Add these to your `~/.bashrc` or `~/.zshrc`:
 ```bash
 # Kubernetes shortcuts
 alias k='kubectl'
-alias kgp='kubectl get pods -n financial-agent-dev'
-alias kgpw='kubectl get pods -n financial-agent-dev -w'
-alias klb='kubectl logs -f deployment/backend -n financial-agent-dev'
-alias krb='kubectl delete pod -l app=backend -n financial-agent-dev'
-alias krf='kubectl delete pod -l app=frontend -n financial-agent-dev'
+alias kgp='kubectl get pods -n klinematrix-test'
+alias kgpw='kubectl get pods -n klinematrix-test -w'
+alias klb='kubectl logs -f deployment/backend -n klinematrix-test'
+alias krb='kubectl delete pod -l app=backend -n klinematrix-test'
+alias krf='kubectl delete pod -l app=frontend -n klinematrix-test'
 
 # Deployment shortcuts
-alias build-backend='az acr build --registry financialAgent --image financial-agent/backend:dev-latest --file backend/Dockerfile backend/'
-alias build-frontend='az acr build --registry financialAgent --image financial-agent/frontend:dev-latest --target production --file frontend/Dockerfile frontend/'
-alias deploy-dev='kubectl apply -k .pipeline/k8s/overlays/dev/'
+alias build-backend='BACKEND_VERSION=$(grep "^version = " backend/pyproject.toml | sed "s/version = \"\(.*\)\"/\1/"); az acr build --registry financialAgent --image klinematrix/backend:test-v${BACKEND_VERSION} --file backend/Dockerfile backend/'
+alias build-frontend='FRONTEND_VERSION=$(grep "\"version\":" frontend/package.json | sed "s/.*\"version\": \"\(.*\)\".*/\1/"); az acr build --registry financialAgent --image klinematrix/frontend:test-v${FRONTEND_VERSION} --target production --file frontend/Dockerfile frontend/'
+alias deploy-test='kubectl apply -k .pipeline/k8s/overlays/test/'
 
 # Health check
-alias health='curl -s https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health | jq .'
+alias health='curl -s https://klinematrix.com/api/health | jq .'
 ```
+
+## Related Documentation
+
+- [Resource Inventory](RESOURCE_INVENTORY.md) - All Azure and K8s resources
+- [Migration Guide](MIGRATION_DEV_TO_TEST.md) - How we got to test environment
+- [Infrastructure](infrastructure.md) - Architecture overview

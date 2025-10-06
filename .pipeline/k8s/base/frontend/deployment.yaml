@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-  namespace: financial-agent-dev
   labels:
     app: frontend
     component: ui
@@ -19,7 +18,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: financial-agent/frontend:dev
+        image: klinematrix/frontend:test
         imagePullPolicy: Always
         ports:
         - containerPort: 80

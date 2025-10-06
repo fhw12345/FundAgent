@@ -68,10 +68,11 @@ class RedisCache:
         try:
             value = await self.client.get(key)
             if value:
-                return json.loads(value)
-            return None
-        except json.JSONDecodeError:
-            logger.warning("Failed to decode JSON from Redis", key=key)
+                # Try JSON decode, fallback to plain string
+                try:
+                    return json.loads(value)
+                except json.JSONDecodeError:
+                    return value  # Return as plain string
             return None
         except Exception as e:
             logger.error("Redis get operation failed", key=key, error=str(e))
@@ -93,6 +94,21 @@ class RedisCache:
             return True
         except Exception as e:
             logger.error("Redis set operation failed", key=key, error=str(e))
+            return False
+
+    async def setex(self, key: str, ttl_seconds: int, value: str) -> bool:
+        """
+        Set key with TTL (Redis SETEX command).
+        For simple string values without JSON encoding.
+        """
+        if not self.client:
+            raise RuntimeError("Redis connection not established")
+
+        try:
+            await self.client.setex(key, ttl_seconds, value)
+            return True
+        except Exception as e:
+            logger.error("Redis setex operation failed", key=key, error=str(e))
             return False
 
     async def delete(self, key: str) -> bool:

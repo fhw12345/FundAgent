@@ -2,7 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 metadata:
-  name: financial-agent-base
+  name: klinematrix-base
 
 resources:
 - namespace.yaml
@@ -15,15 +15,17 @@ resources:
 - redis/service.yaml
 - redis/configmap.yaml
 - redis/secret.yaml
+- ingress/clusterissuer.yaml
+- ingress/ingress.yaml
 
 commonLabels:
-  app.kubernetes.io/name: financial-agent
-  app.kubernetes.io/version: "0.1.0"
+  app.kubernetes.io/name: klinematrix
+  app.kubernetes.io/version: "0.3.0"
 
 images:
-- name: financial-agent/backend
-  newName: financialagent-gxftdbbre4gtegea.azurecr.io/financial-agent/backend
-  newTag: "0.1.0"
-- name: financial-agent/frontend
-  newName: financialagent-gxftdbbre4gtegea.azurecr.io/financial-agent/frontend
-  newTag: "0.1.0"
+- name: klinematrix/backend
+  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend
+  newTag: "test-v0.3.0"
+- name: klinematrix/frontend
+  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend
+  newTag: "test-v0.3.0"

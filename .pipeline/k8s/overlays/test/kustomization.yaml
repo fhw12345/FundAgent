@@ -2,7 +2,10 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 metadata:
-  name: financial-agent-dev
+  name: klinematrix-test
+
+# Override namespace
+namespace: klinematrix-test
 
 # Base configuration
 resources:
@@ -10,23 +13,23 @@ resources:
 - alibaba-config.yaml
 - secrets.yaml
 
-# Dev environment overrides
+# Test environment overrides
 patchesStrategicMerge:
-- backend-dev-patch.yaml
-- frontend-dev-patch.yaml
+- backend-test-patch.yaml
+- frontend-test-patch.yaml
 
 # Environment-specific labels
 commonLabels:
-  environment: dev
+  environment: test
 
-# Dev-specific image tags (version + dev suffix)
+# Test-specific image tags (versioned for stability)
 images:
 - name: financial-agent/backend
-  newTag: "0.1.0-dev"
+  newTag: "test-v0.3.0"
 - name: financial-agent/frontend
-  newTag: "0.1.0-dev"
+  newTag: "test-v0.3.0"
 
-# Resource limits for dev
+# Resource limits for test (10 beta users)
 replicas:
 - name: backend
   count: 1

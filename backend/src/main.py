@@ -14,6 +14,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from .agent.session_manager import get_session_manager
 from .api.analysis import router as analysis_router
+from .api.auth import router as auth_router
 from .api.chat import router as chat_router
 from .api.health import router as health_router
 from .api.market_data import router as market_data_router
@@ -113,6 +114,7 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(health_router, prefix="/api", tags=["health"])
+    app.include_router(auth_router)
     app.include_router(analysis_router)
     app.include_router(market_data_router)
     app.include_router(chat_router)

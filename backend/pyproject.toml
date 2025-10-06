@@ -16,6 +16,7 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
+    "email-validator>=2.1.0",           # Email validation for pydantic
     "motor>=3.3.0",           # Async MongoDB driver
     "redis>=5.0.0",
     "langchain>=0.3.0",
@@ -34,6 +35,7 @@ dependencies = [
     "python-multipart>=0.0.6",         # File uploads
     "httpx>=0.25.0",                    # Async HTTP client
     "tenacity>=8.2.0",                  # Retry logic
+    "tencentcloud-sdk-python-ses>=3.0.0",  # Tencent Cloud SES for email
 ]
 
 [project.optional-dependencies]

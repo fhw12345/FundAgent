@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: alibaba-config
-  namespace: financial-agent-dev
+  namespace: klinematrix-test
 data:
   region: "cn-hangzhou"
   endpoint: "https://dashscope.cn-hangzhou.aliyuncs.com"

@@ -64,6 +64,6 @@ class MongoDB:
 
     def get_collection(self, collection_name: str):
         """Get a MongoDB collection."""
-        if not self.database:
+        if self.database is None:
             raise RuntimeError("Database connection not established")
         return self.database[collection_name]

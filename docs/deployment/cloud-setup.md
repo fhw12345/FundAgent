@@ -15,6 +15,10 @@
 - **OSS (Object Storage)**: Chart storage and file management
 - **DashScope API**: AI model access
 
+### Third-Party Services
+- **Cloudflare**: DNS management and domain registration (`klinematrix.com`)
+- **SendGrid (Twilio)**: Transactional email delivery service
+
 ### Rationale for Hybrid Approach
 1. **Best-of-Breed Services**: Leverage Azure's enterprise Kubernetes platform with Alibaba's cutting-edge AI models
 2. **Cost Optimization**: Use Alibaba Cloud's competitive pricing for storage and AI inference
@@ -63,6 +67,7 @@
 - **Secrets to Store**:
   - `mongodb-url`: Cosmos DB connection string
   - `dashscope-api-key`: Alibaba Cloud DashScope API key
+  - `sendgrid-api-key`: SendGrid API key for email delivery
 
 #### Azure Container Registry (ACR)
 - **Registry Name**: `financialAgent`
@@ -349,6 +354,88 @@ Total: ~$60-250/month
 3. **AKS Cluster Failure**: Redeploy from manifests to new cluster
 4. **Complete Region Failure**: Deploy to secondary region
 
+## DNS and Email Configuration
+
+### Cloudflare DNS Setup
+
+#### Domain Registration
+1. **Register domain** at https://www.cloudflare.com/products/registrar/
+   - Domain: `klinematrix.com`
+   - Cost: ~$9/year (at-cost pricing)
+   - Includes: Free WHOIS privacy, automatic DNS management
+
+#### DNS Records Configuration
+Add the following records in Cloudflare DNS dashboard:
+
+**Application Access:**
+```
+Type: A
+Name: @
+Content: 4.217.130.195
+Proxy: DNS only (gray cloud)
+
+Type: A
+Name: www
+Content: 4.217.130.195
+Proxy: DNS only (gray cloud)
+```
+
+**Email Authentication (SendGrid):**
+```
+Type: TXT
+Name: @
+Content: v=spf1 include:sendgrid.net ~all
+TTL: Auto
+
+Type: TXT
+Name: _dmarc
+Content: v=DMARC1; p=none; rua=mailto:dmarc@klinematrix.com
+TTL: Auto
+
+Type: CNAME
+Name: s1._domainkey
+Target: s1.domainkey.u10419013.wl014.sendgrid.net
+Proxy: DNS only
+
+Type: CNAME
+Name: s2._domainkey
+Target: s2.domainkey.u10419013.wl014.sendgrid.net
+Proxy: DNS only
+```
+
+### SendGrid Email Service Setup
+
+#### Account Setup
+1. Create account at https://sendgrid.com (free tier: 100 emails/day)
+2. Verify email address
+
+#### Domain Authentication
+1. Settings → Sender Authentication → Authenticate Your Domain
+2. DNS Host: Other (Cloudflare)
+3. Domain: `klinematrix.com`
+4. Add generated CNAME records to Cloudflare
+5. Click Verify
+
+#### API Key Creation
+```bash
+# Create API key in SendGrid dashboard
+# Settings → API Keys → Create API Key
+# Name: klinematrix-production
+# Permissions: Mail Send (minimum) or Full Access
+
+# Store in Azure Key Vault
+az keyvault secret set \
+  --vault-name financial-agent-dev-kv \
+  --name sendgrid-api-key \
+  --value "SG.xxxxxxxxxxxxx"
+```
+
+#### Email Authentication Explained
+- **SPF**: Authorizes SendGrid's servers to send email from your domain
+- **DKIM**: Cryptographic signature proving email authenticity
+- **DMARC**: Policy for handling authentication failures
+- **Purpose**: Prevents emails from going to spam, required by Gmail/Yahoo
+
 ## Quick Start Commands
 
 ### Initial Setup (One-time)
@@ -375,5 +462,5 @@ kubectl logs -f deployment/backend -n financial-agent-dev
 kubectl apply -k .pipeline/k8s/overlays/dev/
 
 # Health check
-curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health
+curl https://klinematrix.com/api/health
 ```

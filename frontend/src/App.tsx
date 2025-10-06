@@ -1,10 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HealthCheck } from "./components/HealthCheck";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
+import { LoginPage } from "./components/LoginPage";
+import { authStorage } from "./services/authService";
 import "./App.css";
 
 function App() {
-  const [activeTab, setActiveTab] = useState<"health" | "chat">("health");
+  const [activeTab, setActiveTab] = useState<"health" | "chat">("chat");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState("");
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const token = authStorage.getToken();
+    const user = authStorage.getUser();
+
+    if (token && user) {
+      setIsAuthenticated(true);
+      setUsername(user.username);
+    }
+  }, []);
+
+  const handleLoginSuccess = () => {
+    const user = authStorage.getUser();
+    if (user) {
+      setUsername(user.username);
+    }
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    authStorage.clear();
+    setIsAuthenticated(false);
+    setUsername("");
+  };
+
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
@@ -18,14 +52,14 @@ function App() {
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent tracking-tight">
-                  Financial Agent
+                  Klinematrix
                 </h1>
                 <span className="text-xs font-medium text-gray-500">
-                  AI-Powered Analytics
+                  AI-Powered Financial Intelligence
                 </span>
               </div>
             </div>
-            <nav className="flex gap-2">
+            <nav className="flex items-center gap-2">
               <button
                 onClick={() => setActiveTab("health")}
                 className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
@@ -46,6 +80,17 @@ function App() {
               >
                 Platform
               </button>
+              <div className="ml-4 flex items-center gap-3 pl-4 border-l border-gray-200">
+                <span className="text-sm text-gray-700">
+                  👤 {username}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100/80 rounded-lg transition-all"
+                >
+                  Logout
+                </button>
+              </div>
             </nav>
           </div>
         </div>
@@ -76,7 +121,7 @@ function App() {
       <footer className="bg-white border-t mt-auto">
         <div className="mx-auto py-4 px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500">
-            Financial Agent Platform - AI-Enhanced Financial Analysis
+            Klinematrix - AI-Powered Financial Intelligence
           </p>
         </div>
       </footer>

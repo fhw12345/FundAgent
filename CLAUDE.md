@@ -95,7 +95,7 @@ kubectl delete pod -l app=backend -n financial-agent-dev
 kubectl get pods -n financial-agent-dev
 
 # Test endpoints
-curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health
+curl https://klinematrix.com/api/health
 ```
 
 **See [docs/deployment/workflow.md](docs/deployment/workflow.md) for complete procedures**
@@ -234,7 +234,7 @@ az acr build --registry financialAgent --image financial-agent/backend:dev-lates
 az acr build --registry financialAgent --image financial-agent/frontend:dev-latest --target production --file frontend/Dockerfile frontend/
 
 # Health Checks
-curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health
+curl https://klinematrix.com/api/health
 ```
 
 ## Important Reminders

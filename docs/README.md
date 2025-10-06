@@ -24,6 +24,8 @@ Infrastructure setup and deployment procedures.
 - **[Cloud Setup](deployment/cloud-setup.md)**: Hybrid cloud architecture with Azure and Alibaba Cloud, including setup instructions and cost estimates
 - **[Infrastructure Overview](deployment/infrastructure.md)**: Kubernetes resources, network topology, and operational commands
 - **[Deployment Workflow](deployment/workflow.md)**: Manual deployment procedures, troubleshooting, and rollback strategies
+- **[Resource Inventory](deployment/RESOURCE_INVENTORY.md)**: Complete list of all Azure and Kubernetes resources
+- **[Dev→Test Migration](deployment/MIGRATION_DEV_TO_TEST.md)**: Migration guide from dev to test environment
 
 ### Development
 Developer guides and best practices.
@@ -117,22 +119,34 @@ make fmt && make test && make lint
 
 ## Deployment Environments
 
-### Development
-- **Platform**: Docker Compose (local) or AKS dev namespace
-- **Database**: In-cluster MongoDB
-- **Cache**: In-cluster Redis (non-persistent)
-- **URL**: http://localhost:3000 (local)
+### Local Development
+- **Platform**: Docker Compose (developer machine)
+- **Database**: Local MongoDB container
+- **Cache**: Local Redis container
+- **Email**: Bypass mode (no real emails)
+- **Secrets**: `.env.development`
+- **URL**: http://localhost:3000
+- **Note**: Never deployed to K8s
 
-### Staging
-- **Platform**: AKS dedicated namespace
-- **Database**: Azure Cosmos DB (dev instance)
-- **URL**: https://financial-agent-dev.koreacentral.cloudapp.azure.com
+### Test (Cloud - Current)
+- **Platform**: AKS (`klinematrix-test` namespace)
+- **Database**: Azure Cosmos DB (`klinematrix_test` database)
+- **Cache**: In-cluster Redis
+- **Email**: Tencent Cloud SES API (real email verification)
+- **Secrets**: Azure Key Vault (`klinematrix-test-kv`)
+- **URL**: https://klinematrix.com
+- **Users**: 10 beta testers
+- **Images**: `klinematrix/backend:test-v0.3.0`, `klinematrix/frontend:test-v0.3.0`
 
 ### Production (Planned)
-- **Platform**: AKS multi-region
-- **Database**: Azure Cosmos DB (production, multi-region)
-- **Cache**: ApsaraDB for Redis (managed)
+- **Platform**: AKS multi-region (`klinematrix-prod` namespace)
+- **Database**: Azure Cosmos DB (`klinematrix_prod` database, multi-region)
+- **Cache**: In-cluster Redis (persistent)
+- **Email**: Tencent Cloud SES API (production)
+- **Secrets**: Azure Key Vault (`klinematrix-prod-kv`)
+- **URL**: https://klinematrix.com (same domain, different namespace)
 - **CDN**: Global content delivery
+- **Images**: `klinematrix/backend:v1.0.0`, `klinematrix/frontend:v1.0.0` (no "test-" prefix)
 
 ## Documentation Maintenance
 
@@ -180,19 +194,26 @@ For questions, issues, or contributions:
 
 ## Version History
 
-- **v0.1.0** (Current): Walking skeleton complete
+- **v0.3.0** (Current): Test environment ready
+  - Authentication with email verification
+  - LLM chat integration with streaming responses
+  - Modernized glassmorphism UI
+  - Test deployment at https://klinematrix.com
+  - Clean environment separation (local dev vs cloud test)
+
+- **v0.2.0**: Agent core
+  - LangChain integration
+  - Financial analysis tools
+  - Conversational interface
+
+- **v0.1.0**: Walking skeleton complete
   - End-to-end connectivity
   - Health monitoring
   - Basic infrastructure
   - Documentation organization
 
-- **v0.2.0** (Planned): Agent core
-  - LangChain integration
-  - Financial analysis tools
-  - Conversational interface
-
 - **v1.0.0** (Future): Production release
-  - Authentication
-  - AI interpretation
-  - Full deployment
+  - AI chart interpretation
+  - Production deployment
   - Performance optimization
+  - Multi-user support
