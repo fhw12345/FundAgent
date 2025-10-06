@@ -4,8 +4,9 @@ Run with: python -m scripts.init_indexes
 """
 
 import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
+
 import structlog
+from motor.motor_asyncio import AsyncIOMotorClient
 
 logger = structlog.get_logger()
 

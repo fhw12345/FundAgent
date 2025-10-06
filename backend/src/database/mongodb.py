@@ -55,7 +55,9 @@ class MongoDB:
             return {
                 "connected": True,
                 "version": server_info.get("version", "unknown"),
-                "database": self.database.name if self.database is not None else "unknown",
+                "database": (
+                    self.database.name if self.database is not None else "unknown"
+                ),
             }
 
         except Exception as e:

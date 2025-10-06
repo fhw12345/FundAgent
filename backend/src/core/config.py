@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         # Load base first, then environment-specific override
         env_file=[
-            ".env.base",              # Common defaults (committed)
-            f".env.{ENV}",            # Environment overrides (gitignored)
+            ".env.base",  # Common defaults (committed)
+            f".env.{ENV}",  # Environment overrides (gitignored)
         ],
         env_file_encoding="utf-8",
         case_sensitive=False,

@@ -5,12 +5,13 @@ Handles JWT tokens and delegates verification to auth providers (email, SMS, WeC
 
 from datetime import datetime, timedelta
 from typing import Literal
-from jose import JWTError, jwt
-import structlog
 
+import structlog
+from jose import JWTError, jwt
+
+from ..core.config import get_settings
 from ..database.repositories.user_repository import UserRepository
 from ..models.user import User, UserCreate
-from ..core.config import get_settings
 from .auth_providers import EmailAuthProvider
 
 logger = structlog.get_logger()
@@ -158,7 +159,9 @@ class AuthService:
         """
         try:
             # Decode JWT
-            payload = jwt.decode(token, settings.secret_key, algorithms=[self.ALGORITHM])
+            payload = jwt.decode(
+                token, settings.secret_key, algorithms=[self.ALGORITHM]
+            )
 
             # Extract user ID
             user_id: str = payload.get("sub")

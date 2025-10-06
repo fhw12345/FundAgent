@@ -5,6 +5,7 @@ Everything is a message - user text, LLM responses, and analysis results.
 
 from datetime import datetime
 from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -19,7 +20,9 @@ class MessageMetadata(BaseModel):
     timeframe: str | None = Field(None, description="Analysis timeframe")
 
     # Fibonacci-specific
-    fibonacci_levels: list[dict] | None = Field(None, description="Fibonacci retracement levels")
+    fibonacci_levels: list[dict] | None = Field(
+        None, description="Fibonacci retracement levels"
+    )
     trend_direction: str | None = Field(None, description="uptrend or downtrend")
     swing_high: dict | None = Field(None, description="Swing high price and date")
     swing_low: dict | None = Field(None, description="Swing low price and date")
@@ -74,7 +77,9 @@ class Message(BaseModel):
     message_id: str = Field(..., description="Unique message identifier")
     chat_id: str = Field(..., description="Chat this message belongs to")
 
-    role: Literal["user", "assistant", "system"] = Field(..., description="Message role")
+    role: Literal["user", "assistant", "system"] = Field(
+        ..., description="Message role"
+    )
     content: str = Field(..., description="Message text content")
     source: Literal["user", "llm", "fibonacci", "stochastic", "macro"] = Field(
         ..., description="Message source/type"
@@ -82,7 +87,8 @@ class Message(BaseModel):
 
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: MessageMetadata = Field(
-        default_factory=MessageMetadata, description="Flexible metadata for analysis data"
+        default_factory=MessageMetadata,
+        description="Flexible metadata for analysis data",
     )
 
     class Config:

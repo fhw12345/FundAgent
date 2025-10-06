@@ -3,6 +3,7 @@ User models for authentication and user management.
 """
 
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 

@@ -3,7 +3,7 @@
  * Handles verification code sending, verification, and JWT token management.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export interface User {
   user_id: string;
@@ -29,21 +29,23 @@ export interface SendCodeResponse {
 /**
  * Send verification code to email
  */
-export async function sendVerificationCode(email: string): Promise<SendCodeResponse> {
+export async function sendVerificationCode(
+  email: string,
+): Promise<SendCodeResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/send-code`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      auth_type: 'email',
+      auth_type: "email",
       identifier: email,
     }),
   });
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Failed to send verification code');
+    throw new Error(error.detail || "Failed to send verification code");
   }
 
   return response.json();
@@ -54,15 +56,15 @@ export async function sendVerificationCode(email: string): Promise<SendCodeRespo
  */
 export async function verifyCodeAndLogin(
   email: string,
-  code: string
+  code: string,
 ): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/verify-code`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      auth_type: 'email',
+      auth_type: "email",
       identifier: email,
       code: code,
     }),
@@ -70,7 +72,7 @@ export async function verifyCodeAndLogin(
 
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || 'Failed to verify code');
+    throw new Error(error.detail || "Failed to verify code");
   }
 
   return response.json();
@@ -81,14 +83,14 @@ export async function verifyCodeAndLogin(
  */
 export async function getCurrentUser(token: string): Promise<User> {
   const response = await fetch(`${API_BASE_URL}/api/auth/me?token=${token}`, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
   });
 
   if (!response.ok) {
-    throw new Error('Invalid or expired token');
+    throw new Error("Invalid or expired token");
   }
 
   return response.json();
@@ -99,28 +101,28 @@ export async function getCurrentUser(token: string): Promise<User> {
  */
 export const authStorage = {
   getToken(): string | null {
-    return localStorage.getItem('auth_token');
+    return localStorage.getItem("auth_token");
   },
 
   setToken(token: string): void {
-    localStorage.setItem('auth_token', token);
+    localStorage.setItem("auth_token", token);
   },
 
   removeToken(): void {
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem("auth_token");
   },
 
   getUser(): User | null {
-    const userStr = localStorage.getItem('auth_user');
+    const userStr = localStorage.getItem("auth_user");
     return userStr ? JSON.parse(userStr) : null;
   },
 
   setUser(user: User): void {
-    localStorage.setItem('auth_user', JSON.stringify(user));
+    localStorage.setItem("auth_user", JSON.stringify(user));
   },
 
   removeUser(): void {
-    localStorage.removeItem('auth_user');
+    localStorage.removeItem("auth_user");
   },
 
   clear(): void {

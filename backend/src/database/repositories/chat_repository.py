@@ -4,8 +4,9 @@ Handles CRUD operations for chat collection with UI state management.
 """
 
 from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorCollection
+
 import structlog
+from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.chat import Chat, ChatCreate, ChatUpdate, UIState
 
@@ -36,6 +37,7 @@ class ChatRepository:
         """
         # Generate chat_id
         import uuid
+
         chat_id = f"chat_{uuid.uuid4().hex[:12]}"
 
         chat = Chat(
@@ -180,7 +182,9 @@ class ChatRepository:
         # Remove MongoDB _id field
         result.pop("_id", None)
 
-        logger.info("Chat UI state updated", chat_id=chat_id, symbol=ui_state.current_symbol)
+        logger.info(
+            "Chat UI state updated", chat_id=chat_id, symbol=ui_state.current_symbol
+        )
 
         return Chat(**result)
 

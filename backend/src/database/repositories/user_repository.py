@@ -4,8 +4,9 @@ Handles CRUD operations for user collection.
 """
 
 from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorCollection
+
 import structlog
+from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.user import User, UserCreate
 
@@ -36,6 +37,7 @@ class UserRepository:
         """
         # Generate user_id (use MongoDB ObjectId pattern)
         import uuid
+
         user_id = f"user_{uuid.uuid4().hex[:12]}"
 
         # Auto-generate username from email or phone if not provided

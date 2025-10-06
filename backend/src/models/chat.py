@@ -3,6 +3,7 @@ Chat models for conversation management and UI state restoration.
 """
 
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -13,7 +14,9 @@ class UIState(BaseModel):
     """
 
     current_symbol: str | None = Field(None, description="Currently selected symbol")
-    current_interval: str = Field("1d", description="Current timeframe (1h, 1d, 1w, 1mo)")
+    current_interval: str = Field(
+        "1d", description="Current timeframe (1h, 1d, 1w, 1mo)"
+    )
     current_date_range: dict[str, str | None] = Field(
         default_factory=lambda: {"start": None, "end": None},
         description="Custom date range if any",
@@ -56,7 +59,9 @@ class Chat(BaseModel):
     is_archived: bool = Field(False, description="Archive status")
 
     # UI state for restoration (minimal - messages contain actual data)
-    ui_state: UIState = Field(default_factory=UIState, description="UI restoration state")
+    ui_state: UIState = Field(
+        default_factory=UIState, description="UI restoration state"
+    )
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)

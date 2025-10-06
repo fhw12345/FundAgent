@@ -4,8 +4,9 @@ Handles CRUD operations for message collection.
 """
 
 from datetime import datetime
-from motor.motor_asyncio import AsyncIOMotorCollection
+
 import structlog
+from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.message import Message, MessageCreate
 
@@ -36,6 +37,7 @@ class MessageRepository:
         """
         # Generate message_id
         import uuid
+
         message_id = f"msg_{uuid.uuid4().hex[:12]}"
 
         message = Message(

@@ -4,15 +4,16 @@ Provides email/phone verification and JWT token generation.
 """
 
 from typing import Literal
+
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-import structlog
 
-from ..services.auth_service import AuthService
-from ..database.repositories.user_repository import UserRepository
 from ..database.mongodb import MongoDB
 from ..database.redis import RedisCache
+from ..database.repositories.user_repository import UserRepository
 from ..models.user import User
+from ..services.auth_service import AuthService
 
 logger = structlog.get_logger()
 

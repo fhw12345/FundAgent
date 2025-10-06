@@ -3,19 +3,21 @@ Email authentication provider using Tencent Cloud SES API.
 Sends verification codes via email using templates.
 """
 
-import random
 import json
+import random
+
 import structlog
-from typing import Optional
 from redis.asyncio import Redis
 from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import (
+    TencentCloudSDKException,
+)
 from tencentcloud.common.profile.client_profile import ClientProfile
 from tencentcloud.common.profile.http_profile import HttpProfile
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
-from tencentcloud.ses.v20201002 import ses_client, models
+from tencentcloud.ses.v20201002 import models, ses_client
 
-from .base import AuthProvider
 from ...core.config import get_settings
+from .base import AuthProvider
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -28,7 +30,7 @@ CODE_MAX = 999999  # 6-digit maximum
 class EmailAuthProvider(AuthProvider):
     """Email-based authentication using Tencent Cloud SES."""
 
-    def __init__(self, redis_cache: Optional[Redis] = None):
+    def __init__(self, redis_cache: Redis | None = None):
         """
         Initialize email auth provider.
 
@@ -42,8 +44,7 @@ class EmailAuthProvider(AuthProvider):
         if settings.tencent_secret_id and settings.tencent_secret_key:
             try:
                 cred = credential.Credential(
-                    settings.tencent_secret_id,
-                    settings.tencent_secret_key
+                    settings.tencent_secret_id, settings.tencent_secret_key
                 )
                 http_profile = HttpProfile()
                 http_profile.endpoint = "ses.tencentcloudapi.com"
@@ -52,7 +53,9 @@ class EmailAuthProvider(AuthProvider):
                 client_profile.httpProfile = http_profile
 
                 # Initialize client with region
-                self.ses_client = ses_client.SesClient(cred, settings.tencent_ses_region, client_profile)
+                self.ses_client = ses_client.SesClient(
+                    cred, settings.tencent_ses_region, client_profile
+                )
                 logger.info("Tencent Cloud SES client initialized")
             except Exception as e:
                 logger.error("Failed to initialize SES client", error=str(e))
@@ -80,7 +83,7 @@ class EmailAuthProvider(AuthProvider):
                 "DEV BYPASS MODE: Using fixed verification code (email NOT sent)",
                 email=email,
                 code=code,
-                bypass_enabled=True
+                bypass_enabled=True,
             )
         else:
             # Generate random 6-digit code in production
@@ -89,18 +92,12 @@ class EmailAuthProvider(AuthProvider):
         # Store code in Redis with TTL from settings
         if self.redis:
             await self.redis.setex(
-                self._make_redis_key(email),
-                settings.email_code_ttl_seconds,
-                code
+                self._make_redis_key(email), settings.email_code_ttl_seconds, code
             )
 
         # Send email via Tencent Cloud SES (skip in dev bypass mode)
         if settings.dev_bypass_email_verification:
-            logger.info(
-                "DEV BYPASS: Email sending skipped",
-                email=email,
-                code=code
-            )
+            logger.info("DEV BYPASS: Email sending skipped", email=email, code=code)
         else:
             try:
                 self._send_email_sync(email, code)
@@ -164,10 +161,7 @@ class EmailAuthProvider(AuthProvider):
 
             # Prepare request parameters according to Tencent Cloud SES API spec
             # TemplateData must match template variables: {{email}} and {{code}}
-            template_data = {
-                "email": to_email,
-                "code": code
-            }
+            template_data = {"email": to_email, "code": code}
 
             params = {
                 "FromEmailAddress": f"{settings.tencent_ses_from_name} <{settings.tencent_ses_from_email}>",
@@ -175,15 +169,15 @@ class EmailAuthProvider(AuthProvider):
                 "Subject": settings.email_verification_subject,
                 "Template": {
                     "TemplateID": settings.tencent_ses_template_id,
-                    "TemplateData": json.dumps(template_data)
-                }
+                    "TemplateData": json.dumps(template_data),
+                },
             }
 
             logger.info(
                 "Sending SES email",
                 to_email=to_email,
                 template_data=template_data,
-                template_id=settings.tencent_ses_template_id
+                template_id=settings.tencent_ses_template_id,
             )
 
             req.from_json_string(json.dumps(params))
@@ -195,16 +189,16 @@ class EmailAuthProvider(AuthProvider):
                 "Email sent successfully via Tencent Cloud SES",
                 to_email=to_email,
                 template_id=settings.tencent_ses_template_id,
-                message_id=resp.MessageId if hasattr(resp, 'MessageId') else None
+                message_id=resp.MessageId if hasattr(resp, "MessageId") else None,
             )
 
         except TencentCloudSDKException as e:
             logger.error(
                 "Tencent Cloud SES error",
                 error=str(e),
-                error_code=e.code if hasattr(e, 'code') else None,
-                request_id=e.requestId if hasattr(e, 'requestId') else None,
-                to_email=to_email
+                error_code=e.code if hasattr(e, "code") else None,
+                request_id=e.requestId if hasattr(e, "requestId") else None,
+                to_email=to_email,
             )
             raise
         except Exception as e:
@@ -212,6 +206,6 @@ class EmailAuthProvider(AuthProvider):
                 "Unexpected error sending email",
                 error=str(e),
                 error_type=type(e).__name__,
-                to_email=to_email
+                to_email=to_email,
             )
             raise

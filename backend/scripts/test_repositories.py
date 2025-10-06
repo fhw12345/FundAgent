@@ -4,12 +4,13 @@ Run with: python -m scripts.test_repositories
 """
 
 import asyncio
+
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from src.database.repositories import UserRepository, ChatRepository, MessageRepository
-from src.models.user import UserCreate
+from src.database.repositories import ChatRepository, MessageRepository, UserRepository
 from src.models.chat import ChatCreate, ChatUpdate, UIState
 from src.models.message import MessageCreate, MessageMetadata
+from src.models.user import UserCreate
 
 
 async def main():
@@ -143,7 +144,9 @@ async def main():
     print(f"✅ Fetched messages: {len(messages)} message(s)")
 
     # Get Fibonacci messages
-    fib_messages = await message_repo.get_fibonacci_messages(chat.chat_id, symbol="AAPL")
+    fib_messages = await message_repo.get_fibonacci_messages(
+        chat.chat_id, symbol="AAPL"
+    )
     assert len(fib_messages) == 1
     assert fib_messages[0].metadata.symbol == "AAPL"
     print(f"✅ Fetched Fibonacci messages: {len(fib_messages)} message(s)")
