@@ -46,11 +46,18 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 ### Compute & Orchestration
 - **Platform**: Azure Kubernetes Service (AKS)
 - **Container Runtime**: Docker
+- **Deployment Pattern**: Separate pods for each service (frontend, backend, redis)
+- **Rationale**:
+  - Independent scaling (frontend: 3-5 replicas, backend: 2-3 replicas, redis: 1 replica)
+  - Independent updates (update backend without frontend downtime)
+  - Failure isolation (backend crash doesn't affect frontend)
+  - Fine-grained resource allocation per service
 - **Scaling**: Horizontal Pod Autoscaler (HPA) based on CPU load
 - **Features**:
-  - Automated scaling
+  - Automated scaling per component
   - Self-healing deployments
-  - Zero-downtime updates
+  - Zero-downtime rolling updates
+  - Independent service lifecycle management
 
 ### Data Layer
 
@@ -149,10 +156,20 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 ## Security & Compliance
 
 ### Authentication & Authorization
-- OAuth2/OIDC via Azure AD B2C
-- JWT token validation
-- Scope-based access control
-- Session management
+- **Current Implementation**: Local JWT-based authentication
+  - Username/password with bcrypt hashing (cost factor 12)
+  - Email verification for registration and password reset
+  - JWT tokens (7-day expiry) signed with SECRET_KEY
+  - Session management via localStorage
+- **Planned**: Hybrid authentication system
+  - Keep local JWT for development and China deployment
+  - Add Azure AD B2C OAuth2/OIDC for international production
+  - Support multiple auth providers (local, Microsoft, Google) based on user region
+  - Optional: Add MFA (TOTP) to local auth for enhanced security
+- **Design Decision**: Separate pods architecture chosen over multi-container pods
+  - Avoids OAuth complexity for MVP phase
+  - Allows independent scaling and updates
+  - Provides adequate security for initial user base (<10K users)
 
 ### Network Security
 - HTTPS/TLS encryption (Let's Encrypt)
@@ -195,20 +212,48 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 
 ## Deployment Topology
 
+### Pod Architecture (All Environments)
+```
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│  Frontend   │   │  Backend    │   │   Redis     │
+│    Pod      │   │    Pod      │   │    Pod      │
+│             │   │             │   │             │
+│  Replicas:  │   │  Replicas:  │   │  Replicas:  │
+│   3-5       │   │   2-3       │   │   1         │
+└─────────────┘   └─────────────┘   └─────────────┘
+      ↓                 ↓                  ↓
+  Service           Service            Service
+   (ClusterIP)       (ClusterIP)       (ClusterIP)
+```
+
+**Why Separate Pods?**
+1. **Independent Scaling**: Frontend scales 3-5x during market hours, backend 2-3x for LLM load, Redis stays at 1
+2. **Zero-Downtime Updates**: Update backend without restarting frontend/Redis
+3. **Failure Isolation**: Backend crash doesn't affect frontend UI or Redis cache
+4. **Resource Efficiency**: Fine-grained CPU/memory limits per service
+5. **Monitoring**: Easy to identify which component is unhealthy
+
+**Not Using Multi-Container Pods Because:**
+- ❌ All containers restart when any one fails
+- ❌ Can't scale components independently
+- ❌ Updates require full pod restart (Redis cache lost)
+- ❌ Resource limits shared across all containers
+
 ### Development Environment
-- Local: Docker Compose
-- Cloud: AKS dev namespace
-- Minimal resources
+- Local: Docker Compose (deprecated)
+- Cloud: AKS test namespace
+- Minimal resources (1 replica per pod)
 - In-cluster Redis (non-persistent)
-- Mock authentication
+- Local JWT authentication
 
 ### Production Environment
 - Multi-region AKS deployment
 - Azure Cosmos DB (multi-region)
 - ApsaraDB for Redis (managed)
-- Azure AD B2C authentication
-- Progressive rollouts
-- Blue-green deployments
+- Hybrid authentication (local JWT + Azure AD B2C)
+- Progressive rollouts with health checks
+- Blue-green deployments for major releases
+- Separate pods for each service (frontend, backend, redis)
 
 ## Integration Points
 
