@@ -21,6 +21,10 @@ class UIState(BaseModel):
         default_factory=lambda: {"start": None, "end": None},
         description="Custom date range if any",
     )
+    active_overlays: dict[str, dict] = Field(
+        default_factory=dict,
+        description="Active chart overlays {overlay_name: config_dict}",
+    )
 
     class Config:
         json_schema_extra = {
@@ -28,6 +32,10 @@ class UIState(BaseModel):
                 "current_symbol": "AAPL",
                 "current_interval": "1d",
                 "current_date_range": {"start": "2025-01-01", "end": "2025-10-04"},
+                "active_overlays": {
+                    "fibonacci": {"enabled": True, "levels": [0.236, 0.382, 0.618]},
+                    "stochastic": {"enabled": True, "k_period": 14},
+                },
             }
         }
 
@@ -45,6 +53,7 @@ class ChatUpdate(BaseModel):
     title: str | None = None
     is_archived: bool | None = None
     ui_state: UIState | None = None
+    last_message_preview: str | None = None
 
 
 class Chat(BaseModel):
@@ -63,6 +72,11 @@ class Chat(BaseModel):
         default_factory=UIState, description="UI restoration state"
     )
 
+    # Denormalized preview for chat list (avoids loading all messages)
+    last_message_preview: str | None = Field(
+        None, max_length=200, description="Preview of last message"
+    )
+
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -79,7 +93,9 @@ class Chat(BaseModel):
                     "current_symbol": "AAPL",
                     "current_interval": "1d",
                     "current_date_range": {"start": None, "end": None},
+                    "active_overlays": {"fibonacci": {"enabled": True}},
                 },
+                "last_message_preview": "Based on the Fibonacci levels, AAPL shows...",
                 "created_at": "2025-10-05T10:00:00Z",
                 "updated_at": "2025-10-05T10:15:00Z",
                 "last_message_at": "2025-10-05T10:15:00Z",

@@ -6,184 +6,31 @@
  * - Button clicks → Direct analysis endpoints
  */
 
+import { useRef } from "react";
 import { flushSync } from "react-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { analysisService } from "../../services/analysis";
 import { chatService } from "../../services/api";
+import { chatKeys } from "../../hooks/useChats";
 import type {
   FibonacciAnalysisResponse,
   MacroSentimentResponse,
   StockFundamentalsResponse,
   StochasticAnalysisResponse,
 } from "../../services/analysis";
+import {
+  formatFibonacciResponse,
+  formatMacroResponse,
+  formatFundamentalsResponse,
+  formatStochasticResponse,
+} from "./analysisFormatters";
+import { calculateDateRange } from "../../utils/dateRangeCalculator";
+import {
+  extractFibonacciMetadata,
+  extractStochasticMetadata,
+} from "../../utils/analysisMetadataExtractor";
 
-// Formatting functions
-function formatFibonacciResponse(result: FibonacciAnalysisResponse): string {
-  const keyLevels = result.fibonacci_levels.filter(
-    (level) => level.is_key_level,
-  );
-
-  // Format Big 3 trends with Fibonacci levels
-  let bigThreeSection = "";
-  if (result.raw_data?.top_trends && result.raw_data.top_trends.length > 0) {
-    bigThreeSection = `
-### 🎯 Big 3 Trends with Fibonacci Levels:
-
-${result.raw_data.top_trends
-  .slice(0, 3)
-  .map((trend: any, index: number) => {
-    const trendType = trend.type.includes("Uptrend") ? "📈" : "📉";
-    const magnitude = (trend.magnitude || 0).toFixed(1);
-    const isMainTrend = index === 0;
-
-    const fibLevels = trend.fibonacci_levels || [];
-    const keyFibLevels = fibLevels.filter((level: any) => level.is_key_level);
-
-    let fibSection = "";
-    if (keyFibLevels.length > 0) {
-      fibSection = keyFibLevels
-        .map(
-          (level: any) =>
-            `   • **${level.percentage}** - $${level.price.toFixed(2)}`,
-        )
-        .join("\n");
-    } else if (fibLevels.length > 0) {
-      fibSection = fibLevels
-        .map(
-          (level: any) =>
-            `   • **${level.percentage}** - $${level.price.toFixed(2)}${level.is_key_level ? " 🌟" : ""}`,
-        )
-        .join("\n");
-    } else {
-      fibSection = "   • No levels calculated";
-    }
-
-    let pressureInfo = "";
-    if (isMainTrend && result.pressure_zone) {
-      pressureInfo = `\n   • **Golden Zone:** $${result.pressure_zone.lower_bound.toFixed(2)} - $${result.pressure_zone.upper_bound.toFixed(2)}`;
-    }
-
-    return `**${index + 1}. ${trendType} ${trend.type.toUpperCase()}** (${trend.period})
-   • **Magnitude:** $${magnitude} move
-   • **Range:** $${trend.low?.toFixed(2)} → $${trend.high?.toFixed(2)}
-   • **Fibonacci Levels:**
-${fibSection}${pressureInfo}`;
-  })
-  .join("\n\n")}
-`;
-  }
-
-  return `## 📊 Fibonacci Analysis - ${result.symbol}
-
-**Analysis Period:** ${result.start_date} to ${result.end_date} (${result.timeframe === "1h" ? "Hourly" : result.timeframe === "1d" ? "Daily" : result.timeframe === "1w" ? "Weekly" : result.timeframe === "1mo" ? "Monthly" : result.timeframe} timeframe)
-**Current Price:** $${result.current_price.toFixed(2)}
-**Trend Direction:** ${result.market_structure.trend_direction}
-**Confidence Score:** ${(result.confidence_score * 100).toFixed(1)}%
-${bigThreeSection}
-`;
-}
-
-function formatMacroResponse(result: MacroSentimentResponse): string {
-  const topSectors = Object.entries(result.sector_performance)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3);
-
-  const bottomSectors = Object.entries(result.sector_performance)
-    .sort(([, a], [, b]) => a - b)
-    .slice(0, 3);
-
-  return `## Macro Market Sentiment Analysis
-
-**Overall Sentiment:** ${result.market_sentiment.toUpperCase()}
-**VIX Level:** ${result.vix_level.toFixed(2)} (${result.vix_interpretation})
-**Fear/Greed Score:** ${result.fear_greed_score}/100
-
-### Top Performing Sectors:
-${topSectors.map(([sector, perf]) => `• **${sector}**: ${perf > 0 ? "+" : ""}${perf.toFixed(2)}%`).join("\n")}
-
-### Underperforming Sectors:
-${bottomSectors.map(([sector, perf]) => `• **${sector}**: ${perf.toFixed(2)}%`).join("\n")}
-
-### Market Outlook:
-${result.market_outlook}
-
-### Key Factors:
-${result.key_factors.map((factor) => `• ${factor}`).join("\n")}
-`;
-}
-
-function formatFundamentalsResponse(result: StockFundamentalsResponse): string {
-  const analysisDate = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  return `## Fundamental Analysis - ${result.symbol}
-*Analysis Date: ${analysisDate}*
-
-**Company:** ${result.company_name}
-**Current Price:** $${result.current_price.toFixed(2)} (${result.price_change >= 0 ? "+" : ""}${result.price_change_percent.toFixed(2)}%)
-
-### Valuation Metrics:
-${result.pe_ratio ? `• **P/E Ratio:** ${result.pe_ratio.toFixed(2)}` : ""}
-${result.pb_ratio ? `• **P/B Ratio:** ${result.pb_ratio.toFixed(2)}` : ""}
-${result.dividend_yield ? `• **Dividend Yield:** ${result.dividend_yield.toFixed(2)}%` : ""}
-
-### Financial Health:
-• **Market Cap:** $${(result.market_cap / 1e9).toFixed(2)}B
-• **Volume:** ${result.volume.toLocaleString()} (Avg: ${result.avg_volume.toLocaleString()})
-${result.beta ? `• **Beta:** ${result.beta.toFixed(2)} (volatility vs market)` : ""}
-
-### Price Range:
-• **52-Week High:** $${result.fifty_two_week_high.toFixed(2)}
-• **52-Week Low:** $${result.fifty_two_week_low.toFixed(2)}
-`;
-}
-
-function formatStochasticResponse(result: StochasticAnalysisResponse): string {
-  const signalEmoji =
-    result.current_signal === "overbought"
-      ? "📈"
-      : result.current_signal === "oversold"
-        ? "📉"
-        : "➡️";
-
-  const analysisDate = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const recentSignals = result.signal_changes.slice(-3);
-
-  return `## ${signalEmoji} Stochastic Oscillator Analysis - ${result.symbol}
-*Analysis Date: ${analysisDate}*
-
-**Analysis Period:** ${result.start_date || "Dynamic"} to ${result.end_date || "Current"} (${result.timeframe} timeframe)
-**Current Price:** $${result.current_price.toFixed(2)}
-**Parameters:** %K(${result.k_period}) %D(${result.d_period})
-
-### Current Readings:
-• **%K Line:** ${result.current_k.toFixed(2)}%
-• **%D Line:** ${result.current_d.toFixed(2)}%
-• **Signal:** ${result.current_signal.toUpperCase()} ${signalEmoji}
-
-${
-  recentSignals.length > 0
-    ? `### Recent Signals:
-${recentSignals.map((signal) => `• **${signal.type.toUpperCase()}**: ${signal.description}`).join("\n")}
-`
-    : ""
-}
-
-### Analysis Summary:
-${result.analysis_summary}
-
-### Key Insights:
-${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
-`;
-}
+// Formatting functions moved to analysisFormatters.ts
 
 // Chat hook - streams LLM responses in real-time
 export const useAnalysis = (
@@ -192,11 +39,13 @@ export const useAnalysis = (
   setMessages: (updater: (prevMessages: any[]) => any[]) => void,
   setSelectedDateRange: (range: { start: string; end: string }) => void,
   selectedInterval?: string,
-  sessionId?: string | null,
-  setSessionId?: (id: string) => void,
+  chatId?: string | null,
+  setChatId?: (id: string) => void,
 ) => {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationKey: ["chat", sessionId],
+    mutationKey: ["chat", chatId],
     mutationFn: async (userMessage: string) => {
       // Add user message immediately
       const userMessageObj = {
@@ -216,18 +65,24 @@ export const useAnalysis = (
 
       setMessages((prev) => [...prev, userMessageObj, assistantMessageObj]);
 
-      // Stream response (returns cleanup function)
+      // Local accumulator to avoid race conditions
+      let accumulatedContent = "";
+
+      // Stream response using persistent MongoDB endpoint
       return new Promise((resolve, reject) => {
-        const cleanup = chatService.sendMessageStream(
+        const cleanup = chatService.sendMessageStreamPersistent(
           userMessage,
-          sessionId || null,
+          chatId || null,
           (chunk: string) => {
+            // Accumulate content locally (SAFE - no race condition)
+            accumulatedContent += chunk;
+
             // Use flushSync to force immediate render of each chunk
             flushSync(() => {
               setMessages((prev) =>
                 prev.map((msg: any) =>
                   msg._id === assistantMessageId
-                    ? { ...msg, content: msg.content + chunk }
+                    ? { ...msg, content: accumulatedContent }
                     : msg,
                 ),
               );
@@ -235,21 +90,23 @@ export const useAnalysis = (
             // Force browser to repaint by reading layout (this triggers reflow)
             document.body.offsetHeight;
           },
-          (newSessionId: string) => {
-            // Session created callback
-            if (setSessionId) {
-              setSessionId(newSessionId);
+          (newChatId: string) => {
+            // Chat created callback - save new chat ID
+            if (setChatId) {
+              setChatId(newChatId);
             }
+            // Invalidate chat list to show new chat in sidebar
+            queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
           },
-          (finalSessionId: string, messageCount: number) => {
-            // Stream complete
-
-            // Resolve the promise with final content
-            setMessages((prev) => {
-              const msg = prev.find((m: any) => m._id === assistantMessageId);
-              resolve({ type: "chat", content: msg?.content || "" });
-              return prev;
-            });
+          (title: string) => {
+            // Title generated callback - could update UI if needed
+            console.log("📝 Chat title generated:", title);
+          },
+          (finalChatId: string, messageCount: number) => {
+            // Stream complete - use accumulated content (SAFE)
+            resolve({ type: "chat", content: accumulatedContent });
+            // Invalidate chat list to update title and preview
+            queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
           },
           (error: string) => {
             // Error callback
@@ -279,9 +136,11 @@ export const useButtonAnalysis = (
   setMessages: (updater: (prevMessages: any[]) => any[]) => void,
   setSelectedDateRange: (range: { start: string; end: string }) => void,
   selectedInterval?: string,
-  sessionId?: string | null,
-  setSessionId?: (id: string) => void,
+  chatId?: string | null,
+  setChatId?: (id: string) => void,
 ) => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationKey: [
       "analysis",
@@ -294,75 +153,45 @@ export const useButtonAnalysis = (
       analysisType: "fibonacci" | "macro" | "fundamentals" | "stochastic",
     ) => {
       let response;
-      let currentSessionId = sessionId;
 
-      // Create session if it doesn't exist yet (fast, no LLM call)
-      if (!currentSessionId) {
-        console.log(
-          "🆕 No session exists, creating one for algorithm results...",
-        );
-        try {
-          const sessionResponse = await chatService.createSession();
-          currentSessionId = sessionResponse.session_id;
-          if (setSessionId) {
-            setSessionId(currentSessionId);
-          }
-          console.log("✅ Session created:", currentSessionId);
-        } catch (error) {
-          console.error("❌ Failed to create session:", error);
-          // Continue without session - results will still show but won't be in LLM context
-        }
-      }
+      // Title mapping for different analysis types
+      const titleMap = {
+        fibonacci: "Fibonacci Analysis",
+        macro: "Macro Sentiment",
+        fundamentals: "Stock Fundamentals",
+        stochastic: "Stochastic Analysis",
+      };
+
+      const analysisTitle = titleMap[analysisType];
+      const chatTitle = currentSymbol
+        ? `${currentSymbol} ${analysisTitle}`
+        : analysisTitle;
+
+      // Source matches analysis type for MongoDB filtering
+      const sourceType = analysisType;
 
       switch (analysisType) {
         case "fibonacci": {
           if (!currentSymbol)
             throw new Error("Please select a stock symbol first.");
 
-          let startDate = selectedDateRange.start;
-          let endDate = selectedDateRange.end;
-
-          // Calculate dates if not set
-          if (!startDate || !endDate) {
-            const today = new Date();
-            let periodsBack: Date;
-
-            switch (selectedInterval) {
-              case "1h":
-                periodsBack = new Date(
-                  today.getTime() - 30 * 24 * 60 * 60 * 1000,
-                );
-                break;
-              case "1w":
-                periodsBack = new Date(
-                  today.getTime() - 365 * 24 * 60 * 60 * 1000,
-                );
-                break;
-              case "1mo":
-                periodsBack = new Date(
-                  today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000,
-                );
-                break;
-              default:
-                periodsBack = new Date(
-                  today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-                );
-            }
-
-            startDate = periodsBack.toISOString().split("T")[0];
-            endDate = today.toISOString().split("T")[0];
-          }
+          // Calculate date range using shared utility
+          const dateRange = calculateDateRange(
+            selectedDateRange,
+            (selectedInterval as "1h" | "1d" | "1w" | "1mo") || "1d",
+          );
 
           const result = await analysisService.fibonacciAnalysis({
             symbol: currentSymbol,
-            start_date: startDate,
-            end_date: endDate,
+            start_date: dateRange.start,
+            end_date: dateRange.end,
             timeframe: selectedInterval || "1d",
           });
           response = {
             type: "fibonacci",
             content: formatFibonacciResponse(result),
-            analysis_data: result,
+            // Store only compact metadata, not full price history
+            analysis_data: extractFibonacciMetadata(result),
           };
           break;
         }
@@ -390,43 +219,16 @@ export const useButtonAnalysis = (
           if (!currentSymbol)
             throw new Error("Please select a stock symbol first.");
 
-          let startDate = selectedDateRange.start;
-          let endDate = selectedDateRange.end;
-
-          if (!startDate || !endDate) {
-            const today = new Date();
-            let periodsBack: Date;
-
-            switch (selectedInterval) {
-              case "1h":
-                periodsBack = new Date(
-                  today.getTime() - 30 * 24 * 60 * 60 * 1000,
-                );
-                break;
-              case "1w":
-                periodsBack = new Date(
-                  today.getTime() - 365 * 24 * 60 * 60 * 1000,
-                );
-                break;
-              case "1mo":
-                periodsBack = new Date(
-                  today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000,
-                );
-                break;
-              default:
-                periodsBack = new Date(
-                  today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-                );
-            }
-
-            startDate = periodsBack.toISOString().split("T")[0];
-            endDate = today.toISOString().split("T")[0];
-          }
+          // Calculate date range using shared utility
+          const dateRange = calculateDateRange(
+            selectedDateRange,
+            (selectedInterval as "1h" | "1d" | "1w" | "1mo") || "1d",
+          );
 
           const result = await analysisService.stochasticAnalysis({
             symbol: currentSymbol,
-            start_date: startDate,
-            end_date: endDate,
+            start_date: dateRange.start,
+            end_date: dateRange.end,
             timeframe: (selectedInterval as "1h" | "1d" | "1w" | "1mo") || "1d",
             k_period: 14,
             d_period: 3,
@@ -434,49 +236,61 @@ export const useButtonAnalysis = (
           response = {
             type: "stochastic",
             content: formatStochasticResponse(result),
-            analysis_data: result,
+            // Store only compact metadata, not full K/D arrays
+            analysis_data: extractStochasticMetadata(result),
           };
           break;
         }
       }
 
-      // Sync to backend session BEFORE returning (inside mutationFn)
-      console.log("🔍 Checking session for context sync:", {
-        currentSessionId,
-        hasResponse: !!response,
-        responseType: response?.type,
-        contentLength: response?.content?.length,
-      });
-
-      if (currentSessionId && response) {
-        try {
-          console.log(
-            "📤 Sending context to backend session:",
-            currentSessionId,
-          );
-          await chatService.addContextToSession(
-            currentSessionId,
+      // Save to MongoDB using streaming endpoint (analysis sources skip LLM)
+      if (response) {
+        return new Promise((resolve, reject) => {
+          const cleanup = chatService.sendMessageStreamPersistent(
             response.content,
+            chatId || null,
+            () => {
+              // No chunks expected with analysis sources
+            },
+            (newChatId: string) => {
+              // Chat created callback
+              if (setChatId) {
+                setChatId(newChatId);
+              }
+              queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+            },
+            () => {
+              // No title generation with custom title
+            },
+            (finalChatId: string, messageCount: number) => {
+              // Done callback
+              resolve(response);
+              queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+            },
+            (error: string) => {
+              console.error("❌ Failed to save to MongoDB:", error);
+              reject(new Error(error));
+            },
+            {
+              title: chatTitle,
+              role: "assistant",
+              source: sourceType,
+              // Wrap in raw_data to avoid schema mismatch
+              metadata: { raw_data: response.analysis_data },
+            },
           );
-          console.log(
-            "✅ Context synced to backend session:",
-            currentSessionId,
-          );
-        } catch (error) {
-          console.error("❌ Failed to sync context to backend:", error);
-          // Non-critical error - continue anyway
-        }
-      } else {
-        console.warn("⚠️ Skipping context sync:", {
-          reason: !currentSessionId ? "No session ID" : "No response",
-          currentSessionId,
-          response: !!response,
         });
       }
 
       return response;
     },
     onSuccess: (response) => {
+      console.log("✅ Button analysis complete:", {
+        type: response.type,
+        hasAnalysisData: !!response.analysis_data,
+        analysisData: response.analysis_data,
+      });
+
       // Add to frontend messages
       setMessages((prev) => [
         ...prev,
@@ -487,6 +301,8 @@ export const useButtonAnalysis = (
           analysis_data: response.analysis_data,
         },
       ]);
+
+      console.log("📝 Message added to state with analysis_data");
     },
     onError: (error: any) => {
       const errorContent =

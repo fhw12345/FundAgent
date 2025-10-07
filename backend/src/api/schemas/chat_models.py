@@ -1,0 +1,87 @@
+"""
+Request/Response models for chat API endpoints.
+"""
+
+from pydantic import BaseModel, Field
+
+from ...models.chat import Chat, UIState
+from ...models.message import Message, MessageMetadata
+
+# ===== Request Models =====
+
+
+class ChatRequest(BaseModel):
+    """Chat request from user."""
+
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=10000,
+        description="User message or analysis results",
+    )
+    session_id: str | None = Field(
+        None, description="Session ID for continuing conversation (legacy)"
+    )
+    chat_id: str | None = Field(
+        None, description="Chat ID for persistent conversation (new MongoDB-based)"
+    )
+    title: str | None = Field(
+        None,
+        min_length=1,
+        max_length=200,
+        description="Optional title for new chat (defaults to 'New Chat')",
+    )
+    role: str = Field(
+        "user",
+        description="Message role: 'user' or 'assistant'",
+    )
+    source: str = Field(
+        "user",
+        description="Message source: 'user' (call LLM), 'fibonacci'/'stochastic'/'macro'/'fundamentals' (skip LLM), or 'llm'",
+    )
+    metadata: MessageMetadata | dict | None = Field(
+        None,
+        description="Analysis metadata for overlays (Fibonacci levels, Stochastic signals, etc.)",
+    )
+
+
+class AddContextRequest(BaseModel):
+    """Request to add context (algorithm results) to session."""
+
+    content: str = Field(
+        ..., min_length=1, description="Content to add as assistant message"
+    )
+    session_id: str = Field(..., description="Session ID")
+
+
+class UpdateUIStateRequest(BaseModel):
+    """Request to update chat UI state."""
+
+    ui_state: UIState
+
+
+# ===== Response Models =====
+
+
+class ChatResponse(BaseModel):
+    """Chat response to user."""
+
+    response: str = Field(..., description="Assistant's response")
+    session_id: str = Field(..., description="Session ID for this conversation")
+    message_count: int = Field(..., description="Total messages in conversation")
+
+
+class ChatListResponse(BaseModel):
+    """Response for listing chats."""
+
+    chats: list[Chat]
+    total: int
+    page: int
+    page_size: int
+
+
+class ChatDetailResponse(BaseModel):
+    """Response for getting chat with messages."""
+
+    chat: Chat
+    messages: list[Message]

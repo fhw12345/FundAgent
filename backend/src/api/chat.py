@@ -1,6 +1,9 @@
 """
 Chat API endpoint for conversational financial analysis.
 Following Factor 11 & 12: Triggerable via API, Stateless Service.
+
+This module contains persistent chat management endpoints using MongoDB.
+Legacy session-based endpoints are in chat_legacy.py.
 """
 
 import json
@@ -8,243 +11,423 @@ import json
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
 
 from ..agent.chat_agent import ChatAgent
-from ..agent.session_manager import SessionManager, get_session_manager
-from ..core.config import Settings, get_settings
+from ..models.chat import ChatUpdate
+from ..services.chat_service import ChatService
+from .dependencies.chat_deps import (
+    get_chat_agent,
+    get_chat_service,
+    get_current_user_id,
+)
+from .schemas.chat_models import (
+    ChatDetailResponse,
+    ChatListResponse,
+    ChatRequest,
+    UpdateUIStateRequest,
+)
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
-# Request/Response Models
-class ChatRequest(BaseModel):
-    """Chat request from user."""
-
-    message: str = Field(
-        ..., min_length=1, max_length=10000, description="User message"
-    )
-    session_id: str | None = Field(
-        None, description="Session ID for continuing conversation"
-    )
+# ===== Persistent Chat Management Endpoints =====
 
 
-class ChatResponse(BaseModel):
-    """Chat response to user."""
-
-    response: str = Field(..., description="Assistant's response")
-    session_id: str = Field(..., description="Session ID for this conversation")
-    message_count: int = Field(..., description="Total messages in conversation")
-
-
-# Dependency for chat agent
-def get_chat_agent(
-    settings: Settings = Depends(get_settings),
-    session_manager: SessionManager = Depends(get_session_manager),
-) -> ChatAgent:
+@router.get("/chats", response_model=ChatListResponse)
+async def list_user_chats(
+    page: int = 1,
+    page_size: int = 20,
+    include_archived: bool = False,
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service),
+) -> ChatListResponse:
     """
-    Get or create chat agent instance.
+    List all chats for the authenticated user.
 
-    In production, this would be a singleton managed at app startup.
-    """
-    return ChatAgent(settings=settings, session_manager=session_manager)
+    **Authentication**: Requires Bearer token in Authorization header.
 
-
-@router.post("/sessions", response_model=dict)
-async def create_session(
-    agent: ChatAgent = Depends(get_chat_agent),
-) -> dict:
-    """
-    Create a new chat session without sending a message.
-
-    This is useful when you want to initialize a session before
-    sending algorithm results or analysis data.
+    **Query Parameters:**
+    - page: Page number (1-indexed, default: 1)
+    - page_size: Items per page (1-100, default: 20)
+    - include_archived: Include archived chats (default: false)
 
     **Response:**
     ```json
     {
-      "session_id": "a1b2c3d4-...",
-      "created_at": "2025-10-04T09:00:00Z"
-    }
-    ```
-    """
-    session = await agent.create_session()
-
-    logger.info(
-        "🆕 Empty session created",
-        session_id=session.session_id,
-    )
-
-    return {
-        "session_id": session.session_id,
-        "created_at": session.created_at.isoformat(),
-    }
-
-
-@router.post("", response_model=ChatResponse)
-async def chat(
-    request: ChatRequest,
-    agent: ChatAgent = Depends(get_chat_agent),
-) -> ChatResponse:
-    """
-    Send a message and receive response from financial analysis agent.
-
-    **Multi-turn conversation:**
-    - First request: Omit session_id, receive new session_id in response
-    - Follow-up requests: Include session_id to continue conversation
-
-    **Example:**
-    ```json
-    {
-      "message": "What are the Fibonacci levels for AAPL?",
-      "session_id": "a1b2c3d4-..."
-    }
-    ```
-
-    **Response:**
-    ```json
-    {
-      "response": "I'll analyze the Fibonacci levels for AAPL...",
-      "session_id": "a1b2c3d4-...",
-      "message_count": 2
+      "chats": [
+        {
+          "chat_id": "chat_abc123",
+          "title": "AAPL Analysis",
+          "last_message_preview": "Based on the Fibonacci levels...",
+          "last_message_at": "2025-10-05T10:15:00Z",
+          ...
+        }
+      ],
+      "total": 42,
+      "page": 1,
+      "page_size": 20
     }
     ```
     """
     try:
-        # Create new session or retrieve existing
-        if request.session_id:
-            session = agent.get_session(request.session_id)
-            if session is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Session {request.session_id} not found or expired. Please start a new conversation.",
-                )
-            session_id = request.session_id
-        else:
-            # Create new session
-            session = await agent.create_session()
-            session_id = session.session_id
-            logger.info("New chat session created", session_id=session_id)
-
-        # Process message
-        response_text = await agent.chat(
-            session_id=session_id, user_message=request.message
+        chats, total = await chat_service.list_user_chats(
+            user_id=user_id,
+            page=page,
+            page_size=page_size,
+            include_archived=include_archived,
         )
-
-        # Get updated session for message count
-        updated_session = agent.get_session(session_id)
-        message_count = len(updated_session.messages) if updated_session else 0
 
         logger.info(
-            "Chat request completed",
-            session_id=session_id,
-            message_count=message_count,
+            "Chats listed",
+            user_id=user_id,
+            count=len(chats),
+            page=page,
         )
 
-        return ChatResponse(
-            response=response_text,
-            session_id=session_id,
-            message_count=message_count,
+        return ChatListResponse(
+            chats=chats,
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    except ValueError as e:
+        logger.error("Validation error listing chats", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error("Failed to list chats", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to list chats",
+        ) from e
+
+
+@router.get("/chats/{chat_id}", response_model=ChatDetailResponse)
+async def get_chat_detail(
+    chat_id: str,
+    limit: int | None = None,
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service),
+) -> ChatDetailResponse:
+    """
+    Get chat with messages for state restoration.
+
+    **Authentication**: Requires Bearer token in Authorization header.
+
+    **Path Parameters:**
+    - chat_id: Chat identifier
+
+    **Query Parameters:**
+    - limit: Optional limit on number of messages (default: 100)
+
+    **Response:**
+    ```json
+    {
+      "chat": {
+        "chat_id": "chat_abc123",
+        "title": "AAPL Analysis",
+        "ui_state": {
+          "current_symbol": "AAPL",
+          "current_interval": "1d",
+          "active_overlays": {
+            "fibonacci": {"enabled": true}
+          }
+        },
+        ...
+      },
+      "messages": [
+        {
+          "message_id": "msg_xyz789",
+          "role": "user",
+          "content": "What are the Fibonacci levels for AAPL?",
+          "timestamp": "2025-10-05T10:00:00Z",
+          ...
+        }
+      ]
+    }
+    ```
+    """
+    try:
+        # Get chat with ownership verification
+        chat = await chat_service.get_chat(chat_id, user_id)
+
+        # Get messages
+        messages = await chat_service.get_chat_messages(chat_id, user_id, limit=limit)
+
+        logger.info(
+            "Chat detail retrieved",
+            chat_id=chat_id,
+            user_id=user_id,
+            message_count=len(messages),
+        )
+
+        return ChatDetailResponse(
+            chat=chat,
+            messages=messages,
         )
 
     except HTTPException:
         raise
-    except ValueError as e:
-        logger.error("Validation error", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error("Chat request failed", error=str(e))
+        logger.error("Failed to get chat detail", chat_id=chat_id, error=str(e))
         raise HTTPException(
             status_code=500,
-            detail="Failed to process chat request. Please try again.",
+            detail="Failed to retrieve chat",
         ) from e
 
 
-@router.post("/stream")
-async def chat_stream(
+@router.patch("/chats/{chat_id}/ui-state")
+async def update_chat_ui_state(
+    chat_id: str,
+    request: UpdateUIStateRequest,
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service),
+):
+    """
+    Update chat UI state (debounced from frontend).
+
+    **Authentication**: Requires Bearer token in Authorization header.
+
+    **Path Parameters:**
+    - chat_id: Chat identifier
+
+    **Request Body:**
+    ```json
+    {
+      "ui_state": {
+        "current_symbol": "AAPL",
+        "current_interval": "1d",
+        "current_date_range": {"start": null, "end": null},
+        "active_overlays": {
+          "fibonacci": {"enabled": true, "levels": [0.236, 0.382, 0.618]}
+        }
+      }
+    }
+    ```
+
+    **Response:** Updated chat object
+    """
+    try:
+        updated_chat = await chat_service.update_ui_state(
+            chat_id, user_id, request.ui_state
+        )
+
+        logger.info(
+            "UI state updated",
+            chat_id=chat_id,
+            user_id=user_id,
+            symbol=request.ui_state.current_symbol,
+        )
+
+        return updated_chat
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update UI state", chat_id=chat_id, error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update UI state",
+        ) from e
+
+
+@router.post("/stream-v2")
+async def chat_stream_persistent(
     request: ChatRequest,
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service),
     agent: ChatAgent = Depends(get_chat_agent),
 ) -> StreamingResponse:
     """
-    Send a message and receive streaming response from financial analysis agent.
+    Send a message and receive streaming response with MongoDB persistence.
 
-    Returns Server-Sent Events (SSE) stream with response chunks.
+    **Authentication**: Requires Bearer token in Authorization header.
 
-    **Example:**
+    **Request:**
     ```json
     {
-      "message": "Should I buy AAPL based on the Fibonacci levels?",
-      "session_id": "a1b2c3d4-..."
+      "message": "What are the Fibonacci levels for AAPL?",
+      "chat_id": "chat_abc123"  // Optional - omit to create new chat
     }
     ```
 
     **Response:** Stream of Server-Sent Events with incremental content
     """
 
-    async def generate_stream():
-        """Generate SSE stream from LLM response."""
+    async def generate_stream_with_persistence():
+        """Generate SSE stream and persist to MongoDB."""
+        chat_id = None
+
         try:
-            # Create new session or retrieve existing
-            if request.session_id:
-                session = agent.get_session(request.session_id)
-                if session is None:
-                    # Send error event
-                    error_data = {
-                        "error": f"Session {request.session_id} not found or expired. Please start a new conversation."
-                    }
-                    yield f"data: {json.dumps(error_data)}\n\n"
-                    return
-                session_id = request.session_id
+            # Get or create chat
+            if request.chat_id:
+                # Verify ownership and get chat
+                chat = await chat_service.get_chat(request.chat_id, user_id)
+                chat_id = chat.chat_id
             else:
-                # Create new session
-                session = await agent.create_session()
-                session_id = session.session_id
-                logger.info("New streaming chat session created", session_id=session_id)
+                # Create new chat with provided title or default
+                chat_title = request.title if request.title else "New Chat"
+                chat = await chat_service.create_chat(user_id, title=chat_title)
+                chat_id = chat.chat_id
+                logger.info(
+                    "New persistent chat created",
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    title=chat_title,
+                )
 
-                # Send session info to client
-                session_data = {"session_id": session_id, "type": "session_created"}
-                yield f"data: {json.dumps(session_data)}\n\n"
+                # Send chat_id to client immediately
+                chat_info = {"chat_id": chat_id, "type": "chat_created"}
+                yield f"data: {json.dumps(chat_info)}\n\n"
 
-            # Stream response chunks
+            # Save message to MongoDB
+            msg = await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                role=request.role,
+                content=request.message,
+                source=request.source,
+                metadata=request.metadata,  # Pass metadata for overlays
+            )
+
+            # Auto-update UI state from analysis metadata
+            if request.metadata and hasattr(request.metadata, "raw_data"):
+                raw_data = request.metadata.raw_data or {}
+                symbol = raw_data.get("symbol")
+                timeframe = raw_data.get("timeframe")
+                start_date = raw_data.get("start_date")
+                end_date = raw_data.get("end_date")
+
+                if symbol or timeframe:
+                    from ..models.chat import UIState
+
+                    # Build active_overlays based on analysis source
+                    active_overlays = {}
+                    if request.source == "fibonacci":
+                        active_overlays["fibonacci"] = {"enabled": True}
+                    elif request.source == "stochastic":
+                        active_overlays["stochastic"] = {"enabled": True}
+                    elif request.source == "macro":
+                        active_overlays["macro"] = {"enabled": True}
+                    elif request.source == "fundamentals":
+                        active_overlays["fundamentals"] = {"enabled": True}
+
+                    ui_state = UIState(
+                        current_symbol=symbol,
+                        current_interval=timeframe or "1d",
+                        current_date_range=(
+                            {
+                                "start": start_date,
+                                "end": end_date,
+                            }
+                            if start_date and end_date
+                            else {"start": None, "end": None}
+                        ),
+                        active_overlays=active_overlays,
+                    )
+                    await chat_service.update_ui_state(chat_id, user_id, ui_state)
+                    logger.info(
+                        "UI state auto-updated from metadata",
+                        chat_id=chat_id,
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        overlays=list(active_overlays.keys()),
+                    )
+
+            # If source is analysis (not "user"), skip LLM (results already provided)
+            if request.source in ("fibonacci", "stochastic", "macro", "fundamentals"):
+                logger.info(
+                    "Analysis results - skipping LLM",
+                    chat_id=chat_id,
+                    role=request.role,
+                    source=request.source,
+                )
+
+                # Send completion event
+                messages = await chat_service.get_chat_messages(chat_id, user_id)
+                completion_data = {
+                    "type": "done",
+                    "chat_id": chat_id,
+                    "message_count": len(messages),
+                }
+                yield f"data: {json.dumps(completion_data)}\n\n"
+
+                logger.info(
+                    "Analysis results saved without LLM call",
+                    chat_id=chat_id,
+                    message_count=len(messages),
+                )
+                return
+
+            # Get conversation history from MongoDB
+            messages = await chat_service.get_chat_messages(chat_id, user_id)
+
+            # Create temporary session and populate with MongoDB history
+            session = await agent.create_session(user_id=user_id)
+            session_id = session.session_id
+
+            # Populate session with existing messages (excluding the user message we just added)
+            for msg in messages[:-1]:  # Exclude last message (the one we just added)
+                session.add_message(msg.role, msg.content)
+
+            # Update session in manager
+            agent.session_manager.update_session(session)
+
+            # Stream LLM response
+            full_response = ""
             import asyncio
 
             async for chunk in agent.stream_chat(
                 session_id=session_id, user_message=request.message
             ):
+                full_response += chunk
                 chunk_data = {"content": chunk, "type": "content"}
                 yield f"data: {json.dumps(chunk_data)}\n\n"
-                # Yield control to event loop to flush HTTP buffer immediately
-                # Without this, uvicorn batches all chunks until generator completes
-                await asyncio.sleep(0)
+                await asyncio.sleep(0)  # Flush buffer
+
+            # Save assistant response to MongoDB
+            await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                role="assistant",
+                content=full_response,
+                source="llm",
+            )
+
+            # Generate title on first message (only if not provided)
+            if await chat_service.should_generate_title(chat_id):
+                title = await chat_service.generate_title_from_llm(
+                    request.message, full_response
+                )
+                await chat_service.chat_repo.update(chat_id, ChatUpdate(title=title))
+                logger.info("Chat title generated", chat_id=chat_id, title=title)
+
+                # Send title to client
+                title_data = {"title": title, "type": "title_generated"}
+                yield f"data: {json.dumps(title_data)}\n\n"
 
             # Send completion event
-            updated_session = agent.get_session(session_id)
-            message_count = len(updated_session.messages) if updated_session else 0
-
+            messages = await chat_service.get_chat_messages(chat_id, user_id)
             completion_data = {
                 "type": "done",
-                "session_id": session_id,
-                "message_count": message_count,
+                "chat_id": chat_id,
+                "message_count": len(messages),
             }
             yield f"data: {json.dumps(completion_data)}\n\n"
 
             logger.info(
-                "Streaming chat completed",
-                session_id=session_id,
-                message_count=message_count,
+                "Streaming chat with persistence completed",
+                chat_id=chat_id,
+                message_count=len(messages),
             )
 
         except HTTPException as e:
             error_data = {"error": e.detail, "type": "error"}
             yield f"data: {json.dumps(error_data)}\n\n"
-        except ValueError as e:
-            logger.error("Streaming validation error", error=str(e))
-            error_data = {"error": str(e), "type": "error"}
-            yield f"data: {json.dumps(error_data)}\n\n"
         except Exception as e:
-            logger.error("Streaming chat failed", error=str(e))
+            logger.error("Streaming chat with persistence failed", error=str(e))
             error_data = {
                 "error": "Failed to process streaming chat. Please try again.",
                 "type": "error",
@@ -252,7 +435,7 @@ async def chat_stream(
             yield f"data: {json.dumps(error_data)}\n\n"
 
     return StreamingResponse(
-        generate_stream(),
+        generate_stream_with_persistence(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -260,124 +443,3 @@ async def chat_stream(
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         },
     )
-
-
-@router.get("/sessions/{session_id}", response_model=dict)
-async def get_session_info(
-    session_id: str,
-    agent: ChatAgent = Depends(get_chat_agent),
-) -> dict:
-    """
-    Get information about a chat session.
-
-    Returns session metadata and message count.
-    """
-    session = agent.get_session(session_id)
-    if session is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Session {session_id} not found or expired",
-        )
-
-    return {
-        "session_id": session.session_id,
-        "message_count": len(session.messages),
-        "created_at": session.created_at.isoformat(),
-        "updated_at": session.updated_at.isoformat(),
-        "current_symbol": session.current_symbol,
-    }
-
-
-@router.delete("/sessions/{session_id}")
-async def delete_session(
-    session_id: str,
-    session_manager: SessionManager = Depends(get_session_manager),
-) -> dict:
-    """
-    Delete a chat session.
-
-    Returns success status.
-    """
-    deleted = session_manager.delete_session(session_id)
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Session {session_id} not found",
-        )
-
-    logger.info("Session deleted", session_id=session_id)
-    return {"status": "success", "session_id": session_id}
-
-
-class AddContextRequest(BaseModel):
-    """Request to add context (algorithm results) to session."""
-
-    content: str = Field(
-        ..., min_length=1, description="Content to add as assistant message"
-    )
-    session_id: str = Field(..., description="Session ID")
-
-
-@router.post("/sessions/{session_id}/context")
-async def add_context_to_session(
-    session_id: str,
-    request: AddContextRequest,
-    session_manager: SessionManager = Depends(get_session_manager),
-) -> dict:
-    """
-    Add context (algorithm results) to session for LLM to see.
-
-    This endpoint allows the frontend to inject algorithm results
-    into the conversation history so the LLM can reference them.
-
-    **Example:**
-    ```json
-    {
-      "content": "## Fibonacci Analysis - AAPL\n...",
-      "session_id": "a1b2c3d4-..."
-    }
-    ```
-    """
-    logger.info(
-        "📥 Context sync request received",
-        session_id=session_id,
-        content_preview=(
-            request.content[:100] + "..."
-            if len(request.content) > 100
-            else request.content
-        ),
-        content_length=len(request.content),
-    )
-
-    session = session_manager.get_session(session_id)
-    if session is None:
-        logger.error(
-            "❌ Session not found for context sync",
-            session_id=session_id,
-        )
-        raise HTTPException(
-            status_code=404,
-            detail=f"Session {session_id} not found or expired",
-        )
-
-    message_count_before = len(session.messages)
-
-    # Add content as assistant message
-    session.add_message("assistant", request.content)
-    session_manager.update_session(session)
-
-    message_count_after = len(session.messages)
-
-    logger.info(
-        "✅ Context added to session",
-        session_id=session_id,
-        content_length=len(request.content),
-        message_count_before=message_count_before,
-        message_count_after=message_count_after,
-    )
-
-    return {
-        "status": "success",
-        "session_id": session_id,
-        "message_count": len(session.messages),
-    }

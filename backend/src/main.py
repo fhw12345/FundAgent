@@ -17,6 +17,7 @@ from .agent.session_manager import get_session_manager
 from .api.analysis import router as analysis_router
 from .api.auth import router as auth_router
 from .api.chat import router as chat_router
+from .api.chat_legacy import router as chat_legacy_router
 from .api.health import router as health_router
 from .api.market_data import router as market_data_router
 from .core.config import get_settings
@@ -110,7 +111,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
 
@@ -143,7 +144,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(analysis_router)
     app.include_router(market_data_router)
-    app.include_router(chat_router)
+    app.include_router(chat_router)  # Persistent MongoDB-based chat
+    app.include_router(chat_legacy_router)  # Legacy session-based chat
 
     @app.get("/")
     async def root():

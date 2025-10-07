@@ -1,5 +1,14 @@
 import axios from "axios";
-import type { HealthResponse, ChatRequest, ChatResponse } from "../types/api";
+import type {
+  HealthResponse,
+  ChatRequest,
+  ChatResponse,
+  ChatListResponse,
+  ChatDetailResponse,
+  UpdateUIStateRequest,
+  Chat,
+  StreamEvent,
+} from "../types/api";
 
 // Configure axios with base URL
 // In production, use empty string for relative URLs (nginx proxy)
@@ -243,6 +252,176 @@ export const chatService = {
       });
 
     // Return cleanup function
+    return () => {
+      controller.abort();
+    };
+  },
+
+  // ===== Persistent Chat API =====
+
+  /**
+   * List all chats for the authenticated user
+   */
+  async listChats(
+    page: number = 1,
+    pageSize: number = 20,
+    includeArchived: boolean = false,
+  ): Promise<ChatListResponse> {
+    const response = await api.get<ChatListResponse>("/api/chat/chats", {
+      params: {
+        page,
+        page_size: pageSize,
+        include_archived: includeArchived,
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * Get chat detail with messages for state restoration
+   */
+  async getChatDetail(
+    chatId: string,
+    limit?: number,
+  ): Promise<ChatDetailResponse> {
+    const response = await api.get<ChatDetailResponse>(
+      `/api/chat/chats/${chatId}`,
+      {
+        params: limit ? { limit } : {},
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * Update chat UI state (debounced from frontend)
+   */
+  async updateUIState(
+    chatId: string,
+    request: UpdateUIStateRequest,
+  ): Promise<Chat> {
+    const response = await api.patch<Chat>(
+      `/api/chat/chats/${chatId}/ui-state`,
+      request,
+    );
+    return response.data;
+  },
+
+  /**
+   * Send message with streaming response and MongoDB persistence
+   *
+   * @param message User message
+   * @param chatId Optional chat ID (creates new chat if not provided)
+   * @param onChunk Callback for each content chunk
+   * @param onChatCreated Callback when new chat is created
+   * @param onTitleGenerated Callback when title is generated
+   * @param onDone Callback when streaming completes
+   * @param onError Callback for errors
+   */
+  sendMessageStreamPersistent(
+    message: string,
+    chatId: string | null,
+    onChunk: (content: string) => void,
+    onChatCreated?: (chatId: string) => void,
+    onTitleGenerated?: (title: string) => void,
+    onDone?: (chatId: string, messageCount: number) => void,
+    onError?: (error: string) => void,
+    options?: {
+      title?: string;
+      role?: string;
+      source?: string;
+      metadata?: any; // Analysis metadata for overlays
+    },
+  ): () => void {
+    const baseURL =
+      import.meta.env.VITE_API_URL !== undefined
+        ? import.meta.env.VITE_API_URL
+        : import.meta.env.MODE === "production"
+          ? ""
+          : "http://localhost:8000";
+
+    const url = `${baseURL}/api/chat/stream-v2`;
+    const controller = new AbortController();
+
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(localStorage.getItem("auth_token")
+          ? { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
+          : {}),
+      },
+      body: JSON.stringify({
+        message,
+        chat_id: chatId,
+        title: options?.title,
+        role: options?.role ?? "user",
+        source: options?.source ?? "user",
+        metadata: options?.metadata,
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error("Response body is not readable");
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const messages = buffer.split("\n\n");
+          buffer = messages.pop() || "";
+
+          for (const message of messages) {
+            if (message.startsWith("data: ")) {
+              const data: StreamEvent = JSON.parse(message.slice(6));
+
+              if (
+                data.type === "chat_created" &&
+                onChatCreated &&
+                data.chat_id
+              ) {
+                onChatCreated(data.chat_id);
+              } else if (data.type === "content" && data.content) {
+                onChunk(data.content);
+                await new Promise((resolve) => setTimeout(resolve, 0));
+              } else if (
+                data.type === "title_generated" &&
+                onTitleGenerated &&
+                data.title
+              ) {
+                onTitleGenerated(data.title);
+              } else if (data.type === "done" && onDone && data.chat_id) {
+                onDone(data.chat_id, data.message_count || 0);
+              } else if (data.type === "error" && onError) {
+                console.error("SSE error:", data.error);
+                onError(data.error || "Unknown error");
+              }
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError" && onError) {
+          onError(
+            error instanceof Error ? error.message : "Unknown streaming error",
+          );
+        }
+      });
+
     return () => {
       controller.abort();
     };

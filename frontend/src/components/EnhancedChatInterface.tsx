@@ -6,7 +6,11 @@ import { useAnalysis, useButtonAnalysis } from "./chat/useAnalysis";
 import { ChatMessages } from "./chat/ChatMessages";
 import { ChatInput } from "./chat/ChatInput";
 import { ChartPanel } from "./chat/ChartPanel";
-import type { FibonacciAnalysisResponse } from "../services/analysis";
+import { ChatSidebar } from "./chat/ChatSidebar";
+import { useChatRestoration } from "../hooks/useChatRestoration";
+import { useUIStateSync } from "../hooks/useUIStateSync";
+import type { FibonacciMetadata } from "../utils/analysisMetadataExtractor";
+import { getPeriodForInterval } from "../utils/dateRangeCalculator";
 
 export function EnhancedChatInterface() {
   const [message, setMessage] = useState("");
@@ -17,12 +21,37 @@ export function EnhancedChatInterface() {
     start: string;
     end: string;
   }>({ start: "", end: "" });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  const { messages, setMessages, sessionId, setSessionId } = useChatManager();
+  const { messages, setMessages, chatId, setChatId } = useChatManager();
+
+  // Chat restoration hook
+  const { restoreChat } = useChatRestoration({
+    setMessages,
+    setCurrentSymbol,
+    setCurrentCompanyName,
+    setSelectedInterval,
+    setSelectedDateRange,
+    setChatId,
+  });
+
+  // Auto-sync UI state to MongoDB (debounced)
+  useUIStateSync({
+    activeChatId: chatId,
+    currentSymbol,
+    selectedInterval,
+    selectedDateRange,
+  });
 
   // Extract Fibonacci analysis for the current symbol AND timeframe
   const currentFibonacciAnalysis = useMemo(() => {
     if (!currentSymbol) return null;
+
+    console.log("🔍 Searching for Fibonacci data:", {
+      currentSymbol,
+      selectedInterval,
+      totalMessages: messages.length,
+    });
 
     // Find the most recent Fibonacci analysis for current symbol AND timeframe
     const fibMessage = [...messages]
@@ -36,7 +65,12 @@ export function EnhancedChatInterface() {
           msg.analysis_data.timeframe === selectedInterval,
       );
 
-    return fibMessage?.analysis_data as FibonacciAnalysisResponse | null;
+    console.log("📊 Fibonacci analysis result:", {
+      found: !!fibMessage,
+      fibonacciData: fibMessage?.analysis_data,
+    });
+
+    return fibMessage?.analysis_data as FibonacciMetadata | null;
   }, [messages, currentSymbol, selectedInterval]);
 
   // Chat mutation for user messages
@@ -46,8 +80,8 @@ export function EnhancedChatInterface() {
     setMessages,
     setSelectedDateRange,
     selectedInterval,
-    sessionId,
-    setSessionId,
+    chatId,
+    setChatId,
   );
 
   // Button analysis mutation for quick analysis buttons
@@ -57,24 +91,9 @@ export function EnhancedChatInterface() {
     setMessages,
     setSelectedDateRange,
     selectedInterval,
-    sessionId,
-    setSessionId,
+    chatId,
+    setChatId,
   );
-
-  const getPeriodForInterval = (interval: string) => {
-    switch (interval) {
-      case "1h":
-        return "1mo";
-      case "1d":
-        return "6mo";
-      case "1w":
-        return "1y";
-      case "1mo":
-        return "2y";
-      default:
-        return "6mo";
-    }
-  };
 
   const priceDataQuery = useQuery({
     queryKey: [
@@ -123,163 +142,43 @@ export function EnhancedChatInterface() {
   };
 
   // Old complex pattern matching logic removed
-  const handleQuickAnalysis_OLD = (
-    type: "fibonacci" | "fundamentals" | "macro" | "stochastic",
-  ) => {
-    if (type === "macro") {
-      buttonMutation.mutate("macro");
-      return;
-    }
-    if (!currentSymbol) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "❌ **Error**: Please select a stock symbol first.",
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-      return;
-    }
-
-    if (type === "fibonacci") {
-      // Create timeframe-specific message with current state values (not closure)
-      const timeframeDisplay =
-        selectedInterval === "1d"
-          ? "Daily"
-          : selectedInterval === "1w"
-            ? "Weekly"
-            : selectedInterval === "1M"
-              ? "Monthly"
-              : selectedInterval;
-
-      let queryWithTimeframe: string;
-
-      if (selectedDateRange.start && selectedDateRange.end) {
-        queryWithTimeframe = `Show me Fibonacci analysis for ${currentSymbol} (${timeframeDisplay} analysis: ${selectedDateRange.start} to ${selectedDateRange.end})`;
-      } else {
-        // Calculate the expected date range based on current interval
-        const today = new Date();
-        let periodsBack: Date;
-        let periodDescription: string;
-
-        switch (selectedInterval) {
-          case "1h":
-            periodsBack = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-            periodDescription = "last 30 days";
-            break;
-          case "1d":
-            periodsBack = new Date(
-              today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-            );
-            periodDescription = "last 6 months";
-            break;
-          case "1w":
-            periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
-            periodDescription = "last 1 year";
-            break;
-          case "1mo":
-            periodsBack = new Date(
-              today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000,
-            );
-            periodDescription = "last 2 years";
-            break;
-          default:
-            periodsBack = new Date(
-              today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-            );
-            periodDescription = "last 6 months";
-        }
-
-        const autoStartDate = periodsBack.toISOString().split("T")[0];
-        const autoEndDate = today.toISOString().split("T")[0];
-
-        queryWithTimeframe = `Show me Fibonacci analysis for ${currentSymbol} (${timeframeDisplay} analysis for ${periodDescription}: ${autoStartDate} to ${autoEndDate})`;
-      }
-
-      analysisMutation.mutate(queryWithTimeframe);
-      return;
-    }
-
-    if (type === "stochastic") {
-      // Create timeframe-specific message with current state values (not closure)
-      const timeframeDisplay =
-        selectedInterval === "1d"
-          ? "Daily"
-          : selectedInterval === "1w"
-            ? "Weekly"
-            : selectedInterval === "1M"
-              ? "Monthly"
-              : selectedInterval;
-
-      let queryWithTimeframe: string;
-
-      if (selectedDateRange.start && selectedDateRange.end) {
-        queryWithTimeframe = `Show me Stochastic analysis for ${currentSymbol} (${timeframeDisplay} analysis: ${selectedDateRange.start} to ${selectedDateRange.end})`;
-      } else {
-        // Calculate the expected date range based on current interval
-        const today = new Date();
-        let periodsBack: Date;
-        let periodDescription: string;
-
-        switch (selectedInterval) {
-          case "1h":
-            periodsBack = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-            periodDescription = "last 30 days";
-            break;
-          case "1d":
-            periodsBack = new Date(
-              today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-            );
-            periodDescription = "last 6 months";
-            break;
-          case "1w":
-            periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
-            periodDescription = "last 1 year";
-            break;
-          case "1mo":
-            periodsBack = new Date(
-              today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000,
-            );
-            periodDescription = "last 2 years";
-            break;
-          default:
-            periodsBack = new Date(
-              today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000,
-            );
-            periodDescription = "last 6 months";
-        }
-
-        const autoStartDate = periodsBack.toISOString().split("T")[0];
-        const autoEndDate = today.toISOString().split("T")[0];
-
-        queryWithTimeframe = `Show me Stochastic analysis for ${currentSymbol} (${timeframeDisplay} analysis for ${periodDescription}: ${autoStartDate} to ${autoEndDate})`;
-      }
-
-      analysisMutation.mutate(queryWithTimeframe);
-      return;
-    }
-
-    const queries = {
-      fundamentals: `Give me fundamental analysis for ${currentSymbol}`,
-    };
-    analysisMutation.mutate(queries[type]);
-  };
-
   const handleSendMessage = () => {
     if (!message.trim()) return;
     chatMutation.mutate(message); // All user messages go to LLM
     setMessage("");
   };
 
+  const handleChatSelect = (chatId: string) => {
+    restoreChat(chatId);
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setChatId(null);
+    setCurrentSymbol("");
+    setCurrentCompanyName("");
+    setSelectedDateRange({ start: "", end: "" });
+  };
+
   return (
     <div className="bg-white">
-      {/* Full-width trading interface */}
+      {/* Full-width trading interface with sidebar */}
       <div className="mx-auto">
         <div className="overflow-hidden">
           <div className="flex h-[calc(100vh-10rem)]">
-            {/* Chat Panel - Wider for better readability */}
-            <div className="flex flex-col w-full lg:w-3/5 border-r border-gray-200">
+            {/* Chat History Sidebar */}
+            <ChatSidebar
+              activeChatId={chatId}
+              onChatSelect={handleChatSelect}
+              onNewChat={handleNewChat}
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={() =>
+                setIsSidebarCollapsed(!isSidebarCollapsed)
+              }
+            />
+
+            {/* Chat Panel */}
+            <div className="flex flex-col flex-1 lg:w-2/5 border-r border-gray-200">
               <ChatMessages
                 messages={messages}
                 isAnalysisPending={
