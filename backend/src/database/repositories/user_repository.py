@@ -9,6 +9,7 @@ import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.user import User, UserCreate
+from ...services.password import hash_password
 
 logger = structlog.get_logger()
 
@@ -50,12 +51,19 @@ class UserRepository:
         else:
             username = f"User_{user_id[:8]}"
 
+        # Hash password if provided
+        password_hash = None
+        if user_create.password:
+            password_hash = hash_password(user_create.password)
+
         user = User(
             user_id=user_id,
             email=user_create.email,
             phone_number=user_create.phone_number,
             wechat_openid=user_create.wechat_openid,
             username=username,
+            password_hash=password_hash,
+            email_verified=False,  # Will be set to True after email verification
             created_at=datetime.utcnow(),
             last_login=None,
         )
@@ -64,13 +72,14 @@ class UserRepository:
         user_dict = user.model_dump()
 
         # Insert into database
-        result = await self.collection.insert_one(user_dict)
+        await self.collection.insert_one(user_dict)
 
         logger.info(
             "User created",
             user_id=user_id,
             email=user_create.email,
             phone=user_create.phone_number,
+            has_password=password_hash is not None,
         )
 
         return user
@@ -126,6 +135,26 @@ class UserRepository:
             User if found, None otherwise
         """
         user_dict = await self.collection.find_one({"phone_number": phone_number})
+
+        if not user_dict:
+            return None
+
+        # Remove MongoDB _id field
+        user_dict.pop("_id", None)
+
+        return User(**user_dict)
+
+    async def get_by_username(self, username: str) -> User | None:
+        """
+        Get user by username.
+
+        Args:
+            username: Username to search for
+
+        Returns:
+            User if found, None otherwise
+        """
+        user_dict = await self.collection.find_one({"username": username})
 
         if not user_dict:
             return None

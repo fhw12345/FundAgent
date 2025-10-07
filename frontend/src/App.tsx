@@ -52,7 +52,7 @@ function App() {
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent tracking-tight">
-                  Klinematrix
+                  KlineMatrix
                 </h1>
                 <span className="text-xs font-medium text-gray-500">
                   AI-Powered Financial Intelligence
@@ -119,7 +119,7 @@ function App() {
       <footer className="bg-white border-t mt-auto">
         <div className="mx-auto py-4 px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500">
-            Klinematrix - AI-Powered Financial Intelligence
+            KlineMatrix - AI-Powered Financial Intelligence
           </p>
         </div>
       </footer>

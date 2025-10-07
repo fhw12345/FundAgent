@@ -55,6 +55,10 @@ async def create_indexes():
     )
     print("  ✅ idx_wechat_openid (unique, partial)")
 
+    # Unique index on username (required field, always unique)
+    await users.create_index("username", unique=True, name="idx_username")
+    print("  ✅ idx_username (unique)")
+
     # Index on created_at (for analytics)
     await users.create_index("created_at", name="idx_created_at")
     print("  ✅ idx_created_at")

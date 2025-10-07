@@ -13,6 +13,7 @@ from ..core.config import get_settings
 from ..database.repositories.user_repository import UserRepository
 from ..models.user import User, UserCreate
 from .auth_providers import EmailAuthProvider
+from .password import verify_password
 
 logger = structlog.get_logger()
 settings = get_settings()
@@ -75,10 +76,16 @@ class AuthService:
             ValueError: If verification fails
         """
         if auth_type == "email":
+            if not code:
+                raise ValueError("Verification code required for email authentication")
             return await self._verify_email_login(identifier, code)
         elif auth_type == "phone":
+            if not code:
+                raise ValueError("Verification code required for phone authentication")
             return await self._verify_phone_login(identifier, code)
         elif auth_type == "wechat":
+            if not wechat_code:
+                raise ValueError("WeChat code required for WeChat authentication")
             return await self._verify_wechat_login(wechat_code)
         else:
             raise ValueError(f"Unsupported auth type: {auth_type}")
@@ -96,13 +103,24 @@ class AuthService:
         user = await self.user_repo.get_by_email(email)
 
         if not user:
-            # New user - create account
-            user_create = UserCreate(email=email)
+            # New user - create account with auto-generated username
+            # Username will be generated from email (e.g., user@163.com → User_163)
+            username = email.split("@")[0].replace(".", "_")[:20]
+            user_create = UserCreate(
+                email=email,
+                username=username,
+                password=None,
+                phone_number=None,
+                wechat_openid=None,
+            )
             user = await self.user_repo.create(user_create)
             logger.info("New user created via email", user_id=user.user_id)
         else:
             # Existing user - update last login
-            user = await self.user_repo.update_last_login(user.user_id)
+            updated_user = await self.user_repo.update_last_login(user.user_id)
+            if not updated_user:
+                raise ValueError("User not found after login")
+            user = updated_user
             logger.info("Existing user logged in", user_id=user.user_id)
 
         # Generate JWT token
@@ -119,6 +137,168 @@ class AuthService:
         """Verify WeChat OAuth and login (placeholder for future)."""
         # TODO: Implement WeChat OAuth provider
         raise NotImplementedError("WeChat authentication not yet implemented")
+
+    async def register_user(
+        self, email: str, code: str, username: str, password: str
+    ) -> tuple[User, str]:
+        """
+        Register a new user with email verification.
+
+        Flow:
+        1. Verify email code
+        2. Check if email/username already exists
+        3. Create user with username and password
+        4. Mark email as verified
+        5. Generate JWT token
+
+        Args:
+            email: Email address
+            code: Email verification code
+            username: Desired username (must be unique)
+            password: Plain text password (will be hashed)
+
+        Returns:
+            Tuple of (User, access_token)
+
+        Raises:
+            ValueError: If verification fails or user already exists
+        """
+        # Verify email code
+        is_valid = await self.email_provider.verify_code(email, code)
+        if not is_valid:
+            raise ValueError("Invalid or expired verification code")
+
+        logger.info("Email code verified for registration", email=email)
+
+        # Check if email or username already exists
+        existing_user_by_email = await self.user_repo.get_by_email(email)
+        if existing_user_by_email:
+            raise ValueError("Email already registered")
+
+        existing_user_by_username = await self.user_repo.get_by_username(username)
+        if existing_user_by_username:
+            raise ValueError("Username already taken")
+
+        # Create new user
+        user_create = UserCreate(
+            email=email,
+            username=username,
+            password=password,  # Will be hashed by repo
+            phone_number=None,
+            wechat_openid=None,
+        )
+        user = await self.user_repo.create(user_create)
+
+        # Mark email as verified (update in DB)
+        await self.user_repo.collection.update_one(
+            {"user_id": user.user_id}, {"$set": {"email_verified": True}}
+        )
+        user.email_verified = True
+
+        logger.info("New user registered", user_id=user.user_id, username=username)
+
+        # Generate JWT token
+        access_token = self.create_access_token(user.user_id)
+
+        return user, access_token
+
+    async def login_with_password(
+        self, username: str, password: str
+    ) -> tuple[User, str]:
+        """
+        Login with username and password.
+
+        Args:
+            username: Username
+            password: Plain text password
+
+        Returns:
+            Tuple of (User, access_token)
+
+        Raises:
+            ValueError: If credentials invalid
+        """
+        # Get user by username
+        user = await self.user_repo.get_by_username(username)
+
+        if not user:
+            raise ValueError("Invalid username or password")
+
+        # Check if user has password set
+        if not user.password_hash:
+            raise ValueError(
+                "Password not set for this account. Please use email login."
+            )
+
+        # Verify password
+        is_valid = verify_password(password, user.password_hash)
+        if not is_valid:
+            raise ValueError("Invalid username or password")
+
+        # Update last login
+        updated_user = await self.user_repo.update_last_login(user.user_id)
+        if not updated_user:
+            raise ValueError("User not found after login")
+
+        logger.info("User logged in with password", user_id=updated_user.user_id)
+
+        # Generate JWT token
+        access_token = self.create_access_token(updated_user.user_id)
+
+        return updated_user, access_token
+
+    async def reset_password(
+        self, email: str, code: str, new_password: str
+    ) -> tuple[User, str]:
+        """
+        Reset user password using email verification.
+
+        Flow:
+        1. Verify email code
+        2. Find user by email
+        3. Update password hash
+        4. Generate JWT token for auto-login
+
+        Args:
+            email: Email address
+            code: Email verification code
+            new_password: New password (will be hashed)
+
+        Returns:
+            Tuple of (User, access_token)
+
+        Raises:
+            ValueError: If verification fails or user not found
+        """
+        # Verify email code
+        is_valid = await self.email_provider.verify_code(email, code)
+        if not is_valid:
+            raise ValueError("Invalid or expired verification code")
+
+        logger.info("Email code verified for password reset", email=email)
+
+        # Get user by email
+        user = await self.user_repo.get_by_email(email)
+        if not user:
+            raise ValueError("No account found with this email address")
+
+        # Hash new password
+        from .password import hash_password
+
+        new_password_hash = hash_password(new_password)
+
+        # Update password in database
+        await self.user_repo.collection.update_one(
+            {"user_id": user.user_id}, {"$set": {"password_hash": new_password_hash}}
+        )
+        user.password_hash = new_password_hash
+
+        logger.info("Password reset successful", user_id=user.user_id)
+
+        # Generate JWT token for auto-login after reset
+        access_token = self.create_access_token(user.user_id)
+
+        return user, access_token
 
     def create_access_token(self, user_id: str) -> str:
         """

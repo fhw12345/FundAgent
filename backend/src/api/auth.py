@@ -55,6 +55,32 @@ class LoginResponse(BaseModel):
     user: User
 
 
+class RegisterRequest(BaseModel):
+    """Request to register a new user."""
+
+    email: str = Field(..., description="Email address")
+    code: str = Field(..., description="6-digit verification code")
+    username: str = Field(..., min_length=3, max_length=20, description="Username")
+    password: str = Field(..., min_length=8, description="Password (min 8 characters)")
+
+
+class LoginRequest(BaseModel):
+    """Request to login with username and password."""
+
+    username: str = Field(..., description="Username")
+    password: str = Field(..., description="Password")
+
+
+class ResetPasswordRequest(BaseModel):
+    """Request to reset password using email verification."""
+
+    email: str = Field(..., description="Email address")
+    code: str = Field(..., description="6-digit verification code")
+    new_password: str = Field(
+        ..., min_length=8, description="New password (min 8 characters)"
+    )
+
+
 # ===== Dependencies =====
 
 
@@ -102,7 +128,7 @@ async def send_verification_code(
     """
     try:
         if request.auth_type == "email":
-            code = await auth_service.send_code_email(request.identifier)
+            await auth_service.send_code_email(request.identifier)
         elif request.auth_type == "phone":
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
@@ -128,7 +154,7 @@ async def send_verification_code(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send verification code: {str(e)}",
-        )
+        ) from e
 
 
 @router.post("/verify-code", response_model=LoginResponse)
@@ -159,19 +185,137 @@ async def verify_code_and_login(
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail=str(e),
-        )
+        ) from e
     except ValueError as e:
         logger.warning("Verification failed", identifier=request.identifier)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
-        )
+        ) from e
     except Exception as e:
         logger.error("Login failed", error=str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed",
+        ) from e
+
+
+@router.post("/register", response_model=LoginResponse)
+async def register_user(
+    request: RegisterRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Register a new user with email verification.
+
+    Flow:
+    1. User sends email → receives code
+    2. User submits this endpoint with: email, code, username, password
+    3. System verifies code, creates user, returns JWT token
+    """
+    try:
+        user, access_token = await auth_service.register_user(
+            email=request.email,
+            code=request.code,
+            username=request.username,
+            password=request.password,
         )
+
+        return LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=user,
+        )
+
+    except ValueError as e:
+        logger.warning("Registration failed", email=request.email, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.error("Registration failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed",
+        ) from e
+
+
+@router.post("/login", response_model=LoginResponse)
+async def login_with_password(
+    request: LoginRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Login with username and password.
+
+    For users who have already registered.
+    Returns JWT access token for authenticated requests.
+    """
+    try:
+        user, access_token = await auth_service.login_with_password(
+            username=request.username,
+            password=request.password,
+        )
+
+        return LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=user,
+        )
+
+    except ValueError as e:
+        logger.warning("Login failed", username=request.username)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.error("Login failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login failed",
+        ) from e
+
+
+@router.post("/reset-password", response_model=LoginResponse)
+async def reset_password(
+    request: ResetPasswordRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    """
+    Reset password using email verification.
+
+    Flow:
+    1. User requests password reset (sends email → receives code)
+    2. User submits this endpoint with: email, code, new_password
+    3. System verifies code, updates password, returns JWT token (auto-login)
+    """
+    try:
+        user, access_token = await auth_service.reset_password(
+            email=request.email,
+            code=request.code,
+            new_password=request.new_password,
+        )
+
+        return LoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=user,
+        )
+
+    except ValueError as e:
+        logger.warning("Password reset failed", email=request.email, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        logger.error("Password reset failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Password reset failed",
+        ) from e
 
 
 @router.get("/me", response_model=User)

@@ -61,9 +61,9 @@ class Settings(BaseSettings):
     tencent_secret_key: str = ""  # Tencent Cloud API SecretKey (from Azure Key Vault)
     tencent_ses_region: str = "ap-guangzhou"  # ap-guangzhou or ap-hongkong
     tencent_ses_from_email: str = "noreply@klinematrix.com"
-    tencent_ses_from_name: str = "Klinematrix"
+    tencent_ses_from_name: str = "KlineMatrix"
     tencent_ses_template_id: int = 37066  # Template ID for verification emails
-    email_verification_subject: str = "Your Klinematrix Verification Code"
+    email_verification_subject: str = "Your KlineMatrix Verification Code"
     email_code_ttl_seconds: int = 300  # 5 minutes
 
     # Development mode settings

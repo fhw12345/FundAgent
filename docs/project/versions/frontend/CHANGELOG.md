@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-10-07
+
+### Added
+- feat: Add username/password login UI with registration flow (email → code → credentials)
+
+
 ### Planned
 - Advanced charting with TradingView integration
 - User authentication and session management

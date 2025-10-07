@@ -79,6 +79,90 @@ export async function verifyCodeAndLogin(
 }
 
 /**
+ * Register a new user with email verification
+ */
+export async function registerUser(
+  email: string,
+  code: string,
+  username: string,
+  password: string,
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      code,
+      username,
+      password,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Registration failed");
+  }
+
+  return response.json();
+}
+
+/**
+ * Login with username and password
+ */
+export async function loginWithPassword(
+  username: string,
+  password: string,
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      username,
+      password,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Login failed");
+  }
+
+  return response.json();
+}
+
+/**
+ * Reset password using email verification
+ */
+export async function resetPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      code,
+      new_password: newPassword,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Password reset failed");
+  }
+
+  return response.json();
+}
+
+/**
  * Get current user from token
  */
 export async function getCurrentUser(token: string): Promise<User> {

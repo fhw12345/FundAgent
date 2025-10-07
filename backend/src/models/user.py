@@ -13,7 +13,8 @@ class UserCreate(BaseModel):
     email: str | None = Field(None, description="Email address")
     phone_number: str | None = Field(None, description="Phone number with country code")
     wechat_openid: str | None = Field(None, description="WeChat OpenID")
-    username: str | None = Field(None, description="Display name")
+    username: str = Field(..., description="Username for login (unique)")
+    password: str | None = Field(None, description="Password (will be hashed)")
 
 
 class User(BaseModel):
@@ -23,7 +24,9 @@ class User(BaseModel):
     email: str | None = Field(None, description="Email address (unique if set)")
     phone_number: str | None = Field(None, description="Phone number (unique if set)")
     wechat_openid: str | None = Field(None, description="WeChat OpenID (unique if set)")
-    username: str = Field(..., description="Display name")
+    username: str = Field(..., description="Username for login (unique)")
+    password_hash: str | None = Field(None, description="Bcrypt password hash")
+    email_verified: bool = Field(False, description="Email verification status")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: datetime | None = Field(None, description="Last login timestamp")
 
