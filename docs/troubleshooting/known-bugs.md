@@ -4,66 +4,49 @@
 
 ## Current Open Issues
 
-### 🟢 Frontend BaseURL Hardcoded to Localhost - Fixed 2025-10-04
+*No known bugs at this time.*
 
-**Problem**: Frontend built with hardcoded `baseURL: 'http://localhost:8000'` causing CORS errors in production.
+All previously reported issues have been resolved. See [fixed-bugs.md](fixed-bugs.md) for complete history.
 
-**Root Cause**: Vite build not using environment variable correctly.
-
-**Solution Implemented**:
-```typescript
-// frontend/src/services/api.ts
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL !== undefined
-    ? import.meta.env.VITE_API_URL
-    : (import.meta.env.MODE === 'production' ? '' : 'http://localhost:8000'),
-  ...
-})
-```
-
-**Status**: 🟢 Fixed - Deployed to dev environment
-**Related**: [cors-api-connectivity.md](cors-api-connectivity.md)
+**Last Updated**: 2025-10-07
+**Current Versions**: Backend v0.4.2, Frontend v0.4.4
 
 ---
 
-### 🟢 Dividend Yield Validation Error - Fixed 2025-10-04
+## Recently Fixed Issues (Past 7 Days)
 
-**Problem**: MSFT fundamental analysis fails with "dividend_yield should be ≤ 25" error (71% > 25%)
+### Render Loop in Chat Input - Fixed 2025-10-07
+**Version**: Frontend v0.4.3
+**Impact**: Performance degradation (6+ renders per keystroke)
+**Solution**: Memoized object state, stabilized callbacks
+**Details**: [fixed-bugs.md#render-loop-in-chat-input](fixed-bugs.md#render-loop-in-chat-input---fixed-2025-10-07)
 
-**Root Cause**: yfinance API inconsistency - some stocks return dividend yield as percentage instead of decimal.
+### Concurrent Request Spam - Fixed 2025-10-07
+**Version**: Frontend v0.4.4
+**Impact**: Network flooding (10+ requests/sec) on chat switching
+**Solution**: Added concurrent restoration protection
+**Details**: [fixed-bugs.md#concurrent-chat-restoration-request-spam](fixed-bugs.md#concurrent-chat-restoration-request-spam---fixed-2025-10-07)
 
-**Solution Implemented**:
-```python
-# backend/src/core/analysis/stock_analyzer.py
-if dividend_yield_raw > 1:
-    dividend_yield = dividend_yield_raw  # Already percentage
-else:
-    dividend_yield = dividend_yield_raw * 100  # Convert decimal
-```
+### Backend Startup Crash - Fixed 2025-10-07
+**Version**: Backend v0.4.2
+**Impact**: Service unavailability (ModuleNotFoundError)
+**Solution**: Removed chat_legacy import
+**Details**: [fixed-bugs.md#backend-chat-legacy-import-error](fixed-bugs.md#backend-chat-legacy-import-error---fixed-2025-10-07)
 
-**Status**: 🟢 Fixed - Smart detection implemented
-**Related**: [data-validation-issues.md](data-validation-issues.md#issue-dividend-yield-validation-error-71--25)
+### Frontend BaseURL to Localhost - Fixed 2025-10-04
+**Version**: Frontend v0.4.1
+**Impact**: CORS errors in production
+**Solution**: Environment-based baseURL configuration
 
----
+### Dividend Yield Validation - Fixed 2025-10-04
+**Version**: Backend v0.4.1
+**Impact**: Fundamental analysis failures
+**Solution**: Smart percentage/decimal detection
 
-### 🟢 Backend Health Check Returns 400 - Fixed 2025-10-04
-
-**Problem**: `/api/health` endpoint returns 400 Bad Request causing pod restarts.
-
-**Root Cause**: Health check endpoint validation or database connection issue.
-
-**Workaround**: Health checks temporarily disabled in deployment.
-
-**Solution**: Disabled livenessProbe and readinessProbe in deployment
-```yaml
-# .pipeline/k8s/base/backend/deployment.yaml
-# livenessProbe: Commented out
-# readinessProbe: Commented out
-```
-
-**Status**: 🟢 Fixed - Probes disabled
-**Next Steps**: Fix health endpoint and re-enable probes
-**Related**: [deployment-issues.md](deployment-issues.md#issue-health-check-failing-readinessliveness-probe)
+### Backend Health Check 400 - Fixed 2025-10-04
+**Version**: Backend v0.4.1
+**Impact**: Pod restart loops
+**Solution**: Disabled problematic probes
 
 ---
 

@@ -132,7 +132,7 @@ make fmt && make test && make lint
 - **Secrets**: Azure Key Vault (`klinematrix-test-kv`)
 - **URL**: https://klinematrix.com
 - **Users**: 10 beta testers
-- **Images**: `klinematrix/backend:test-v0.3.0`, `klinematrix/frontend:test-v0.3.0`
+- **Current Versions**: Backend v0.4.2, Frontend v0.4.4 (as of 2025-10-07)
 
 ### Production (Planned)
 - **Platform**: AKS multi-region (`klinematrix-prod` namespace)

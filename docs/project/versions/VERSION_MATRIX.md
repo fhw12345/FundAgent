@@ -6,8 +6,8 @@ This document tracks compatibility between Financial Agent components across dif
 
 | Component | Version | Status | Released |
 |-----------|---------|--------|----------|
-| Backend | 0.4.1 | ✅ Current | 2025-10-07 |
-| Frontend | 0.4.1 | ✅ Current | 2025-10-07 |
+| Backend | 0.4.2 | ✅ Current | 2025-10-07 |
+| Frontend | 0.4.4 | ✅ Current | 2025-10-07 |
 
 ## Compatibility Table
 
@@ -15,6 +15,9 @@ This document tracks compatibility between Financial Agent components across dif
 
 | Backend | Frontend | Compatible | Notes |
 |---------|----------|------------|-------|
+| 0.4.2 | 0.4.4 | ✅ Yes | Performance fixes - render loop, request spam, startup crash |
+| 0.4.2 | 0.4.3 | ✅ Yes | Render loop fix + backend optimizations |
+| 0.4.1 | 0.4.3 | ✅ Yes | Frontend performance fixes work with v0.4.1 backend |
 | 0.4.1 | 0.4.1 | ✅ Yes | Bug fixes - MongoDB URL parsing, API URL fallback |
 | 0.4.0 | 0.4.0 | ⚠️ Partial | Works but has critical bugs (see 0.4.1 fixes) |
 | 0.4.0 | 0.3.0 | ❌ No | Auth endpoints missing in 0.3.0 |

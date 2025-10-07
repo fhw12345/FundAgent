@@ -375,3 +375,238 @@ useEffect(() => {
 ```
 
 **Lesson**: React Query mutation objects are recreated on every mutation. Use `mutate` function directly or exclude from dependencies.
+
+---
+
+## Render Loop in Chat Input - Fixed 2025-10-07
+
+**Problem**: Typing in chat input triggered 6+ renders per keystroke, causing laggy typing experience and poor performance
+
+**Symptom**:
+```
+🚨 RENDER LOOP DETECTED: 6 renders in 1 second
+🚨 RENDER LOOP DETECTED: 12 renders in 1 second
+```
+
+**Root Cause**: Unstable object references and callbacks causing cascade re-renders
+
+1. **Unstable Object State**: `selectedDateRange` object recreated on every render
+   ```typescript
+   // BEFORE (BUG)
+   const [selectedDateRange, setSelectedDateRange] = useState<{
+     start: string;
+     end: string;
+   }>({ start: "", end: "" });
+   // Every render creates NEW object with same values → triggers effects!
+   ```
+
+2. **Unstable Callbacks**: Event handlers recreated on every render
+   ```typescript
+   // BEFORE (BUG)
+   const handleSymbolSelect = (symbol: string, name: string) => {
+     // New function instance every render
+   };
+   ```
+
+3. **Cascade Effect**:
+   - User types → `message` state updates → parent re-renders
+   - New `selectedDateRange` object created → `useUIStateSync` effect sees "change"
+   - Effect runs → triggers mutation → parent re-renders again
+   - Loop continues! 🔁
+
+**Solution**: Stabilize all object references and callbacks
+
+`frontend/src/components/EnhancedChatInterface.tsx`:
+```typescript
+// 1. Split object state into primitives
+const [dateRangeStart, setDateRangeStart] = useState("");
+const [dateRangeEnd, setDateRangeEnd] = useState("");
+
+// 2. Memoize derived object (only recreates when primitives change)
+const selectedDateRange = useMemo(
+  () => ({ start: dateRangeStart, end: dateRangeEnd }),
+  [dateRangeStart, dateRangeEnd],
+);
+
+// 3. Stable setter with useCallback
+const setSelectedDateRange = useCallback(
+  (range: { start: string; end: string }) => {
+    setDateRangeStart(range.start);
+    setDateRangeEnd(range.end);
+  },
+  [],
+);
+
+// 4. Stabilize all event handlers
+const handleSymbolSelect = useCallback((symbol: string, name: string) => {
+  setCurrentSymbol(symbol);
+  setCurrentCompanyName(name);
+  setDateRangeStart("");
+  setDateRangeEnd("");
+}, []);
+
+const handleQuickAnalysis = useCallback(
+  (type: "fibonacci" | "fundamentals" | "macro" | "stochastic") => {
+    buttonMutation.mutate(type);
+  },
+  [buttonMutation.mutate], // Use stable .mutate reference
+);
+```
+
+**Additional Optimizations**:
+- Reduced duplicate query invalidations (only invalidate once after completion)
+- Combined MongoDB indexes (user_id + is_archived + last_message_at)
+- Skip UI state sync on chat restoration
+
+**Files Changed**:
+- `frontend/src/components/EnhancedChatInterface.tsx` (memoization, useCallback)
+- `frontend/src/hooks/useUIStateSync.ts` (skip sync on restoration)
+- `frontend/src/components/chat/useAnalysis.ts` (optimize invalidations)
+- `frontend/src/components/chat/useChatManager.ts` (rename sessionId → chatId)
+- `backend/scripts/init_indexes.py` (optimize indexes)
+
+**Verification**:
+```bash
+# Browser console should show:
+✅ Render #1 (1 in last 1s)  # One render per keystroke
+✅ Render #2 (1 in last 1s)
+✅ Render #3 (1 in last 1s)
+# (Not 6+ renders per keystroke)
+
+# When selecting chat:
+🔄 Chat changed, skipping initial sync
+# (Not "💾 UI state synced" on restoration)
+```
+
+**Version**: Frontend v0.4.3, Backend v0.4.2
+
+---
+
+## Concurrent Chat Restoration Request Spam - Fixed 2025-10-07
+
+**Problem**: Massive OPTIONS preflight request spam when switching between chats rapidly
+
+**Symptom**:
+```
+INFO: 183.47.101.192 - "OPTIONS /api/chat/chats/chat_01a08def1afc HTTP/1.1" 200 OK
+INFO: 183.47.101.192 - "OPTIONS /api/chat/chats/chat_01a08def1afc HTTP/1.1" 200 OK
+INFO: 183.47.101.192 - "OPTIONS /api/chat/chats/chat_01a08def1afc HTTP/1.1" 200 OK
+... (10+ duplicate requests per second)
+```
+
+**Root Cause**: No concurrent request protection allowing overlapping chat restoration requests
+
+1. **Double-click/Rapid Switching**: User rapidly clicking chat items
+2. **Component Re-renders**: State updates triggering handleChatSelect multiple times
+3. **React Query Aggressive Refetching**: useChatDetail refetching on mount/focus/reconnect
+
+**Solution**: Add concurrent request protection and optimize query behavior
+
+`frontend/src/components/EnhancedChatInterface.tsx`:
+```typescript
+const isRestoringRef = useRef(false);
+
+const handleChatSelect = useCallback(
+  async (chatId: string) => {
+    // Prevent concurrent restoration requests
+    if (isRestoringRef.current) {
+      console.log("⏭️ Skipping chat select: restoration in progress");
+      return;
+    }
+
+    isRestoringRef.current = true;
+    try {
+      await restoreChat(chatId);
+    } finally {
+      isRestoringRef.current = false;
+    }
+  },
+  [restoreChat],
+);
+```
+
+`frontend/src/hooks/useChats.ts`:
+```typescript
+export function useChatDetail(chatId: string | null, limit?: number) {
+  return useQuery({
+    queryKey: chatId ? chatKeys.detail(chatId) : [],
+    queryFn: () => {
+      if (!chatId) throw new Error("Chat ID is required");
+      return chatService.getChatDetail(chatId, limit);
+    },
+    enabled: !!chatId,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: false,      // Prevent refetch on mount
+    refetchOnWindowFocus: false, // Prevent refetch on focus
+    refetchOnReconnect: false,   // Prevent refetch on reconnect
+  });
+}
+```
+
+**Files Changed**:
+- `frontend/src/components/EnhancedChatInterface.tsx` (concurrent protection)
+- `frontend/src/hooks/useChats.ts` (disable aggressive refetching)
+
+**Verification**:
+```bash
+# Backend logs should show clean flow:
+INFO: Chat detail retrieved {"chat_id": "chat_b30b1155b888", "message_count": 1}
+INFO: GET /api/chat/chats/chat_b30b1155b888 HTTP/1.1" 200 OK
+INFO: GET /api/market/price/MSFT?interval=1d&period=6mo HTTP/1.1" 200 OK
+# (Single request per chat selection, not 10+)
+
+# Browser console:
+⏭️ Skipping chat select: restoration in progress
+# (If user rapidly clicks)
+```
+
+**Version**: Frontend v0.4.4
+
+---
+
+## Backend Chat Legacy Import Error - Fixed 2025-10-07
+
+**Problem**: Backend container restarting in loop, failing to start
+
+**Error**:
+```
+ModuleNotFoundError: No module named 'src.api.chat_legacy'
+```
+
+**Root Cause**: main.py still importing chat_legacy_router which was removed in previous refactoring (replaced with persistent MongoDB chat)
+
+`backend/src/main.py` (BEFORE):
+```python
+from .api.chat_legacy import router as chat_legacy_router  # ❌ Module doesn't exist
+...
+app.include_router(chat_legacy_router)  # ❌ Trying to register removed router
+```
+
+**Solution**: Remove chat_legacy import and router registration
+
+```python
+# Removed import
+# Removed: from .api.chat_legacy import router as chat_legacy_router
+
+# Removed router registration
+# Removed: app.include_router(chat_legacy_router)
+```
+
+**Why it happened**: chat_legacy.py was removed during MongoDB persistent chat migration, but main.py references weren't cleaned up
+
+**Files Changed**:
+- `backend/src/main.py` (remove import and router registration)
+
+**Verification**:
+```bash
+# Backend should start successfully:
+docker compose ps backend
+# STATUS: Up 10 seconds (healthy)
+
+# Health check should pass:
+curl https://klinematrix.com/api/health
+# {"status": "healthy"}
+```
+
+**Version**: Backend v0.4.2
