@@ -4,6 +4,7 @@ Handles CRUD operations for chat collection with UI state management.
 """
 
 from datetime import datetime
+from typing import Any
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -46,6 +47,7 @@ class ChatRepository:
             title=chat_create.title,
             is_archived=False,
             ui_state=UIState(),  # Default empty UI state
+            last_message_preview=None,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
             last_message_at=None,
@@ -85,6 +87,7 @@ class ChatRepository:
         self,
         user_id: str,
         limit: int = 50,
+        skip: int = 0,
         include_archived: bool = False,
     ) -> list[Chat]:
         """
@@ -93,18 +96,24 @@ class ChatRepository:
         Args:
             user_id: User identifier
             limit: Maximum number of chats to return
+            skip: Number of chats to skip (for pagination)
             include_archived: Whether to include archived chats
 
         Returns:
             List of chats sorted by last_message_at descending
         """
         # Build query
-        query = {"user_id": user_id}
+        query: dict[str, Any] = {"user_id": user_id}
         if not include_archived:
             query["is_archived"] = False
 
         # Find chats
-        cursor = self.collection.find(query).sort("last_message_at", -1).limit(limit)
+        cursor = (
+            self.collection.find(query)
+            .sort("last_message_at", -1)
+            .skip(skip)
+            .limit(limit)
+        )
 
         chats = []
         async for chat_dict in cursor:
@@ -126,7 +135,7 @@ class ChatRepository:
             Updated chat if found, None otherwise
         """
         # Build update dict (only include non-None fields)
-        update_dict = {"updated_at": datetime.utcnow()}
+        update_dict: dict[str, Any] = {"updated_at": datetime.utcnow()}
 
         if chat_update.title is not None:
             update_dict["title"] = chat_update.title
@@ -136,6 +145,9 @@ class ChatRepository:
 
         if chat_update.ui_state is not None:
             update_dict["ui_state"] = chat_update.ui_state.model_dump()
+
+        if chat_update.last_message_preview is not None:
+            update_dict["last_message_preview"] = chat_update.last_message_preview
 
         # Update in database
         result = await self.collection.find_one_and_update(

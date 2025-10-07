@@ -3,6 +3,8 @@ Chat service for managing conversations with LLM.
 Business logic layer coordinating chats, messages, and LLM interactions.
 """
 
+from typing import Any, Literal
+
 import structlog
 from pydantic import BaseModel, Field
 
@@ -11,7 +13,7 @@ from ..core.exceptions import NotFoundError, ValidationError
 from ..database.repositories.chat_repository import ChatRepository
 from ..database.repositories.message_repository import MessageRepository
 from ..models.chat import Chat, ChatCreate, ChatUpdate, UIState
-from ..models.message import Message, MessageCreate
+from ..models.message import Message, MessageCreate, MessageMetadata
 
 logger = structlog.get_logger()
 
@@ -128,10 +130,12 @@ class ChatService:
         self,
         chat_id: str,
         user_id: str,
-        role: str,
+        role: Literal["user", "assistant", "system"],
         content: str,
-        source: str,
-        metadata: dict | None = None,
+        source: Literal[
+            "user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"
+        ],
+        metadata: MessageMetadata | dict[str, Any] | None = None,
     ) -> Message:
         """
         Add message to chat and update chat timestamps.
@@ -142,7 +146,7 @@ class ChatService:
             role: Message role (user/assistant/system)
             content: Message content
             source: Message source (user/llm/fibonacci/etc.)
-            metadata: Optional message metadata
+            metadata: Optional message metadata (MessageMetadata or dict)
 
         Returns:
             Created message
@@ -153,16 +157,30 @@ class ChatService:
         # Verify chat ownership (raises NotFoundError if invalid)
         await self.get_chat(chat_id, user_id)
 
-        # Create message
-        from ..models.message import MessageMetadata
+        # Convert dict metadata to MessageMetadata if needed
+        if isinstance(metadata, dict):
+            # For dict, wrap it in raw_data if it's analysis data
+            if any(
+                key in metadata
+                for key in ["symbol", "timeframe", "fibonacci_levels", "stochastic_k"]
+            ):
+                metadata_obj = MessageMetadata(raw_data=metadata)
+            else:
+                # Try to construct MessageMetadata from dict fields
+                metadata_obj = MessageMetadata(**metadata)
+        elif metadata is None:
+            metadata_obj = MessageMetadata()
+        else:
+            metadata_obj = metadata
 
+        # Create message
         message = await self.message_repo.create(
             MessageCreate(
                 chat_id=chat_id,
                 role=role,
                 content=content,
                 source=source,
-                metadata=metadata or MessageMetadata(),
+                metadata=metadata_obj,
             )
         )
 

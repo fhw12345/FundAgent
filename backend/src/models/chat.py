@@ -3,6 +3,7 @@ Chat models for conversation management and UI state restoration.
 """
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -13,15 +14,17 @@ class UIState(BaseModel):
     Stores only current selections, not data (data lives in messages).
     """
 
-    current_symbol: str | None = Field(None, description="Currently selected symbol")
+    current_symbol: str | None = Field(
+        default=None, description="Currently selected symbol"
+    )
     current_interval: str = Field(
-        "1d", description="Current timeframe (1h, 1d, 1w, 1mo)"
+        default="1d", description="Current timeframe (1h, 1d, 1w, 1mo)"
     )
     current_date_range: dict[str, str | None] = Field(
-        default_factory=lambda: {"start": None, "end": None},
+        default={"start": None, "end": None},
         description="Custom date range if any",
     )
-    active_overlays: dict[str, dict] = Field(
+    active_overlays: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description="Active chart overlays {overlay_name: config_dict}",
     )
@@ -68,9 +71,7 @@ class Chat(BaseModel):
     is_archived: bool = Field(False, description="Archive status")
 
     # UI state for restoration (minimal - messages contain actual data)
-    ui_state: UIState = Field(
-        default_factory=UIState, description="UI restoration state"
-    )
+    ui_state: UIState = Field(default=UIState(), description="UI restoration state")
 
     # Denormalized preview for chat list (avoids loading all messages)
     last_message_preview: str | None = Field(

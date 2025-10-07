@@ -2,6 +2,8 @@
 Request/Response models for chat API endpoints.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from ...models.chat import Chat, UIState
@@ -31,11 +33,13 @@ class ChatRequest(BaseModel):
         max_length=200,
         description="Optional title for new chat (defaults to 'New Chat')",
     )
-    role: str = Field(
+    role: Literal["user", "assistant", "system"] = Field(
         "user",
-        description="Message role: 'user' or 'assistant'",
+        description="Message role: 'user', 'assistant', or 'system'",
     )
-    source: str = Field(
+    source: Literal[
+        "user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"
+    ] = Field(
         "user",
         description="Message source: 'user' (call LLM), 'fibonacci'/'stochastic'/'macro'/'fundamentals' (skip LLM), or 'llm'",
     )

@@ -41,13 +41,25 @@ export function useChatRestoration(callbacks: ChatRestoreCallbacks) {
 
         // Convert backend Message[] to frontend ChatMessage[]
         const restoredMessages: ChatMessage[] = chatDetail.messages.map(
-          (msg) => ({
-            role: msg.role as "user" | "assistant",
-            content: msg.content,
-            timestamp: msg.timestamp,
-            // Unwrap from raw_data field
-            analysis_data: msg.metadata?.raw_data || msg.metadata,
-          }),
+          (msg) => {
+            // Unwrap from raw_data field with validation
+            let analysis_data = undefined;
+            if (
+              msg.metadata?.raw_data &&
+              Object.keys(msg.metadata.raw_data).length > 0
+            ) {
+              analysis_data = msg.metadata.raw_data;
+            } else if (msg.metadata && Object.keys(msg.metadata).length > 0) {
+              analysis_data = msg.metadata;
+            }
+
+            return {
+              role: msg.role as "user" | "assistant",
+              content: msg.content,
+              timestamp: msg.timestamp,
+              analysis_data,
+            };
+          },
         );
 
         // Restore messages
@@ -101,7 +113,21 @@ export function useChatRestoration(callbacks: ChatRestoreCallbacks) {
         });
       } catch (error) {
         console.error("❌ Failed to restore chat:", error);
-        // On error, don't change current state
+
+        // Show user-friendly error message
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              "⚠️ Failed to restore this chat. The data may be corrupted or unavailable. Please try refreshing the page or start a new chat.",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+
+        // Clear state on error to prevent showing stale data
+        setCurrentSymbol("");
+        setCurrentCompanyName("");
+        setSelectedDateRange({ start: "", end: "" });
       }
     },
     [

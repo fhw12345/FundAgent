@@ -4,7 +4,7 @@ Everything is a message - user text, LLM responses, and analysis results.
 """
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,30 +16,40 @@ class MessageMetadata(BaseModel):
     """
 
     # Common fields for analysis messages
-    symbol: str | None = Field(None, description="Stock symbol")
-    timeframe: str | None = Field(None, description="Analysis timeframe")
+    symbol: str | None = Field(default=None, description="Stock symbol")
+    timeframe: str | None = Field(default=None, description="Analysis timeframe")
 
     # Fibonacci-specific
-    fibonacci_levels: list[dict] | None = Field(
-        None, description="Fibonacci retracement levels"
+    fibonacci_levels: list[dict[str, Any]] | None = Field(
+        default=None, description="Fibonacci retracement levels"
     )
-    trend_direction: str | None = Field(None, description="uptrend or downtrend")
-    swing_high: dict | None = Field(None, description="Swing high price and date")
-    swing_low: dict | None = Field(None, description="Swing low price and date")
-    confidence_score: float | None = Field(None, description="Analysis confidence")
+    trend_direction: str | None = Field(
+        default=None, description="uptrend or downtrend"
+    )
+    swing_high: dict[str, Any] | None = Field(
+        default=None, description="Swing high price and date"
+    )
+    swing_low: dict[str, Any] | None = Field(
+        default=None, description="Swing low price and date"
+    )
+    confidence_score: float | None = Field(
+        default=None, description="Analysis confidence"
+    )
 
     # Stochastic-specific
-    stochastic_k: float | None = Field(None, description="%K value")
-    stochastic_d: float | None = Field(None, description="%D value")
-    overbought: bool | None = Field(None, description="Overbought condition")
-    oversold: bool | None = Field(None, description="Oversold condition")
+    stochastic_k: float | None = Field(default=None, description="%K value")
+    stochastic_d: float | None = Field(default=None, description="%D value")
+    overbought: bool | None = Field(default=None, description="Overbought condition")
+    oversold: bool | None = Field(default=None, description="Oversold condition")
 
     # LLM-specific
-    model: str | None = Field(None, description="LLM model used")
-    tokens: int | None = Field(None, description="Token count")
+    model: str | None = Field(default=None, description="LLM model used")
+    tokens: int | None = Field(default=None, description="Token count")
 
     # Extensible - any additional data
-    raw_data: dict | None = Field(None, description="Raw analysis data")
+    raw_data: dict[str, Any] | None = Field(
+        default=None, description="Raw analysis data"
+    )
 
     class Config:
         json_schema_extra = {
@@ -64,8 +74,8 @@ class MessageCreate(BaseModel):
     chat_id: str
     role: Literal["user", "assistant", "system"]
     content: str
-    source: Literal["user", "llm", "fibonacci", "stochastic", "macro"]
-    metadata: MessageMetadata = Field(default_factory=MessageMetadata)
+    source: Literal["user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"]
+    metadata: MessageMetadata = MessageMetadata()
 
 
 class Message(BaseModel):
@@ -81,13 +91,13 @@ class Message(BaseModel):
         ..., description="Message role"
     )
     content: str = Field(..., description="Message text content")
-    source: Literal["user", "llm", "fibonacci", "stochastic", "macro"] = Field(
-        ..., description="Message source/type"
-    )
+    source: Literal[
+        "user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"
+    ] = Field(..., description="Message source/type")
 
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: MessageMetadata = Field(
-        default_factory=MessageMetadata,
+        default=MessageMetadata(),
         description="Flexible metadata for analysis data",
     )
 
