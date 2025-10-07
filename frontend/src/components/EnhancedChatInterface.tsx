@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { marketService, TimeInterval } from "../services/market";
 import { useChatManager } from "./chat/useChatManager";
@@ -168,9 +168,22 @@ export function EnhancedChatInterface() {
     setMessage("");
   }, [message, chatMutation.mutate]);
 
+  const isRestoringRef = useRef(false);
+
   const handleChatSelect = useCallback(
-    (chatId: string) => {
-      restoreChat(chatId);
+    async (chatId: string) => {
+      // Prevent concurrent restoration requests
+      if (isRestoringRef.current) {
+        console.log("⏭️ Skipping chat select: restoration in progress");
+        return;
+      }
+
+      isRestoringRef.current = true;
+      try {
+        await restoreChat(chatId);
+      } finally {
+        isRestoringRef.current = false;
+      }
     },
     [restoreChat],
   );

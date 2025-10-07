@@ -54,6 +54,9 @@ export function useChatDetail(chatId: string | null, limit?: number) {
     enabled: !!chatId, // Only fetch if chatId exists
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false, // Prevent refetch on component mount
+    refetchOnWindowFocus: false, // Prevent refetch on window focus
+    refetchOnReconnect: false, // Prevent refetch on reconnect
   });
 }
 
