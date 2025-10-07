@@ -470,3 +470,88 @@ az network public-ip update \
 - Verify DNS resolves before requesting certificate
 - Use staging Let's Encrypt for testing
 - Check ingress events after creation
+
+---
+
+## Issue: ExternalSecret Not Syncing (Workload Identity)
+
+### Symptoms
+```bash
+kubectl get externalsecret -n klinematrix-test
+# STATUS: SecretSyncedError, READY: False
+
+kubectl describe secretstore azure-keyvault-store -n klinematrix-test
+# Error: Tenant '${azure_tenant_id}' not found
+```
+
+### Root Cause
+- Workload identity service account has placeholder variables instead of actual values
+- Federated credential not created linking managed identity to service account
+- Managed identity not granted Key Vault access
+
+### Diagnosis
+```bash
+# Check service account annotations
+kubectl get serviceaccount klinematrix-sa -n klinematrix-test -o yaml
+# Should have actual client-id and tenant-id, not ${AZURE_CLIENT_ID}
+
+# Check ExternalSecret status
+kubectl describe externalsecret app-secrets -n klinematrix-test
+
+# Check SecretStore status
+kubectl describe secretstore azure-keyvault-store -n klinematrix-test
+```
+
+### Solution
+
+**Temporary workaround - Manual secret update:**
+```bash
+# Update secret directly (doesn't require ExternalSecrets)
+kubectl create secret generic app-secrets -n klinematrix-test \
+  --from-literal=key=value \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+**Proper fix - Configure workload identity:**
+```bash
+# 1. Create managed identity
+az identity create --name klinematrix-external-secrets \
+  --resource-group FinancialAgent --location koreacentral
+
+# 2. Grant Key Vault access (RBAC-enabled vault)
+PRINCIPAL_ID=$(az identity show --name klinematrix-external-secrets \
+  --resource-group FinancialAgent --query principalId -o tsv)
+
+az role assignment create \
+  --role "Key Vault Secrets User" \
+  --assignee $PRINCIPAL_ID \
+  --scope /subscriptions/.../vaults/klinematrix-test-kv
+
+# 3. Create federated credential
+CLIENT_ID=$(az identity show --name klinematrix-external-secrets \
+  --resource-group FinancialAgent --query clientId -o tsv)
+
+OIDC_ISSUER=$(az aks show --name FinancialAgent-AKS \
+  --resource-group FinancialAgent --query oidcIssuerProfile.issuerUrl -o tsv)
+
+az identity federated-credential create \
+  --name klinematrix-test-federated-credential \
+  --identity-name klinematrix-external-secrets \
+  --resource-group FinancialAgent \
+  --issuer "$OIDC_ISSUER" \
+  --subject "system:serviceaccount:klinematrix-test:klinematrix-sa" \
+  --audience api://AzureADTokenExchange
+
+# 4. Update service account
+TENANT_ID=$(az account show --query tenantId -o tsv)
+
+kubectl patch serviceaccount klinematrix-sa -n klinematrix-test \
+  --type merge \
+  -p "{\"metadata\":{\"annotations\":{\"azure.workload.identity/client-id\":\"$CLIENT_ID\",\"azure.workload.identity/tenant-id\":\"$TENANT_ID\"}}}"
+```
+
+### Prevention
+- Don't commit placeholder variables in base manifests
+- Use kustomize configMapGenerator for environment-specific values
+- Test ExternalSecrets sync after setup
+- Document workload identity configuration in deployment guide

@@ -86,7 +86,9 @@ class Settings(BaseSettings):
     @property
     def database_name(self) -> str:
         """Extract database name from MongoDB URL."""
-        return self.mongodb_url.split("/")[-1]
+        # Extract database name and strip query parameters
+        db_with_params = self.mongodb_url.split("/")[-1]
+        return db_with_params.split("?")[0] if "?" in db_with_params else db_with_params
 
     @property
     def is_development(self) -> bool:

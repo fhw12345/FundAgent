@@ -25,7 +25,7 @@ commonLabels:
 images:
 - name: klinematrix/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend
-  newTag: "test-v0.3.0"
+  newTag: "test-v0.4.0"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend
-  newTag: "test-v0.3.0"
+  newTag: "test-v0.4.0"

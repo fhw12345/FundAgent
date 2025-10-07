@@ -8,9 +8,10 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
 from .agent.session_manager import get_session_manager
 from .api.analysis import router as analysis_router
@@ -19,6 +20,7 @@ from .api.chat import router as chat_router
 from .api.health import router as health_router
 from .api.market_data import router as market_data_router
 from .core.config import get_settings
+from .core.exceptions import AppError
 from .database.mongodb import MongoDB
 from .database.redis import RedisCache
 
@@ -111,6 +113,30 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
     )
+
+    # Global exception handler for custom app errors
+    @app.exception_handler(AppError)
+    async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+        """
+        Handle all custom AppError exceptions with proper HTTP status codes.
+
+        This prevents DatabaseError, ConfigurationError, etc. from appearing as
+        generic 500 errors, making debugging much faster.
+        """
+        error_dict = exc.to_dict()
+
+        # Log error with full context
+        logger.error(
+            "Application error occurred",
+            path=request.url.path,
+            method=request.method,
+            **error_dict,
+        )
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message, "error_type": exc.error_type},
+        )
 
     # Include routers
     app.include_router(health_router, prefix="/api", tags=["health"])

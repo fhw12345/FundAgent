@@ -6,6 +6,8 @@ Following Factor 3: External Dependencies as Services.
 import structlog
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
+from ..core.exceptions import ConfigurationError, DatabaseError
+
 logger = structlog.get_logger()
 
 
@@ -19,20 +21,63 @@ class MongoDB:
     async def connect(self, mongodb_url: str) -> None:
         """Establish connection to MongoDB."""
         try:
-            self.client = AsyncIOMotorClient(mongodb_url)
+            # Extract and validate database name from URL
+            db_with_params = mongodb_url.split("/")[-1]
+            raw_db_name = db_with_params  # For logging
+            database_name = (
+                db_with_params.split("?")[0]
+                if "?" in db_with_params
+                else db_with_params
+            )
 
-            # Extract database name from URL
-            database_name = mongodb_url.split("/")[-1]
+            # Validate database name doesn't contain query parameters
+            if any(char in database_name for char in ["?", "&", "="]):
+                logger.error(
+                    "Invalid database name: contains query parameter characters",
+                    raw_value=raw_db_name,
+                    parsed_value=database_name,
+                    mongodb_url_suffix=db_with_params,
+                )
+                raise ConfigurationError(
+                    f"Database name '{database_name}' contains invalid characters (?, &, =). "
+                    f"Check MONGODB_URL format: should be mongodb://host/dbname?params",
+                    raw_db_name=raw_db_name,
+                    parsed_db_name=database_name,
+                )
+
+            # Log parsed database name for debugging
+            if db_with_params != database_name:
+                logger.info(
+                    "Database name extracted from URL",
+                    raw_url_suffix=db_with_params,
+                    parsed_db_name=database_name,
+                )
+
+            self.client = AsyncIOMotorClient(mongodb_url)
             self.database = self.client[database_name]
 
             # Test connection
             await self.client.admin.command("ping")
 
-            logger.info("MongoDB connection established", database=database_name)
+            logger.info(
+                "MongoDB connection established",
+                database=database_name,
+                connection_verified=True,
+            )
 
-        except Exception as e:
-            logger.error("Failed to connect to MongoDB", error=str(e))
+        except ConfigurationError:
+            # Re-raise configuration errors (already logged)
             raise
+        except Exception as e:
+            logger.error(
+                "Failed to connect to MongoDB",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise DatabaseError(
+                f"MongoDB connection failed: {str(e)}",
+                original_error=type(e).__name__,
+            ) from e
 
     async def disconnect(self) -> None:
         """Close MongoDB connection."""
@@ -67,5 +112,8 @@ class MongoDB:
     def get_collection(self, collection_name: str):
         """Get a MongoDB collection."""
         if self.database is None:
-            raise RuntimeError("Database connection not established")
+            raise DatabaseError(
+                "Cannot get collection: database connection not established",
+                collection_name=collection_name,
+            )
         return self.database[collection_name]
