@@ -24,11 +24,26 @@ export function useUIStateSync(props: UIStateSyncProps) {
 
   const updateMutation = useUpdateUIState();
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastChatIdRef = useRef<string | null>(null);
+  const isFirstRenderAfterChatChange = useRef(false);
 
   useEffect(() => {
     // Skip if no active chat (new chat scenario)
     if (!activeChatId) {
       return;
+    }
+
+    // Detect chat change (restoration)
+    if (lastChatIdRef.current !== activeChatId) {
+      lastChatIdRef.current = activeChatId;
+      isFirstRenderAfterChatChange.current = true;
+      console.log("🔄 Chat changed, skipping initial sync");
+      return; // Skip sync on first render after chat change
+    }
+
+    // Reset flag after first render
+    if (isFirstRenderAfterChatChange.current) {
+      isFirstRenderAfterChatChange.current = false;
     }
 
     // Clear existing timer

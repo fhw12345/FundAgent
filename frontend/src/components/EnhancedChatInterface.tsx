@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { marketService, TimeInterval } from "../services/market";
 import { useChatManager } from "./chat/useChatManager";
@@ -17,11 +17,24 @@ export function EnhancedChatInterface() {
   const [currentSymbol, setCurrentSymbol] = useState("");
   const [currentCompanyName, setCurrentCompanyName] = useState("");
   const [selectedInterval, setSelectedInterval] = useState<TimeInterval>("1d");
-  const [selectedDateRange, setSelectedDateRange] = useState<{
-    start: string;
-    end: string;
-  }>({ start: "", end: "" });
+  const [dateRangeStart, setDateRangeStart] = useState("");
+  const [dateRangeEnd, setDateRangeEnd] = useState("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Memoize selectedDateRange object to prevent recreation on every render
+  const selectedDateRange = useMemo(
+    () => ({ start: dateRangeStart, end: dateRangeEnd }),
+    [dateRangeStart, dateRangeEnd],
+  );
+
+  // Stable setter for date range
+  const setSelectedDateRange = useCallback(
+    (range: { start: string; end: string }) => {
+      setDateRangeStart(range.start);
+      setDateRangeEnd(range.end);
+    },
+    [],
+  );
 
   const { messages, setMessages, chatId, setChatId } = useChatManager();
 
@@ -119,46 +132,57 @@ export function EnhancedChatInterface() {
     retry: false,
   });
 
-  const handleSymbolSelect = (symbol: string, name: string) => {
+  const handleSymbolSelect = useCallback((symbol: string, name: string) => {
     setCurrentSymbol(symbol);
     setCurrentCompanyName(name);
-    setSelectedDateRange({ start: "", end: "" });
-  };
+    setDateRangeStart("");
+    setDateRangeEnd("");
+  }, []);
 
-  const handleIntervalChange = (interval: TimeInterval) => {
+  const handleIntervalChange = useCallback((interval: TimeInterval) => {
     setSelectedInterval(interval);
-    setSelectedDateRange({ start: "", end: "" });
-  };
+    setDateRangeStart("");
+    setDateRangeEnd("");
+  }, []);
 
-  const handleDateRangeSelect = (startDate: string, endDate: string) => {
-    setSelectedDateRange({ start: startDate, end: endDate });
-  };
+  const handleDateRangeSelect = useCallback(
+    (startDate: string, endDate: string) => {
+      setDateRangeStart(startDate);
+      setDateRangeEnd(endDate);
+    },
+    [],
+  );
 
-  const handleQuickAnalysis = (
-    type: "fibonacci" | "fundamentals" | "macro" | "stochastic",
-  ) => {
-    // All button clicks go directly to analysis endpoints
-    buttonMutation.mutate(type);
-  };
+  const handleQuickAnalysis = useCallback(
+    (type: "fibonacci" | "fundamentals" | "macro" | "stochastic") => {
+      // All button clicks go directly to analysis endpoints
+      buttonMutation.mutate(type);
+    },
+    [buttonMutation.mutate],
+  );
 
   // Old complex pattern matching logic removed
-  const handleSendMessage = () => {
+  const handleSendMessage = useCallback(() => {
     if (!message.trim()) return;
     chatMutation.mutate(message); // All user messages go to LLM
     setMessage("");
-  };
+  }, [message, chatMutation.mutate]);
 
-  const handleChatSelect = (chatId: string) => {
-    restoreChat(chatId);
-  };
+  const handleChatSelect = useCallback(
+    (chatId: string) => {
+      restoreChat(chatId);
+    },
+    [restoreChat],
+  );
 
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
     setMessages([]);
     setChatId(null);
     setCurrentSymbol("");
     setCurrentCompanyName("");
-    setSelectedDateRange({ start: "", end: "" });
-  };
+    setDateRangeStart("");
+    setDateRangeEnd("");
+  }, [setMessages, setChatId]);
 
   return (
     <div className="bg-white">

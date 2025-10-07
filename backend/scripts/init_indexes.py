@@ -71,19 +71,13 @@ async def create_indexes():
     await chats.create_index("chat_id", unique=True, name="idx_chat_id")
     print("  ✅ idx_chat_id (unique)")
 
-    # Compound index on user_id + last_message_at (for listing user's chats sorted)
+    # Optimal compound index for listing user's chats with archive filtering
+    # Covers query: { user_id, is_archived }.sort(last_message_at, -1)
     await chats.create_index(
-        [("user_id", 1), ("last_message_at", -1)],
-        name="idx_user_chats",
+        [("user_id", 1), ("is_archived", 1), ("last_message_at", -1)],
+        name="idx_user_chats_optimal",
     )
-    print("  ✅ idx_user_chats (user_id + last_message_at)")
-
-    # Compound index on user_id + is_archived (for filtering archived chats)
-    await chats.create_index(
-        [("user_id", 1), ("is_archived", 1)],
-        name="idx_user_archived",
-    )
-    print("  ✅ idx_user_archived (user_id + is_archived)")
+    print("  ✅ idx_user_chats_optimal (user_id + is_archived + last_message_at)")
 
     # Index on updated_at (for sorting)
     await chats.create_index("updated_at", name="idx_updated_at")

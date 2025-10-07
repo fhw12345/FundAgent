@@ -23,7 +23,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 
 export const useChatManager = () => {
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
 
-  return { messages, setMessages, sessionId, setSessionId };
+  return { messages, setMessages, chatId, setChatId };
 };

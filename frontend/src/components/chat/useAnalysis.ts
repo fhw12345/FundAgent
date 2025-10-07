@@ -95,8 +95,7 @@ export const useAnalysis = (
             if (setChatId) {
               setChatId(newChatId);
             }
-            // Invalidate chat list to show new chat in sidebar
-            queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+            // Don't invalidate here - wait for stream completion to avoid duplicate requests
           },
           (title: string) => {
             // Title generated callback - could update UI if needed
@@ -105,7 +104,7 @@ export const useAnalysis = (
           (finalChatId: string, messageCount: number) => {
             // Stream complete - use accumulated content (SAFE)
             resolve({ type: "chat", content: accumulatedContent });
-            // Invalidate chat list to update title and preview
+            // Invalidate chat list ONCE after stream completes
             queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
           },
           (error: string) => {
@@ -257,13 +256,13 @@ export const useButtonAnalysis = (
               if (setChatId) {
                 setChatId(newChatId);
               }
-              queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+              // Don't invalidate here - wait for completion to avoid duplicate requests
             },
             () => {
               // No title generation with custom title
             },
             (finalChatId: string, messageCount: number) => {
-              // Done callback
+              // Done callback - invalidate chat list ONCE after completion
               resolve(response);
               queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
             },
