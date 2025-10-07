@@ -2,50 +2,6 @@
 
 > **RULE**: Only concise, actionable rules here. No details, no repetition. See [docs/](docs/) for comprehensive documentation.
 
-## 📚 Documentation Index
-
-### Quick Links
-- **[Getting Started](docs/development/getting-started.md)** - Local setup, first deployment
-- **[Deployment Workflow](docs/deployment/workflow.md)** - Deploy changes to production
-- **[Coding Standards](docs/development/coding-standards.md)** - Python/TypeScript patterns
-- **[System Design](docs/architecture/system-design.md)** - Architecture overview
-
-### Complete Documentation Structure
-
-```
-docs/
-├── architecture/           # System design and patterns
-│   ├── agent-12-factors.md      # 12-Factor agent principles
-│   ├── agent-architecture.md    # LangChain/LangGraph implementation
-│   └── system-design.md         # Tech stack & architecture
-│
-├── deployment/            # Production deployment
-│   ├── cloud-setup.md          # Azure + Alibaba hybrid cloud
-│   ├── infrastructure.md       # Kubernetes resources & topology
-│   └── workflow.md             # Deploy, verify, rollback procedures
-│
-├── development/           # Local development
-│   ├── getting-started.md      # Quick start guide
-│   ├── coding-standards.md     # Code patterns & debugging
-│   ├── pipeline-workflow.md    # CI/CD & testing
-│   └── verification.md         # Health checks & validation
-│
-├── project/              # Project management
-│   ├── specifications.md       # Requirements & roadmap
-│   └── versions/              # 📦 Version management
-│       ├── README.md              # Versioning guidelines
-│       ├── VERSION_MATRIX.md      # Compatibility matrix
-│       ├── backend/CHANGELOG.md   # Backend version history
-│       └── frontend/CHANGELOG.md  # Frontend version history
-│
-└── troubleshooting/      # 🐛 Bug fixes & common issues
-    ├── README.md                   # Troubleshooting index
-    ├── cors-api-connectivity.md    # CORS & API issues
-    ├── data-validation-issues.md   # Validation errors
-    ├── deployment-issues.md        # Kubernetes issues
-    └── known-bugs.md              # Current bugs & status
-```
-
 ## Tech Stack
 
 | Layer | Technology |
@@ -54,7 +10,8 @@ docs/
 | **Frontend** | React 18 + TypeScript 5 + Vite + TailwindCSS |
 | **Deployment** | Kubernetes (AKS) + Azure + Alibaba Cloud |
 | **AI/LLM** | LangChain + LangGraph + Alibaba DashScope |
-| **Tooling** | Black, Ruff, MyPy (Python) \| ESLint, Prettier (TS) |
+
+> 📖 **See [System Design](docs/architecture/system-design.md) for architecture details**
 
 ## Development Workflow
 
@@ -76,30 +33,30 @@ cd frontend && npm test && npm run lint
 # Pre-commit hook validates version increment
 ```
 
-### 3. Deploy to Dev
+### 3. Deploy to Test
 ```bash
 # Build versioned images in Azure Container Registry
 BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
 
 az acr build --registry financialAgent \
-  --image financial-agent/backend:${BACKEND_VERSION}-dev \
+  --image klinematrix/backend:test-v${BACKEND_VERSION} \
   --file backend/Dockerfile backend/
 
-# Restart pods (with imagePullPolicy: Always)
-kubectl delete pod -l app=backend -n financial-agent-dev
+# Restart pods to pull new image (imagePullPolicy: Always)
+kubectl delete pod -l app=backend -n klinematrix-test
 ```
 
 ### 4. Verify
 ```bash
-# Check deployment
-kubectl get pods -n financial-agent-dev
+# Check deployment status
+kubectl get pods -n klinematrix-test
 
-# Test endpoints
+# Test health endpoint
 curl https://klinematrix.com/api/health
 ```
 
-**See [docs/deployment/workflow.md](docs/deployment/workflow.md) for complete procedures**
-**See [docs/project/versions/README.md](docs/project/versions/README.md) for versioning system**
+> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for complete procedures (build, deploy, verify, rollback)**
+> 📖 **See [Version Management](docs/project/versions/README.md) for versioning system and workflow**
 
 ## Code Standards
 
@@ -122,47 +79,6 @@ make fmt && make test && make lint  # Must pass before commit
 
 **See [docs/development/coding-standards.md](docs/development/coding-standards.md) for patterns & debugging**
 
-## Common Patterns & Debugging
-
-### API Validation Pattern
-```python
-# ✅ Validate symbols before suggesting
-ticker = yf.Ticker(symbol)
-history = ticker.history(period="5d")
-if history.empty:
-    raise ValueError(f"No data available for {symbol}")
-```
-
-### React Closure Trap Fix
-```typescript
-// ❌ Closure captures stale state
-const mutation = useMutation({
-  mutationFn: () => api.analyze(symbol)  // symbol is stale!
-});
-
-// ✅ Pass state explicitly
-const mutation = useMutation({
-  mutationFn: ({ symbol, timeframe }) =>
-    api.analyze({ symbol, timeframe })
-});
-```
-
-### Data Contract Synchronization
-```python
-# Backend Pydantic
-class Analysis(BaseModel):
-    interval: Literal["1d", "1h", "5m"]  # Add new value here
-
-# Frontend TypeScript
-type Interval = "1d" | "1h" | "5m"      // Must match exactly
-
-# User parsing - handle new format
-if "1 hour" in message: interval = "1h"
-```
-
-**422 errors** → Backend rejects frontend data (check contracts)
-**Silent fallbacks** → Frontend parsing fails (check user input handlers)
-
 ### Docker Hot Reload
 
 **Restart Required ❌**
@@ -178,42 +94,7 @@ if "1 hour" in message: interval = "1h"
 
 ## Project Methodology
 
-### Walking Skeleton Approach
-1. **Milestone 1**: End-to-end connectivity (Frontend → API → DB → Cache) ✅
-2. **Milestone 2**: Authentication + core business logic ✅
-3. **Milestone 3+**: Layer features incrementally 🚧
-
 **See [docs/development/verification.md](docs/development/verification.md) for validation procedures**
-
-## Key Resources
-
-### Architecture & Design
-- [12-Factor Agent Principles](docs/architecture/agent-12-factors.md)
-- [LangChain Implementation](docs/architecture/agent-architecture.md)
-- [System Design Overview](docs/architecture/system-design.md)
-
-### Deployment & Operations
-- [Cloud Setup Guide](docs/deployment/cloud-setup.md) - Azure + Alibaba hybrid
-- [Kubernetes Infrastructure](docs/deployment/infrastructure.md) - Resources, networking
-- [Deployment Workflow](docs/deployment/workflow.md) - Build, deploy, verify, rollback
-
-### Development
-- [Getting Started](docs/development/getting-started.md) - Local setup
-- [Coding Standards](docs/development/coding-standards.md) - Patterns & debugging
-- [CI/CD Pipeline](docs/development/pipeline-workflow.md) - Automated testing
-- [Verification Guide](docs/development/verification.md) - Health checks
-
-### Project Management
-- [Technical Specifications](docs/project/specifications.md) - Features & roadmap
-- [Versioning System](docs/project/versions/README.md) - Version management & workflow
-- [Version Matrix](docs/project/versions/VERSION_MATRIX.md) - Component compatibility
-
-### Troubleshooting
-- [Troubleshooting Index](docs/troubleshooting/README.md) - Bug fixes & common issues
-- [CORS & API Issues](docs/troubleshooting/cors-api-connectivity.md) - Connection problems
-- [Data Validation](docs/troubleshooting/data-validation-issues.md) - Pydantic errors
-- [Deployment Issues](docs/troubleshooting/deployment-issues.md) - Kubernetes problems
-- [Known Bugs](docs/troubleshooting/known-bugs.md) - Current open issues
 
 ## Quick Reference Commands
 
@@ -260,6 +141,15 @@ curl https://klinematrix.com/api/health
 4. Check Redis cache if caching issues
 5. Review External Secrets sync
 
+### 💡 Development Principles
+- **Find the root cause** - Don't fix symptoms, fix the underlying problem
+- **Less code is more** - Simplest solution that works is usually correct
+- **Avoid duplication** - Same logic in multiple places = bug waiting to happen
+- **Don't overcomplicate** - Complex solutions are harder to debug and maintain
+- **Compare environments** - When cloud differs from local, check config/credentials first
+
+**Example**: Database name parsing bug existed in TWO places (config.py + mongodb.py). Fix once, extract to shared utility if needed.
+
 ---
 
-**For detailed information, see the [complete documentation](docs/).**
+**Before any actions, always get context by reading the [docs main page](docs/README.md).**

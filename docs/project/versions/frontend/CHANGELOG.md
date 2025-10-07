@@ -7,10 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-10-07
+
+### Fixed
+- **API URL Fallback to Localhost** (Critical)
+  - Fixed `VITE_API_URL` fallback logic treating empty string as falsy
+  - Bug: `const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"`
+  - Empty string is falsy in JavaScript, so fallback to localhost:8000 was triggered
+  - Browser tried to connect to user's local machine instead of relative API URLs
+  - Changed fallback to empty string for proper relative URL behavior
+  - File: `frontend/src/services/authService.ts`
+
+### Architecture
+- **Clarified Pod Architecture**
+  - Frontend and backend run in **separate pods** (not same pod)
+  - Frontend pod serves static files via nginx
+  - React JavaScript runs in **user's browser**, not in pod
+  - Ingress routes: `/api/*` → backend pod, `/*` → frontend pod
+  - Browser needs relative URLs to reach backend via ingress
+
 ## [0.4.0] - 2025-10-07
 
 ### Added
-- feat: Add username/password login UI with registration flow (email → code → credentials)
+- **Authentication UI**
+  - Login page with email/password fields
+  - Registration flow: email → verification code → username/password
+  - Forgot password flow with email verification
+  - JWT token storage in localStorage
+  - Auto-login after successful registration/password reset
+  - Error handling and validation messages
 
 
 ### Planned

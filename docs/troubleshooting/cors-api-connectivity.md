@@ -5,7 +5,7 @@
 ### Symptoms
 ```
 Access to XMLHttpRequest at 'http://localhost:8000/api/health' from origin
-'https://financial-agent-dev.koreacentral.cloudapp.azure.com' has been blocked
+'https://klinematrix-test.koreacentral.cloudapp.azure.com' has been blocked
 by CORS policy: No 'Access-Control-Allow-Origin' header is present on the
 requested resource.
 ```
@@ -16,7 +16,7 @@ Frontend built with hardcoded `baseURL: 'http://localhost:8000'` instead of usin
 ### Diagnosis
 ```bash
 # Check frontend JavaScript for localhost references
-kubectl exec -n financial-agent-dev deployment/frontend -- \
+kubectl exec -n klinematrix-test deployment/frontend -- \
   grep -o 'baseURL[^,]*localhost[^,]*' /usr/share/nginx/html/assets/*.js
 ```
 
@@ -49,7 +49,7 @@ az acr build --registry financialAgent \
   --target production \
   --file frontend/Dockerfile frontend/
 
-kubectl delete pod -l app=frontend -n financial-agent-dev
+kubectl delete pod -l app=frontend -n klinematrix-test
 ```
 
 ### Prevention
@@ -63,7 +63,7 @@ kubectl delete pod -l app=frontend -n financial-agent-dev
 
 ### Symptoms
 ```bash
-curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health
+curl https://klinematrix-test.koreacentral.cloudapp.azure.com/api/health
 # Returns: Invalid host header
 ```
 
@@ -73,10 +73,10 @@ FastAPI's `TrustedHostMiddleware` rejects requests from the domain because it's 
 ### Diagnosis
 ```bash
 # Check backend logs
-kubectl logs deployment/backend -n financial-agent-dev | grep -i "host"
+kubectl logs deployment/backend -n klinematrix-test | grep -i "host"
 
 # Check TrustedHostMiddleware configuration
-kubectl exec deployment/backend -n financial-agent-dev -- \
+kubectl exec deployment/backend -n klinematrix-test -- \
   python -c "from src.core.config import get_settings; print(get_settings().allowed_hosts)"
 ```
 
@@ -103,7 +103,7 @@ def create_app() -> FastAPI:
 allowed_hosts: list[str] = [
     "localhost",
     "127.0.0.1",
-    "financial-agent-dev.koreacentral.cloudapp.azure.com",
+    "klinematrix-test.koreacentral.cloudapp.azure.com",
     "*.cloudapp.azure.com",  # Wildcard for Azure domains
 ]
 ```
@@ -114,7 +114,7 @@ az acr build --registry financialAgent \
   --image financial-agent/backend:dev-latest \
   --file backend/Dockerfile backend/
 
-kubectl delete pod -l app=backend -n financial-agent-dev
+kubectl delete pod -l app=backend -n klinematrix-test
 ```
 
 ### Prevention
@@ -137,13 +137,13 @@ Backend pod is not ready or backend service is not routing correctly.
 ### Diagnosis
 ```bash
 # Check backend pod status
-kubectl get pods -n financial-agent-dev
+kubectl get pods -n klinematrix-test
 
 # Check backend service
-kubectl get svc backend-service -n financial-agent-dev
+kubectl get svc backend-service -n klinematrix-test
 
 # Test backend directly from within cluster
-kubectl exec -n financial-agent-dev deployment/frontend -- \
+kubectl exec -n klinematrix-test deployment/frontend -- \
   curl -v http://backend-service:8000/api/health
 ```
 
@@ -152,25 +152,25 @@ kubectl exec -n financial-agent-dev deployment/frontend -- \
 **If backend pod is not ready:**
 ```bash
 # Check logs
-kubectl logs deployment/backend -n financial-agent-dev --tail=50
+kubectl logs deployment/backend -n klinematrix-test --tail=50
 
 # Common issues:
 # 1. Database connection failed - check External Secrets
-kubectl describe externalsecret database-secrets -n financial-agent-dev
+kubectl describe externalsecret database-secrets -n klinematrix-test
 
 # 2. Application crash - check logs for stack trace
-kubectl logs deployment/backend -n financial-agent-dev --previous
+kubectl logs deployment/backend -n klinematrix-test --previous
 ```
 
 **If backend service misconfigured:**
 ```bash
 # Verify service endpoints
-kubectl get endpoints backend-service -n financial-agent-dev
+kubectl get endpoints backend-service -n klinematrix-test
 
 # Should show backend pod IP:8000
 # If empty, check service selector matches pod labels
-kubectl get pod -n financial-agent-dev --show-labels
-kubectl describe svc backend-service -n financial-agent-dev
+kubectl get pod -n klinematrix-test --show-labels
+kubectl describe svc backend-service -n klinematrix-test
 ```
 
 ### Prevention
@@ -194,7 +194,7 @@ Backend CORS middleware not configured to allow the origin.
 ### Diagnosis
 ```bash
 # Check CORS configuration
-kubectl exec deployment/backend -n financial-agent-dev -- \
+kubectl exec deployment/backend -n klinematrix-test -- \
   python -c "from src.core.config import get_settings; print(get_settings().cors_origins)"
 ```
 
@@ -205,7 +205,7 @@ kubectl exec deployment/backend -n financial-agent-dev -- \
 # backend/src/core/config.py
 cors_origins: list[str] = [
     "http://localhost:3000",
-    "https://financial-agent-dev.koreacentral.cloudapp.azure.com",
+    "https://klinematrix-test.koreacentral.cloudapp.azure.com",
     "*",  # Allow all in dev (NOT for production)
 ]
 ```
@@ -221,7 +221,7 @@ env:
 **Deploy:**
 ```bash
 kubectl apply -k .pipeline/k8s/overlays/dev/
-kubectl rollout restart deployment/backend -n financial-agent-dev
+kubectl rollout restart deployment/backend -n klinematrix-test
 ```
 
 ### Prevention
@@ -242,7 +242,7 @@ Nginx configuration missing or incorrect proxy rules.
 ### Diagnosis
 ```bash
 # Check nginx config
-kubectl exec deployment/frontend -n financial-agent-dev -- \
+kubectl exec deployment/frontend -n klinematrix-test -- \
   cat /etc/nginx/conf.d/default.conf | grep -A 10 "location /api"
 ```
 
@@ -268,7 +268,7 @@ az acr build --registry financialAgent \
   --target production \
   --file frontend/Dockerfile frontend/
 
-kubectl delete pod -l app=frontend -n financial-agent-dev
+kubectl delete pod -l app=frontend -n klinematrix-test
 ```
 
 ### Prevention

@@ -3,58 +3,115 @@
 ## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Node.js 18+ (for local frontend development)
-- Python 3.12+ (for local backend development)
-- Git
+- **kubectl** configured with AKS cluster access
+- **Azure CLI** (az) authenticated
+- **Node.js 18+** (for local frontend development)
+- **Python 3.12+** (for local backend development)
+- **Git**
 
-### 1. Clone and Setup
+### 1. Clone Repository
 
 ```bash
 git clone <repository>
 cd financial_agent
-cp .env.example .env
-# Edit .env with your configuration
 ```
 
-### 2. Start Development Environment
+### 2. Access Deployed Services
 
+The application is deployed on Kubernetes. Access it via:
+
+**Production URLs:**
+- **Frontend**: https://klinematrix.com
+- **Backend API**: https://klinematrix.com/api/health
+- **API Docs**: https://klinematrix.com/api/docs
+
+**Verify deployment:**
 ```bash
-make dev
+# Check pod status
+kubectl get pods -n klinematrix-test
+
+# Check services
+kubectl get svc -n klinematrix-test
+
+# View backend logs
+kubectl logs -f deployment/backend -n klinematrix-test
+
+# View frontend logs
+kubectl logs -f deployment/frontend -n klinematrix-test
 ```
 
-This starts:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **MongoDB**: localhost:27017
-- **Redis**: localhost:6379
+### 3. Local Development (Optional)
 
-### 3. Verify Walking Skeleton
+For local code development with hot reload:
 
-Visit http://localhost:3000 and check the "Health Status" tab. You should see:
-- ✅ MongoDB connected
-- ✅ Redis connected
-- ✅ End-to-end connectivity confirmed
+**Backend:**
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -e ".[dev]"
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev  # Starts on http://localhost:5173
+```
+
+**Note**: Local development requires port-forwarding to access Kubernetes services:
+```bash
+# Forward MongoDB
+kubectl port-forward -n klinematrix-test svc/mongodb-service 27017:27017
+
+# Forward Redis
+kubectl port-forward -n klinematrix-test svc/redis-service 6379:6379
+```
+
+### 4. Verify Walking Skeleton
+
+**Via production deployment:**
+```bash
+curl https://klinematrix.com/api/health | python3 -m json.tool
+```
+
+Expected response:
+```json
+{
+  "status": "ok",
+  "environment": "test",
+  "dependencies": {
+    "mongodb": {"connected": true},
+    "redis": {"connected": true}
+  }
+}
+```
 
 ## Development Commands
 
 ```bash
-# Development
-make dev          # Start development environment
-make up           # Start all services
-make down         # Stop all services
-make logs         # View service logs
-
 # Code Quality (REQUIRED before commits)
 make fmt          # Format all code
 make lint         # Lint all code
 make test         # Run all tests
 
-# Building
-make build        # Build Docker images
-make clean        # Clean up Docker resources
+# Backend-specific
+cd backend
+make test-backend # Run Python tests
+make lint-backend # Lint Python code
+
+# Frontend-specific
+cd frontend
+npm test          # Run React tests
+npm run lint      # Lint TypeScript code
+
+# Version Management
+./scripts/bump-version.sh backend patch   # Increment backend version
+./scripts/bump-version.sh frontend minor  # Increment frontend version
 ```
+
+**Note**: Every commit must increment at least one component version. Pre-commit hooks enforce this.
 
 ## Project Structure
 
@@ -78,9 +135,10 @@ financial_agent/
 │   └── Dockerfile          # Frontend container
 ├── docs/                   # Documentation
 ├── .pipeline/              # Kubernetes and CI/CD
-├── docker-compose.yml      # Development orchestration
-├── Makefile               # Development commands
-└── README.md              # Project overview
+│   └── k8s/               # Kubernetes manifests
+├── scripts/               # Utility scripts
+├── Makefile              # Development commands
+└── README.md             # Project overview
 ```
 
 ## Tech Stack Overview
@@ -111,12 +169,12 @@ financial_agent/
 ### Backend Development
 
 ```bash
-# Start backend with hot reload
+# Option 1: Direct Python execution (fastest hot reload)
 cd backend
-python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-
-# Or use Docker Compose (recommended)
-docker-compose up backend
+python -m venv venv
+source venv/bin/activate
+pip install -e ".[dev]"
+uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 **Backend Hot Reload:**
@@ -125,16 +183,17 @@ docker-compose up backend
 - New dependencies: Restart required ❌
 - Global/module-level changes: Restart required ❌
 
+**Testing backend directly:**
+```bash
+curl http://localhost:8000/api/health
+```
+
 ### Frontend Development
 
 ```bash
-# Start frontend with hot reload
 cd frontend
 npm install
-npm run dev
-
-# Or use Docker Compose (recommended)
-docker-compose up frontend
+npm run dev  # Starts on http://localhost:5173
 ```
 
 **Frontend Hot Reload:**
@@ -142,14 +201,36 @@ docker-compose up frontend
 - CSS/styling changes: Auto-reload ✅
 - New dependencies: Restart required ❌
 
-### Database Development
+**Testing frontend:**
+Visit http://localhost:5173 in your browser.
 
+### Database Access
+
+**MongoDB:**
 ```bash
-# Access MongoDB shell
-docker-compose exec mongodb mongosh
+# Via port-forward to Kubernetes
+kubectl port-forward -n klinematrix-test svc/mongodb-service 27017:27017
 
-# Access Redis CLI
-docker-compose exec redis redis-cli
+# Then connect locally
+mongosh mongodb://localhost:27017/klinematrix_test
+```
+
+**Redis:**
+```bash
+# Via port-forward to Kubernetes
+kubectl port-forward -n klinematrix-test svc/redis-service 6379:6379
+
+# Then connect locally
+redis-cli -h localhost -p 6379
+```
+
+**Or access directly in pods:**
+```bash
+# MongoDB shell in pod
+kubectl exec -it deployment/mongodb -n klinematrix-test -- mongosh
+
+# Redis CLI in pod
+kubectl exec -it deployment/redis -n klinematrix-test -- redis-cli
 ```
 
 ## Code Standards
@@ -213,100 +294,140 @@ This ensures:
 
 ## Environment Variables
 
-### Backend (.env)
-```env
-ENVIRONMENT=development
-MONGODB_URL=mongodb://mongodb:27017/financial_agent
-REDIS_URL=redis://redis:6379/0
-CORS_ORIGINS='["*"]'
-LOG_LEVEL=DEBUG
+### Backend (Kubernetes Deployment)
+Environment variables are configured in Kubernetes deployments and ConfigMaps:
+
+**Key Variables:**
+```yaml
+ENVIRONMENT: test
+MONGODB_URL: mongodb://mongodb-service:27017/klinematrix_test
+REDIS_URL: redis://redis-service:6379
+CORS_ORIGINS: '["https://klinematrix.com"]'
+EMAIL_BYPASS_MODE: true  # Test environment only
 ```
 
-### Frontend (.env)
+See `.pipeline/k8s/base/backend/deployment.yaml` for complete configuration.
+
+### Frontend (Local Development)
+Create `frontend/.env.local` for local development:
 ```env
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
+For production builds, API URL is auto-detected from window.location.
+
 ## Troubleshooting
 
-### Services Won't Start
+### Backend Not Responding
 
 ```bash
-# Clean up and restart
-make clean
-make dev
+# Check pod status
+kubectl get pods -n klinematrix-test -l app=backend
 
-# Check for port conflicts
-lsof -i :3000  # Frontend
-lsof -i :8000  # Backend
-lsof -i :27017 # MongoDB
-lsof -i :6379  # Redis
+# Check pod logs
+kubectl logs -f deployment/backend -n klinematrix-test
+
+# Restart backend pods
+kubectl rollout restart deployment/backend -n klinematrix-test
+
+# Check service endpoints
+kubectl get endpoints backend-service -n klinematrix-test
 ```
 
-### Backend Shows "unhealthy"
+### Frontend Shows 503 Error
 
 ```bash
-# Check backend logs
-docker-compose logs backend
+# Check frontend pod status
+kubectl get pods -n klinematrix-test -l app=frontend
 
-# Restart backend
-docker-compose restart backend
-
-# Check database connectivity
-docker-compose logs mongodb
-docker-compose logs redis
-```
-
-### Frontend Not Loading
-
-```bash
 # Check frontend logs
-docker-compose logs frontend
+kubectl logs -f deployment/frontend -n klinematrix-test
 
-# Verify frontend container is running
-docker-compose ps frontend
-
-# Restart frontend
-docker-compose restart frontend
+# Restart frontend pods
+kubectl rollout restart deployment/frontend -n klinematrix-test
 ```
 
 ### Database Connection Errors
 
 ```bash
-# Restart databases
-docker-compose restart mongodb redis backend
+# Check database pod status
+kubectl get pods -n klinematrix-test -l app=mongodb
+kubectl get pods -n klinematrix-test -l app=redis
 
 # Check database logs
-docker-compose logs mongodb
-docker-compose logs redis
+kubectl logs deployment/mongodb -n klinematrix-test
+kubectl logs deployment/redis -n klinematrix-test
+
+# Verify service endpoints
+kubectl get endpoints mongodb-service -n klinematrix-test
+kubectl get endpoints redis-service -n klinematrix-test
+
+# Restart backend after database restart
+kubectl rollout restart deployment/backend -n klinematrix-test
+```
+
+### Local Development Issues
+
+**Port conflicts:**
+```bash
+# Check for processes using ports
+lsof -i :5173  # Frontend dev server
+lsof -i :8000  # Backend
+lsof -i :27017 # MongoDB port-forward
+lsof -i :6379  # Redis port-forward
+```
+
+**Port-forward not working:**
+```bash
+# Kill existing port-forwards
+pkill -f "port-forward"
+
+# Restart port-forwards
+kubectl port-forward -n klinematrix-test svc/mongodb-service 27017:27017 &
+kubectl port-forward -n klinematrix-test svc/redis-service 6379:6379 &
 ```
 
 ### Hot Reload Not Working
 
 **If code changes aren't reflected:**
-1. Check if it's a type of change that requires restart (see Hot Reload sections above)
-2. If yes, restart the service:
+
+**For local development:**
+1. Check if change requires restart (dependencies, module-level code)
+2. Stop and restart the dev server:
    ```bash
-   docker-compose restart backend  # or frontend
+   # Backend: Ctrl+C, then restart uvicorn
+   # Frontend: Ctrl+C, then npm run dev
    ```
-3. If no, check logs for errors:
-   ```bash
-   docker-compose logs backend  # or frontend
-   ```
+
+**For Kubernetes deployment:**
+```bash
+# Rebuild image with new version
+./scripts/bump-version.sh backend patch
+az acr build --registry financialagent --image klinematrix/backend:test-v{VERSION} --file backend/Dockerfile backend/
+
+# Update deployment
+kubectl set image deployment/backend backend=financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v{VERSION} -n klinematrix-test
+
+# Or force pod restart
+kubectl rollout restart deployment/backend -n klinematrix-test
+```
 
 ## Next Steps
 
 Once your development environment is running:
 
-1. **Explore the Interface** - Try the chat interface and health monitoring
+1. **Explore the Interface** - Visit https://klinematrix.com
 2. **Review the Code** - Check out backend and frontend source code
-3. **Read the Architecture** - See [docs/architecture/system-design.md](/Users/allenpan/Desktop/repos/projects/financial_agent/docs/architecture/system-design.md)
-4. **Review Coding Standards** - See [docs/development/coding-standards.md](/Users/allenpan/Desktop/repos/projects/financial_agent/docs/development/coding-standards.md)
-5. **Start Building** - Pick a task and start developing!
+3. **Read the Architecture** - See [System Design](../architecture/system-design.md)
+4. **Review Coding Standards** - See [Coding Standards](coding-standards.md)
+5. **Review Deployment** - See [Deployment Workflow](../deployment/workflow.md)
+6. **Start Building** - Pick a task and start developing!
 
 ## Resources
 
-- **API Documentation**: http://localhost:8000/docs
-- **Project Specifications**: [docs/project/specifications.md](/Users/allenpan/Desktop/repos/projects/financial_agent/docs/project/specifications.md)
-- **12-Factor Agent Guide**: [docs/architecture/agent-12-factors.md](/Users/allenpan/Desktop/repos/projects/financial_agent/docs/architecture/agent-12-factors.md)
+- **API Documentation**: https://klinematrix.com/api/docs
+- **Complete Documentation**: [docs/README.md](../README.md)
+- **Project Specifications**: [docs/project/specifications.md](../project/specifications.md)
+- **12-Factor Agent Guide**: [docs/architecture/agent-12-factors.md](../architecture/agent-12-factors.md)
+- **Troubleshooting**: [docs/troubleshooting/README.md](../troubleshooting/README.md)
 - **Deployment Guide**: [docs/deployment/workflow.md](/Users/allenpan/Desktop/repos/projects/financial_agent/docs/deployment/workflow.md)

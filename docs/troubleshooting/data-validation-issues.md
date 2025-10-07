@@ -19,7 +19,7 @@ yfinance API inconsistency:
 ### Diagnosis
 ```bash
 # Check what yfinance returns for a symbol
-kubectl exec deployment/backend -n financial-agent-dev -- python << 'EOF'
+kubectl exec deployment/backend -n klinematrix-test -- python << 'EOF'
 import yfinance as yf
 ticker = yf.Ticker("MSFT")
 print(f"Dividend Yield: {ticker.info.get('dividendYield')}")
@@ -53,7 +53,7 @@ az acr build --registry financialAgent \
   --image financial-agent/backend:dev-latest \
   --file backend/Dockerfile backend/
 
-kubectl delete pod -l app=backend -n financial-agent-dev
+kubectl delete pod -l app=backend -n klinematrix-test
 ```
 
 **Fixed in**: `backend/src/core/analysis/stock_analyzer.py:84-97`
@@ -147,7 +147,7 @@ External API returns `None` or invalid values, but Pydantic field is not Optiona
 grep "pe_ratio" backend/src/api/models.py
 
 # Check if yfinance returns None
-kubectl exec deployment/backend -n financial-agent-dev -- python << 'EOF'
+kubectl exec deployment/backend -n klinematrix-test -- python << 'EOF'
 import yfinance as yf
 ticker = yf.Ticker("BRK.B")  # Berkshire doesn't have P/E
 print(f"PE Ratio: {ticker.info.get('trailingPE')}")

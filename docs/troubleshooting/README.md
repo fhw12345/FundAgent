@@ -7,8 +7,8 @@ This directory contains documentation for bugs, fixes, and common issues encount
 ### Common Issues
 - [CORS & API Connectivity](cors-api-connectivity.md) - CORS errors, localhost issues, nginx proxy problems
 - [Data Validation](data-validation-issues.md) - Pydantic validation errors, data format mismatches
-- [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems
-- [Frontend Issues](frontend-issues.md) - React state issues, build problems, browser errors
+- [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems, service selectors
+- [MongoDB Indexes](mongodb-unique-indexes-with-nulls.md) - Unique index handling with NULL values
 
 ### Bug Reports
 - [Known Bugs](known-bugs.md) - Current open issues and workarounds
@@ -85,12 +85,12 @@ Pydantic validation failures, type mismatches, data format issues
 ### Deployment Issues
 Kubernetes problems, image pulls, pod crashes, health check failures
 
-### Frontend Issues
-React errors, build failures, browser compatibility, state management
+### MongoDB Indexes
+Unique index configuration, handling NULL values in multi-auth systems
 
 ## Emergency Contacts
 
 If you encounter a critical production issue:
 1. Check [deployment/workflow.md](../deployment/workflow.md) for rollback procedures
-2. Review logs: `kubectl logs -f deployment/backend -n financial-agent-dev`
-3. Check health: `curl https://financial-agent-dev.koreacentral.cloudapp.azure.com/api/health`
+2. Review logs: `kubectl logs -f deployment/backend -n klinematrix-test`
+3. Check health: `curl https://klinematrix-test.koreacentral.cloudapp.azure.com/api/health`

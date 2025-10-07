@@ -7,10 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-10-07
+
+### Fixed
+- **MongoDB Database Name Parsing** (Critical)
+  - Fixed database name extraction to strip query parameters from Cosmos DB URLs
+  - Bug: `mongodb://host/dbname?ssl=true` was parsed as `dbname?ssl=true` instead of `dbname`
+  - Added validation to detect invalid characters in database names
+  - Fixed in both `config.py` and `mongodb.py`
+  - Hidden locally because local MongoDB doesn't use query parameters
+
+### Added
+- **Custom Exception Hierarchy**
+  - Added `ConfigurationError` for configuration validation failures
+  - Added `DatabaseError` for database connection/operation failures
+  - Proper error categorization (400=user error, 500=database, 503=external service)
+
+### Changed
+- **Enhanced MongoDB Logging**
+  - Log parsed vs raw database name when query parameters present
+  - Log validation errors with detailed context (raw value, parsed value, invalid chars)
+  - Added `error_type` field to all error logs for better debugging
+  - Connection verification logged with `connection_verified=True`
+
 ## [0.4.0] - 2025-10-07
 
 ### Added
-- feat: Add username/password authentication with email verification for registration
+- **Authentication System**
+  - Username/password registration with email verification
+  - Email verification code system (6-digit codes, 5-min expiry)
+  - Password-based login with JWT tokens
+  - Forgot password flow with email verification
+  - Bcrypt password hashing for security
+  - Tencent Cloud SES integration for email delivery
 
 
 ### Planned

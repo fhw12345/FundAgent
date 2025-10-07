@@ -62,7 +62,7 @@
 - **Configuration**: Multi-region, auto-scaling
 
 #### Azure Key Vault
-- **Name**: `financial-agent-dev-kv`
+- **Name**: `klinematrix-test-kv`
 - **Purpose**: Centralized secret management
 - **Secrets to Store**:
   - `mongodb-url`: Cosmos DB connection string
@@ -158,13 +158,13 @@ az cosmosdb create \
 ```bash
 # Create Key Vault
 az keyvault create \
-  --name financial-agent-dev-kv \
+  --name klinematrix-test-kv \
   --resource-group FinancialAgent \
   --location koreacentral
 
 # Enable Azure AD authentication
 az keyvault update \
-  --name financial-agent-dev-kv \
+  --name klinematrix-test-kv \
   --resource-group FinancialAgent \
   --enable-rbac-authorization true
 ```
@@ -224,13 +224,13 @@ MONGODB_URL=$(az cosmosdb keys list \
   --query "connectionStrings[0].connectionString" -o tsv)
 
 az keyvault secret set \
-  --vault-name financial-agent-dev-kv \
+  --vault-name klinematrix-test-kv \
   --name mongodb-url \
   --value "$MONGODB_URL"
 
 # Store Alibaba DashScope API key (get from Alibaba Cloud Console)
 az keyvault secret set \
-  --vault-name financial-agent-dev-kv \
+  --vault-name klinematrix-test-kv \
   --name dashscope-api-key \
   --value "your-dashscope-api-key"
 ```
@@ -403,38 +403,109 @@ Target: s2.domainkey.u10419013.wl014.sendgrid.net
 Proxy: DNS only
 ```
 
-### SendGrid Email Service Setup
+### Tencent Cloud SES (Simple Email Service) Setup
 
-#### Account Setup
-1. Create account at https://sendgrid.com (free tier: 100 emails/day)
-2. Verify email address
+**Status**: ✅ Currently in use for production email sending
 
-#### Domain Authentication
-1. Settings → Sender Authentication → Authenticate Your Domain
-2. DNS Host: Other (Cloudflare)
-3. Domain: `klinematrix.com`
-4. Add generated CNAME records to Cloudflare
-5. Click Verify
+#### Overview
+Tencent Cloud SES is used for transactional emails (password reset, verification codes) instead of SendGrid.
 
-#### API Key Creation
+**Key Features**:
+- API-based email sending
+- Authentication via SecretId/SecretKey
+- Integrated with Alibaba Cloud infrastructure
+- See [Fixed Bugs - Tencent SES Authentication](../troubleshooting/fixed-bugs.md) for implementation details
+
+#### Configuration in Kubernetes
+
+**Stored in Azure Key Vault** (synced via External Secrets Operator):
 ```bash
-# Create API key in SendGrid dashboard
-# Settings → API Keys → Create API Key
-# Name: klinematrix-production
-# Permissions: Mail Send (minimum) or Full Access
-
-# Store in Azure Key Vault
-az keyvault secret set \
-  --vault-name financial-agent-dev-kv \
-  --name sendgrid-api-key \
-  --value "SG.xxxxxxxxxxxxx"
+# Secret name: tencent-ses-credentials
+# Fields:
+# - TENCENT_SECRET_ID
+# - TENCENT_SECRET_KEY
 ```
 
-#### Email Authentication Explained
-- **SPF**: Authorizes SendGrid's servers to send email from your domain
-- **DKIM**: Cryptographic signature proving email authenticity
-- **DMARC**: Policy for handling authentication failures
-- **Purpose**: Prevents emails from going to spam, required by Gmail/Yahoo
+**Environment variables** (set in backend deployment):
+```yaml
+env:
+- name: TENCENT_SECRET_ID
+  valueFrom:
+    secretKeyRef:
+      name: tencent-ses-credentials
+      key: TENCENT_SECRET_ID
+- name: TENCENT_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: tencent-ses-credentials
+      key: TENCENT_SECRET_KEY
+```
+
+#### Test Environment Bypass
+
+Test environment uses `EMAIL_BYPASS_MODE=true` to skip actual email sending during development:
+```yaml
+env:
+- name: EMAIL_BYPASS_MODE
+  value: "true"
+```
+
+This allows testing password reset flows without sending real emails.
+
+#### Production Setup Checklist
+
+**If setting up fresh Tencent SES credentials:**
+
+1. **Obtain Tencent Cloud credentials**
+   - Log in to Tencent Cloud Console
+   - Navigate to CAM (Cloud Access Management)
+   - Create API key for SES service
+   - Note down `SecretId` and `SecretKey`
+
+2. **Store in Azure Key Vault**
+   ```bash
+   az keyvault secret set \
+     --vault-name klinematrix-test-kv \
+     --name tencent-ses-credentials \
+     --value '{"TENCENT_SECRET_ID":"xxx","TENCENT_SECRET_KEY":"yyy"}'
+   ```
+
+3. **Configure External Secrets to sync**
+   ```yaml
+   # Already configured in .pipeline/k8s/base/external-secrets.yaml
+   apiVersion: external-secrets.io/v1beta1
+   kind: ExternalSecret
+   metadata:
+     name: tencent-ses-credentials
+   spec:
+     target:
+       name: tencent-ses-credentials
+   ```
+
+4. **Verify secret sync**
+   ```bash
+   kubectl get secret tencent-ses-credentials -n klinematrix-test
+   kubectl describe externalsecret tencent-ses-credentials -n klinematrix-test
+   ```
+
+#### Email Authentication (Future Enhancement)
+
+**Note**: Currently using basic API authentication. For production-grade email delivery, consider:
+- **SPF**: Authorize Tencent's mail servers for your domain
+- **DKIM**: Add cryptographic signatures to emails
+- **DMARC**: Set policy for authentication failures
+- **Purpose**: Improves deliverability, prevents spam classification
+
+**Alternative**: If Tencent SES has deliverability issues, SendGrid is a proven alternative with better Gmail/Yahoo compatibility.
+
+#### Troubleshooting
+
+**Common Issues**:
+- **Invalid credentials**: Check Azure Key Vault secret format
+- **External Secrets not syncing**: Verify workload identity configuration
+- **Emails not sending in test**: Verify `EMAIL_BYPASS_MODE=true` is set
+
+See [Troubleshooting - Fixed Bugs](../troubleshooting/fixed-bugs.md) for detailed password reset flow debugging.
 
 ## Quick Start Commands
 
@@ -447,16 +518,16 @@ az keyvault secret set \
 kubectl apply -k .pipeline/k8s/overlays/dev/
 
 # Verify deployment
-kubectl get pods -n financial-agent-dev
+kubectl get pods -n klinematrix-test
 ```
 
 ### Day-to-Day Operations
 ```bash
 # Check status
-kubectl get pods -n financial-agent-dev
+kubectl get pods -n klinematrix-test
 
 # View logs
-kubectl logs -f deployment/backend -n financial-agent-dev
+kubectl logs -f deployment/backend -n klinematrix-test
 
 # Update deployment
 kubectl apply -k .pipeline/k8s/overlays/dev/

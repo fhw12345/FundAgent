@@ -4,7 +4,7 @@
 
 ### Symptoms
 ```bash
-kubectl get pods -n financial-agent-dev
+kubectl get pods -n klinematrix-test
 # NAME                      READY   STATUS             RESTARTS   AGE
 # backend-xxx-yyy           0/1     ImagePullBackOff   0          2m
 ```
@@ -18,7 +18,7 @@ kubectl get pods -n financial-agent-dev
 ### Diagnosis
 ```bash
 # Check pod events
-kubectl describe pod -l app=backend -n financial-agent-dev | grep -A 10 Events
+kubectl describe pod -l app=backend -n klinematrix-test | grep -A 10 Events
 
 # Verify image exists in ACR
 az acr repository show-tags \
@@ -50,13 +50,13 @@ az aks update \
   --attach-acr financialAgent
 
 # Restart pod after attaching
-kubectl delete pod -l app=backend -n financial-agent-dev
+kubectl delete pod -l app=backend -n klinematrix-test
 ```
 
 **If image tag wrong:**
 ```bash
 # Check deployment image reference
-kubectl get deployment backend -n financial-agent-dev -o jsonpath='{.spec.template.spec.containers[0].image}'
+kubectl get deployment backend -n klinematrix-test -o jsonpath='{.spec.template.spec.containers[0].image}'
 
 # Should match: financialagent-gxftdbbre4gtegea.azurecr.io/financial-agent/backend:dev-latest
 ```
@@ -73,7 +73,7 @@ kubectl get deployment backend -n financial-agent-dev -o jsonpath='{.spec.templa
 
 ### Symptoms
 ```bash
-kubectl get pods -n financial-agent-dev
+kubectl get pods -n klinematrix-test
 # NAME                      READY   STATUS             RESTARTS   AGE
 # backend-xxx-yyy           0/1     CrashLoopBackOff   5          5m
 ```
@@ -88,13 +88,13 @@ Application crashes on startup due to:
 ### Diagnosis
 ```bash
 # Check current logs
-kubectl logs deployment/backend -n financial-agent-dev --tail=50
+kubectl logs deployment/backend -n klinematrix-test --tail=50
 
 # Check previous container logs (after crash)
-kubectl logs deployment/backend -n financial-agent-dev --previous
+kubectl logs deployment/backend -n klinematrix-test --previous
 
 # Check environment variables
-kubectl exec deployment/backend -n financial-agent-dev -- env | grep -E "MONGO|REDIS|ENVIRONMENT"
+kubectl exec deployment/backend -n klinematrix-test -- env | grep -E "MONGO|REDIS|ENVIRONMENT"
 ```
 
 ### Solution
@@ -102,21 +102,21 @@ kubectl exec deployment/backend -n financial-agent-dev -- env | grep -E "MONGO|R
 **Database connection issues:**
 ```bash
 # Check External Secrets are synced
-kubectl get externalsecret -n financial-agent-dev
-kubectl describe externalsecret database-secrets -n financial-agent-dev
+kubectl get externalsecret -n klinematrix-test
+kubectl describe externalsecret database-secrets -n klinematrix-test
 
 # If not synced, check SecretStore
-kubectl describe secretstore azure-keyvault-store -n financial-agent-dev
+kubectl describe secretstore azure-keyvault-store -n klinematrix-test
 
 # Force refresh External Secret
-kubectl delete externalsecret database-secrets -n financial-agent-dev
+kubectl delete externalsecret database-secrets -n klinematrix-test
 kubectl apply -k .pipeline/k8s/overlays/dev/
 ```
 
 **Missing environment variables:**
 ```bash
 # Check deployment env vars
-kubectl get deployment backend -n financial-agent-dev -o yaml | grep -A 20 "env:"
+kubectl get deployment backend -n klinematrix-test -o yaml | grep -A 20 "env:"
 
 # Add missing vars to overlay
 vim .pipeline/k8s/overlays/dev/backend-dev-patch.yaml
@@ -128,7 +128,7 @@ kubectl apply -k .pipeline/k8s/overlays/dev/
 **Application errors:**
 ```bash
 # Get detailed error
-kubectl logs deployment/backend -n financial-agent-dev --previous | tail -30
+kubectl logs deployment/backend -n klinematrix-test --previous | tail -30
 
 # Common Python errors:
 # - ImportError: Module not found -> rebuild with dependencies
@@ -157,13 +157,13 @@ Docker build not targeting production stage or using wrong base image.
 ### Diagnosis
 ```bash
 # Check pod logs
-kubectl logs deployment/frontend -n financial-agent-dev | head -10
+kubectl logs deployment/frontend -n klinematrix-test | head -10
 
 # If shows "vite" -> using dev mode
 # Should show nginx logs: "GET / HTTP/1.1" 200
 
 # Check which image stage is running
-kubectl describe pod -l app=frontend -n financial-agent-dev | grep -A 3 "Image:"
+kubectl describe pod -l app=frontend -n klinematrix-test | grep -A 3 "Image:"
 ```
 
 ### Solution
@@ -175,7 +175,7 @@ az acr build --registry financialAgent \
   --target production \
   --file frontend/Dockerfile frontend/
 
-kubectl delete pod -l app=frontend -n financial-agent-dev
+kubectl delete pod -l app=frontend -n klinematrix-test
 ```
 
 **Verify Dockerfile has production stage:**
@@ -202,10 +202,10 @@ CMD ["nginx", "-g", "daemon off;"]
 
 ### Symptoms
 ```bash
-kubectl get pods -n financial-agent-dev
+kubectl get pods -n klinematrix-test
 # STATUS: OOMKilled or CrashLoopBackOff
 
-kubectl describe pod frontend-xxx -n financial-agent-dev
+kubectl describe pod frontend-xxx -n klinematrix-test
 # Reason: OOMKilled
 ```
 
@@ -215,13 +215,13 @@ Container uses more memory than the defined limit.
 ### Diagnosis
 ```bash
 # Check memory limits
-kubectl get pod -l app=frontend -n financial-agent-dev -o jsonpath='{.items[0].spec.containers[0].resources}'
+kubectl get pod -l app=frontend -n klinematrix-test -o jsonpath='{.items[0].spec.containers[0].resources}'
 
 # Check actual memory usage
-kubectl top pod -l app=frontend -n financial-agent-dev
+kubectl top pod -l app=frontend -n klinematrix-test
 
 # Check logs before OOMKill
-kubectl logs deployment/frontend -n financial-agent-dev --previous
+kubectl logs deployment/frontend -n klinematrix-test --previous
 ```
 
 ### Solution
@@ -252,7 +252,7 @@ az acr build --registry financialAgent \
 **Apply and restart:**
 ```bash
 kubectl apply -k .pipeline/k8s/overlays/dev/
-kubectl delete pod -l app=frontend -n financial-agent-dev
+kubectl delete pod -l app=frontend -n klinematrix-test
 ```
 
 ### Prevention
@@ -267,7 +267,7 @@ kubectl delete pod -l app=frontend -n financial-agent-dev
 
 ### Symptoms
 ```bash
-kubectl describe pod backend-xxx -n financial-agent-dev
+kubectl describe pod backend-xxx -n klinematrix-test
 # Warning  Unhealthy  10s (x3 over 20s)  kubelet  Readiness probe failed: HTTP probe failed
 ```
 
@@ -279,14 +279,14 @@ kubectl describe pod backend-xxx -n financial-agent-dev
 ### Diagnosis
 ```bash
 # Test health endpoint directly
-kubectl exec deployment/backend -n financial-agent-dev -- \
+kubectl exec deployment/backend -n klinematrix-test -- \
   curl -v http://localhost:8000/api/health
 
 # Check probe configuration
-kubectl get deployment backend -n financial-agent-dev -o yaml | grep -A 10 "livenessProbe"
+kubectl get deployment backend -n klinematrix-test -o yaml | grep -A 10 "livenessProbe"
 
 # Check backend logs during probe
-kubectl logs -f deployment/backend -n financial-agent-dev
+kubectl logs -f deployment/backend -n klinematrix-test
 ```
 
 ### Solution
@@ -294,10 +294,10 @@ kubectl logs -f deployment/backend -n financial-agent-dev
 **If health endpoint returns 400/500:**
 ```bash
 # Check backend logs for error
-kubectl logs deployment/backend -n financial-agent-dev | grep "api/health"
+kubectl logs deployment/backend -n klinematrix-test | grep "api/health"
 
 # Temporarily disable probes for debugging
-kubectl edit deployment backend -n financial-agent-dev
+kubectl edit deployment backend -n klinematrix-test
 # Comment out livenessProbe and readinessProbe sections
 
 # Fix health endpoint code
@@ -353,10 +353,10 @@ Kubernetes cached the image because tag hasn't changed and `imagePullPolicy` not
 ### Diagnosis
 ```bash
 # Check when image was pulled
-kubectl describe pod -l app=backend -n financial-agent-dev | grep -E "Image:|Pulled:"
+kubectl describe pod -l app=backend -n klinematrix-test | grep -E "Image:|Pulled:"
 
 # Check imagePullPolicy
-kubectl get deployment backend -n financial-agent-dev -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}'
+kubectl get deployment backend -n klinematrix-test -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}'
 ```
 
 ### Solution
@@ -373,10 +373,10 @@ containers:
 **Force pull new image:**
 ```bash
 # Delete pod to force fresh pull
-kubectl delete pod -l app=backend -n financial-agent-dev
+kubectl delete pod -l app=backend -n klinematrix-test
 
 # Or use rollout restart
-kubectl rollout restart deployment/backend -n financial-agent-dev
+kubectl rollout restart deployment/backend -n klinematrix-test
 ```
 
 **Alternative: Use unique tags:**
@@ -390,7 +390,7 @@ az acr build --registry financialAgent \
 # Update deployment to use new tag
 kubectl set image deployment/backend \
   backend=financialagent-gxftdbbre4gtegea.azurecr.io/financial-agent/backend:${COMMIT_SHA} \
-  -n financial-agent-dev
+  -n klinematrix-test
 ```
 
 ### Prevention
@@ -405,7 +405,7 @@ kubectl set image deployment/backend \
 
 ### Symptoms
 ```bash
-curl https://financial-agent-dev.koreacentral.cloudapp.azure.com
+curl https://klinematrix-test.koreacentral.cloudapp.azure.com
 # 404 Not Found or Connection refused
 ```
 
@@ -418,13 +418,13 @@ curl https://financial-agent-dev.koreacentral.cloudapp.azure.com
 ### Diagnosis
 ```bash
 # Check ingress exists
-kubectl get ingress -n financial-agent-dev
+kubectl get ingress -n klinematrix-test
 
 # Check ingress details
-kubectl describe ingress financial-agent-ingress -n financial-agent-dev
+kubectl describe ingress financial-agent-ingress -n klinematrix-test
 
 # Check certificate status
-kubectl get certificate -n financial-agent-dev
+kubectl get certificate -n klinematrix-test
 
 # Check nginx ingress controller
 kubectl get pods -n ingress-nginx
@@ -445,11 +445,11 @@ helm install nginx-ingress ingress-nginx/ingress-nginx \
 kubectl get pods -n cert-manager
 
 # Check certificate order
-kubectl describe certificate financial-agent-tls -n financial-agent-dev
+kubectl describe certificate financial-agent-tls -n klinematrix-test
 
 # If failed, delete and recreate
-kubectl delete certificate financial-agent-tls -n financial-agent-dev
-kubectl delete secret financial-agent-tls -n financial-agent-dev
+kubectl delete certificate financial-agent-tls -n klinematrix-test
+kubectl delete secret financial-agent-tls -n klinematrix-test
 kubectl apply -k .pipeline/k8s/overlays/dev/
 ```
 
@@ -462,7 +462,7 @@ kubectl get svc -n ingress-nginx
 az network public-ip update \
   --resource-group MC_FinancialAgent_FinancialAgent-AKS_koreacentral \
   --name <public-ip-name> \
-  --dns-name financial-agent-dev
+  --dns-name klinematrix-test
 ```
 
 ### Prevention
@@ -555,3 +555,293 @@ kubectl patch serviceaccount klinematrix-sa -n klinematrix-test \
 - Use kustomize configMapGenerator for environment-specific values
 - Test ExternalSecrets sync after setup
 - Document workload identity configuration in deployment guide
+
+---
+
+## Issue: Service Has No Endpoints (Label Selector Mismatch)
+
+### Symptoms
+```bash
+# Pods are running and healthy
+kubectl get pods -n klinematrix-test
+# NAME                     READY   STATUS    RESTARTS   AGE
+# backend-xxx-yyy          1/1     Running   0          5m
+
+# But service has no endpoints
+kubectl describe svc backend-service -n klinematrix-test
+# Selector: app=backend,app.kubernetes.io/version=0.4.1
+# Endpoints: <none>  # ❌ No endpoints!
+
+# Application returns 503 or Connection refused
+curl https://klinematrix.com/api/health
+# 503 Service Temporarily Unavailable
+```
+
+### Root Cause
+Kustomize's `commonLabels` adds labels to **service selectors**, making them require exact matches. When pods have different version labels than the service selector requires, the service finds zero matching pods.
+
+**Example of mismatch:**
+```bash
+# Service requires version 0.4.1
+kubectl describe svc backend-service -n klinematrix-test
+# Selector: app.kubernetes.io/name=klinematrix,app.kubernetes.io/version=0.4.1,app=backend
+
+# But pod has version 0.3.0
+kubectl get pod backend-xxx-yyy -n klinematrix-test --show-labels
+# Labels: app.kubernetes.io/version=0.3.0,app=backend
+```
+
+The service selector is **immutable** after creation, so `kubectl apply` cannot fix it:
+```bash
+kubectl apply -k .pipeline/k8s/base
+# Error: spec.selector: Invalid value: ... field is immutable
+```
+
+### Diagnosis
+```bash
+# 1. Check service selector
+kubectl describe svc backend-service -n klinematrix-test | grep "Selector"
+# Note: look for version labels in selector
+
+# 2. Check service endpoints (should be empty if mismatch)
+kubectl get endpoints backend-service -n klinematrix-test
+# Endpoints: <none>
+
+# 3. Check pod labels
+kubectl get pods -l app=backend -n klinematrix-test --show-labels
+# Compare version label with service selector
+
+# 4. Test if selector is the issue
+kubectl get pods -n klinematrix-test -l "app=backend,app.kubernetes.io/version=0.4.1"
+# If this returns no pods, but plain "app=backend" returns pods, it's a selector mismatch
+```
+
+### Solution
+
+**Delete and recreate services** using base YAML (without `commonLabels`):
+
+```bash
+# Example: Fix Redis service
+kubectl delete svc redis-service -n klinematrix-test
+kubectl apply -f .pipeline/k8s/base/redis/service.yaml -n klinematrix-test
+
+# Example: Fix backend service
+kubectl delete svc backend-service -n klinematrix-test
+kubectl apply -f .pipeline/k8s/base/backend/service.yaml -n klinematrix-test
+
+# Example: Fix frontend service
+kubectl delete svc frontend-service -n klinematrix-test
+kubectl apply -f .pipeline/k8s/base/frontend/service.yaml -n klinematrix-test
+
+# Verify endpoints exist
+kubectl describe svc backend-service -n klinematrix-test | grep "Endpoints"
+# Should show: Endpoints: 10.244.0.252:8000 (pod IP)
+```
+
+**Base service.yaml should have minimal stable selector:**
+```yaml
+# .pipeline/k8s/base/backend/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend  # ✅ Stable - matches any version
+    # NOT: app.kubernetes.io/version: "0.4.2"  # ❌ Too strict
+  ports:
+  - port: 8000
+    targetPort: 8000
+```
+
+### Why This Happens
+
+**Kustomize's `commonLabels` is deprecated** for this reason:
+```yaml
+# .pipeline/k8s/base/kustomization.yaml
+commonLabels:  # ⚠️ DEPRECATED - adds labels to selectors
+  app.kubernetes.io/version: "0.4.2"
+
+# Better: use 'labels' instead
+labels:  # ✅ Adds labels to resources, NOT selectors
+  - pairs:
+      app.kubernetes.io/version: "0.4.2"
+```
+
+When you run `kubectl apply -k`, `commonLabels` adds the version label to:
+- ✅ Deployments (pod templates) - OK
+- ❌ **Services** (selectors) - BREAKS routing
+
+### Prevention
+1. **Avoid `commonLabels`** - it's deprecated, use `labels` instead
+2. **Keep service selectors minimal** - only `app: backend`, not version labels
+3. **Version labels are informational only** - put on pods, not in selectors
+4. **Test after kustomization changes**:
+   ```bash
+   kubectl describe svc <service-name> | grep -E "Selector|Endpoints"
+   # Endpoints should not be empty
+   ```
+
+### Understanding Labels vs Selectors
+
+**Labels** identify resources:
+```yaml
+# Pod has labels
+metadata:
+  labels:
+    app: backend
+    version: "0.4.2"  # Informational tag
+```
+
+**Selectors** find resources:
+```yaml
+# Service uses selector to find pods
+spec:
+  selector:
+    app: backend  # Find pods matching this label
+```
+
+**Best Practice:**
+- ✅ **Service selectors**: Stable labels only (`app: backend`)
+- ✅ **Pod labels**: Can include version (`version: "0.4.2"`)
+- ❌ **Avoid**: Version labels in service selectors
+
+This allows pods to update to new versions while services continue routing traffic seamlessly.
+
+---
+
+## Issue: Pods Pending Due to Resource Constraints
+
+### Symptoms
+```bash
+kubectl get pods -n klinematrix-test
+# NAME                     READY   STATUS             RESTARTS   AGE
+# backend-new-abc123       0/1     Pending            0          2m
+# backend-old-xyz789       0/1     CrashLoopBackOff   5          10m
+
+kubectl describe pod backend-new-abc123 -n klinematrix-test
+# Events:
+#   Warning  FailedScheduling  0/2 nodes available: 1 Insufficient cpu, 2 Insufficient memory
+#   Normal   TriggeredScaleUp  pod triggered scale-up: [{aks-agentpool-xxx 1->2 (max: 2)}]
+```
+
+### Root Cause
+During rolling updates, old crashing pods still consume resource reservations (even though they're failing), preventing new pods from scheduling. Cluster autoscaler is triggered but takes time to add nodes, blocking deployment progress.
+
+### Diagnosis
+```bash
+# 1. Check all pods and their resource usage
+kubectl get pods -n klinematrix-test
+kubectl top pods -n klinematrix-test
+
+# 2. Check pod events for "Insufficient" messages
+kubectl describe pod <pending-pod> -n klinematrix-test | grep -A 5 Events
+
+# 3. Check node capacity
+kubectl describe nodes | grep -A 5 "Allocated resources"
+
+# 4. Identify old crashing pods consuming resources
+kubectl get pods -n klinematrix-test --field-selector=status.phase!=Running
+```
+
+### Solution
+
+**Delete old crashing/failed pods immediately** to free resources:
+
+```bash
+# Delete specific old pod
+kubectl delete pod backend-old-xyz789 -n klinematrix-test
+
+# Or delete all pods with specific old ReplicaSet
+kubectl delete pod -l pod-template-hash=<old-hash> -n klinematrix-test
+
+# New pod should schedule within seconds
+kubectl get pods -n klinematrix-test -w  # Watch for Running status
+```
+
+**If multiple pods are stuck:**
+```bash
+# Scale down old deployment/replicaset
+kubectl scale replicaset <old-replicaset-name> --replicas=0 -n klinematrix-test
+
+# Wait for new pods to start
+kubectl wait --for=condition=Ready pod -l app=backend -n klinematrix-test --timeout=120s
+```
+
+### Why Deleting Old Pods Helps
+
+Kubernetes **reserves resources** based on pod `requests`, even for crashing pods:
+```yaml
+# Each pod reserves these resources
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "250m"
+```
+
+When a pod is `CrashLoopBackOff`:
+- ✅ Kubernetes keeps the pod object (for debugging)
+- ✅ Resource reservation remains (blocking new pods)
+- ❌ Pod isn't actually using resources (it's crashed)
+
+Deleting the old pod:
+- Releases the resource reservation immediately
+- Allows new pod to schedule without waiting for autoscaler
+- Old pod's ReplicaSet won't recreate it (new ReplicaSet has taken over)
+
+### Prevention
+
+**1. Set appropriate resource requests/limits:**
+```yaml
+# .pipeline/k8s/base/backend/deployment.yaml
+resources:
+  requests:
+    memory: "256Mi"  # Lower request = more pods fit
+    cpu: "100m"
+  limits:
+    memory: "512Mi"  # Upper bound
+    cpu: "500m"
+```
+
+**2. Configure pod disruption budgets** for graceful replacements:
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+spec:
+  minAvailable: 1  # Keep at least 1 pod during updates
+  selector:
+    matchLabels:
+      app: backend
+```
+
+**3. Use smaller image builds** to reduce memory footprint:
+- Frontend: Use production nginx build, not dev vite server
+- Backend: Use slim Python base images
+
+**4. Monitor cluster autoscaler:**
+```bash
+# Check autoscaler logs
+kubectl logs -n kube-system deployment/cluster-autoscaler
+
+# Check node provisioning time
+kubectl get events --sort-by='.lastTimestamp' | grep ScaleUp
+```
+
+### Quick Fix Script
+```bash
+#!/bin/bash
+# clean-failed-pods.sh - Delete failed pods to free resources
+
+NAMESPACE="klinematrix-test"
+
+echo "Deleting failed/crashing pods in $NAMESPACE..."
+
+kubectl delete pod \
+  --field-selector=status.phase!=Running \
+  -n $NAMESPACE
+
+echo "Remaining pods:"
+kubectl get pods -n $NAMESPACE
+```

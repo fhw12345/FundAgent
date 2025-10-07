@@ -65,29 +65,25 @@ Bug fixes, common issues, and debugging guides.
 - Context-aware responses
 
 ### Technology Stack
-- **Backend**: Python 3.12, FastAPI, MongoDB, Redis
-- **Frontend**: React 18, TypeScript 5, Vite, TailwindCSS
-- **AI/ML**: LangChain, LangGraph, LangSmith, Qwen-VL
-- **Infrastructure**: Kubernetes (AKS), Docker, GitHub Actions
-- **Cloud**: Hybrid Azure + Alibaba Cloud
+See [Architecture → System Design](architecture/system-design.md) for complete tech stack and architecture overview.
 
 ## Development Quick Start
 
+See [Development → Getting Started](development/getting-started.md) for complete setup instructions.
+
+**Quick access:**
 ```bash
-# Clone and setup
-git clone <repository>
-cd financial_agent
-cp .env.example .env
+# Production deployment
+curl https://klinematrix.com/api/health
 
-# Start development environment
-make dev
+# View logs
+kubectl logs -f deployment/backend -n klinematrix-test
 
-# Access services
-# Frontend:  http://localhost:3000
-# Backend:   http://localhost:8000
-# API Docs:  http://localhost:8000/docs
+# Local development (optional)
+cd backend && uvicorn src.main:app --reload
+cd frontend && npm run dev
 
-# Code quality checks
+# Code quality checks (REQUIRED before commits)
 make fmt && make test && make lint
 ```
 
@@ -194,11 +190,16 @@ For questions, issues, or contributions:
 
 ## Version History
 
-- **v0.3.0** (Current): Test environment ready
+- **v0.4.2** (Current): Type safety and error handling improvements
+  - Backend: v0.4.2 - Improved type safety, error handling, metadata validation
+  - Frontend: v0.4.1 - Chat restoration with metadata persistence
+  - Production deployment at https://klinematrix.com
+  - See [Version Matrix](project/versions/VERSION_MATRIX.md) for compatibility
+
+- **v0.3.0**: Test environment ready
   - Authentication with email verification
   - LLM chat integration with streaming responses
   - Modernized glassmorphism UI
-  - Test deployment at https://klinematrix.com
   - Clean environment separation (local dev vs cloud test)
 
 - **v0.2.0**: Agent core

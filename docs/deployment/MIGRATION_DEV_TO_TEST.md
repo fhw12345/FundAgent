@@ -5,16 +5,16 @@
 
 ## Summary
 
-Successfully migrated from dev-focused naming (`financial-agent-dev`) to proper test environment (`klinematrix-test`) with clean separation between local development and cloud test.
+Successfully migrated from dev-focused naming (`klinematrix-test`) to proper test environment (`klinematrix-test`) with clean separation between local development and cloud test.
 
 ## Architecture Changes
 
 ### Before (Incorrect)
 ```
 Local Dev + Cloud "Dev" (mixed):
-- Namespace: financial-agent-dev (actually test environment)
+- Namespace: klinematrix-test (actually test environment)
 - Images: financial-agent/backend:dev-latest
-- Key Vault: financial-agent-dev-kv
+- Key Vault: klinematrix-test-kv
 - Domain: klinematrix.com
 ```
 
@@ -54,8 +54,8 @@ Test (Cloud - AKS):
 ### Deleted
 | Resource | Name | Reason |
 |----------|------|--------|
-| Namespace | `financial-agent-dev` | Was actually test, renamed properly |
-| Key Vault | `financial-agent-dev-kv` | Obsolete, secrets moved to new vault |
+| Namespace | `klinematrix-test` | Was actually test, renamed properly |
+| Key Vault | `klinematrix-test-kv` | Obsolete, secrets moved to new vault |
 
 ## Secrets Configuration
 
@@ -169,7 +169,7 @@ curl https://klinematrix.com/api/health
 If needed, revert by:
 
 1. Keep `klinematrix-test` namespace (it's working)
-2. Old `financial-agent-dev` is deleted, cannot restore
+2. Old `klinematrix-test` is deleted, cannot restore
 3. Secrets in old vault can be retrieved if needed
 4. Images are immutable (safe)
 

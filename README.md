@@ -8,45 +8,24 @@ This project transforms a sophisticated CLI financial analysis tool into a produ
 
 ### Tech Stack
 
-**Backend:**
-- FastAPI (Python 3.12) with async/await
-- MongoDB for document storage
-- Redis for caching and ticker data
-- DashScope Qwen LLM with streaming support
-- yfinance for market data
-- pandas/numpy for analysis
+**Tech Stack:**
+- **Backend**: FastAPI + Python 3.12, MongoDB, Redis, LangChain + LangGraph
+- **Frontend**: React 18 + TypeScript 5, Vite, TailwindCSS
+- **Deployment**: Kubernetes (AKS), Azure + Alibaba Cloud hybrid
+- **AI/LLM**: DashScope Qwen with streaming, LangSmith observability
 
-**Frontend:**
-- React 18 with TypeScript 5.x
-- Vite for build tooling
-- TailwindCSS with glassmorphism design
-- React Query for state management
-- Lightweight Charts for interactive charting
-- Server-Sent Events (SSE) for streaming
-
-**Infrastructure:**
-- Docker Compose for local development
-- Kubernetes (Azure AKS) for production deployment
-- GitHub Actions for CI/CD
-- Azure Container Registry for image hosting
-- Azure DNS for domain management
+> 📖 **See [System Design](docs/architecture/system-design.md) for complete tech stack details**
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Docker and Docker Compose
-- Node.js 18+ (for local frontend development)
-- Python 3.12+ (for local backend development)
+> 📖 **See [Getting Started Guide](docs/development/getting-started.md) for detailed setup instructions**
 
-### 1. Clone and Setup
-```bash
-git clone <repository>
-cd financial_agent
-cp .env.example .env
-# Edit .env with your configuration
-```
+**Access deployed application:**
+- Production: https://klinematrix.com
+- API Docs: https://klinematrix.com/api/docs
+- Health Check: https://klinematrix.com/api/health
 
-### 2. Start Development Environment
+**Local development:**
 ```bash
 make dev
 ```
@@ -247,9 +226,10 @@ helm install financial-agent infra/helm/financials/
 
 ## 📚 Documentation
 
-- [Architecture Decisions](docs/adr/) - ADR records for major decisions
-- [API Documentation](http://localhost:8000/docs) - Auto-generated OpenAPI docs
-- [12-Factor Agent Guide](agent_12_factors.md) - Agent development principles
+- [Complete Documentation](docs/README.md) - Full documentation index
+- [12-Factor Agent Guide](docs/architecture/agent-12-factors.md) - Agent development principles
+- [Agent Architecture](docs/architecture/agent-architecture.md) - Implementation details
+- [API Documentation](https://klinematrix.com/api/docs) - Auto-generated OpenAPI docs
 - [Coding Standards](CLAUDE.md) - Development practices and patterns
 
 ## 🔮 Roadmap
