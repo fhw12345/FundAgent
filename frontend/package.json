@@ -1,6 +1,6 @@
 {
   "name": "financial-agent-frontend",
-  "version": "0.4.8",
+  "version": "0.4.9",
   "type": "module",
   "description": "AI-Enhanced Financial Analysis Platform Frontend",
   "scripts": {
@@ -45,9 +45,11 @@
     "autoprefixer": "^10.4.16",
     "eslint": "^8.53.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-perf-standard": "^1.0.3",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
+    "eslint-plugin-security": "^3.0.1",
     "postcss": "^8.4.31",
     "prettier": "^3.1.0",
     "prettier-plugin-tailwindcss": "^0.5.7",

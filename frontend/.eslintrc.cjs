@@ -26,6 +26,8 @@ module.exports = {
     "jsx-a11y",
     "react-refresh",
     "@typescript-eslint",
+    "security",
+    "eslint-plugin-perf-standard",
   ],
   settings: {
     react: {
@@ -56,5 +58,18 @@ module.exports = {
     "@typescript-eslint/no-unsafe-member-access": "warn",
     "@typescript-eslint/no-unsafe-call": "warn",
     "@typescript-eslint/no-unsafe-return": "warn",
+
+    // Security rules
+    "security/detect-object-injection": "warn",
+    "security/detect-non-literal-regexp": "warn",
+    "security/detect-unsafe-regex": "error",
+    "security/detect-buffer-noassert": "error",
+    "security/detect-eval-with-expression": "error",
+    "security/detect-no-csrf-before-method-override": "error",
+    "security/detect-possible-timing-attacks": "warn",
+
+    // Performance rules
+    "perf-standard/no-instanceof-guard": "warn",
+    "perf-standard/no-self-in-constructor": "warn",
   },
 };

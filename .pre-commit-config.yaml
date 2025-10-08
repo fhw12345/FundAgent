@@ -13,6 +13,13 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: check-file-length
+        name: Check for oversized files (500 line limit)
+        entry: ./scripts/check-file-length.sh
+        language: system
+        types_or: [python, javascript, jsx, ts, tsx]
+        exclude: '__init__.py'
+
   # Python code quality
   - repo: https://github.com/psf/black
     rev: 24.10.0

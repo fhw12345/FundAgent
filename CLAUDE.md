@@ -20,9 +20,16 @@
 # Backend changes
 cd backend && make test && make lint
 
-# Frontend changes
-cd frontend && npm test && npm run lint
+# Frontend changes - MUST run inside Docker
+docker compose exec frontend npm run lint
+docker compose exec frontend npm run type-check
+docker compose exec frontend npm test
+
+# Install new frontend dependencies
+docker compose exec frontend npm install --save-dev <package-name>
 ```
+
+**⚠️ Frontend Lint/Type Check**: Always run inside Docker container to ensure correct dependencies and ESLint plugins are available.
 
 ### 2. Bump Version (Required)
 ```bash
@@ -74,8 +81,21 @@ curl https://klinematrix.com/api/health
 
 ### Quality Gates
 ```bash
-make fmt && make test && make lint  # Must pass before commit
+# Backend
+make fmt && make test && make lint
+
+# Frontend (inside Docker)
+docker compose exec frontend npm run lint
+docker compose exec frontend npm run type-check
+docker compose exec frontend npm test
 ```
+
+### Pre-commit Hooks
+- **Version validation**: Every commit must bump version
+- **File length**: Max 500 lines per file (Python, TypeScript, JavaScript)
+- **Security**: eslint-plugin-security for vulnerability detection
+- **Performance**: eslint-plugin-perf-standard for optimization
+- **Code quality**: Black, Ruff, mypy, ESLint, Prettier
 
 **See [docs/development/coding-standards.md](docs/development/coding-standards.md) for patterns & debugging**
 
