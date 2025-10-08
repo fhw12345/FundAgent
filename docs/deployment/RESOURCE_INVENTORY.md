@@ -18,14 +18,34 @@ This document provides a complete inventory of all Azure and Kubernetes resource
 | **Name** | FinancialAgent-AKS |
 | **Resource Group** | FinancialAgent |
 | **Location** | Korea Central |
-| **Kubernetes Version** | 1.28+ |
-| **Node Pool** | Standard_B2s (2 vCPU, 4 GB RAM) |
+| **Kubernetes Version** | 1.32.7 |
+| **Node Pools** | agentpool (system), userpool (user) |
+| **VM Size** | Standard_D2ls_v5 (2 vCPU, 4 GB RAM) |
+| **Node Count** | 2 total (1 per pool, autoscaling capped at max=1) |
 | **Purpose** | Hosts test workloads for 10 beta users |
+
+**Node Pool Configuration**:
+```bash
+# agentpool (system pool)
+- Min: 1, Max: 1, Current: 1
+- Mode: System
+- Autoscaling: Enabled (capped to prevent cost overruns)
+
+# userpool (user pool)
+- Min: 1, Max: 1, Current: 1
+- Mode: User
+- Autoscaling: Enabled (capped to prevent cost overruns)
+```
 
 **Access**:
 ```bash
 az aks get-credentials --resource-group FinancialAgent --name FinancialAgent-AKS
 ```
+
+**Cost Optimization** (Oct 2025):
+- Capped autoscaler at max-count=1 per pool to prevent unexpected scaling
+- Cleaned up duplicate deployments that were causing memory pressure
+- See [Cost Optimization Guide](cost-optimization.md) for details
 
 ---
 
@@ -332,14 +352,28 @@ TXT   _dmarc.klinematrix.com   → v=DMARC1; p=none; rua=mailto:dmarc@klinematri
 
 ## Cost Breakdown (Monthly)
 
-| Service | SKU | Estimated Cost |
-|---------|-----|----------------|
-| AKS | Standard_B2s (2 nodes) | $30-40 |
-| Cosmos DB | Serverless | $10-20 |
-| ACR | Basic | $5 |
+| Service | SKU/Tier | Estimated Cost |
+|---------|----------|----------------|
+| **AKS Nodes** | 2× Standard_D2ls_v5 | **$53** |
+| Cosmos DB MongoDB | 400 RU/s shared throughput | $24 |
+| Container Registry | Basic tier | $5 |
+| Load Balancer + IPs | 2 public IPs | $8 |
+| Log Analytics | Data ingestion | $5-10 |
 | Key Vault | Standard | $0.03 |
-| Bandwidth | Ingress/Egress | $5-10 |
-| **Total** |  | **~$50-75/month** |
+| **Total** |  | **~$95-100/month** |
+
+### Recent Cost Optimization (Oct 2025)
+
+**Before optimization**: $148-153/month (4 nodes autoscaled)
+**After optimization**: $95-100/month (2 nodes capped)
+**Savings**: $53-58/month (35-38% reduction)
+
+**Actions taken**:
+1. Deleted duplicate deployments in default namespace (~640Mi freed)
+2. Capped autoscaler: `az aks nodepool update --max-count 1` on both pools
+3. Result: Stable 2-node configuration with proper resource headroom
+
+See [Cost Optimization Guide](cost-optimization.md) for detailed analysis and monitoring procedures.
 
 ---
 

@@ -710,6 +710,193 @@ This allows pods to update to new versions while services continue routing traff
 
 ---
 
+## Issue: Unexpected Node Autoscaling Due to Duplicate Deployments
+
+### Symptoms
+```bash
+# More nodes than expected
+kubectl get nodes
+# Shows 3-4 nodes instead of expected 2
+
+# Multiple namespaces with same applications
+kubectl get deployments --all-namespaces | grep -E 'backend|frontend|redis'
+# Shows duplicate deployments in multiple namespaces
+
+# High memory utilization triggering autoscale
+kubectl top nodes
+# Memory: 85-88% across all nodes
+```
+
+### Root Cause
+Multiple namespaces running duplicate/old workloads that weren't cleaned up during migration, consuming ~30-40% extra resources and triggering cluster autoscaler to add nodes beyond budget expectations.
+
+### Real-World Example (Oct 2025)
+- **Before**: 2 nodes expected (1 agentpool + 1 userpool)
+- **After autoscale**: 4 nodes running (both pools scaled 1→2)
+- **Cause**: Old v0.4.2 deployments in `default` namespace + current v0.4.5/v0.6.1 in `klinematrix-test`
+- **Memory waste**: ~640Mi consumed by duplicate pods
+- **Cost impact**: $53/month → $106/month (100% increase)
+
+### Diagnosis
+```bash
+# 1. Check all namespaces for deployments
+kubectl get deployments --all-namespaces -o wide
+
+# 2. Identify duplicate applications
+kubectl get pods --all-namespaces | grep -E 'backend|frontend|redis'
+
+# 3. Check resource usage across nodes
+kubectl top nodes
+
+# 4. Check pod status in old namespaces
+kubectl get pods -n default
+# Look for CrashLoopBackOff or old versions
+
+# 5. Check autoscaler events
+kubectl get events --all-namespaces --sort-by='.lastTimestamp' | grep -i "scale"
+
+# 6. Verify autoscaler settings
+az aks nodepool show --resource-group FinancialAgent \
+  --cluster-name FinancialAgent-AKS --name agentpool \
+  --query '{min:minCount, max:maxCount, current:count}'
+```
+
+### Solution
+
+**Step 1: Identify old/duplicate deployments**
+```bash
+# List all deployments across namespaces
+kubectl get deployments --all-namespaces
+
+# Check for old versions or crashing pods
+kubectl get pods --all-namespaces | grep -E "CrashLoopBackOff|Error|ImagePullBackOff"
+```
+
+**Step 2: Delete duplicate deployments**
+```bash
+# Example: Delete old deployments in default namespace
+kubectl delete deployment backend frontend redis -n default
+
+# Verify cleanup
+kubectl get pods -n default
+# Should show: No resources found
+```
+
+**Step 3: Check resource usage improvement**
+```bash
+# Memory should drop significantly
+kubectl top nodes
+
+# Example improvement:
+# Before: userpool at 85% (2708Mi)
+# After:  userpool at 60% (1910Mi)
+# Freed:  ~640Mi (19% reduction)
+```
+
+**Step 4: Cap autoscaler to prevent future unexpected scaling**
+```bash
+# Set max-count to prevent scaling beyond budget
+az aks nodepool update --resource-group FinancialAgent \
+  --cluster-name FinancialAgent-AKS \
+  --name agentpool \
+  --update-cluster-autoscaler --max-count 1
+
+az aks nodepool update --resource-group FinancialAgent \
+  --cluster-name FinancialAgent-AKS \
+  --name userpool \
+  --update-cluster-autoscaler --max-count 1
+
+# Autoscaler will scale down extra nodes within 10-15 minutes
+```
+
+**Step 5: Monitor scale-down**
+```bash
+# Watch node count decrease
+kubectl get nodes -w
+
+# Check autoscaler status
+kubectl get configmap cluster-autoscaler-status -n kube-system -o yaml | grep "Scale-down"
+```
+
+### Prevention
+
+**1. Always clean up old deployments when migrating:**
+```bash
+# Before migrating to new namespace
+kubectl get deployments -n old-namespace
+kubectl delete deployment <old-deployments> -n old-namespace
+```
+
+**2. Set appropriate autoscaler limits:**
+```bash
+# Production: Set max-count to match budget/capacity planning
+az aks nodepool update --max-count <expected-max-nodes>
+
+# Development: Use tighter limits to prevent cost surprises
+az aks nodepool update --max-count 1
+```
+
+**3. Regular cleanup checks:**
+```bash
+# Weekly: Check for orphaned deployments
+kubectl get deployments --all-namespaces
+
+# Weekly: Check node count vs expected
+kubectl get nodes | wc -l
+```
+
+**4. Monitor resource usage:**
+```bash
+# Add to monitoring dashboard
+kubectl top nodes
+kubectl top pods --all-namespaces --sort-by=memory
+```
+
+**5. Budget alerts:**
+```bash
+# Set Azure cost alerts at expected monthly budget
+# Example: Alert if cost exceeds $100/month (vs expected $95)
+```
+
+### Cost Analysis
+
+**Node costs per month** (Standard_D2ls_v5 in Korea Central):
+- 1 node: ~$26.50/month
+- 2 nodes: ~$53/month (expected for HA)
+- 3 nodes: ~$80/month (one pool autoscaled)
+- 4 nodes: ~$106/month (both pools autoscaled)
+
+**Example savings from cleanup:**
+- Before: 4 nodes = $106/month
+- After cleanup + autoscaler cap: 2 nodes = $53/month
+- **Savings: $53/month (50% reduction)**
+
+### Understanding Autoscaler Behavior
+
+**When autoscaler adds nodes:**
+1. Pod pending due to insufficient resources
+2. Autoscaler checks if adding node would help
+3. Checks `max-count` limit not reached
+4. Provisions new node (takes ~3-5 minutes)
+5. Pod schedules on new node
+
+**When autoscaler removes nodes:**
+1. Node utilization <50% for >10 minutes
+2. All pods can be evicted safely (PDB respected)
+3. Pods can fit on other nodes
+4. Node drained and deleted (~10-15 minute delay)
+
+**Memory reservation vs usage:**
+- Kubernetes reserves resources based on pod `requests`, not actual usage
+- Even crashing pods hold reservations
+- This can trigger autoscaling even when actual usage is low
+
+### Related Issues
+- See [Pods Pending Due to Resource Constraints](#issue-pods-pending-due-to-resource-constraints) for handling resource-based scheduling failures
+- See [Cost Optimization Guide](../deployment/cost-optimization.md) for comprehensive cost management
+
+---
+
 ## Issue: Pods Pending Due to Resource Constraints
 
 ### Symptoms
