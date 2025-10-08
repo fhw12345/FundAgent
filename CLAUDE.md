@@ -15,7 +15,31 @@
 
 ## Development Workflow
 
-### 1. Make Changes Locally
+### 1. Feature Specification (Required for New Features)
+
+**Before implementing any new feature**, create a specification document:
+
+```bash
+# Create feature spec in /docs/features/
+touch docs/features/<feature-name>.md
+```
+
+**Required sections**:
+- **Context**: Why this feature is needed, user problem it solves
+- **Problem Statement**: Clear description of the problem
+- **Proposed Solution**: Detailed technical approach
+- **Implementation Plan**: Step-by-step breakdown
+- **Acceptance Criteria**: How to verify success
+
+**Process**:
+1. Create feature spec document
+2. **Discuss and get approval** before coding
+3. Reference spec during implementation
+4. Update spec if design changes during development
+
+> 📖 **See [docs/features/](docs/features/) for examples**
+
+### 2. Make Changes Locally
 ```bash
 # Backend changes
 cd backend && make test && make lint
@@ -31,7 +55,7 @@ docker compose exec frontend npm install --save-dev <package-name>
 
 **⚠️ Frontend Lint/Type Check**: Always run inside Docker container to ensure correct dependencies and ESLint plugins are available.
 
-### 2. Bump Version (Required)
+### 3. Bump Version (Required)
 ```bash
 # Every commit must increment at least one version
 ./scripts/bump-version.sh backend patch   # 0.1.0 → 0.1.1
@@ -40,7 +64,7 @@ docker compose exec frontend npm install --save-dev <package-name>
 # Pre-commit hook validates version increment
 ```
 
-### 3. Deploy to Test
+### 4. Deploy to Test
 ```bash
 # Build versioned images in Azure Container Registry
 BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
@@ -53,7 +77,7 @@ az acr build --registry financialAgent \
 kubectl delete pod -l app=backend -n klinematrix-test
 ```
 
-### 4. Verify
+### 5. Verify
 ```bash
 # Check deployment status
 kubectl get pods -n klinematrix-test
@@ -66,29 +90,6 @@ curl https://klinematrix.com/api/health
 > 📖 **See [Version Management](docs/project/versions/README.md) for versioning system and workflow**
 
 ## Code Standards
-
-### Python
-- Modern syntax: `|` unions, `match/case`, f-strings, `@dataclass`
-- Type hints: All functions typed
-- Docstrings: Required for all modules, classes, functions
-- Max file size: 500 lines (split into modules)
-
-### TypeScript
-- ES modules, optional chaining, `satisfies` operator
-- Strict mode enabled
-- Components: Functional with hooks
-- State: React Query for server state, useState for UI state
-
-### Quality Gates
-```bash
-# Backend
-make fmt && make test && make lint
-
-# Frontend (inside Docker)
-docker compose exec frontend npm run lint
-docker compose exec frontend npm run type-check
-docker compose exec frontend npm test
-```
 
 ### Pre-commit Hooks
 - **Version validation**: Every commit must bump version
@@ -126,21 +127,30 @@ make lint           # Check code quality
 docker-compose up   # Start local services (deprecated - use kubectl)
 
 # Kubernetes Deployment
-kubectl get pods -n financial-agent-dev                    # Check status
-kubectl logs -f deployment/backend -n financial-agent-dev  # View logs
-kubectl delete pod -l app=backend -n financial-agent-dev   # Restart with new image
+kubectl get pods -n klinematrix-test                    # Check status
+kubectl logs -f deployment/backend -n klinematrix-test  # View logs
+kubectl delete pod -l app=backend -n klinematrix-test   # Restart with new image
 
-# Build Images
-az acr build --registry financialAgent --image financial-agent/backend:dev-latest --file backend/Dockerfile backend/
-az acr build --registry financialAgent --image financial-agent/frontend:dev-latest --target production --file frontend/Dockerfile frontend/
+# Build Images (use current versions from pyproject.toml/package.json)
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+FRONTEND_VERSION=$(grep '"version":' frontend/package.json | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+az acr build --registry financialAgent --image klinematrix/backend:test-v${BACKEND_VERSION} --file backend/Dockerfile backend/
+az acr build --registry financialAgent --image klinematrix/frontend:test-v${FRONTEND_VERSION} --target production --file frontend/Dockerfile frontend/
 
 # Health Checks
 curl https://klinematrix.com/api/health
+
+# Cost Monitoring (prevent unexpected autoscaling)
+kubectl get nodes                          # Should show 2 nodes (not 3-4)
+kubectl top nodes                          # Memory should be <80%
+kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 ```
 
 ## Important Reminders
 
 ### ⚠️ Before Committing
+- [ ] **Feature spec created** (for new features): Document in `docs/features/`
 - [ ] Run `make fmt && make test && make lint`
 - [ ] **Bump version** (required): `./scripts/bump-version.sh [component] [patch|minor|major]`
 - [ ] Check data contracts (Pydantic ↔ TypeScript)
@@ -160,6 +170,10 @@ curl https://klinematrix.com/api/health
 3. Test backend directly (kubectl exec)
 4. Check Redis cache if caching issues
 5. Review External Secrets sync
+
+### 💰 Cost Management
+- **Monitor weekly**: `kubectl get nodes | wc -l` should always return 2
+- See [Cost Optimization Guide](docs/deployment/cost-optimization.md) for troubleshooting
 
 ### 💡 Development Principles
 - **Find the root cause** - Don't fix symptoms, fix the underlying problem
