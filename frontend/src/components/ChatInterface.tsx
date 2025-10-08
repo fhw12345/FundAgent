@@ -1,161 +1,19 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import {
-  Send,
-  BarChart3,
-  TrendingUp,
-  DollarSign,
-  Loader2,
-  LineChart,
-  Activity,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { analysisService } from "../services/analysis";
 import type { ChatMessage } from "../types/api";
-import type {
-  FibonacciAnalysisResponse,
-  MacroSentimentResponse,
-  StockFundamentalsResponse,
-  StochasticAnalysisResponse,
-} from "../services/analysis";
-
-// Formatting functions for analysis responses
-function formatFibonacciResponse(result: FibonacciAnalysisResponse): string {
-  const keyLevels = result.fibonacci_levels.filter(
-    (level) => level.is_key_level,
-  );
-
-  return `## Fibonacci Analysis - ${result.symbol}
-
-**Current Price:** $${result.current_price.toFixed(2)}
-**Trend Direction:** ${result.market_structure.trend_direction}
-**Confidence Score:** ${(result.confidence_score * 100).toFixed(1)}%
-
-### Key Fibonacci Levels:
-${keyLevels
-  .map((level) => `• **${level.percentage}** - $${level.price.toFixed(2)}`)
-  .join("\n")}
-
-### Market Structure:
-• **Swing High:** $${result.market_structure.swing_high.price.toFixed(2)} (${result.market_structure.swing_high.date})
-• **Swing Low:** $${result.market_structure.swing_low.price.toFixed(2)} (${result.market_structure.swing_low.date})
-• **Structure Quality:** ${result.market_structure.structure_quality}
-
-### Analysis Summary:
-${result.analysis_summary}
-
-### Key Insights:
-${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
-`;
-}
-
-function formatMacroResponse(result: MacroSentimentResponse): string {
-  const topSectors = Object.entries(result.sector_performance)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3);
-
-  const bottomSectors = Object.entries(result.sector_performance)
-    .sort(([, a], [, b]) => a - b)
-    .slice(0, 3);
-
-  return `## Macro Market Sentiment Analysis
-
-**Overall Sentiment:** ${result.market_sentiment.toUpperCase()}
-**VIX Level:** ${result.vix_level.toFixed(2)} (${result.vix_interpretation})
-**Fear/Greed Score:** ${result.fear_greed_score}/100
-
-### Major Indices Performance:
-${Object.entries(result.major_indices)
-  .map(
-    ([index, change]) =>
-      `• **${index}:** ${change > 0 ? "+" : ""}${change.toFixed(2)}%`,
-  )
-  .join("\n")}
-
-### Top Performing Sectors:
-${topSectors
-  .map(([sector, change]) => `• **${sector}:** +${change.toFixed(2)}%`)
-  .join("\n")}
-
-### Bottom Performing Sectors:
-${bottomSectors
-  .map(([sector, change]) => `• **${sector}:** ${change.toFixed(2)}%`)
-  .join("\n")}
-
-### Market Outlook:
-${result.market_outlook}
-
-### Key Factors:
-${result.key_factors.map((factor) => `• ${factor}`).join("\n")}
-`;
-}
-
-function formatFundamentalsResponse(result: StockFundamentalsResponse): string {
-  const priceChange = result.price_change_percent > 0 ? "+" : "";
-
-  return `## Stock Fundamentals - ${result.symbol}
-
-**Company:** ${result.company_name}
-**Current Price:** $${result.current_price.toFixed(2)} (${priceChange}${result.price_change_percent.toFixed(2)}%)
-**Market Cap:** $${(result.market_cap / 1_000_000_000).toFixed(2)}B
-
-### Valuation Metrics:
-${result.pe_ratio ? `• **P/E Ratio:** ${result.pe_ratio.toFixed(2)}` : ""}
-${result.pb_ratio ? `• **P/B Ratio:** ${result.pb_ratio.toFixed(2)}` : ""}
-${result.dividend_yield ? `• **Dividend Yield:** ${result.dividend_yield.toFixed(2)}%` : ""}
-${result.beta ? `• **Beta:** ${result.beta.toFixed(2)}` : ""}
-
-### Trading Data:
-• **Volume:** ${result.volume.toLocaleString()} (Avg: ${result.avg_volume.toLocaleString()})
-• **52-Week High:** $${result.fifty_two_week_high.toFixed(2)}
-• **52-Week Low:** $${result.fifty_two_week_low.toFixed(2)}
-
-### Summary:
-${result.fundamental_summary}
-
-### Key Metrics:
-${result.key_metrics.map((metric) => `• ${metric}`).join("\n")}
-`;
-}
-
-function formatStochasticResponse(result: StochasticAnalysisResponse): string {
-  const signalEmoji =
-    result.current_signal === "overbought"
-      ? "📈"
-      : result.current_signal === "oversold"
-        ? "📉"
-        : "➡️";
-
-  // Get recent signals (last 3 signals)
-  const recentSignals = result.signal_changes.slice(-3);
-
-  return `## ${signalEmoji} Stochastic Oscillator Analysis - ${result.symbol}
-
-**Current Price:** $${result.current_price.toFixed(2)}
-**Analysis Period:** ${result.start_date || "Dynamic"} to ${result.end_date || "Current"} (${result.timeframe} timeframe)
-**Parameters:** %K(${result.k_period}) %D(${result.d_period})
-
-### Current Readings:
-• **%K Line:** ${result.current_k.toFixed(2)}%
-• **%D Line:** ${result.current_d.toFixed(2)}%
-• **Signal:** ${result.current_signal.toUpperCase()} ${signalEmoji}
-
-${
-  recentSignals.length > 0
-    ? `### Recent Signals:
-${recentSignals.map((signal) => `• **${signal.type.toUpperCase()}**: ${signal.description}`).join("\n")}
-`
-    : ""
-}
-
-### Analysis Summary:
-${result.analysis_summary}
-
-### Key Insights:
-${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
-`;
-}
+import {
+  formatFibonacciResponse,
+  formatMacroResponse,
+  formatFundamentalsResponse,
+  formatStochasticResponse,
+} from "./chat/analysisFormatters";
+import { QuickAnalysisPanel } from "./chat/QuickAnalysisPanel";
+import { DateRangeControls } from "./chat/DateRangeControls";
+import { ChatMessageInput } from "./chat/ChatMessageInput";
 
 export function ChatInterface() {
   const [message, setMessage] = useState("");
@@ -186,7 +44,6 @@ export function ChatInterface() {
 
   const analysisMutation = useMutation({
     mutationFn: async (userMessage: string) => {
-      // Parse user intent
       const intent = analysisService.parseAnalysisIntent(userMessage);
 
       switch (intent.type) {
@@ -197,11 +54,9 @@ export function ChatInterface() {
             );
           }
 
-          // Ensure we have dates for Fibonacci analysis
           const startDate = intent.start_date;
           const endDate = intent.end_date;
 
-          // If no date range specified, default to last 6 months
           const finalStartDate =
             startDate ||
             new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000)
@@ -284,7 +139,6 @@ Please specify a stock symbol and analysis type.`);
       }
     },
     onMutate: (newMessage) => {
-      // Optimistically add user message
       const userMessage: ChatMessage = {
         role: "user",
         content: newMessage,
@@ -295,7 +149,6 @@ Please specify a stock symbol and analysis type.`);
       return { userMessage };
     },
     onSuccess: (response) => {
-      // Add assistant response
       const assistantMessage: ChatMessage = {
         role: "assistant",
         content: response.content,
@@ -306,14 +159,11 @@ Please specify a stock symbol and analysis type.`);
       setMessages((prev) => [...prev, assistantMessage]);
     },
     onError: (error: any) => {
-      // Extract specific error message from API response
       let errorContent = "Unknown error occurred. Please try again.";
 
       if (error?.response?.data?.detail) {
-        // FastAPI validation error or custom error message
         errorContent = error.response.data.detail;
       } else if (error?.response?.status === 400) {
-        // Bad request - likely invalid symbol
         if (error?.response?.data?.detail) {
           errorContent = error.response.data.detail;
         } else {
@@ -528,13 +378,6 @@ Please specify a stock symbol and analysis type.`);
     });
   };
 
-  const formatTimestamp = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
     <div className="bg-white rounded-lg shadow-sm border h-[600px] flex flex-col">
       {/* Chat Header */}
@@ -596,7 +439,10 @@ Please specify a stock symbol and analysis type.`);
                   msg.role === "user" ? "text-blue-200" : "text-gray-500"
                 }`}
               >
-                {formatTimestamp(msg.timestamp)}
+                {new Date(msg.timestamp).toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </div>
             </div>
           </div>
@@ -618,217 +464,32 @@ Please specify a stock symbol and analysis type.`);
       {/* Analysis Controls */}
       <div className="border-t p-4">
         {/* Symbol and Date Range Inputs */}
-        <div className="mb-4 space-y-3">
-          <div className="flex space-x-3">
-            <div className="flex-1">
-              <label
-                htmlFor="symbol-input"
-                className="block text-xs font-medium text-gray-700 mb-1"
-              >
-                Stock Symbol
-              </label>
-              <input
-                id="symbol-input"
-                type="text"
-                value={currentSymbol}
-                onChange={(e) => setCurrentSymbol(e.target.value.toUpperCase())}
-                placeholder="e.g., AAPL, TSLA, MSFT"
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                maxLength={10}
-              />
-            </div>
-            <div className="w-36">
-              <label
-                htmlFor="start-date-input"
-                className="block text-xs font-medium text-gray-700 mb-1"
-              >
-                From Date
-              </label>
-              <input
-                id="start-date-input"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="w-36">
-              <label
-                htmlFor="end-date-input"
-                className="block text-xs font-medium text-gray-700 mb-1"
-              >
-                To Date
-              </label>
-              <input
-                id="end-date-input"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Quick Date Range Buttons */}
-          <div className="flex space-x-2">
-            <span className="text-xs text-gray-500">Quick ranges:</span>
-            <button
-              onClick={() => {
-                const end = new Date();
-                const start = new Date();
-                start.setMonth(start.getMonth() - 1);
-                setStartDate(start.toISOString().split("T")[0]);
-                setEndDate(end.toISOString().split("T")[0]);
-              }}
-              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-            >
-              1M
-            </button>
-            <button
-              onClick={() => {
-                const end = new Date();
-                const start = new Date();
-                start.setMonth(start.getMonth() - 3);
-                setStartDate(start.toISOString().split("T")[0]);
-                setEndDate(end.toISOString().split("T")[0]);
-              }}
-              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-            >
-              3M
-            </button>
-            <button
-              onClick={() => {
-                const end = new Date();
-                const start = new Date();
-                start.setMonth(start.getMonth() - 6);
-                setStartDate(start.toISOString().split("T")[0]);
-                setEndDate(end.toISOString().split("T")[0]);
-              }}
-              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-            >
-              6M
-            </button>
-            <button
-              onClick={() => {
-                const end = new Date();
-                const start = new Date();
-                start.setFullYear(start.getFullYear() - 1);
-                setStartDate(start.toISOString().split("T")[0]);
-                setEndDate(end.toISOString().split("T")[0]);
-              }}
-              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-            >
-              1Y
-            </button>
-            <button
-              onClick={() => {
-                const end = new Date();
-                const start = new Date();
-                start.setFullYear(start.getFullYear() - 2);
-                setStartDate(start.toISOString().split("T")[0]);
-                setEndDate(end.toISOString().split("T")[0]);
-              }}
-              className="text-xs px-2 py-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
-            >
-              2Y
-            </button>
-          </div>
-        </div>
+        <DateRangeControls
+          currentSymbol={currentSymbol}
+          startDate={startDate}
+          endDate={endDate}
+          onSymbolChange={setCurrentSymbol}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+        />
 
         {/* Quick Actions */}
-        <div className="mb-3">
-          <p className="text-xs text-gray-500 mb-2">Quick Analysis:</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => handleDirectAction("fibonacci")}
-              disabled={directActionMutation.isPending}
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
-                currentSymbol.trim()
-                  ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-            >
-              <BarChart3 className="h-3 w-3 mr-1" />
-              Fibonacci
-            </button>
-            <button
-              onClick={() => handleDirectAction("macro")}
-              disabled={directActionMutation.isPending}
-              className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-50"
-            >
-              <TrendingUp className="h-3 w-3 mr-1" />
-              Macro
-            </button>
-            <button
-              onClick={() => handleDirectAction("fundamentals")}
-              disabled={directActionMutation.isPending}
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
-                currentSymbol.trim()
-                  ? "bg-purple-100 text-purple-800 hover:bg-purple-200"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-            >
-              <DollarSign className="h-3 w-3 mr-1" />
-              Fundamentals
-            </button>
-            <button
-              onClick={() => handleDirectAction("chart")}
-              disabled={directActionMutation.isPending}
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
-                currentSymbol.trim()
-                  ? "bg-orange-100 text-orange-800 hover:bg-orange-200"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-            >
-              <LineChart className="h-3 w-3 mr-1" />
-              Chart
-            </button>
-            <button
-              onClick={() => handleDirectAction("stochastic")}
-              disabled={directActionMutation.isPending}
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium disabled:opacity-50 ${
-                currentSymbol.trim()
-                  ? "bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-              }`}
-            >
-              <Activity className="h-3 w-3 mr-1" />
-              Stochastic
-            </button>
-          </div>
-        </div>
+        <QuickAnalysisPanel
+          currentSymbol={currentSymbol}
+          onAnalysisClick={handleDirectAction}
+          disabled={directActionMutation.isPending}
+        />
 
         {/* Message Input */}
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={(e) =>
-              e.key === "Enter" && !e.shiftKey && handleSendMessage()
-            }
-            placeholder="Ask about stocks, Fibonacci analysis, market sentiment..."
-            disabled={
-              analysisMutation.isPending || directActionMutation.isPending
-            }
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={
-              !message.trim() ||
-              analysisMutation.isPending ||
-              directActionMutation.isPending
-            }
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {analysisMutation.isPending || directActionMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </button>
-        </div>
+        <ChatMessageInput
+          message={message}
+          onMessageChange={setMessage}
+          onSend={handleSendMessage}
+          disabled={
+            analysisMutation.isPending || directActionMutation.isPending
+          }
+          loading={analysisMutation.isPending || directActionMutation.isPending}
+        />
       </div>
     </div>
   );
