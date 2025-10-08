@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.8] - 2025-10-08
+
+### Added
+- feat(agent): Context-adaptive LLM response style (structured for initial analysis, conversational for follow-ups)
+- feat(agent): Instruction for LLM to match formatting style from conversation history
+- feat(agent): Simplified system prompt with less over-instruction
+
+### Changed
+- Removed mandatory rigid structure ("The Verdict", "The Evidence") for all responses
+- Split instructions into "Initial Analysis" vs "Follow-Up Questions" patterns
+
 ## [0.4.7] - 2025-10-08
 
 ### Added
