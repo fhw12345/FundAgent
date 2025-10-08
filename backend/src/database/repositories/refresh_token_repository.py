@@ -147,6 +147,124 @@ class RefreshTokenRepository:
 
         return False
 
+    async def rotate_token_atomic(
+        self, old_token_hash: str, new_token: RefreshToken
+    ) -> RefreshToken:
+        """
+        Atomically revoke old token and create new token using MongoDB transaction.
+        This prevents race conditions where a token could be revoked but new token fails to create.
+
+        Falls back to non-atomic operations if transactions not supported (standalone MongoDB).
+        Production (Cosmos DB) supports transactions; local dev (standalone) uses fallback.
+
+        Args:
+            old_token_hash: SHA256 hash of the old token to revoke
+            new_token: New refresh token to create
+
+        Returns:
+            Created refresh token
+
+        Raises:
+            ValueError: If old token not found or already revoked
+        """
+        # Get the client from collection database to start session
+        client = self.collection.database.client
+
+        try:
+            # Try transactional approach (Cosmos DB, replica sets)
+            async with await client.start_session() as session:
+                async with session.start_transaction():
+                    # 1. Verify old token exists and is valid
+                    old_token_doc = await self.collection.find_one(
+                        {"token_hash": old_token_hash}, session=session
+                    )
+
+                    if not old_token_doc:
+                        raise ValueError("Old refresh token not found")
+
+                    if old_token_doc.get("revoked", False):
+                        raise ValueError("Old refresh token already revoked")
+
+                    # 2. Revoke old token
+                    await self.collection.update_one(
+                        {"token_hash": old_token_hash},
+                        {
+                            "$set": {
+                                "revoked": True,
+                                "revoked_at": datetime.utcnow(),
+                            }
+                        },
+                        session=session,
+                    )
+
+                    # 3. Create new token
+                    new_token_dict = new_token.model_dump()
+                    await self.collection.insert_one(new_token_dict, session=session)
+
+                    logger.info(
+                        "Token rotation completed atomically (transactional)",
+                        old_token_hash=old_token_hash[:16] + "...",
+                        new_token_id=new_token.token_id,
+                        user_id=new_token.user_id,
+                    )
+
+                    # Transaction auto-commits on successful context exit
+                    return new_token
+
+        except Exception as transaction_error:
+            # If transactions not supported (standalone MongoDB), fall back to non-atomic
+            error_msg = str(transaction_error).lower()
+            if "transaction" in error_msg or "replica" in error_msg:
+                logger.warning(
+                    "MongoDB transactions not supported, using non-atomic fallback",
+                    error=str(transaction_error),
+                    recommendation="Use replica set or Cosmos DB for atomic operations",
+                )
+
+                # Fallback: Non-atomic operations (best effort)
+                # 1. Verify old token exists and is valid
+                old_token_doc = await self.collection.find_one(
+                    {"token_hash": old_token_hash}
+                )
+
+                if not old_token_doc:
+                    raise ValueError("Old refresh token not found") from None
+
+                if old_token_doc.get("revoked", False):
+                    raise ValueError("Old refresh token already revoked") from None
+
+                # 2. Revoke old token
+                await self.collection.update_one(
+                    {"token_hash": old_token_hash},
+                    {
+                        "$set": {
+                            "revoked": True,
+                            "revoked_at": datetime.utcnow(),
+                        }
+                    },
+                )
+
+                # 3. Create new token
+                new_token_dict = new_token.model_dump()
+                await self.collection.insert_one(new_token_dict)
+
+                logger.info(
+                    "Token rotation completed (non-atomic fallback)",
+                    old_token_hash=old_token_hash[:16] + "...",
+                    new_token_id=new_token.token_id,
+                    user_id=new_token.user_id,
+                )
+
+                return new_token
+            else:
+                # Other errors (token validation, etc.) - propagate
+                logger.error(
+                    "Token rotation failed",
+                    error=str(transaction_error),
+                    old_token_hash=old_token_hash[:16] + "...",
+                )
+                raise
+
     async def revoke_all_for_user(self, user_id: str) -> int:
         """
         Revoke all refresh tokens for a user.

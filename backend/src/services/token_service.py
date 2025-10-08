@@ -205,9 +205,6 @@ class TokenService:
             user_id = payload["sub"]
 
             if rotate:
-                # Revoke old refresh token
-                await self.refresh_token_repo.revoke_by_hash(token_hash)
-
                 # Create new token pair (rotation)
                 # Note: Need user object - this requires UserRepository
                 # For now, create access token with user_id from payload
@@ -219,7 +216,7 @@ class TokenService:
                     user_id, new_refresh_value
                 )
 
-                # Store new refresh token
+                # Prepare new refresh token
                 new_token_hash = self._hash_token(new_refresh_value)
                 new_refresh_token = RefreshToken(
                     token_id=str(uuid.uuid4()),
@@ -232,7 +229,11 @@ class TokenService:
                     revoked=False,
                     revoked_at=None,
                 )
-                await self.refresh_token_repo.create(new_refresh_token)
+
+                # Atomically revoke old token and create new token (prevents race conditions)
+                await self.refresh_token_repo.rotate_token_atomic(
+                    token_hash, new_refresh_token
+                )
 
                 logger.info(
                     "Access token refreshed with rotation",
