@@ -42,11 +42,19 @@ export function ChatListItem({
   };
 
   return (
-    <button
+    <div
       onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={`
         w-full px-3 py-3 rounded-xl text-left transition-all duration-200
-        group relative
+        group relative cursor-pointer
         ${
           isActive
             ? "bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-300/50 shadow-lg"
@@ -115,6 +123,6 @@ export function ChatListItem({
           </div>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
