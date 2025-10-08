@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.7] - 2025-10-08
+
+### Added
+- feat(ux): Assistant responses now fill full chat width (removed max-w-3xl and mr-8)
+- feat(ux): Consistent, prominent display for analysis content (mimics Gemini layout)
+
+## [0.7.6] - 2025-10-08
+
+### Added
+- feat(ux): NEUTRAL Stochastic signal uses yellow text (rgb(255, 215, 0)) on white background
+- feat(ux): Completed dynamic color implementation for all signal types (OVERBOUGHT/OVERSOLD/NEUTRAL)
+
 ## [0.7.5] - 2025-10-08
 
 ### Added
