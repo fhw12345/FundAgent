@@ -166,29 +166,31 @@ export function formatStochasticResponse(
   // Signal interpretation with dynamic color intensity
   let signalEmoji = "";
   let signalMeaning = "";
-  let signalColor = "";
-  let textColor = "white"; // Default white text
+  let signalColor = ""; // Background color
+  let textColor = "white"; // Text color
 
   const kValue = result.current_k;
 
   if (result.current_signal === "overbought") {
-    // Red: darker as %K approaches 100
+    // Red background: darker as %K approaches 100
     const intensity = Math.min(((kValue - 80) / 20) * 100, 100); // 0-100%
     const red = Math.round(139 + (intensity / 100) * 116); // 139 (dark) → 255 (bright)
     signalColor = `rgb(${red}, 0, 0)`;
+    textColor = "white";
     signalEmoji = "🔴";
     signalMeaning = "OVERBOUGHT (Potential Sell Zone)";
   } else if (result.current_signal === "oversold") {
-    // Green: darker as %K approaches 0
+    // Green background: darker as %K approaches 0
     const intensity = Math.min(((20 - kValue) / 20) * 100, 100); // 0-100%
     const green = Math.round(100 + (intensity / 100) * 155); // 100 (dark) → 255 (bright)
     signalColor = `rgb(0, ${green}, 0)`;
+    textColor = "white";
     signalEmoji = "🟢";
     signalMeaning = "OVERSOLD (Potential Buy Zone)";
   } else {
-    // Yellow for neutral - use dark text for readability
-    signalColor = "rgb(255, 215, 0)"; // Gold yellow
-    textColor = "#1f2937"; // Dark gray text (better contrast on yellow)
+    // Neutral: Yellow text on white background
+    signalColor = "white"; // White background for contrast
+    textColor = "rgb(255, 215, 0)"; // Gold yellow text
     signalEmoji = "🟡";
     signalMeaning = "NEUTRAL (No Clear Signal)";
   }
