@@ -5,7 +5,7 @@
  * assistant responses, and loading indicators.
  */
 
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Loader2 } from "lucide-react";
@@ -123,6 +123,13 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   messages,
   isAnalysisPending,
 }) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isAnalysisPending]);
+
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
       {messages.map((msg: any) => (
@@ -139,6 +146,9 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           </div>
         </div>
       )}
+
+      {/* Invisible scroll target */}
+      <div ref={messagesEndRef} />
     </div>
   );
 };
