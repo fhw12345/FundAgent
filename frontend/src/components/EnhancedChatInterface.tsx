@@ -155,10 +155,39 @@ export function EnhancedChatInterface() {
 
   const handleQuickAnalysis = useCallback(
     (type: "fibonacci" | "fundamentals" | "macro" | "stochastic") => {
-      // All button clicks go directly to analysis endpoints
+      // Generate user message describing the analysis request
+      let userMessage = "";
+
+      if (type === "fibonacci") {
+        userMessage = `Start Fibonacci analysis for ${currentSymbol || "symbol"} on ${selectedInterval} period${selectedDateRange.start && selectedDateRange.end ? ` from ${selectedDateRange.start} to ${selectedDateRange.end}` : ""}`;
+      } else if (type === "fundamentals") {
+        userMessage = `Get fundamentals for ${currentSymbol || "symbol"}`;
+      } else if (type === "macro") {
+        userMessage = "Analyze macro market sentiment";
+      } else if (type === "stochastic") {
+        userMessage = `Start Stochastic oscillator analysis for ${currentSymbol || "symbol"} on ${selectedInterval} period${selectedDateRange.start && selectedDateRange.end ? ` from ${selectedDateRange.start} to ${selectedDateRange.end}` : ""}`;
+      }
+
+      // Add user message to chat (triggers auto-scroll to user message position)
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "user",
+          content: userMessage,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      // Trigger analysis (assistant response will appear below)
       buttonMutation.mutate(type);
     },
-    [buttonMutation.mutate],
+    [
+      buttonMutation.mutate,
+      setMessages,
+      currentSymbol,
+      selectedInterval,
+      selectedDateRange,
+    ],
   );
 
   // Old complex pattern matching logic removed

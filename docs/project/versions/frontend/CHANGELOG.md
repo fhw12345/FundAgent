@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2025-10-08
+
+### Added
+- feat(ux): User messages for quick analysis button clicks (shows "Start X analysis for symbol...")
+- feat(ux): Table-based analysis formatting for better readability
+- feat(ux): Removed redundant explanatory text from analysis outputs
+
 ## [0.7.1] - 2025-10-08
 
 ### Added

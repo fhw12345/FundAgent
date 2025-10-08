@@ -22,66 +22,42 @@ export function formatFibonacciResponse(
       ? "📉"
       : "➡️";
 
-  // Format Big 3 trends with Fibonacci levels
-  let bigThreeSection = "";
+  // Build main trend table
+  let mainTrendTable = "";
   if (result.raw_data?.top_trends && result.raw_data.top_trends.length > 0) {
-    bigThreeSection = `
-### 📊 Key Support/Resistance Levels:
+    const mainTrend = result.raw_data.top_trends[0];
+    const trendType = mainTrend.type.includes("Uptrend") ? "📈" : "📉";
 
-${result.raw_data.top_trends
-  .slice(0, 3)
-  .map((trend: any, index: number) => {
-    const trendType = trend.type.includes("Uptrend") ? "📈" : "📉";
-    const magnitude = (trend.magnitude || 0).toFixed(1);
-    const isMainTrend = index === 0;
+    mainTrendTable = `
+### ${trendType} Main Trend - ${mainTrend.type.toUpperCase()}
 
-    const fibLevels = trend.fibonacci_levels || [];
-    const keyFibLevels = fibLevels.filter((level: any) => level.is_key_level);
+| Metric | Value |
+|--------|-------|
+| Period | ${mainTrend.period} |
+| Magnitude | $${(mainTrend.magnitude || 0).toFixed(2)} move |
+| Range | $${mainTrend.low?.toFixed(2)} → $${mainTrend.high?.toFixed(2)} |${result.pressure_zone ? `\n| Golden Zone | $${result.pressure_zone.lower_bound.toFixed(2)} - $${result.pressure_zone.upper_bound.toFixed(2)} |` : ""}
 
-    let fibSection = "";
-    if (keyFibLevels.length > 0) {
-      fibSection = keyFibLevels
-        .map(
-          (level: any) =>
-            `   • **${level.percentage}** - $${level.price.toFixed(2)}`,
-        )
-        .join("\n");
-    } else if (fibLevels.length > 0) {
-      fibSection = fibLevels
-        .map(
-          (level: any) =>
-            `   • **${level.percentage}** - $${level.price.toFixed(2)}${level.is_key_level ? " 🌟" : ""}`,
-        )
-        .join("\n");
-    } else {
-      fibSection = "   • No levels calculated";
-    }
+**Fibonacci Levels:**
 
-    let pressureInfo = "";
-    if (isMainTrend && result.pressure_zone) {
-      pressureInfo = `\n   • **Golden Zone:** $${result.pressure_zone.lower_bound.toFixed(2)} - $${result.pressure_zone.upper_bound.toFixed(2)}`;
-    }
-
-    return `**${index + 1}. ${trendType} ${trend.type.toUpperCase()}** (${trend.period})
-   • **Magnitude:** $${magnitude} move
-   • **Range:** $${trend.low?.toFixed(2)} → $${trend.high?.toFixed(2)}
-   • **Fibonacci Levels:**
-${fibSection}${pressureInfo}`;
-  })
-  .join("\n\n")}
+| Level | Price |
+|-------|-------|
+${(mainTrend.fibonacci_levels || [])
+  .map((level: any) => `| ${level.percentage} | $${level.price.toFixed(2)} |`)
+  .join("\n")}
 `;
   }
 
   return `## 📊 Fibonacci Analysis - ${result.symbol}
 
-### ${trendEmoji} Bottom Line:
-• **Trend:** ${result.market_structure.trend_direction}
-• **Current Price:** $${result.current_price.toFixed(2)}
-• **Confidence:** ${(result.confidence_score * 100).toFixed(1)}%
+### ${trendEmoji} Bottom Line
 
-### 📋 Context:
-• **Period:** ${result.start_date || "Dynamic"} to ${result.end_date || "Current"}
-${bigThreeSection}
+| Metric | Value |
+|--------|-------|
+| Trend | ${result.market_structure.trend_direction.toUpperCase()} |
+| Current Price | $${result.current_price.toFixed(2)} |
+| Confidence | ${(result.confidence_score * 100).toFixed(1)}% |
+| Period | ${result.start_date || "Dynamic"} to ${result.end_date || "Current"} |
+${mainTrendTable}
 `;
 }
 
@@ -93,32 +69,32 @@ export function formatMacroResponse(result: MacroSentimentResponse): string {
         ? "📉"
         : "➡️";
 
-  const topSectors = Object.entries(result.sector_performance)
+  const allSectors = Object.entries(result.sector_performance)
     .sort(([, a], [, b]) => b - a)
-    .slice(0, 3);
+    .slice(0, 6);
 
-  const bottomSectors = Object.entries(result.sector_performance)
-    .sort(([, a], [, b]) => a - b)
-    .slice(0, 3);
+  return `## 🌍 Macro Market Sentiment
 
-  return `## 🌍 Macro Market Sentiment Analysis
+### ${sentimentEmoji} Bottom Line
 
-### ${sentimentEmoji} Bottom Line:
-• **Market Sentiment:** ${result.market_sentiment.toUpperCase()}
-• **VIX Level:** ${result.vix_level.toFixed(2)} (${result.vix_interpretation})
-• **Fear/Greed Score:** ${result.fear_greed_score}/100
+| Metric | Value |
+|--------|-------|
+| Market Sentiment | ${result.market_sentiment.toUpperCase()} |
+| VIX Level | ${result.vix_level.toFixed(2)} (${result.vix_interpretation}) |
+| Fear/Greed Score | ${result.fear_greed_score}/100 |
 
-### 📝 Market Outlook:
+### 📝 Market Outlook
+
 ${result.market_outlook}
 
-### 🔑 Key Factors:
+### 📊 Sector Performance
+
+| Sector | Performance |
+|--------|-------------|
+${allSectors.map(([sector, perf]) => `| ${sector} | ${perf > 0 ? "+" : ""}${perf.toFixed(2)}% |`).join("\n")}
+
+### 🔑 Key Factors
 ${result.key_factors.map((factor) => `• ${factor}`).join("\n")}
-
-### 📊 Top Performing Sectors:
-${topSectors.map(([sector, perf]) => `• **${sector}**: ${perf > 0 ? "+" : ""}${perf.toFixed(2)}%`).join("\n")}
-
-### 📉 Underperforming Sectors:
-${bottomSectors.map(([sector, perf]) => `• **${sector}**: ${perf.toFixed(2)}%`).join("\n")}
 `;
 }
 
@@ -132,25 +108,28 @@ export function formatFundamentalsResponse(
     day: "numeric",
   });
 
-  return `## 💼 Fundamental Analysis - ${result.symbol}
+  return `## 💼 Fundamentals - ${result.symbol}
 *${result.company_name} • ${analysisDate}*
 
-### ${priceChangeEmoji} Bottom Line:
-• **Current Price:** $${result.current_price.toFixed(2)} (${result.price_change >= 0 ? "+" : ""}${result.price_change_percent.toFixed(2)}%)
-• **Market Cap:** $${(result.market_cap / 1e9).toFixed(2)}B
-${result.pe_ratio ? `• **P/E Ratio:** ${result.pe_ratio.toFixed(2)}` : ""}
+### ${priceChangeEmoji} Bottom Line
 
-### 📊 Valuation Metrics:
-${result.pe_ratio ? `• **P/E Ratio:** ${result.pe_ratio.toFixed(2)}` : ""}
-${result.pb_ratio ? `• **P/B Ratio:** ${result.pb_ratio.toFixed(2)}` : ""}
-${result.dividend_yield ? `• **Dividend Yield:** ${result.dividend_yield.toFixed(2)}%` : ""}
-${result.beta ? `• **Beta:** ${result.beta.toFixed(2)} (volatility vs market)` : ""}
+| Metric | Value |
+|--------|-------|
+| Current Price | $${result.current_price.toFixed(2)} (${result.price_change >= 0 ? "+" : ""}${result.price_change_percent.toFixed(2)}%) |
+| Market Cap | $${(result.market_cap / 1e9).toFixed(2)}B |
+${result.pe_ratio ? `| P/E Ratio | ${result.pe_ratio.toFixed(2)} |` : ""}
+${result.pb_ratio ? `| P/B Ratio | ${result.pb_ratio.toFixed(2)} |` : ""}
 
-### 📈 Trading Activity:
-• **Volume:** ${result.volume.toLocaleString()}
-• **Avg Volume:** ${result.avg_volume.toLocaleString()}
-• **52-Week High:** $${result.fifty_two_week_high.toFixed(2)}
-• **52-Week Low:** $${result.fifty_two_week_low.toFixed(2)}
+### 📊 Valuation & Trading
+
+| Metric | Value |
+|--------|-------|
+${result.dividend_yield ? `| Dividend Yield | ${result.dividend_yield.toFixed(2)}% |` : ""}
+${result.beta ? `| Beta | ${result.beta.toFixed(2)} |` : ""}
+| Volume | ${result.volume.toLocaleString()} |
+| Avg Volume | ${result.avg_volume.toLocaleString()} |
+| 52-Week High | $${result.fifty_two_week_high.toFixed(2)} |
+| 52-Week Low | $${result.fifty_two_week_low.toFixed(2)} |
 `;
 }
 
@@ -172,30 +151,32 @@ export function formatStochasticResponse(
 
   const recentSignals = result.signal_changes.slice(-3);
 
-  return `## 📊 Stochastic Oscillator Analysis - ${result.symbol}
+  return `## 📊 Stochastic Oscillator - ${result.symbol}
 *${analysisDate} • ${result.timeframe} timeframe*
 
-### ${signalEmoji} Bottom Line:
-• **Signal:** ${result.current_signal.toUpperCase()}
-• **Current Price:** $${result.current_price.toFixed(2)}
-• **%K:** ${result.current_k.toFixed(2)}% | **%D:** ${result.current_d.toFixed(2)}%
+### ${signalEmoji} Bottom Line
 
-### 📝 Analysis Summary:
+| Indicator | Value |
+|-----------|-------|
+| Signal | ${result.current_signal.toUpperCase()} |
+| Current Price | $${result.current_price.toFixed(2)} |
+| %K Line | ${result.current_k.toFixed(1)}% |
+| %D Line | ${result.current_d.toFixed(1)}% |
+| Parameters | %K(${result.k_period}) %D(${result.d_period}) |
+
+### 📝 Summary
+
 ${result.analysis_summary}
 
-### 💡 Key Insights:
+### 💡 Key Insights
 ${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
-
 ${
   recentSignals.length > 0
-    ? `### 🔔 Recent Signals:
-${recentSignals.map((signal) => `• **${signal.type.toUpperCase()}**: ${signal.description}`).join("\n")}
-`
+    ? `
+### 🔔 Recent Signals
+
+${recentSignals.map((signal) => `• **${signal.type.toUpperCase()}**: ${signal.description}`).join("\n")}`
     : ""
 }
-
-### 🔧 Technical Details:
-• **Period:** ${result.start_date || "Dynamic"} to ${result.end_date || "Current"}
-• **Parameters:** %K(${result.k_period}) %D(${result.d_period})
 `;
 }
