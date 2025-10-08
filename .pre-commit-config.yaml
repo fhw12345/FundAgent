@@ -18,7 +18,7 @@ repos:
         entry: ./scripts/check-file-length.sh
         language: system
         types_or: [python, javascript, jsx, ts, tsx]
-        exclude: '__init__.py'
+        exclude: '(__init__\.py|test_.*\.py|.*\.test\.ts|.*\.test\.tsx)$'
 
   # Python code quality
   - repo: https://github.com/psf/black
