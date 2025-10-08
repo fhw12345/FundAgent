@@ -236,7 +236,7 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4">
           <div className="text-center text-gray-500">
             <Search className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm">No stocks found for "{query}"</p>
+            <p className="text-sm">No stocks found for &ldquo;{query}&rdquo;</p>
             <p className="text-xs text-gray-400 mt-1">
               Try searching by company name or stock symbol
             </p>
@@ -247,7 +247,10 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
       {/* Search Tips */}
       {query.length === 0 && (
         <div className="mt-2 text-xs text-gray-500">
-          <p>💡 Try searching: "Apple", "AAPL", "Microsoft", "Tesla", etc.</p>
+          <p>
+            💡 Try searching: &ldquo;Apple&rdquo;, &ldquo;AAPL&rdquo;,
+            &ldquo;Microsoft&rdquo;, &ldquo;Tesla&rdquo;, etc.
+          </p>
         </div>
       )}
     </div>

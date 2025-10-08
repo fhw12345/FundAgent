@@ -104,8 +104,8 @@ function App() {
                 </h2>
                 <p className="text-gray-600 mb-6">
                   Real-time status of backend services and dependencies. This
-                  demonstrates the "walking skeleton" - end-to-end connectivity
-                  from frontend → FastAPI → MongoDB → Redis.
+                  demonstrates the &ldquo;walking skeleton&rdquo; - end-to-end
+                  connectivity from frontend → FastAPI → MongoDB → Redis.
                 </p>
               </div>
               <HealthCheck />

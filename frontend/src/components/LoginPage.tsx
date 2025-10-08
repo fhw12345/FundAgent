@@ -291,7 +291,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     onClick={switchToRegister}
                     className="text-blue-600 hover:text-blue-800 font-medium text-sm"
                   >
-                    Don't have an account? Register →
+                    Don&apos;t have an account? Register →
                   </button>
                 </div>
               </div>
@@ -373,7 +373,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                       📧 Check your email
                     </p>
                     <p className="text-xs text-blue-700">
-                      We've sent a 6-digit verification code to your inbox.
+                      We&apos;ve sent a 6-digit verification code to your inbox.
                       Please check your email and enter the code below.
                     </p>
                   </div>
@@ -590,7 +590,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                       📧 Check your email
                     </p>
                     <p className="text-xs text-blue-700">
-                      We've sent a 6-digit verification code to your inbox.
+                      We&apos;ve sent a 6-digit verification code to your inbox.
                     </p>
                   </div>
 
