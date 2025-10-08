@@ -107,6 +107,30 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
                     {children}
                   </blockquote>
                 ),
+                table: ({ children }) => (
+                  <div className="overflow-x-auto mb-3">
+                    <table className="min-w-full border-collapse border border-gray-300">
+                      {children}
+                    </table>
+                  </div>
+                ),
+                thead: ({ children }) => (
+                  <thead className="bg-gray-100">{children}</thead>
+                ),
+                tbody: ({ children }) => <tbody>{children}</tbody>,
+                tr: ({ children }) => (
+                  <tr className="border-b border-gray-300">{children}</tr>
+                ),
+                th: ({ children }) => (
+                  <th className="px-4 py-2 text-left font-semibold text-gray-900 border-r border-gray-300 last:border-r-0">
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td className="px-4 py-2 text-gray-800 border-r border-gray-300 last:border-r-0">
+                    {children}
+                  </td>
+                ),
               }}
             >
               {msg.content}

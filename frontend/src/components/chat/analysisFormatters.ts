@@ -164,10 +164,6 @@ export function formatStochasticResponse(
 | %D Line | ${result.current_d.toFixed(1)}% |
 | Parameters | %K(${result.k_period}) %D(${result.d_period}) |
 
-### 📝 Summary
-
-${result.analysis_summary}
-
 ### 💡 Key Insights
 ${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
 ${
