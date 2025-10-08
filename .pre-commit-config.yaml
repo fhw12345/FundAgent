@@ -90,21 +90,21 @@ repos:
     hooks:
       - id: gitleaks
 
-  # Kubernetes Linting
+  # Kubernetes Linting (run via Docker)
   - repo: local
     hooks:
       - id: kube-linter
         name: Kubernetes Linter (kube-linter)
-        entry: bash -c 'if command -v kube-linter &> /dev/null; then kube-linter lint --config .kube-linter.yaml k8s/; else echo "kube-linter not installed, skipping"; fi'
+        entry: bash -c 'docker run --rm -v "$(pwd):/app" -w /app stackrox/kube-linter:latest lint .pipeline/k8s/'
         language: system
-        files: ^k8s/.*\.yaml$
+        files: ^\.pipeline/k8s/.*\.yaml$
         pass_filenames: false
 
       - id: kubeconform
         name: Kubernetes Validator (kubeconform)
-        entry: bash -c 'if command -v kubeconform &> /dev/null; then kubeconform -strict -summary k8s/*.yaml; else echo "kubeconform not installed, skipping"; fi'
+        entry: bash -c 'docker run --rm -v "$(pwd):/app" -w /app ghcr.io/yannh/kubeconform:latest -strict -summary .pipeline/k8s/base/*.yaml .pipeline/k8s/overlays/*/*.yaml'
         language: system
-        files: ^k8s/.*\.yaml$
+        files: ^\.pipeline/k8s/.*\.yaml$
         pass_filenames: false
 
   # Dockerfile linting
