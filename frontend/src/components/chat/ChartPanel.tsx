@@ -86,38 +86,66 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
 
         {currentSymbol && (
           <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => handleQuickAnalysis("fibonacci")}
-              disabled={analysisMutation.isPending}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Fibonacci
-            </button>
-            <button
-              onClick={() => handleQuickAnalysis("fundamentals")}
-              disabled={analysisMutation.isPending}
-              className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 text-sm"
-            >
-              <DollarSign className="h-4 w-4" />
-              Fundamentals
-            </button>
-            <button
-              onClick={() => handleQuickAnalysis("macro")}
-              disabled={analysisMutation.isPending}
-              className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-sm"
-            >
-              <TrendingUp className="h-4 w-4" />
-              Macro
-            </button>
-            <button
-              onClick={() => handleQuickAnalysis("stochastic")}
-              disabled={analysisMutation.isPending}
-              className="flex items-center gap-2 px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 text-sm"
-            >
-              <Activity className="h-4 w-4" />
-              Stochastic
-            </button>
+            <div className="relative group">
+              <button
+                onClick={() => handleQuickAnalysis("fibonacci")}
+                disabled={analysisMutation.isPending}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm transition-all"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Fibonacci
+              </button>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
+                Identify key support/resistance levels using Fibonacci
+                retracement
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
+              </div>
+            </div>
+            <div className="relative group">
+              <button
+                onClick={() => handleQuickAnalysis("fundamentals")}
+                disabled={analysisMutation.isPending}
+                className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 text-sm transition-all"
+              >
+                <DollarSign className="h-4 w-4" />
+                Fundamentals
+              </button>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
+                View company metrics: P/E ratio, market cap, dividend yield,
+                volume
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
+              </div>
+            </div>
+            <div className="relative group">
+              <button
+                onClick={() => handleQuickAnalysis("macro")}
+                disabled={analysisMutation.isPending}
+                className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-sm transition-all"
+              >
+                <TrendingUp className="h-4 w-4" />
+                Macro
+              </button>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
+                Analyze overall market sentiment, VIX level, and sector
+                performance
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
+              </div>
+            </div>
+            <div className="relative group">
+              <button
+                onClick={() => handleQuickAnalysis("stochastic")}
+                disabled={analysisMutation.isPending}
+                className="flex items-center gap-2 px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 text-sm transition-all"
+              >
+                <Activity className="h-4 w-4" />
+                Stochastic
+              </button>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
+                Measure momentum to identify overbought/oversold conditions
+                (%K/%D)
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
+              </div>
+            </div>
             {selectedDateRange.start && selectedDateRange.end && (
               <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm">
                 <Zap className="h-4 w-4" />
