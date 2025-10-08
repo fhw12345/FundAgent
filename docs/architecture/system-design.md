@@ -15,7 +15,7 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 - **Primary Platform**: Microsoft Azure
   - Container orchestration (AKS)
   - Database (Cosmos DB with MongoDB API)
-  - Authentication (Azure AD B2C)
+  - Secrets management (Key Vault)
   - Monitoring (Azure Monitor)
 
 - **Specialized Services**: Alibaba Cloud
@@ -161,11 +161,11 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
   - Email verification for registration and password reset
   - JWT tokens (7-day expiry) signed with SECRET_KEY
   - Session management via localStorage
-- **Planned**: Hybrid authentication system
-  - Keep local JWT for development and China deployment
-  - Add Azure AD B2C OAuth2/OIDC for international production
-  - Support multiple auth providers (local, Microsoft, Google) based on user region
-  - Optional: Add MFA (TOTP) to local auth for enhanced security
+- **Planned Enhancements**:
+  - Add OAuth2/OIDC providers (Microsoft, Google) for social login
+  - Support multiple auth providers based on user region
+  - Add MFA (TOTP) for enhanced security
+  - Implement refresh tokens for better session management
 - **Design Decision**: Separate pods architecture chosen over multi-container pods
   - Avoids OAuth complexity for MVP phase
   - Allows independent scaling and updates
@@ -250,7 +250,7 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 - Multi-region AKS deployment
 - Azure Cosmos DB (multi-region)
 - ApsaraDB for Redis (managed)
-- Hybrid authentication (local JWT + Azure AD B2C)
+- JWT-based authentication with OAuth2/OIDC support
 - Progressive rollouts with health checks
 - Blue-green deployments for major releases
 - Separate pods for each service (frontend, backend, redis)
@@ -258,7 +258,7 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 ## Integration Points
 
 ### Cross-Cloud Integration
-1. **Authentication Flow**: Azure AD B2C → AKS → Services
+1. **Authentication Flow**: JWT → AKS → Services
 2. **Data Flow**: Azure Cosmos DB ↔ Application ↔ Alibaba OSS
 3. **AI Processing**: Application → Qwen-VL Model → Response
 4. **Monitoring**: Azure Monitor + custom metrics from Alibaba services

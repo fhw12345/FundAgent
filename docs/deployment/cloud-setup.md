@@ -17,7 +17,7 @@
 
 ### Third-Party Services
 - **Cloudflare**: DNS management and domain registration (`klinematrix.com`)
-- **SendGrid (Twilio)**: Transactional email delivery service
+- **Tencent Cloud SES**: Transactional email delivery service (replaces SendGrid)
 
 ### Rationale for Hybrid Approach
 1. **Best-of-Breed Services**: Leverage Azure's enterprise Kubernetes platform with Alibaba's cutting-edge AI models
@@ -67,7 +67,8 @@
 - **Secrets to Store**:
   - `mongodb-url`: Cosmos DB connection string
   - `dashscope-api-key`: Alibaba Cloud DashScope API key
-  - `sendgrid-api-key`: SendGrid API key for email delivery
+  - `tencent-ses-secret-id`: Tencent Cloud SES credentials
+  - `tencent-ses-secret-key`: Tencent Cloud SES credentials
 
 #### Azure Container Registry (ACR)
 - **Registry Name**: `financialAgent`
@@ -380,11 +381,11 @@ Content: 4.217.130.195
 Proxy: DNS only (gray cloud)
 ```
 
-**Email Authentication (SendGrid):**
+**Email Authentication (Tencent Cloud SES):**
 ```
 Type: TXT
 Name: @
-Content: v=spf1 include:sendgrid.net ~all
+Content: v=spf1 include:spf.qcloud.com ~all
 TTL: Auto
 
 Type: TXT
@@ -392,14 +393,10 @@ Name: _dmarc
 Content: v=DMARC1; p=none; rua=mailto:dmarc@klinematrix.com
 TTL: Auto
 
+# Domain verification (obtain from Tencent Cloud Console)
 Type: CNAME
-Name: s1._domainkey
-Target: s1.domainkey.u10419013.wl014.sendgrid.net
-Proxy: DNS only
-
-Type: CNAME
-Name: s2._domainkey
-Target: s2.domainkey.u10419013.wl014.sendgrid.net
+Name: tencent-verify-<verification-code>
+Target: verify.qcloud.com
 Proxy: DNS only
 ```
 
@@ -496,7 +493,7 @@ This allows testing password reset flows without sending real emails.
 - **DMARC**: Set policy for authentication failures
 - **Purpose**: Improves deliverability, prevents spam classification
 
-**Alternative**: If Tencent SES has deliverability issues, SendGrid is a proven alternative with better Gmail/Yahoo compatibility.
+**Alternative**: If Tencent SES has deliverability issues, alternative email providers (AWS SES, Mailgun) can be configured with similar API integration patterns.
 
 #### Troubleshooting
 

@@ -27,6 +27,12 @@ Infrastructure setup and deployment procedures.
 - **[Resource Inventory](deployment/RESOURCE_INVENTORY.md)**: Complete list of all Azure and Kubernetes resources
 - **[Dev→Test Migration](deployment/MIGRATION_DEV_TO_TEST.md)**: Migration guide from dev to test environment
 
+### Features
+Feature specifications and requirements documentation.
+
+- **[Feature Specs](features/README.md)**: Template and guidelines for creating feature specifications before implementation
+- **Active Features**: Browse `features/` directory for approved and in-progress feature specs
+
 ### Development
 Developer guides and best practices.
 
