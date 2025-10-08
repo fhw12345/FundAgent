@@ -42,14 +42,17 @@ export function useChatRestoration(callbacks: ChatRestoreCallbacks) {
         const restoredMessages: ChatMessage[] = chatDetail.messages.map(
           (msg) => {
             // Unwrap from raw_data field with validation
-            let analysis_data = undefined;
+            let analysis_data: Record<string, unknown> | undefined = undefined;
             if (
               msg.metadata?.raw_data &&
               Object.keys(msg.metadata.raw_data).length > 0
             ) {
-              analysis_data = msg.metadata.raw_data;
+              analysis_data = msg.metadata.raw_data as Record<string, unknown>;
             } else if (msg.metadata && Object.keys(msg.metadata).length > 0) {
-              analysis_data = msg.metadata;
+              analysis_data = msg.metadata as unknown as Record<
+                string,
+                unknown
+              >;
             }
 
             return {
@@ -64,8 +67,13 @@ export function useChatRestoration(callbacks: ChatRestoreCallbacks) {
         // Restore messages
         setMessages(restoredMessages);
 
-        // Restore UI state from chat.ui_state
-        const uiState = chatDetail.chat.ui_state;
+        // Restore UI state from chat.ui_state (with default empty state)
+        const uiState = chatDetail.chat.ui_state || {
+          current_symbol: null,
+          current_interval: "1d",
+          current_date_range: { start: null, end: null },
+          active_overlays: {},
+        };
 
         console.log("🔄 Restoring chat UI state:", {
           chatId,

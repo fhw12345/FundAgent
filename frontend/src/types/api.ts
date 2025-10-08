@@ -78,3 +78,84 @@ export interface ErrorResponse {
   detail: string;
   error_code?: string;
 }
+
+// ===== Chat Types =====
+
+export interface UIState {
+  current_symbol?: string | null;
+  current_interval?: string;
+  current_date_range?: {
+    start?: string | null;
+    end?: string | null;
+  };
+  active_overlays?: Record<string, Record<string, unknown>>;
+}
+
+export interface Chat {
+  chat_id: string;
+  user_id: string;
+  title: string;
+  is_archived: boolean;
+  ui_state?: UIState;
+  last_message_preview?: string | null;
+  created_at: string;
+  updated_at: string;
+  last_message_at?: string | null;
+}
+
+export interface ChatListResponse {
+  chats: Chat[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface Message {
+  message_id: string;
+  chat_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  source:
+    | "user"
+    | "llm"
+    | "fibonacci"
+    | "stochastic"
+    | "macro"
+    | "fundamentals";
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ChatDetailResponse {
+  chat: Chat;
+  messages: Message[];
+}
+
+export interface UpdateUIStateRequest {
+  ui_state: UIState;
+}
+
+// ===== Stream Event Types =====
+
+export type StreamEvent =
+  | {
+      type: "chat_created";
+      chat_id: string;
+    }
+  | {
+      type: "content";
+      content: string;
+    }
+  | {
+      type: "title_generated";
+      title: string;
+    }
+  | {
+      type: "done";
+      chat_id: string;
+      message_count?: number;
+    }
+  | {
+      type: "error";
+      error?: string;
+    };
