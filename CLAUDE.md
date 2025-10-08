@@ -162,12 +162,21 @@ kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 ## Important Reminders
 
 ### ⚠️ Before Committing
+
+**🚨 CRITICAL: TEST FIRST, THEN COMMIT**
+- **ALWAYS test changes before committing**
+- Restart services (`docker restart <service>`) to verify hot reload worked
+- Check browser console for errors
+- Test the actual user flow (click buttons, check UI updates)
+- **DO NOT commit without testing**
+
+**Checklist:**
+- [ ] **Test locally first** - Verify changes work in browser/terminal
 - [ ] **Feature spec created** (for new features): Document in `docs/features/`
 - [ ] Run `make fmt && make test && make lint`
 - [ ] **Bump version** (required): `./scripts/bump-version.sh [component] [patch|minor|major]`
 - [ ] Check data contracts (Pydantic ↔ TypeScript)
 - [ ] Verify no secrets in code
-- [ ] Test locally first
 
 ### 🚀 Before Deploying
 - [ ] Build images in ACR

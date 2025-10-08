@@ -133,7 +133,6 @@ export function EnhancedChatInterface() {
   });
 
   const handleSymbolSelect = useCallback((symbol: string, name: string) => {
-    console.log("🎯 Symbol selected:", { symbol, name });
     setCurrentSymbol(symbol);
     setCurrentCompanyName(name);
     setDateRangeStart("");

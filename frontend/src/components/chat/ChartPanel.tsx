@@ -48,12 +48,6 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
   handleDateRangeSelect,
   handleQuickAnalysis,
 }) => {
-  console.log("📊 ChartPanel rendered with:", {
-    currentSymbol,
-    currentCompanyName,
-    hasPriceData: !!priceDataQuery.data,
-  });
-
   return (
     <div className="flex flex-col w-1/2">
       <div className="border-b p-4 bg-gray-50">
