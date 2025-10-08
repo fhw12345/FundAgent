@@ -166,7 +166,7 @@ if __name__ == "__main__":
     settings = get_settings()
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 - Required for Docker container
         port=8000,
         reload=settings.environment == "development",
         log_config=None,  # Use structlog configuration
