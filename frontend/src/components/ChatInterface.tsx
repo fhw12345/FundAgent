@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   Send,
   BarChart3,
@@ -190,7 +190,7 @@ export function ChatInterface() {
       const intent = analysisService.parseAnalysisIntent(userMessage);
 
       switch (intent.type) {
-        case "fibonacci":
+        case "fibonacci": {
           if (!intent.symbol) {
             throw new Error(
               'Please specify a stock symbol for Fibonacci analysis (e.g., "Show Fibonacci analysis for AAPL")',
@@ -221,8 +221,9 @@ export function ChatInterface() {
             content: formatFibonacciResponse(fibResult),
             analysis_data: fibResult,
           };
+        }
 
-        case "macro":
+        case "macro": {
           const macroResult = await analysisService.macroSentimentAnalysis({
             include_sectors: true,
             include_indices: true,
@@ -232,8 +233,9 @@ export function ChatInterface() {
             content: formatMacroResponse(macroResult),
             analysis_data: macroResult,
           };
+        }
 
-        case "fundamentals":
+        case "fundamentals": {
           if (!intent.symbol) {
             throw new Error(
               'Please specify a stock symbol for fundamental analysis (e.g., "Give me fundamentals for TSLA")',
@@ -247,8 +249,9 @@ export function ChatInterface() {
             content: formatFundamentalsResponse(fundResult),
             analysis_data: fundResult,
           };
+        }
 
-        case "chart":
+        case "chart": {
           if (!intent.symbol) {
             throw new Error(
               'Please specify a stock symbol for chart generation (e.g., "Show chart for AAPL")',
@@ -267,6 +270,7 @@ export function ChatInterface() {
             analysis_data: chartResult,
             chart_url: chartResult.chart_url,
           };
+        }
 
         default:
           throw new Error(`I can help you with:
@@ -279,7 +283,7 @@ export function ChatInterface() {
 Please specify a stock symbol and analysis type.`);
       }
     },
-    onMutate: async (newMessage) => {
+    onMutate: (newMessage) => {
       // Optimistically add user message
       const userMessage: ChatMessage = {
         role: "user",
@@ -339,10 +343,6 @@ Please specify a stock symbol and analysis type.`);
     analysisMutation.mutate(message);
   };
 
-  const handleQuickAction = (action: string) => {
-    analysisMutation.mutate(action);
-  };
-
   // Direct action mutation for button-based analyses
   const directActionMutation = useMutation({
     mutationFn: async (actionData: {
@@ -354,9 +354,12 @@ Please specify a stock symbol and analysis type.`);
       const { type, symbol, startDate, endDate } = actionData;
 
       switch (type) {
-        case "fibonacci":
+        case "fibonacci": {
+          if (!symbol) {
+            throw new Error("Symbol is required for Fibonacci analysis");
+          }
           const fibResult = await analysisService.fibonacciAnalysis({
-            symbol: symbol!,
+            symbol,
             start_date: startDate,
             end_date: endDate,
             include_chart: true,
@@ -366,8 +369,9 @@ Please specify a stock symbol and analysis type.`);
             content: formatFibonacciResponse(fibResult),
             analysis_data: fibResult,
           };
+        }
 
-        case "macro":
+        case "macro": {
           const macroResult = await analysisService.macroSentimentAnalysis({
             include_sectors: true,
             include_indices: true,
@@ -377,20 +381,28 @@ Please specify a stock symbol and analysis type.`);
             content: formatMacroResponse(macroResult),
             analysis_data: macroResult,
           };
+        }
 
-        case "fundamentals":
+        case "fundamentals": {
+          if (!symbol) {
+            throw new Error("Symbol is required for fundamentals analysis");
+          }
           const fundResult = await analysisService.stockFundamentals({
-            symbol: symbol!,
+            symbol,
           });
           return {
             type: "fundamentals",
             content: formatFundamentalsResponse(fundResult),
             analysis_data: fundResult,
           };
+        }
 
-        case "stochastic":
+        case "stochastic": {
+          if (!symbol) {
+            throw new Error("Symbol is required for stochastic analysis");
+          }
           const stochResult = await analysisService.stochasticAnalysis({
-            symbol: symbol!,
+            symbol,
             start_date: startDate,
             end_date: endDate,
             timeframe: "1d", // Default timeframe
@@ -402,10 +414,14 @@ Please specify a stock symbol and analysis type.`);
             content: formatStochasticResponse(stochResult),
             analysis_data: stochResult,
           };
+        }
 
-        case "chart":
+        case "chart": {
+          if (!symbol) {
+            throw new Error("Symbol is required for chart generation");
+          }
           const chartResult = await analysisService.generateChart({
-            symbol: symbol!,
+            symbol,
             start_date: startDate,
             end_date: endDate,
             chart_type: "fibonacci",
@@ -417,6 +433,7 @@ Please specify a stock symbol and analysis type.`);
             analysis_data: chartResult,
             chart_url: chartResult.chart_url,
           };
+        }
 
         default:
           throw new Error(`Unknown action type: ${type}`);
@@ -604,7 +621,10 @@ Please specify a stock symbol and analysis type.`);
         <div className="mb-4 space-y-3">
           <div className="flex space-x-3">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="symbol-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
                 Stock Symbol
               </label>
               <input
@@ -618,10 +638,14 @@ Please specify a stock symbol and analysis type.`);
               />
             </div>
             <div className="w-36">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="start-date-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
                 From Date
               </label>
               <input
+                id="start-date-input"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -629,10 +653,14 @@ Please specify a stock symbol and analysis type.`);
               />
             </div>
             <div className="w-36">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="end-date-input"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
                 To Date
               </label>
               <input
+                id="end-date-input"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
