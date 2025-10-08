@@ -111,7 +111,7 @@ export function useUpdateUIState() {
 
     // Always refetch after error or success
     onSettled: (_data, _error, { chatId }) => {
-      queryClient.invalidateQueries({ queryKey: chatKeys.detail(chatId) });
+      void queryClient.invalidateQueries({ queryKey: chatKeys.detail(chatId) });
     },
   });
 }
@@ -123,7 +123,7 @@ export function useInvalidateChats() {
   const queryClient = useQueryClient();
 
   return () => {
-    queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+    void queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
   };
 }
 
@@ -151,7 +151,7 @@ export function useOptimisticChatAdd() {
     }
 
     // Invalidate to ensure fresh data
-    queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+    void queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
   };
 }
 
@@ -235,7 +235,7 @@ export function useDeleteChat() {
 
     // Always refetch after error or success
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
     },
   });
 }

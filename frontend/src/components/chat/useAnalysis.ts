@@ -98,7 +98,7 @@ export const useAnalysis = (
             // Stream complete - use accumulated content (SAFE)
             resolve({ type: "chat", content: accumulatedContent });
             // Invalidate chat list ONCE after stream completes
-            queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+            void queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
           },
           (error: string) => {
             // Error callback
@@ -257,7 +257,9 @@ export const useButtonAnalysis = (
             () => {
               // Done callback - invalidate chat list ONCE after completion
               resolve(response);
-              queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+              void queryClient.invalidateQueries({
+                queryKey: chatKeys.lists(),
+              });
             },
             (error: string) => {
               console.error("❌ Failed to save to MongoDB:", error);
