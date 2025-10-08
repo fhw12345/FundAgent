@@ -13,8 +13,8 @@ GitHub's push protection detected Tencent Cloud Secret IDs in `docs/troubleshoot
 - `c587bc8` (2025-10-07)
 
 **Secrets Detected**:
-- `YOUR_SECRET_ID_HERE`
-- `YOUR_SECRET_ID_HERE`
+- `AKID*****` (Tencent Cloud Secret ID - redacted)
+- `AKID*****` (Tencent Cloud Secret ID - redacted)
 
 **Action Taken**: Used `git filter-branch` to rewrite all 58 commits, replacing Secret IDs with `AKID*****` placeholders. Force-pushed clean history to `main` branch.
 
@@ -220,7 +220,7 @@ brew install git-filter-repo  # macOS
 pip install git-filter-repo
 
 # Redact secrets
-echo 'YOUR_SECRET_ID_HERE==>AKID*****' > /tmp/replacements.txt
+echo 'YOUR_SECRET_ID_HERE==>REDACTED' > /tmp/replacements.txt
 git filter-repo --replace-text /tmp/replacements.txt
 
 # Force push

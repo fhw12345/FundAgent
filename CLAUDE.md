@@ -2,6 +2,18 @@
 
 > **RULE**: Only concise, actionable rules here. No details, no repetition. See [docs/](docs/) for comprehensive documentation.
 
+## 🔐 Security Rules
+
+**CRITICAL**: Never write secrets in code, docs, or comments:
+- ❌ API keys, access tokens, secret IDs, passwords
+- ❌ Connection strings with credentials
+- ❌ Private keys, certificates
+- ✅ Use placeholders: `YOUR_SECRET_HERE`, `AKID*****`, `<REDACTED>`
+- ✅ Store secrets in Azure Key Vault + External Secrets Operator
+- ✅ Reference secrets by name in documentation
+
+**GitHub Push Protection will block commits containing secrets.**
+
 ## Tech Stack
 
 | Layer | Technology |

@@ -69,6 +69,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Start session manager cleanup task
         await session_manager.start()
 
+        # Create database indexes for refresh tokens
+        from .database.repositories.refresh_token_repository import (
+            RefreshTokenRepository,
+        )
+
+        refresh_token_repo = RefreshTokenRepository(
+            mongodb.get_collection("refresh_tokens")
+        )
+        await refresh_token_repo.ensure_indexes()
+        logger.info("Refresh token indexes created")
+
         # Store in app state for dependency injection
         app.state.mongodb = mongodb
         app.state.redis = redis_cache
