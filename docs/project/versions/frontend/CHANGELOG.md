@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] - 2025-10-08
+
+### Added
+- feat(ux): Stochastic signals now show color indicators (🔴 OVERBOUGHT, 🟢 OVERSOLD, 🟡 NEUTRAL)
+- feat(ux): Stochastic signals display meaning in table (e.g., "OVERBOUGHT (Potential Sell Zone)")
+- feat(ux): Recent signals show color emojis (🟢 BUY, 🔴 SELL) on independent lines
+- feat(ux): Fibonacci analysis uses flexible lists instead of rigid tables
+- feat(ux): Fibonacci levels are now collapsible (click to expand) - starts collapsed
+- feat(ux): Key trends shown as numbered list (top 3 if available)
+
 ## [0.7.4] - 2025-10-08
 
 ### Fixed

@@ -22,28 +22,46 @@ export function formatFibonacciResponse(
       ? "📉"
       : "➡️";
 
-  // Build main trend table
-  let mainTrendTable = "";
+  // Build trends section
+  let trendsSection = "";
   if (result.raw_data?.top_trends && result.raw_data.top_trends.length > 0) {
-    const mainTrend = result.raw_data.top_trends[0];
-    const trendType = mainTrend.type.includes("Uptrend") ? "📈" : "📉";
+    const trends = result.raw_data.top_trends.slice(0, 3); // Top 3 trends
 
-    mainTrendTable = `
-### ${trendType} Main Trend - ${mainTrend.type.toUpperCase()}
+    trendsSection = `
 
-| Metric | Value |
-|--------|-------|
-| Period | ${mainTrend.period} |
-| Magnitude | $${(mainTrend.magnitude || 0).toFixed(2)} move |
-| Range | $${mainTrend.low?.toFixed(2)} → $${mainTrend.high?.toFixed(2)} |${result.pressure_zone ? `\n| Golden Zone | $${result.pressure_zone.lower_bound.toFixed(2)} - $${result.pressure_zone.upper_bound.toFixed(2)} |` : ""}
+### 📊 Key Trends Identified
 
-**Fibonacci Levels:**
+${trends
+  .map((trend: any, index: number) => {
+    const trendEmoji = trend.type.includes("Uptrend") ? "📈" : "📉";
+    const isMainTrend = index === 0;
+
+    // Build Fibonacci levels collapsible section
+    const fibLevels = trend.fibonacci_levels || [];
+    const fibSection =
+      fibLevels.length > 0
+        ? `
+
+<details>
+<summary><strong>📐 Fibonacci Levels</strong> (click to expand)</summary>
 
 | Level | Price |
 |-------|-------|
-${(mainTrend.fibonacci_levels || [])
-  .map((level: any) => `| ${level.percentage} | $${level.price.toFixed(2)} |`)
-  .join("\n")}
+${fibLevels.map((level: any) => `| ${level.percentage} | $${level.price.toFixed(2)} |`).join("\n")}
+
+</details>`
+        : "";
+
+    return `**${index + 1}. ${trendEmoji} ${trend.type.toUpperCase()}**
+• Period: ${trend.period}
+• Magnitude: $${(trend.magnitude || 0).toFixed(2)} move
+• Range: $${trend.low?.toFixed(2)} → $${trend.high?.toFixed(2)}${
+      isMainTrend && result.pressure_zone
+        ? `\n• Golden Zone: $${result.pressure_zone.lower_bound.toFixed(2)} - $${result.pressure_zone.upper_bound.toFixed(2)}`
+        : ""
+    }${fibSection}`;
+  })
+  .join("\n\n")}
 `;
   }
 
@@ -51,13 +69,11 @@ ${(mainTrend.fibonacci_levels || [])
 
 ### ${trendEmoji} Bottom Line
 
-| Metric | Value |
-|--------|-------|
-| Trend | ${result.market_structure.trend_direction.toUpperCase()} |
-| Current Price | $${result.current_price.toFixed(2)} |
-| Confidence | ${(result.confidence_score * 100).toFixed(1)}% |
-| Period | ${result.start_date || "Dynamic"} to ${result.end_date || "Current"} |
-${mainTrendTable}
+• **Trend**: ${result.market_structure.trend_direction.toUpperCase()}
+• **Current Price**: $${result.current_price.toFixed(2)}
+• **Confidence**: ${(result.confidence_score * 100).toFixed(1)}%
+• **Period**: ${result.start_date || "Dynamic"} to ${result.end_date || "Current"}
+${trendsSection}
 `;
 }
 
@@ -136,12 +152,33 @@ ${result.beta ? `| Beta | ${result.beta.toFixed(2)} |` : ""}
 export function formatStochasticResponse(
   result: StochasticAnalysisResponse,
 ): string {
-  const signalEmoji =
-    result.current_signal === "overbought"
-      ? "🔴"
-      : result.current_signal === "oversold"
-        ? "🟢"
-        : "🟡";
+  // Signal interpretation with dynamic color intensity
+  let signalEmoji = "";
+  let signalMeaning = "";
+  let signalColor = "";
+
+  const kValue = result.current_k;
+
+  if (result.current_signal === "overbought") {
+    // Red: darker as %K approaches 100
+    const intensity = Math.min(((kValue - 80) / 20) * 100, 100); // 0-100%
+    const red = Math.round(139 + (intensity / 100) * 116); // 139 (dark) → 255 (bright)
+    signalColor = `rgb(${red}, 0, 0)`;
+    signalEmoji = "🔴";
+    signalMeaning = "OVERBOUGHT (Potential Sell Zone)";
+  } else if (result.current_signal === "oversold") {
+    // Green: darker as %K approaches 0
+    const intensity = Math.min(((20 - kValue) / 20) * 100, 100); // 0-100%
+    const green = Math.round(100 + (intensity / 100) * 155); // 100 (dark) → 255 (bright)
+    signalColor = `rgb(0, ${green}, 0)`;
+    signalEmoji = "🟢";
+    signalMeaning = "OVERSOLD (Potential Buy Zone)";
+  } else {
+    // Yellow for neutral
+    signalColor = "rgb(255, 215, 0)"; // Gold yellow
+    signalEmoji = "🟡";
+    signalMeaning = "NEUTRAL (No Clear Signal)";
+  }
 
   const analysisDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -156,22 +193,51 @@ export function formatStochasticResponse(
 
 ### ${signalEmoji} Bottom Line
 
-| Indicator | Value |
-|-----------|-------|
-| Signal | ${result.current_signal.toUpperCase()} |
-| Current Price | $${result.current_price.toFixed(2)} |
-| %K Line | ${result.current_k.toFixed(1)}% |
-| %D Line | ${result.current_d.toFixed(1)}% |
-| Parameters | %K(${result.k_period}) %D(${result.d_period}) |
+<table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 1rem;">
+  <tbody>
+    <tr style="border-bottom: 1px solid #d1d5db;">
+      <td style="padding: 0.5rem 1rem; font-weight: 600; border-right: 1px solid #d1d5db;">Signal</td>
+      <td style="padding: 0.5rem 1rem; background-color: ${signalColor}; color: white; font-weight: 700; border-right: 1px solid #d1d5db;">${signalMeaning}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #d1d5db;">
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">Current Price</td>
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">$${result.current_price.toFixed(2)}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #d1d5db;">
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">%K Line</td>
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">${result.current_k.toFixed(1)}%</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #d1d5db;">
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">%D Line</td>
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">${result.current_d.toFixed(1)}%</td>
+    </tr>
+    <tr>
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">Parameters</td>
+      <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">%K(${result.k_period}) %D(${result.d_period})</td>
+    </tr>
+  </tbody>
+</table>
 
 ### 💡 Key Insights
-${result.key_insights.map((insight) => `• ${insight}`).join("\n")}
+
+${result.key_insights.map((insight) => `• ${insight}`).join("\n\n")}
 ${
   recentSignals.length > 0
     ? `
+
 ### 🔔 Recent Signals
 
-${recentSignals.map((signal) => `• **${signal.type.toUpperCase()}**: ${signal.description}`).join("\n")}`
+${recentSignals
+  .map((signal) => {
+    const emoji =
+      signal.type.toLowerCase() === "buy"
+        ? "🟢"
+        : signal.type.toLowerCase() === "sell"
+          ? "🔴"
+          : "🟡";
+    return `${emoji} **${signal.type.toUpperCase()}**: ${signal.description}`;
+  })
+  .join("\n\n")}`
     : ""
 }
 `;

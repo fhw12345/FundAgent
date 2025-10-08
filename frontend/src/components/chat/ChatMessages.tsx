@@ -8,6 +8,7 @@
 import React, { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { Loader2 } from "lucide-react";
 import type { ChatMessage } from "../../types/api";
 
@@ -42,6 +43,7 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
               components={{
                 h1: ({ children }) => (
                   <h1 className="text-xl font-bold mb-3 text-gray-900">
@@ -130,6 +132,17 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
                   <td className="px-4 py-2 text-gray-800 border-r border-gray-300 last:border-r-0">
                     {children}
                   </td>
+                ),
+                // HTML elements for collapsible sections
+                details: ({ children }) => (
+                  <details className="my-3 border border-gray-300 rounded-lg p-3 bg-gray-50">
+                    {children}
+                  </details>
+                ),
+                summary: ({ children }) => (
+                  <summary className="cursor-pointer font-medium text-blue-700 hover:text-blue-900 select-none">
+                    {children}
+                  </summary>
                 ),
               }}
             >
