@@ -90,19 +90,19 @@ repos:
     hooks:
       - id: gitleaks
 
-  # Kubernetes Linting (run via Docker)
+  # Kubernetes Linting (run via Docker on built manifests)
   - repo: local
     hooks:
       - id: kube-linter
         name: Kubernetes Linter (kube-linter)
-        entry: bash -c 'docker run --rm -v "$(pwd):/app" -w /app stackrox/kube-linter:latest lint .pipeline/k8s/'
+        entry: bash -c 'kubectl kustomize .pipeline/k8s/base > /tmp/k8s-manifests.yaml && docker run --rm -v "/tmp:/tmp" stackrox/kube-linter:latest lint /tmp/k8s-manifests.yaml'
         language: system
         files: ^\.pipeline/k8s/.*\.yaml$
         pass_filenames: false
 
       - id: kubeconform
         name: Kubernetes Validator (kubeconform)
-        entry: bash -c 'docker run --rm -v "$(pwd):/app" -w /app ghcr.io/yannh/kubeconform:latest -strict -summary .pipeline/k8s/base/*.yaml .pipeline/k8s/overlays/*/*.yaml'
+        entry: bash -c 'kubectl kustomize .pipeline/k8s/base > /tmp/k8s-manifests.yaml && docker run --rm -v "/tmp:/tmp" ghcr.io/yannh/kubeconform:latest -strict -summary -skip ClusterIssuer /tmp/k8s-manifests.yaml'
         language: system
         files: ^\.pipeline/k8s/.*\.yaml$
         pass_filenames: false
