@@ -3,20 +3,19 @@ Comprehensive unit tests for Stochastic Oscillator Analysis.
 Tests core calculations, edge cases, data validation, and API integration.
 """
 
-import pytest
-import pandas as pd
-import numpy as np
-from datetime import datetime, date
-from unittest.mock import patch, MagicMock, Mock, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
-from src.core.analysis.stochastic_analyzer import StochasticAnalyzer
-from src.core.data.ticker_data_service import TickerDataService
-from src.database.redis import RedisCache
+import numpy as np
+import pandas as pd
+import pytest
+
 from src.api.models import (
     StochasticAnalysisRequest,
     StochasticAnalysisResponse,
-    StochasticLevel
+    StochasticLevel,
 )
+from src.core.analysis.stochastic_analyzer import StochasticAnalyzer
+from src.core.data.ticker_data_service import TickerDataService
 
 
 @pytest.fixture
@@ -39,26 +38,28 @@ class TestStochasticCalculations:
         base_prices = np.linspace(100, 120, 30)
         noise = np.random.uniform(-2, 2, 30)
 
-        test_data = pd.DataFrame({
-            'High': base_prices + noise + 2,
-            'Low': base_prices + noise - 2,
-            'Close': base_prices + noise
-        })
-        test_data.index = pd.date_range('2024-01-01', periods=len(test_data), freq='D')
+        test_data = pd.DataFrame(
+            {
+                "High": base_prices + noise + 2,
+                "Low": base_prices + noise - 2,
+                "Close": base_prices + noise,
+            }
+        )
+        test_data.index = pd.date_range("2024-01-01", periods=len(test_data), freq="D")
 
         result = analyzer._calculate_stochastic(test_data, k_period=14, d_period=3)
 
         # Verify basic structure
-        assert 'slow_%k' in result.columns
-        assert 'slow_%d' in result.columns
-        assert 'fast_%k' in result.columns
+        assert "slow_%k" in result.columns
+        assert "slow_%d" in result.columns
+        assert "fast_%k" in result.columns
 
         # Verify we have some valid calculations
         assert len(result.dropna()) > 0, "Should have valid stochastic calculations"
 
         # Verify K% is between 0 and 100 for valid values
-        valid_k = result['slow_%k'].dropna()
-        valid_d = result['slow_%d'].dropna()
+        valid_k = result["slow_%k"].dropna()
+        valid_d = result["slow_%d"].dropna()
 
         if len(valid_k) > 0:
             assert all(0 <= k <= 100 for k in valid_k)
@@ -70,24 +71,24 @@ class TestStochasticCalculations:
             k_std = valid_k.std()
             d_std = valid_d.std()
             if not np.isnan(k_std) and not np.isnan(d_std):
-                assert d_std <= k_std + 1, "D% should generally be smoother than K%"  # Allow small tolerance
+                assert (
+                    d_std <= k_std + 1
+                ), "D% should generally be smoother than K%"  # Allow small tolerance
 
     def test_stochastic_edge_case_all_same_prices(self, mock_ticker_data_service):
         """Test stochastic calculation when all prices are the same (edge case)."""
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # All prices the same - should result in 50% stochastic (or handle division by zero)
-        test_data = pd.DataFrame({
-            'High': [100] * 20,
-            'Low': [100] * 20,
-            'Close': [100] * 20
-        })
-        test_data.index = pd.date_range('2024-01-01', periods=20, freq='D')
+        test_data = pd.DataFrame(
+            {"High": [100] * 20, "Low": [100] * 20, "Close": [100] * 20}
+        )
+        test_data.index = pd.date_range("2024-01-01", periods=20, freq="D")
 
         result = analyzer._calculate_stochastic(test_data, k_period=14, d_period=3)
 
         # Should handle division by zero gracefully
-        k_values = result['slow_%k'].dropna()
+        k_values = result["slow_%k"].dropna()
         if not k_values.empty:
             # If values exist, they should be valid numbers (not NaN or inf)
             assert all(np.isfinite(k) for k in k_values)
@@ -97,12 +98,14 @@ class TestStochasticCalculations:
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Only 5 data points, requesting 14-period stochastic
-        test_data = pd.DataFrame({
-            'High': [110, 115, 120, 118, 125],
-            'Low': [105, 108, 112, 110, 115],
-            'Close': [108, 112, 118, 115, 120]
-        })
-        test_data.index = pd.date_range('2024-01-01', periods=5, freq='D')
+        test_data = pd.DataFrame(
+            {
+                "High": [110, 115, 120, 118, 125],
+                "Low": [105, 108, 112, 110, 115],
+                "Close": [108, 112, 118, 115, 120],
+            }
+        )
+        test_data.index = pd.date_range("2024-01-01", periods=5, freq="D")
 
         result = analyzer._calculate_stochastic(test_data, k_period=14, d_period=3)
 
@@ -110,7 +113,9 @@ class TestStochasticCalculations:
         assert isinstance(result, pd.DataFrame)
         # With insufficient data, should have no or very few valid calculations
         valid_rows = result.dropna()
-        assert len(valid_rows) == 0, "Should have no valid calculations with insufficient data"
+        assert (
+            len(valid_rows) == 0
+        ), "Should have no valid calculations with insufficient data"
 
 
 class TestStochasticSignalDetection:
@@ -137,14 +142,58 @@ class TestStochasticSignalDetection:
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Create data with clear crossover pattern
-        test_data = pd.DataFrame({
-            'High': [100] * 20,
-            'Low': [80] * 20,
-            'Close': [90] * 20,
-            'slow_%k': [30, 35, 45, 55, 65, 70, 68, 62, 55, 48, 42, 38, 35, 40, 45, 50, 55, 60, 65, 70],
-            'slow_%d': [32, 36, 42, 48, 58, 68, 69, 67, 62, 55, 48, 42, 38, 38, 40, 45, 50, 55, 60, 65]
-        })
-        test_data.index = pd.date_range('2024-01-01', periods=20, freq='D')
+        test_data = pd.DataFrame(
+            {
+                "High": [100] * 20,
+                "Low": [80] * 20,
+                "Close": [90] * 20,
+                "slow_%k": [
+                    30,
+                    35,
+                    45,
+                    55,
+                    65,
+                    70,
+                    68,
+                    62,
+                    55,
+                    48,
+                    42,
+                    38,
+                    35,
+                    40,
+                    45,
+                    50,
+                    55,
+                    60,
+                    65,
+                    70,
+                ],
+                "slow_%d": [
+                    32,
+                    36,
+                    42,
+                    48,
+                    58,
+                    68,
+                    69,
+                    67,
+                    62,
+                    55,
+                    48,
+                    42,
+                    38,
+                    38,
+                    40,
+                    45,
+                    50,
+                    55,
+                    60,
+                    65,
+                ],
+            }
+        )
+        test_data.index = pd.date_range("2024-01-01", periods=20, freq="D")
 
         signals = analyzer._analyze_crossovers(test_data, lookback_days=20)
 
@@ -153,29 +202,35 @@ class TestStochasticSignalDetection:
 
         # Verify signal structure
         for signal in signals:
-            assert 'type' in signal
-            assert 'date' in signal
-            assert 'description' in signal
-            assert signal['type'] in ['buy', 'sell']
+            assert "type" in signal
+            assert "date" in signal
+            assert "description" in signal
+            assert signal["type"] in ["buy", "sell"]
 
     def test_divergence_detection_basic(self, mock_ticker_data_service):
         """Test basic divergence detection functionality."""
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Create data with potential divergence pattern
-        test_data = pd.DataFrame({
-            'Close': np.concatenate([
-                np.linspace(100, 110, 30),  # Rising price
-                np.linspace(110, 120, 30),  # Higher high
-                np.linspace(120, 115, 30)   # Slight pullback
-            ]),
-            'slow_%k': np.concatenate([
-                np.linspace(30, 70, 30),    # Rising oscillator
-                np.linspace(70, 65, 30),    # Lower high (divergence)
-                np.linspace(65, 60, 30)     # Continued weakness
-            ])
-        })
-        test_data.index = pd.date_range('2024-01-01', periods=90, freq='D')
+        test_data = pd.DataFrame(
+            {
+                "Close": np.concatenate(
+                    [
+                        np.linspace(100, 110, 30),  # Rising price
+                        np.linspace(110, 120, 30),  # Higher high
+                        np.linspace(120, 115, 30),  # Slight pullback
+                    ]
+                ),
+                "slow_%k": np.concatenate(
+                    [
+                        np.linspace(30, 70, 30),  # Rising oscillator
+                        np.linspace(70, 65, 30),  # Lower high (divergence)
+                        np.linspace(65, 60, 30),  # Continued weakness
+                    ]
+                ),
+            }
+        )
+        test_data.index = pd.date_range("2024-01-01", periods=90, freq="D")
 
         divergences = analyzer._analyze_divergence(test_data, lookback_period=90)
 
@@ -184,9 +239,9 @@ class TestStochasticSignalDetection:
 
         # If divergences found, verify structure
         for div in divergences:
-            assert 'type' in div
-            assert 'description' in div
-            assert div['type'] in ['bullish', 'bearish']
+            assert "type" in div
+            assert "description" in div
+            assert div["type"] in ["bullish", "bearish"]
 
 
 class TestStochasticAnalysisModels:
@@ -201,7 +256,7 @@ class TestStochasticAnalysisModels:
             end_date="2024-12-31",
             timeframe="1d",
             k_period=14,
-            d_period=3
+            d_period=3,
         )
         assert valid_request.symbol == "AAPL"
         assert valid_request.k_period == 14
@@ -232,7 +287,7 @@ class TestStochasticAnalysisModels:
             timestamp="2024-01-01 12:00:00",
             k_percent=75.5,
             d_percent=72.3,
-            signal="overbought"
+            signal="overbought",
         )
         assert valid_level.k_percent == 75.5
         assert valid_level.signal == "overbought"
@@ -242,7 +297,7 @@ class TestStochasticAnalysisModels:
             timestamp="2024-01-01 12:00:00",
             k_percent=0.0,
             d_percent=100.0,
-            signal="oversold"
+            signal="oversold",
         )
         assert boundary_level.k_percent == 0.0
         assert boundary_level.d_percent == 100.0
@@ -253,7 +308,7 @@ class TestStochasticAnalysisModels:
                 timestamp="2024-01-01 12:00:00",
                 k_percent=-5.0,
                 d_percent=50.0,
-                signal="neutral"
+                signal="neutral",
             )
 
         # Invalid signal
@@ -262,7 +317,7 @@ class TestStochasticAnalysisModels:
                 timestamp="2024-01-01 12:00:00",
                 k_percent=50.0,
                 d_percent=50.0,
-                signal="invalid_signal"
+                signal="invalid_signal",
             )
 
     def test_stochastic_response_model_completeness(self):
@@ -283,7 +338,7 @@ class TestStochasticAnalysisModels:
             signal_changes=[],
             analysis_summary="Test analysis",
             key_insights=["Test insight"],
-            raw_data={"test": "data"}
+            raw_data={"test": "data"},
         )
 
         # Verify all required fields are present
@@ -306,14 +361,16 @@ class TestStochasticAnalysisIntegration:
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Mock yfinance data
-        mock_data = pd.DataFrame({
-            'High': np.random.uniform(100, 110, 50),
-            'Low': np.random.uniform(90, 100, 50),
-            'Close': np.random.uniform(95, 105, 50)
-        })
-        mock_data.index = pd.date_range('2024-01-01', periods=50, freq='D')
+        mock_data = pd.DataFrame(
+            {
+                "High": np.random.uniform(100, 110, 50),
+                "Low": np.random.uniform(90, 100, 50),
+                "Close": np.random.uniform(95, 105, 50),
+            }
+        )
+        mock_data.index = pd.date_range("2024-01-01", periods=50, freq="D")
 
-        with patch.object(analyzer, '_fetch_stock_data') as mock_fetch:
+        with patch.object(analyzer, "_fetch_stock_data") as mock_fetch:
             mock_fetch.return_value = mock_data
 
             result = await analyzer.analyze(
@@ -322,7 +379,7 @@ class TestStochasticAnalysisIntegration:
                 end_date="2024-02-19",
                 timeframe="1d",
                 k_period=14,
-                d_period=3
+                d_period=3,
             )
 
             # Verify response structure
@@ -341,22 +398,17 @@ class TestStochasticAnalysisIntegration:
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Mock minimal data (insufficient for 14-period stochastic)
-        mock_data = pd.DataFrame({
-            'High': [105, 110, 108],
-            'Low': [100, 105, 103],
-            'Close': [102, 107, 105]
-        })
-        mock_data.index = pd.date_range('2024-01-01', periods=3, freq='D')
+        mock_data = pd.DataFrame(
+            {"High": [105, 110, 108], "Low": [100, 105, 103], "Close": [102, 107, 105]}
+        )
+        mock_data.index = pd.date_range("2024-01-01", periods=3, freq="D")
 
-        with patch.object(analyzer, '_fetch_stock_data') as mock_fetch:
+        with patch.object(analyzer, "_fetch_stock_data") as mock_fetch:
             mock_fetch.return_value = mock_data
 
             with pytest.raises(ValueError, match="Insufficient data"):
                 await analyzer.analyze(
-                    symbol="TEST",
-                    timeframe="1d",
-                    k_period=14,
-                    d_period=3
+                    symbol="TEST", timeframe="1d", k_period=14, d_period=3
                 )
 
     @pytest.mark.asyncio
@@ -364,14 +416,11 @@ class TestStochasticAnalysisIntegration:
         """Test analyzer with invalid/delisted symbol."""
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
-        with patch.object(analyzer, '_fetch_stock_data') as mock_fetch:
+        with patch.object(analyzer, "_fetch_stock_data") as mock_fetch:
             mock_fetch.return_value = pd.DataFrame()  # Empty data
 
             with pytest.raises(ValueError, match="not a valid stock symbol"):
-                await analyzer.analyze(
-                    symbol="INVALID123",
-                    timeframe="1d"
-                )
+                await analyzer.analyze(symbol="INVALID123", timeframe="1d")
 
     @pytest.mark.asyncio
     async def test_analyzer_different_timeframes(self, mock_ticker_data_service):
@@ -379,24 +428,23 @@ class TestStochasticAnalysisIntegration:
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Mock data for different timeframes
-        mock_data = pd.DataFrame({
-            'High': np.random.uniform(100, 110, 100),
-            'Low': np.random.uniform(90, 100, 100),
-            'Close': np.random.uniform(95, 105, 100)
-        })
-        mock_data.index = pd.date_range('2024-01-01', periods=100, freq='H')
+        mock_data = pd.DataFrame(
+            {
+                "High": np.random.uniform(100, 110, 100),
+                "Low": np.random.uniform(90, 100, 100),
+                "Close": np.random.uniform(95, 105, 100),
+            }
+        )
+        mock_data.index = pd.date_range("2024-01-01", periods=100, freq="H")
 
-        timeframes = ['1h', '1d', '1w', '1M']
+        timeframes = ["1h", "1d", "1w", "1M"]
 
         for timeframe in timeframes:
-            with patch.object(analyzer, '_fetch_stock_data') as mock_fetch:
+            with patch.object(analyzer, "_fetch_stock_data") as mock_fetch:
                 mock_fetch.return_value = mock_data
 
                 result = await analyzer.analyze(
-                    symbol="AAPL",
-                    timeframe=timeframe,
-                    k_period=14,
-                    d_period=3
+                    symbol="AAPL", timeframe=timeframe, k_period=14, d_period=3
                 )
 
                 assert result.timeframe == timeframe
@@ -411,10 +459,10 @@ class TestStochasticErrorHandling:
         """Test handling of network errors during data fetch."""
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
-        with patch.object(analyzer, '_fetch_stock_data') as mock_fetch:
+        with patch.object(analyzer, "_fetch_stock_data") as mock_fetch:
             mock_fetch.side_effect = Exception("Network error")
 
-            with pytest.raises(Exception):
+            with pytest.raises(Exception, match="Network error"):
                 await analyzer.analyze(symbol="AAPL", timeframe="1d")
 
     def test_empty_dataframe_handling(self, mock_ticker_data_service):
@@ -432,10 +480,12 @@ class TestStochasticErrorHandling:
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
         # Missing required columns
-        bad_data = pd.DataFrame({
-            'High': [100, 110, 105],
-            # Missing 'Low' and 'Close'
-        })
+        bad_data = pd.DataFrame(
+            {
+                "High": [100, 110, 105],
+                # Missing 'Low' and 'Close'
+            }
+        )
 
         # Should return empty DataFrame for malformed data
         result = analyzer._calculate_stochastic(bad_data)
@@ -445,12 +495,10 @@ class TestStochasticErrorHandling:
         """Test analyzer with extreme parameter values."""
         analyzer = StochasticAnalyzer(mock_ticker_data_service)
 
-        test_data = pd.DataFrame({
-            'High': [110] * 100,
-            'Low': [90] * 100,
-            'Close': [100] * 100
-        })
-        test_data.index = pd.date_range('2024-01-01', periods=100, freq='D')
+        test_data = pd.DataFrame(
+            {"High": [110] * 100, "Low": [90] * 100, "Close": [100] * 100}
+        )
+        test_data.index = pd.date_range("2024-01-01", periods=100, freq="D")
 
         # Test with minimum valid parameters
         result = analyzer._calculate_stochastic(test_data, k_period=5, d_period=2)
@@ -473,16 +521,23 @@ class TestDataContractValidation:
             end_date="2024-12-31",
             timeframe="1d",
             k_period=14,
-            d_period=3
+            d_period=3,
         )
 
         # Should serialize to match frontend expectations
         request_dict = request.model_dump()
-        expected_keys = {'symbol', 'start_date', 'end_date', 'timeframe', 'k_period', 'd_period'}
+        expected_keys = {
+            "symbol",
+            "start_date",
+            "end_date",
+            "timeframe",
+            "k_period",
+            "d_period",
+        }
         assert set(request_dict.keys()) == expected_keys
 
         # Timeframe should be one of supported values
-        assert request.timeframe in ['1h', '1d', '1w', '1M']
+        assert request.timeframe in ["1h", "1d", "1w", "1M"]
 
     def test_response_serialization_format(self):
         """Test that response serializes correctly for frontend consumption."""
@@ -490,7 +545,7 @@ class TestDataContractValidation:
             timestamp="2024-01-01T12:00:00",
             k_percent=75.5,
             d_percent=72.3,
-            signal="overbought"
+            signal="overbought",
         )
 
         response = StochasticAnalysisResponse(
@@ -506,20 +561,20 @@ class TestDataContractValidation:
             signal_changes=[{"type": "buy", "date": "2024-01-01"}],
             analysis_summary="Test analysis",
             key_insights=["Test insight"],
-            raw_data={"test": "data"}
+            raw_data={"test": "data"},
         )
 
         # Should serialize without errors
         response_dict = response.model_dump()
-        assert 'symbol' in response_dict
-        assert 'current_signal' in response_dict
-        assert 'stochastic_levels' in response_dict
+        assert "symbol" in response_dict
+        assert "current_signal" in response_dict
+        assert "stochastic_levels" in response_dict
 
         # Signal values should be valid
-        assert response_dict['current_signal'] in ['overbought', 'oversold', 'neutral']
+        assert response_dict["current_signal"] in ["overbought", "oversold", "neutral"]
 
         # Levels should serialize correctly
-        assert len(response_dict['stochastic_levels']) == 1
-        level_dict = response_dict['stochastic_levels'][0]
-        assert level_dict['signal'] == 'overbought'
-        assert 0 <= level_dict['k_percent'] <= 100
+        assert len(response_dict["stochastic_levels"]) == 1
+        level_dict = response_dict["stochastic_levels"][0]
+        assert level_dict["signal"] == "overbought"
+        assert 0 <= level_dict["k_percent"] <= 100

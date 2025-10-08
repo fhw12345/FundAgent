@@ -329,3 +329,36 @@ class ChatService:
         message_count = await self.message_repo.count_by_chat(chat_id)
 
         return chat.title == "New Chat" and message_count > 0
+
+    async def delete_chat(self, chat_id: str, user_id: str) -> bool:
+        """
+        Delete chat and all associated messages.
+
+        Args:
+            chat_id: Chat identifier
+            user_id: User identifier (for ownership check)
+
+        Returns:
+            True if deleted successfully
+
+        Raises:
+            NotFoundError: If chat not found or user doesn't own it
+        """
+        # Verify chat ownership
+        await self.get_chat(chat_id, user_id)
+
+        # Delete all messages first (cascade)
+        deleted_messages = await self.message_repo.delete_by_chat(chat_id)
+
+        # Delete chat
+        deleted = await self.chat_repo.delete(chat_id)
+
+        if deleted:
+            logger.info(
+                "Chat deleted",
+                chat_id=chat_id,
+                user_id=user_id,
+                messages_deleted=deleted_messages,
+            )
+
+        return deleted

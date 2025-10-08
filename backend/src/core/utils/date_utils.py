@@ -4,14 +4,15 @@ Handles conversion between yfinance periods and absolute date ranges.
 """
 
 from datetime import datetime, timedelta
-from typing import Tuple
 
 
 class DateUtils:
     """Utility class for date operations in financial analysis."""
 
     @staticmethod
-    def period_to_date_range(period: str, reference_date: datetime = None) -> Tuple[str, str]:
+    def period_to_date_range(
+        period: str, reference_date: datetime | None = None
+    ) -> tuple[str, str]:
         """
         Convert yfinance period string to start/end date range.
 
@@ -32,26 +33,28 @@ class DateUtils:
 
         # Map yfinance periods to timedelta
         period_map = {
-            '1d': timedelta(days=1),
-            '5d': timedelta(days=5),
-            '1mo': timedelta(days=30),
-            '3mo': timedelta(days=90),
-            '6mo': timedelta(days=180),
-            '1y': timedelta(days=365),
-            '2y': timedelta(days=730),
-            '5y': timedelta(days=1825),
-            '10y': timedelta(days=3650),
-            'ytd': DateUtils._get_ytd_delta(reference_date),
-            'max': timedelta(days=7300)  # ~20 years
+            "1d": timedelta(days=1),
+            "5d": timedelta(days=5),
+            "1mo": timedelta(days=30),
+            "3mo": timedelta(days=90),
+            "6mo": timedelta(days=180),
+            "1y": timedelta(days=365),
+            "2y": timedelta(days=730),
+            "5y": timedelta(days=1825),
+            "10y": timedelta(days=3650),
+            "ytd": DateUtils._get_ytd_delta(reference_date),
+            "max": timedelta(days=7300),  # ~20 years
         }
 
         if period not in period_map:
-            raise ValueError(f"Unsupported period: {period}. Supported periods: {list(period_map.keys())}")
+            raise ValueError(
+                f"Unsupported period: {period}. Supported periods: {list(period_map.keys())}"
+            )
 
         delta = period_map[period]
         start_date = end_date - delta
 
-        return start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+        return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
     @staticmethod
     def _get_ytd_delta(reference_date: datetime) -> timedelta:
@@ -73,7 +76,8 @@ class DateUtils:
         """
         # Strict format validation - must be exactly YYYY-MM-DD
         import re
-        date_pattern = r'^\d{4}-\d{2}-\d{2}$'
+
+        date_pattern = r"^\d{4}-\d{2}-\d{2}$"
 
         if not re.match(date_pattern, start_date):
             raise ValueError(f"Invalid date format. Expected YYYY-MM-DD: {start_date}")
@@ -81,10 +85,12 @@ class DateUtils:
             raise ValueError(f"Invalid date format. Expected YYYY-MM-DD: {end_date}")
 
         try:
-            start = datetime.strptime(start_date, '%Y-%m-%d').date()
-            end = datetime.strptime(end_date, '%Y-%m-%d').date()
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
         except ValueError as e:
-            raise ValueError(f"Invalid date format. Expected YYYY-MM-DD: {e}")
+            raise ValueError(f"Invalid date format. Expected YYYY-MM-DD: {e}") from e
 
         if start >= end:
-            raise ValueError(f"Start date ({start_date}) must be before end date ({end_date})")
+            raise ValueError(
+                f"Start date ({start_date}) must be before end date ({end_date})"
+            )

@@ -3,8 +3,6 @@ yfinance utility functions for interval mapping and data handling.
 Centralizes yfinance-specific logic to avoid duplication across the codebase.
 """
 
-from typing import Dict
-
 
 def map_timeframe_to_yfinance_interval(frontend_interval: str) -> str:
     """
@@ -22,24 +20,23 @@ def map_timeframe_to_yfinance_interval(frontend_interval: str) -> str:
     Returns:
         yfinance-compatible interval ('1wk', '1mo', etc.)
     """
-    interval_map: Dict[str, str] = {
+    interval_map: dict[str, str] = {
         # Most intervals work as-is
-        '1m': '1m',
-        '2m': '2m',
-        '5m': '5m',
-        '15m': '15m',
-        '30m': '30m',
-        '60m': '60m',
-        '90m': '90m',
-        '1h': '1h',
-        '1d': '1d',
-        '5d': '5d',
-        '3mo': '3mo',
-
+        "1m": "1m",
+        "2m": "2m",
+        "5m": "5m",
+        "15m": "15m",
+        "30m": "30m",
+        "60m": "60m",
+        "90m": "90m",
+        "1h": "1h",
+        "1d": "1d",
+        "5d": "5d",
+        "3mo": "3mo",
         # These require mapping for yfinance compatibility
-        '1w': '1wk',   # Weekly: Frontend '1w' → yfinance '1wk' (required)
-        '1M': '1mo',   # Monthly: Frontend '1M' → yfinance '1mo' (required)
-        '1mo': '1mo',  # Monthly: Frontend '1mo' → yfinance '1mo' (already compatible)
+        "1w": "1wk",  # Weekly: Frontend '1w' → yfinance '1wk' (required)
+        "1M": "1mo",  # Monthly: Frontend '1M' → yfinance '1mo' (required)
+        "1mo": "1mo",  # Monthly: Frontend '1mo' → yfinance '1mo' (already compatible)
     }
 
     return interval_map.get(frontend_interval, frontend_interval)
@@ -47,9 +44,38 @@ def map_timeframe_to_yfinance_interval(frontend_interval: str) -> str:
 
 def get_valid_frontend_intervals() -> list[str]:
     """Get list of valid frontend interval formats."""
-    return ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1w', '1M', '1mo', '3mo']
+    return [
+        "1m",
+        "2m",
+        "5m",
+        "15m",
+        "30m",
+        "60m",
+        "90m",
+        "1h",
+        "1d",
+        "5d",
+        "1w",
+        "1M",
+        "1mo",
+        "3mo",
+    ]
 
 
 def get_valid_yfinance_intervals() -> list[str]:
     """Get list of valid yfinance interval formats."""
-    return ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h', '1d', '5d', '1wk', '1mo', '3mo']
+    return [
+        "1m",
+        "2m",
+        "5m",
+        "15m",
+        "30m",
+        "60m",
+        "90m",
+        "1h",
+        "1d",
+        "5d",
+        "1wk",
+        "1mo",
+        "3mo",
+    ]

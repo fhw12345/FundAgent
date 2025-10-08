@@ -104,7 +104,7 @@ class EmailAuthProvider(AuthProvider):
                 logger.info("Verification code sent via Tencent Cloud SES", email=email)
             except Exception as e:
                 logger.error("Failed to send email via SES", email=email, error=str(e))
-                raise ValueError(f"Failed to send verification email: {str(e)}")
+                raise ValueError(f"Failed to send verification email: {str(e)}") from e
 
         return code
 

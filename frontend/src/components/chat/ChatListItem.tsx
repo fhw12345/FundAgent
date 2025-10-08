@@ -3,16 +3,22 @@
  * Displays title, preview, and timestamp with glassmorphism design.
  */
 
-import { MessageSquare, Clock } from "lucide-react";
+import { MessageSquare, Clock, Trash2 } from "lucide-react";
 import type { Chat } from "../../types/api";
 
 interface ChatListItemProps {
   chat: Chat;
   isActive: boolean;
   onClick: () => void;
+  onDelete: (chatId: string) => void;
 }
 
-export function ChatListItem({ chat, isActive, onClick }: ChatListItemProps) {
+export function ChatListItem({
+  chat,
+  isActive,
+  onClick,
+  onDelete,
+}: ChatListItemProps) {
   // Format timestamp
   const formatTime = (timestamp: string | null) => {
     if (!timestamp) return "No messages";
@@ -88,10 +94,24 @@ export function ChatListItem({ chat, isActive, onClick }: ChatListItemProps) {
             </p>
           )}
 
-          {/* Timestamp */}
-          <div className="flex items-center gap-1 text-xs text-gray-500">
-            <Clock size={12} />
-            <span>{formatTime(chat.last_message_at)}</span>
+          {/* Timestamp & Actions */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <Clock size={12} />
+              <span>{formatTime(chat.last_message_at)}</span>
+            </div>
+
+            {/* Delete Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(chat.chat_id);
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-all"
+              title="Delete chat"
+            >
+              <Trash2 size={14} className="text-gray-400 hover:text-red-500" />
+            </button>
           </div>
         </div>
       </div>

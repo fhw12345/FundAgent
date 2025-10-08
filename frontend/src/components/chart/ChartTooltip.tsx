@@ -4,44 +4,47 @@
  * Displays price, time, and volume information when hovering over the chart.
  */
 
-import React from 'react'
+import React from "react";
 
 interface TooltipData {
-  visible: boolean
-  x: number
-  y: number
-  time: string
-  price: number
-  volume?: number
-  isGreen?: boolean
+  visible: boolean;
+  x: number;
+  y: number;
+  time: string;
+  price: number;
+  volume?: number;
+  isGreen?: boolean;
 }
 
 interface ChartTooltipProps {
-  tooltipData: TooltipData
-  chartContainerRef: React.RefObject<HTMLDivElement>
+  tooltipData: TooltipData;
+  chartContainerRef: React.RefObject<HTMLDivElement>;
 }
 
 const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(price)
-}
+  }).format(price);
+};
 
 const formatVolume = (volume: number) => {
   if (volume >= 1_000_000) {
-    return `${(volume / 1_000_000).toFixed(1)}M`
+    return `${(volume / 1_000_000).toFixed(1)}M`;
   } else if (volume >= 1_000) {
-    return `${(volume / 1_000).toFixed(1)}K`
+    return `${(volume / 1_000).toFixed(1)}K`;
   }
-  return volume.toString()
-}
+  return volume.toString();
+};
 
-export const ChartTooltip: React.FC<ChartTooltipProps> = ({ tooltipData, chartContainerRef }) => {
+export const ChartTooltip: React.FC<ChartTooltipProps> = ({
+  tooltipData,
+  chartContainerRef,
+}) => {
   if (!tooltipData.visible) {
-    return null
+    return null;
   }
 
   return (
@@ -53,14 +56,22 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({ tooltipData, chartCo
       }}
     >
       <div>{tooltipData.time}</div>
-      <div className={tooltipData.isGreen !== undefined ?
-        (tooltipData.isGreen ? 'text-green-400' : 'text-red-400') : 'text-white'
-      }>
+      <div
+        className={
+          tooltipData.isGreen !== undefined
+            ? tooltipData.isGreen
+              ? "text-green-400"
+              : "text-red-400"
+            : "text-white"
+        }
+      >
         {formatPrice(tooltipData.price)}
       </div>
       {tooltipData.volume !== undefined && (
-        <div className="text-gray-300">Vol: {formatVolume(tooltipData.volume)}</div>
+        <div className="text-gray-300">
+          Vol: {formatVolume(tooltipData.volume)}
+        </div>
       )}
     </div>
-  )
-}
+  );
+};

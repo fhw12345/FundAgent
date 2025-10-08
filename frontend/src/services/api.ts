@@ -308,6 +308,13 @@ export const chatService = {
   },
 
   /**
+   * Delete a chat and all its messages
+   */
+  async deleteChat(chatId: string): Promise<void> {
+    await api.delete(`/api/chat/chats/${chatId}`);
+  },
+
+  /**
    * Send message with streaming response and MongoDB persistence
    *
    * @param message User message

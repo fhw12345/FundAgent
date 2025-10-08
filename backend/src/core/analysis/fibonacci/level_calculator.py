@@ -3,7 +3,8 @@ Fibonacci level calculation and pressure zone analysis.
 Handles computation of retracement levels, key ratios, and golden pressure zones.
 """
 
-from typing import Dict, List, Any
+from typing import Any, Literal, cast
+
 import structlog
 
 from ....api.models import FibonacciLevel, MarketStructure, PricePoint
@@ -19,7 +20,7 @@ class LevelCalculator:
         """Initialize calculator with standard Fibonacci constants."""
         self.constants = FibonacciConstants()
 
-    def calculate_fibonacci_levels(self, trend: Dict[str, Any]) -> List[FibonacciLevel]:
+    def calculate_fibonacci_levels(self, trend: dict[str, Any]) -> list[FibonacciLevel]:
         """Calculate Fibonacci retracement levels for a given trend."""
         try:
             high_price = trend["Absolute High"]
@@ -37,30 +38,43 @@ class LevelCalculator:
                     # For downtrends, retracements are levels above the low
                     fib_price = low_price + (price_range * level)
 
-                fibonacci_levels.append(FibonacciLevel(
-                    level=level,
-                    price=fib_price,
-                    percentage=f"{level * 100:.1f}%",
-                    is_key_level=level in self.constants.KEY_LEVELS
-                ))
+                fibonacci_levels.append(
+                    FibonacciLevel(
+                        level=level,
+                        price=fib_price,
+                        percentage=f"{level * 100:.1f}%",
+                        is_key_level=level in self.constants.KEY_LEVELS,
+                    )
+                )
 
-            logger.info("Calculated Fibonacci levels",
-                       trend_type=trend["Trend Type"],
-                       levels_count=len(fibonacci_levels),
-                       key_levels_count=len([l for l in fibonacci_levels if l.is_key_level]))
+            logger.info(
+                "Calculated Fibonacci levels",
+                trend_type=trend["Trend Type"],
+                levels_count=len(fibonacci_levels),
+                key_levels_count=len(
+                    [level for level in fibonacci_levels if level.is_key_level]
+                ),
+            )
             return fibonacci_levels
 
         except Exception as e:
-            logger.error("Failed to calculate Fibonacci levels",
-                        trend=trend, error=str(e))
+            logger.error(
+                "Failed to calculate Fibonacci levels", trend=trend, error=str(e)
+            )
             return []
 
-    def get_fibonacci_levels_for_trend(self, trend: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def get_fibonacci_levels_for_trend(
+        self, trend: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Get Fibonacci levels for a trend in dictionary format."""
         try:
-            logger.info(f"Calculating Fibonacci levels for trend: {trend.get('Trend Type', 'Unknown')}")
+            logger.info(
+                f"Calculating Fibonacci levels for trend: {trend.get('Trend Type', 'Unknown')}"
+            )
             logger.info(f"Trend fields: {list(trend.keys())}")
-            logger.info(f"High: {trend.get('Absolute High')}, Low: {trend.get('Absolute Low')}")
+            logger.info(
+                f"High: {trend.get('Absolute High')}, Low: {trend.get('Absolute Low')}"
+            )
 
             fib_levels = self.calculate_fibonacci_levels(trend)
 
@@ -69,7 +83,7 @@ class LevelCalculator:
                     "level": level.level,
                     "price": level.price,
                     "percentage": level.percentage,
-                    "is_key_level": level.is_key_level
+                    "is_key_level": level.is_key_level,
                 }
                 for level in fib_levels
             ]
@@ -82,7 +96,7 @@ class LevelCalculator:
             logger.error(f"Trend data: {trend}")
             return []
 
-    def calculate_golden_pressure_zone(self, trend: Dict[str, Any]) -> Dict[str, float]:
+    def calculate_golden_pressure_zone(self, trend: dict[str, Any]) -> dict[str, float]:
         """Calculate the golden ratio pressure zone (61.5% - 61.8%)."""
         high_price = trend["Absolute High"]
         low_price = trend["Absolute Low"]
@@ -91,40 +105,55 @@ class LevelCalculator:
 
         if is_uptrend:
             # For uptrends, golden zone is below the high
-            upper_level = high_price - (price_range * self.constants.GOLDEN_ZONE_START)  # 61.5%
-            lower_level = high_price - (price_range * self.constants.GOLDEN_ZONE_END)    # 61.8%
+            upper_level = high_price - (
+                price_range * self.constants.GOLDEN_ZONE_START
+            )  # 61.5%
+            lower_level = high_price - (
+                price_range * self.constants.GOLDEN_ZONE_END
+            )  # 61.8%
         else:
             # For downtrends, golden zone is above the low
-            lower_level = low_price + (price_range * self.constants.GOLDEN_ZONE_START)   # 61.5%
-            upper_level = low_price + (price_range * self.constants.GOLDEN_ZONE_END)     # 61.8%
+            lower_level = low_price + (
+                price_range * self.constants.GOLDEN_ZONE_START
+            )  # 61.5%
+            upper_level = low_price + (
+                price_range * self.constants.GOLDEN_ZONE_END
+            )  # 61.8%
 
         return {
             "upper_bound": max(upper_level, lower_level),  # Ensure upper > lower
             "lower_bound": min(upper_level, lower_level),
             "strength": 0.9,  # Golden zone is always high strength (0.9/1.0)
-            "zone_width": abs(upper_level - lower_level)
+            "zone_width": abs(upper_level - lower_level),
         }
 
-    def create_market_structure(self, primary_trend: Dict[str, Any], current_price: float) -> MarketStructure:
+    def create_market_structure(
+        self, primary_trend: dict[str, Any], current_price: float
+    ) -> MarketStructure:
         """Create market structure analysis from primary trend."""
-        trend_direction = "uptrend" if "Uptrend" in primary_trend["Trend Type"] else "downtrend"
+        trend_direction = cast(
+            Literal["uptrend", "downtrend", "sideways"],
+            "uptrend" if "Uptrend" in primary_trend["Trend Type"] else "downtrend",
+        )
 
         # Assess structure quality based on magnitude and price
         magnitude = primary_trend["Magnitude"]
         magnitude_pct = (magnitude / current_price) * 100
 
         if magnitude_pct > 20:
-            structure_quality = "high"
+            structure_quality = cast(Literal["high", "medium", "low"], "high")
         elif magnitude_pct > 10:
-            structure_quality = "medium"
+            structure_quality = cast(Literal["high", "medium", "low"], "medium")
         else:
-            structure_quality = "low"
+            structure_quality = cast(Literal["high", "medium", "low"], "low")
 
         # Determine current market phase
         high_price = primary_trend["Absolute High"]
         low_price = primary_trend["Absolute Low"]
         price_range = high_price - low_price
-        position_in_range = (current_price - low_price) / price_range if price_range > 0 else 0.5
+        position_in_range = (
+            (current_price - low_price) / price_range if price_range > 0 else 0.5
+        )
 
         if position_in_range > 0.8:
             phase = "Near swing high - potential resistance"
@@ -139,17 +168,27 @@ class LevelCalculator:
             trend_direction=trend_direction,
             swing_high=PricePoint(
                 price=high_price,
-                date=str(primary_trend["End Date"] if "Uptrend" in primary_trend["Trend Type"] else primary_trend["Start Date"])
+                date=str(
+                    primary_trend["End Date"]
+                    if "Uptrend" in primary_trend["Trend Type"]
+                    else primary_trend["Start Date"]
+                ),
             ),
             swing_low=PricePoint(
                 price=low_price,
-                date=str(primary_trend["Start Date"] if "Uptrend" in primary_trend["Trend Type"] else primary_trend["End Date"])
+                date=str(
+                    primary_trend["Start Date"]
+                    if "Uptrend" in primary_trend["Trend Type"]
+                    else primary_trend["End Date"]
+                ),
             ),
             structure_quality=structure_quality,
-            phase=phase
+            phase=phase,
         )
 
-    def calculate_confidence_score(self, trends: List[Dict[str, Any]], current_price: float) -> float:
+    def calculate_confidence_score(
+        self, trends: list[dict[str, Any]], current_price: float
+    ) -> float:
         """Calculate confidence score based on trend analysis quality."""
         if not trends:
             return 0.1
@@ -174,7 +213,7 @@ class LevelCalculator:
 
         return max(final_confidence, 0.1)  # Minimum 10% confidence
 
-    def assess_trend_strength(self, trends: List[Dict[str, Any]]) -> str:
+    def assess_trend_strength(self, trends: list[dict[str, Any]]) -> str:
         """Assess overall trend strength from detected trends."""
         if not trends:
             return "weak"
@@ -184,7 +223,9 @@ class LevelCalculator:
 
         # Count trends of same direction
         uptrends = sum(1 for t in trends[:3] if "Uptrend" in t.get("Trend Type", ""))
-        downtrends = sum(1 for t in trends[:3] if "Downtrend" in t.get("Trend Type", ""))
+        downtrends = sum(
+            1 for t in trends[:3] if "Downtrend" in t.get("Trend Type", "")
+        )
 
         # Assess based on magnitude and consistency
         if magnitude > 50 and max(uptrends, downtrends) >= 2:

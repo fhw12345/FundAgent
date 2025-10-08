@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from ..agent.chat_agent import ChatAgent
+from ..core.exceptions import NotFoundError
 from ..models.chat import ChatUpdate
 from ..services.chat_service import ChatService
 from .dependencies.chat_deps import (
@@ -176,6 +177,48 @@ async def get_chat_detail(
             status_code=500,
             detail="Failed to retrieve chat",
         ) from e
+
+
+@router.delete("/chats/{chat_id}", status_code=204)
+async def delete_chat(
+    chat_id: str,
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service),
+) -> None:
+    """
+    Delete a chat and all its messages.
+
+    **Authentication**: Requires Bearer token in Authorization header.
+
+    **Path Parameters:**
+    - chat_id: Chat identifier
+
+    **Response:** 204 No Content on success
+
+    **Errors:**
+    - 404: Chat not found or user doesn't own it
+    - 500: Internal server error
+    """
+    try:
+        deleted = await chat_service.delete_chat(chat_id, user_id)
+
+        if not deleted:
+            raise HTTPException(
+                status_code=404,
+                detail="Chat not found",
+            )
+
+        logger.info("Chat deleted via API", chat_id=chat_id, user_id=user_id)
+
+        # Return 204 No Content (no response body)
+        return None
+
+    except NotFoundError as e:
+        logger.error("Chat not found for deletion", chat_id=chat_id, error=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except Exception as e:
+        logger.error("Failed to delete chat", chat_id=chat_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete chat") from e
 
 
 @router.patch("/chats/{chat_id}/ui-state")

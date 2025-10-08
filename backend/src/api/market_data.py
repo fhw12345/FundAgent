@@ -3,37 +3,51 @@ Market Data API endpoints for symbol search and price data.
 Provides symbol autocomplete and real-time price data with granularity controls.
 """
 
-import yfinance as yf
+from datetime import datetime
+from typing import Any
+
 import pandas as pd
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
+import yfinance as yf
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from ..core.utils import map_timeframe_to_yfinance_interval, get_valid_frontend_intervals
+from ..core.utils import (
+    get_valid_frontend_intervals,
+    map_timeframe_to_yfinance_interval,
+)
 
 router = APIRouter(prefix="/api/market", tags=["Market Data"])
 
 
 class SymbolSearchResult(BaseModel):
     """Symbol search result."""
+
     symbol: str = Field(..., description="Stock symbol (e.g., AAPL)")
     name: str = Field(..., description="Company name")
     exchange: str = Field(default="", description="Exchange name")
     type: str = Field(default="", description="Security type")
-    match_type: str = Field(default="", description="Match classification: exact_symbol | symbol_prefix | name_prefix | fuzzy")
-    confidence: float = Field(default=0.0, description="Confidence score 0-1 for ranking")
+    match_type: str = Field(
+        default="",
+        description="Match classification: exact_symbol | symbol_prefix | name_prefix | fuzzy",
+    )
+    confidence: float = Field(
+        default=0.0, description="Confidence score 0-1 for ranking"
+    )
 
 
 class SymbolSearchResponse(BaseModel):
     """Symbol search response."""
+
     query: str = Field(..., description="Original search query")
-    results: List[SymbolSearchResult] = Field(..., description="Search results")
+    results: list[SymbolSearchResult] = Field(..., description="Search results")
 
 
 class PriceDataPoint(BaseModel):
     """Single price data point."""
-    time: str = Field(..., description="Timestamp (YYYY-MM-DD format for daily, ISO for intraday)")
+
+    time: str = Field(
+        ..., description="Timestamp (YYYY-MM-DD format for daily, ISO for intraday)"
+    )
     open: float = Field(..., description="Opening price")
     high: float = Field(..., description="High price")
     low: float = Field(..., description="Low price")
@@ -43,15 +57,21 @@ class PriceDataPoint(BaseModel):
 
 class PriceDataResponse(BaseModel):
     """Price data response."""
+
     symbol: str = Field(..., description="Stock symbol")
     interval: str = Field(..., description="Data interval")
-    data: List[PriceDataPoint] = Field(..., description="Price data points")
+    data: list[PriceDataPoint] = Field(..., description="Price data points")
     last_updated: str = Field(..., description="Last updated timestamp")
 
 
 @router.get("/search", response_model=SymbolSearchResponse)
 async def search_symbols(
-    q: str = Query(..., min_length=1, max_length=50, description="Search query (company name or partial symbol)")
+    q: str = Query(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Search query (company name or partial symbol)",
+    )
 ) -> SymbolSearchResponse:
     """
     Search for stock symbols using company names or partial symbols.
@@ -69,36 +89,36 @@ async def search_symbols(
 
         # Common company name to symbol mappings
         COMMON_MAPPINGS = {
-            'apple': 'AAPL',
-            'microsoft': 'MSFT',
-            'google': 'GOOGL',
-            'alphabet': 'GOOGL',
-            'amazon': 'AMZN',
-            'tesla': 'TSLA',
-            'meta': 'META',
-            'facebook': 'META',
-            'netflix': 'NFLX',
-            'nvidia': 'NVDA',
-            'amd': 'AMD',
-            'intel': 'INTC',
-            'boeing': 'BA',
-            'disney': 'DIS',
-            'walmart': 'WMT',
-            'coca cola': 'KO',
-            'pepsi': 'PEP',
-            'mcdonalds': 'MCD',
-            'starbucks': 'SBUX',
-            'visa': 'V',
-            'mastercard': 'MA',
-            'jp morgan': 'JPM',
-            'goldman sachs': 'GS',
-            'bank of america': 'BAC',
-            'wells fargo': 'WFC',
-            'exxon': 'XOM',
-            'chevron': 'CVX',
-            'pfizer': 'PFE',
-            'johnson': 'JNJ',
-            'berkshire': 'BRK-B'
+            "apple": "AAPL",
+            "microsoft": "MSFT",
+            "google": "GOOGL",
+            "alphabet": "GOOGL",
+            "amazon": "AMZN",
+            "tesla": "TSLA",
+            "meta": "META",
+            "facebook": "META",
+            "netflix": "NFLX",
+            "nvidia": "NVDA",
+            "amd": "AMD",
+            "intel": "INTC",
+            "boeing": "BA",
+            "disney": "DIS",
+            "walmart": "WMT",
+            "coca cola": "KO",
+            "pepsi": "PEP",
+            "mcdonalds": "MCD",
+            "starbucks": "SBUX",
+            "visa": "V",
+            "mastercard": "MA",
+            "jp morgan": "JPM",
+            "goldman sachs": "GS",
+            "bank of america": "BAC",
+            "wells fargo": "WFC",
+            "exxon": "XOM",
+            "chevron": "CVX",
+            "pfizer": "PFE",
+            "johnson": "JNJ",
+            "berkshire": "BRK-B",
         }
 
         # Check for direct mapping first
@@ -109,16 +129,18 @@ async def search_symbols(
             try:
                 ticker = yf.Ticker(symbol)
                 info = ticker.info
-                if info and 'symbol' in info:
-                    results.append(SymbolSearchResult(
-                        symbol=symbol,
-                        name=info.get('shortName', info.get('longName', '')),
-                        exchange=info.get('exchange', ''),
-                        type=info.get('quoteType', 'EQUITY'),
-                        match_type='name_prefix',
-                        confidence=1.0
-                    ))
-            except:
+                if info and "symbol" in info:
+                    results.append(
+                        SymbolSearchResult(
+                            symbol=symbol,
+                            name=info.get("shortName", info.get("longName", "")),
+                            exchange=info.get("exchange", ""),
+                            type=info.get("quoteType", "EQUITY"),
+                            match_type="name_prefix",
+                            confidence=1.0,
+                        )
+                    )
+            except Exception:
                 pass
 
         # Use yfinance Search for company name to symbol mapping with ranking
@@ -127,28 +149,28 @@ async def search_symbols(
             raw_quotes = search.quotes or []
 
             for result in raw_quotes[:50]:
-                symbol = result.get('symbol', '') or ''
-                name = result.get('shortname', result.get('longname', '')) or ''
-                exchange = result.get('exchange', '') or ''
-                quote_type = result.get('quoteType', '') or ''
+                symbol = result.get("symbol", "") or ""
+                name = result.get("shortname", result.get("longname", "")) or ""
+                exchange = result.get("exchange", "") or ""
+                quote_type = result.get("quoteType", "") or ""
 
                 q_lower = query.lower()
                 symbol_lower = symbol.lower()
                 name_lower = name.lower()
 
                 if symbol_lower == q_lower:
-                    match_type = 'exact_symbol'
+                    match_type = "exact_symbol"
                     confidence = 1.0
                 elif symbol_lower.startswith(q_lower):
-                    match_type = 'symbol_prefix'
+                    match_type = "symbol_prefix"
                     confidence = 0.9 - (len(symbol_lower) - len(q_lower)) * 0.01
                 elif name_lower.startswith(q_lower):
-                    match_type = 'name_prefix'
+                    match_type = "name_prefix"
                     confidence = 0.75
                 else:
                     # Simple fuzzy: containment
                     if q_lower in symbol_lower or q_lower in name_lower:
-                        match_type = 'fuzzy'
+                        match_type = "fuzzy"
                         confidence = 0.5
                     else:
                         continue
@@ -159,7 +181,7 @@ async def search_symbols(
                     exchange=exchange,
                     type=quote_type,
                     match_type=match_type,
-                    confidence=confidence
+                    confidence=confidence,
                 )
                 results.append(symbol_result)
 
@@ -175,27 +197,27 @@ async def search_symbols(
                 lookup_results = lookup.lookup(query)
 
                 for result in lookup_results[:50]:
-                    symbol = result.get('symbol', '') or ''
-                    name = result.get('name', '') or ''
-                    exchange = result.get('exchange', '') or ''
-                    quote_type = result.get('type', '') or ''
+                    symbol = result.get("symbol", "") or ""
+                    name = result.get("name", "") or ""
+                    exchange = result.get("exchange", "") or ""
+                    quote_type = result.get("type", "") or ""
 
                     q_lower = query.lower()
                     symbol_lower = symbol.lower()
                     name_lower = name.lower()
 
                     if symbol_lower == q_lower:
-                        match_type = 'exact_symbol'
+                        match_type = "exact_symbol"
                         confidence = 1.0
                     elif symbol_lower.startswith(q_lower):
-                        match_type = 'symbol_prefix'
+                        match_type = "symbol_prefix"
                         confidence = 0.9 - (len(symbol_lower) - len(q_lower)) * 0.01
                     elif name_lower.startswith(q_lower):
-                        match_type = 'name_prefix'
+                        match_type = "name_prefix"
                         confidence = 0.75
                     else:
                         if q_lower in symbol_lower or q_lower in name_lower:
-                            match_type = 'fuzzy'
+                            match_type = "fuzzy"
                             confidence = 0.5
                         else:
                             continue
@@ -206,7 +228,7 @@ async def search_symbols(
                         exchange=exchange,
                         type=quote_type,
                         match_type=match_type,
-                        confidence=confidence
+                        confidence=confidence,
                     )
                     results.append(symbol_result)
 
@@ -219,42 +241,62 @@ async def search_symbols(
                     try:
                         ticker = yf.Ticker(query.upper())
                         info = ticker.info
-                        if info and 'symbol' in info:
+                        if info and "symbol" in info:
                             # Validate that the symbol has actual price data
                             # Try to get recent data (last 5 days) to verify it's tradeable
                             try:
                                 test_data = ticker.history(period="5d", interval="1d")
                                 if not test_data.empty:
                                     symbol_result = SymbolSearchResult(
-                                        symbol=info.get('symbol', query.upper()),
-                                        name=info.get('shortName', info.get('longName', '')),
-                                        exchange=info.get('exchange', ''),
-                                        type=info.get('quoteType', 'EQUITY'),
-                                        match_type='exact_symbol' if info.get('symbol', '').lower() == query.lower() else 'fuzzy',
-                                        confidence=1.0 if info.get('symbol', '').lower() == query.lower() else 0.6
+                                        symbol=info.get("symbol", query.upper()),
+                                        name=info.get(
+                                            "shortName", info.get("longName", "")
+                                        ),
+                                        exchange=info.get("exchange", ""),
+                                        type=info.get("quoteType", "EQUITY"),
+                                        match_type=(
+                                            "exact_symbol"
+                                            if info.get("symbol", "").lower()
+                                            == query.lower()
+                                            else "fuzzy"
+                                        ),
+                                        confidence=(
+                                            1.0
+                                            if info.get("symbol", "").lower()
+                                            == query.lower()
+                                            else 0.6
+                                        ),
                                     )
                                     results.append(symbol_result)
-                            except:
+                            except Exception:
                                 # Skip symbols that don't have price data
                                 pass
-                    except:
+                    except Exception:
                         pass
 
         return SymbolSearchResponse(query=query, results=results)
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Symbol search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Symbol search failed: {str(e)}"
+        ) from e
 
 
 @router.get("/price/{symbol}", response_model=PriceDataResponse)
 async def get_price_data(
     symbol: str,
-    interval: str = Query(default="1d", description="Data interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo"),
-    period: str = Query(default="6mo", description="Data period: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max"),
-    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
-    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)")
+    interval: str = Query(
+        default="1d",
+        description="Data interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo",
+    ),
+    period: str = Query(
+        default="6mo",
+        description="Data period: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max",
+    ),
+    start_date: str | None = Query(default=None, description="Start date (YYYY-MM-DD)"),
+    end_date: str | None = Query(default=None, description="End date (YYYY-MM-DD)"),
 ) -> PriceDataResponse:
     """
     Get price data for a symbol with configurable granularity.
@@ -289,12 +331,26 @@ async def get_price_data(
                 datetime.strptime(start_date, "%Y-%m-%d")
                 datetime.strptime(end_date, "%Y-%m-%d")
             except ValueError:
-                raise ValueError("Dates must be in YYYY-MM-DD format")
+                raise ValueError("Dates must be in YYYY-MM-DD format") from None
 
-            data = ticker.history(start=start_date, end=end_date, interval=yfinance_interval)
+            data = ticker.history(
+                start=start_date, end=end_date, interval=yfinance_interval
+            )
         else:
             # Use relative period
-            valid_periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
+            valid_periods = [
+                "1d",
+                "5d",
+                "1mo",
+                "3mo",
+                "6mo",
+                "1y",
+                "2y",
+                "5y",
+                "10y",
+                "ytd",
+                "max",
+            ]
             if period not in valid_periods:
                 raise ValueError(f"Invalid period. Must be one of: {valid_periods}")
 
@@ -306,27 +362,35 @@ async def get_price_data(
                 search = yf.Search(symbol)
                 raw_quotes = search.quotes or []
                 for r in raw_quotes[:20]:
-                    s = r.get('symbol') or ''
-                    n = r.get('shortname', r.get('longname', '')) or ''
+                    s = r.get("symbol") or ""
+                    n = r.get("shortname", r.get("longname", "")) or ""
                     if s and s != symbol and s.isalpha() and len(s) <= 5:
                         suggestions.append({"symbol": s, "name": n})
                 # Heuristic: if missing common vowel in AAPL case
-                if symbol == 'APPL' and not any(sug['symbol'] == 'AAPL' for sug in suggestions):
+                if symbol == "APPL" and not any(
+                    sug["symbol"] == "AAPL" for sug in suggestions
+                ):
                     suggestions.insert(0, {"symbol": "AAPL", "name": "Apple Inc."})
             except Exception:
                 pass
 
             # Ensure fallback for common typos always works
-            if symbol == 'APPL' and not suggestions:
+            if symbol == "APPL" and not suggestions:
                 suggestions.append({"symbol": "AAPL", "name": "Apple Inc."})
 
-            raise HTTPException(status_code=400, detail={"message": f"No data available for symbol {symbol}", "suggestions": suggestions})
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": f"No data available for symbol {symbol}",
+                    "suggestions": suggestions,
+                },
+            )
 
         # Convert to response format
         price_points = []
         for index, row in data.iterrows():
             # Format time based on interval
-            if interval in ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1h']:
+            if interval in ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h"]:
                 # Intraday: use full timestamp
                 time_str = index.strftime("%Y-%m-%dT%H:%M:%S")
             else:
@@ -335,11 +399,11 @@ async def get_price_data(
 
             price_point = PriceDataPoint(
                 time=time_str,
-                open=float(row['Open']),
-                high=float(row['High']),
-                low=float(row['Low']),
-                close=float(row['Close']),
-                volume=int(row['Volume']) if not pd.isna(row['Volume']) else 0
+                open=float(row["Open"]),
+                high=float(row["High"]),
+                low=float(row["Low"]),
+                close=float(row["Close"]),
+                volume=int(row["Volume"]) if not pd.isna(row["Volume"]) else 0,
             )
             price_points.append(price_point)
 
@@ -347,20 +411,22 @@ async def get_price_data(
             symbol=symbol,
             interval=interval,
             data=price_points,
-            last_updated=datetime.now().isoformat()
+            last_updated=datetime.now().isoformat(),
         )
 
     except HTTPException:
         # Re-raise HTTPExceptions (like our suggestions response)
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch price data: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch price data: {str(e)}"
+        ) from e
 
 
 @router.get("/info/{symbol}")
-async def get_symbol_info(symbol: str) -> Dict[str, Any]:
+async def get_symbol_info(symbol: str) -> dict[str, Any]:
     """
     Get basic information about a symbol for autocomplete enhancement.
 
@@ -371,22 +437,24 @@ async def get_symbol_info(symbol: str) -> Dict[str, Any]:
         ticker = yf.Ticker(symbol)
         info = ticker.info
 
-        if not info or 'symbol' not in info:
+        if not info or "symbol" not in info:
             raise ValueError(f"Symbol {symbol} not found")
 
         # Extract relevant info for autocomplete
         return {
-            "symbol": info.get('symbol', symbol),
-            "name": info.get('shortName', info.get('longName', '')),
-            "sector": info.get('sector', ''),
-            "industry": info.get('industry', ''),
-            "exchange": info.get('exchange', ''),
-            "currency": info.get('currency', 'USD'),
-            "market_cap": info.get('marketCap'),
-            "current_price": info.get('currentPrice', info.get('regularMarketPrice'))
+            "symbol": info.get("symbol", symbol),
+            "name": info.get("shortName", info.get("longName", "")),
+            "sector": info.get("sector", ""),
+            "industry": info.get("industry", ""),
+            "exchange": info.get("exchange", ""),
+            "currency": info.get("currency", "USD"),
+            "market_cap": info.get("marketCap"),
+            "current_price": info.get("currentPrice", info.get("regularMarketPrice")),
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch symbol info: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch symbol info: {str(e)}"
+        ) from e

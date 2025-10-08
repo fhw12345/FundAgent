@@ -4,30 +4,35 @@ Provides REST API access to core financial analysis functionality.
 """
 
 import time
-from datetime import datetime, date
-from typing import Optional
+from datetime import date, datetime
+from typing import Any
 
 import structlog
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
-from ..core.financial_analysis import FibonacciAnalyzer, MacroAnalyzer, StockAnalyzer, StochasticAnalyzer
+from ..core.financial_analysis import (
+    FibonacciAnalyzer,
+    MacroAnalyzer,
+    StochasticAnalyzer,
+    StockAnalyzer,
+)
 from ..database.redis import RedisCache
 from .health import get_redis
 from .models import (
+    ChartGenerationResponse,
+    ChartRequest,
     FibonacciAnalysisRequest,
     FibonacciAnalysisResponse,
     MacroAnalysisRequest,
     MacroSentimentResponse,
-    StockFundamentalsRequest,
-    StockFundamentalsResponse,
     StochasticAnalysisRequest,
     StochasticAnalysisResponse,
-    ChartRequest,
-    ChartGenerationResponse,
-    ErrorResponse,
+    StockFundamentalsRequest,
+    StockFundamentalsResponse,
 )
 
-def validate_date_range(start_date: Optional[str], end_date: Optional[str]) -> None:
+
+def validate_date_range(start_date: str | None, end_date: str | None) -> None:
     """
     Validate date range inputs.
 
@@ -40,31 +45,41 @@ def validate_date_range(start_date: Optional[str], end_date: Optional[str]) -> N
         try:
             start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
             if start_dt > today:
-                raise ValueError(f"Start date {start_date} cannot be in the future. Latest allowed date is {today}")
+                raise ValueError(
+                    f"Start date {start_date} cannot be in the future. Latest allowed date is {today}"
+                )
         except ValueError as e:
             if "cannot be in the future" in str(e):
                 raise
-            raise ValueError(f"Invalid start date format: {start_date}. Expected YYYY-MM-DD")
+            raise ValueError(
+                f"Invalid start date format: {start_date}. Expected YYYY-MM-DD"
+            ) from None
 
     if end_date:
         try:
             end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
             if end_dt > today:
-                raise ValueError(f"End date {end_date} cannot be in the future. Latest allowed date is {today}")
+                raise ValueError(
+                    f"End date {end_date} cannot be in the future. Latest allowed date is {today}"
+                )
         except ValueError as e:
             if "cannot be in the future" in str(e):
                 raise
-            raise ValueError(f"Invalid end date format: {end_date}. Expected YYYY-MM-DD")
+            raise ValueError(
+                f"Invalid end date format: {end_date}. Expected YYYY-MM-DD"
+            ) from None
 
     if start_date and end_date:
         start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
         if start_dt > end_dt:
-            raise ValueError(f"Start date {start_date} cannot be after end date {end_date}")
+            raise ValueError(
+                f"Start date {start_date} cannot be after end date {end_date}"
+            )
 
         # Check if date range is too long (more than 5 years)
         if (end_dt - start_dt).days > 5 * 365:
-            raise ValueError(f"Date range is too long. Maximum allowed range is 5 years")
+            raise ValueError("Date range is too long. Maximum allowed range is 5 years")
 
 
 logger = structlog.get_logger()
@@ -91,7 +106,7 @@ async def fibonacci_analysis(
         start_date=request.start_date,
         end_date=request.end_date,
         timeframe=request.timeframe,
-        include_chart=request.include_chart
+        include_chart=request.include_chart,
     )
 
     try:
@@ -104,9 +119,11 @@ async def fibonacci_analysis(
                 "Fibonacci analysis request failed - missing date range",
                 symbol=request.symbol,
                 start_date=request.start_date,
-                end_date=request.end_date
+                end_date=request.end_date,
             )
-            raise ValueError("Both start_date and end_date are required for Fibonacci analysis")
+            raise ValueError(
+                "Both start_date and end_date are required for Fibonacci analysis"
+            )
 
         # Check cache first
         cache_start_time = time.time()
@@ -115,7 +132,7 @@ async def fibonacci_analysis(
         logger.info(
             "Checking cache for Fibonacci analysis",
             cache_key=cache_key,
-            symbol=request.symbol
+            symbol=request.symbol,
         )
 
         cached_result = await redis_cache.get(cache_key)
@@ -128,7 +145,7 @@ async def fibonacci_analysis(
                 symbol=request.symbol,
                 cache_key=cache_key,
                 cache_check_duration_ms=round(cache_check_duration * 1000, 2),
-                total_duration_ms=round(total_duration * 1000, 2)
+                total_duration_ms=round(total_duration * 1000, 2),
             )
             return FibonacciAnalysisResponse.model_validate(cached_result)
 
@@ -136,7 +153,7 @@ async def fibonacci_analysis(
             "Fibonacci analysis cache MISS - proceeding with calculation",
             symbol=request.symbol,
             cache_key=cache_key,
-            cache_check_duration_ms=round(cache_check_duration * 1000, 2)
+            cache_check_duration_ms=round(cache_check_duration * 1000, 2),
         )
 
         # Perform analysis with timeframe parameter
@@ -145,7 +162,10 @@ async def fibonacci_analysis(
             "Starting Fibonacci analysis calculation",
             symbol=request.symbol,
             timeframe=request.timeframe,
-            date_range_days=(datetime.strptime(request.end_date, "%Y-%m-%d") - datetime.strptime(request.start_date, "%Y-%m-%d")).days
+            date_range_days=(
+                datetime.strptime(request.end_date, "%Y-%m-%d")
+                - datetime.strptime(request.start_date, "%Y-%m-%d")
+            ).days,
         )
 
         analyzer = FibonacciAnalyzer()
@@ -153,7 +173,7 @@ async def fibonacci_analysis(
             symbol=request.symbol,
             start_date=request.start_date,
             end_date=request.end_date,
-            timeframe=request.timeframe
+            timeframe=request.timeframe,
         )
 
         analysis_duration = time.time() - analysis_start_time
@@ -163,7 +183,7 @@ async def fibonacci_analysis(
             timeframe=result.timeframe,
             confidence_score=result.confidence_score,
             fibonacci_levels_count=len(result.fibonacci_levels),
-            analysis_duration_ms=round(analysis_duration * 1000, 2)
+            analysis_duration_ms=round(analysis_duration * 1000, 2),
         )
 
         # Cache the result for 5 minutes
@@ -180,7 +200,7 @@ async def fibonacci_analysis(
             cache_ttl_seconds=300,
             cache_store_duration_ms=round(cache_store_duration * 1000, 2),
             analysis_duration_ms=round(analysis_duration * 1000, 2),
-            total_duration_ms=round(total_duration * 1000, 2)
+            total_duration_ms=round(total_duration * 1000, 2),
         )
 
         return result
@@ -191,9 +211,9 @@ async def fibonacci_analysis(
             "Fibonacci analysis request failed - invalid input",
             symbol=request.symbol,
             error=str(e),
-            total_duration_ms=round(total_duration * 1000, 2)
+            total_duration_ms=round(total_duration * 1000, 2),
         )
-        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}") from e
     except Exception as e:
         total_duration = time.time() - request_start_time
         logger.error(
@@ -201,9 +221,9 @@ async def fibonacci_analysis(
             symbol=request.symbol,
             error=str(e),
             error_type=type(e).__name__,
-            total_duration_ms=round(total_duration * 1000, 2)
+            total_duration_ms=round(total_duration * 1000, 2),
         )
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}") from e
 
 
 @router.post("/macro", response_model=MacroSentimentResponse)
@@ -227,7 +247,7 @@ async def macro_sentiment_analysis(
         analyzer = MacroAnalyzer()
         result = await analyzer.analyze(
             include_sectors=request.include_sectors,
-            include_indices=request.include_indices
+            include_indices=request.include_indices,
         )
 
         # Cache for 2 minutes (macro data changes frequently)
@@ -236,7 +256,9 @@ async def macro_sentiment_analysis(
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Macro analysis failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Macro analysis failed: {str(e)}"
+        ) from e
 
 
 @router.post("/fundamentals", response_model=StockFundamentalsResponse)
@@ -266,9 +288,11 @@ async def stock_fundamentals(
         return result
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid symbol: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid symbol: {str(e)}") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Fundamentals analysis failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Fundamentals analysis failed: {str(e)}"
+        ) from e
 
 
 @router.post("/stochastic", response_model=StochasticAnalysisResponse)
@@ -292,7 +316,7 @@ async def stochastic_analysis(
         end_date=request.end_date,
         timeframe=request.timeframe,
         k_period=request.k_period,
-        d_period=request.d_period
+        d_period=request.d_period,
     )
 
     try:
@@ -306,7 +330,7 @@ async def stochastic_analysis(
         logger.info(
             "Checking cache for Stochastic analysis",
             cache_key=cache_key,
-            symbol=request.symbol
+            symbol=request.symbol,
         )
 
         cached_result = await redis_cache.get(cache_key)
@@ -319,7 +343,7 @@ async def stochastic_analysis(
                 symbol=request.symbol,
                 cache_key=cache_key,
                 cache_check_duration_ms=round(cache_check_duration * 1000, 2),
-                total_duration_ms=round(total_duration * 1000, 2)
+                total_duration_ms=round(total_duration * 1000, 2),
             )
             return StochasticAnalysisResponse.model_validate(cached_result)
 
@@ -327,7 +351,7 @@ async def stochastic_analysis(
             "Stochastic analysis cache MISS - proceeding with calculation",
             symbol=request.symbol,
             cache_key=cache_key,
-            cache_check_duration_ms=round(cache_check_duration * 1000, 2)
+            cache_check_duration_ms=round(cache_check_duration * 1000, 2),
         )
 
         # Perform analysis
@@ -337,11 +361,12 @@ async def stochastic_analysis(
             symbol=request.symbol,
             timeframe=request.timeframe,
             k_period=request.k_period,
-            d_period=request.d_period
+            d_period=request.d_period,
         )
 
         # Initialize TickerDataService and analyzer
         from ..core.data.ticker_data_service import TickerDataService
+
         ticker_service = TickerDataService(redis_cache)
         analyzer = StochasticAnalyzer(ticker_service)
 
@@ -351,7 +376,7 @@ async def stochastic_analysis(
             end_date=request.end_date,
             timeframe=request.timeframe,
             k_period=request.k_period,
-            d_period=request.d_period
+            d_period=request.d_period,
         )
 
         analysis_duration = time.time() - analysis_start_time
@@ -362,7 +387,7 @@ async def stochastic_analysis(
             current_signal=result.current_signal,
             k_value=result.current_k,
             d_value=result.current_d,
-            analysis_duration_ms=round(analysis_duration * 1000, 2)
+            analysis_duration_ms=round(analysis_duration * 1000, 2),
         )
 
         # Cache the result for 5 minutes (same as technical indicators)
@@ -379,7 +404,7 @@ async def stochastic_analysis(
             cache_ttl_seconds=300,
             cache_store_duration_ms=round(cache_store_duration * 1000, 2),
             analysis_duration_ms=round(analysis_duration * 1000, 2),
-            total_duration_ms=round(total_duration * 1000, 2)
+            total_duration_ms=round(total_duration * 1000, 2),
         )
 
         return result
@@ -390,9 +415,9 @@ async def stochastic_analysis(
             "Stochastic analysis request failed - invalid input",
             symbol=request.symbol,
             error=str(e),
-            total_duration_ms=round(total_duration * 1000, 2)
+            total_duration_ms=round(total_duration * 1000, 2),
         )
-        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}") from e
     except Exception as e:
         total_duration = time.time() - request_start_time
         logger.error(
@@ -400,9 +425,9 @@ async def stochastic_analysis(
             symbol=request.symbol,
             error=str(e),
             error_type=type(e).__name__,
-            total_duration_ms=round(total_duration * 1000, 2)
+            total_duration_ms=round(total_duration * 1000, 2),
         )
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}") from e
 
 
 @router.post("/chart", response_model=ChartGenerationResponse)
@@ -422,14 +447,15 @@ async def generate_chart(
 
         # For now, return chart data structure that frontend can use
         # Chart image generation will be implemented in next phase
-        chart_data = {
+        generation_date = datetime.now().isoformat()
+        chart_data: dict[str, Any] = {
             "symbol": request.symbol,
             "start_date": request.start_date,
             "end_date": request.end_date,
             "chart_type": request.chart_type,
             "includes_indicators": request.include_indicators,
             "data_points": [],  # Will be populated with actual chart data
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": generation_date,
         }
 
         result = ChartGenerationResponse(
@@ -437,8 +463,9 @@ async def generate_chart(
             chart_type=request.chart_type,
             chart_url=None,  # Will be set when image generation is implemented
             chart_data=chart_data,
-            generation_date=datetime.now().isoformat(),
+            generation_date=generation_date,
             success=True,
+            error_message=None,
         )
 
         # Chart data returned for frontend use
@@ -455,5 +482,3 @@ async def generate_chart(
             success=False,
             error_message=str(e),
         )
-
-

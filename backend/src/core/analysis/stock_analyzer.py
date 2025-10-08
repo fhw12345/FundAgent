@@ -3,11 +3,10 @@ Stock fundamentals and analysis engine.
 Provides comprehensive fundamental analysis including valuation metrics and company information.
 """
 
-import yfinance as yf
-import pandas as pd
 from datetime import datetime
-from typing import Optional, Tuple, List
+
 import structlog
+import yfinance as yf
 
 from ...api.models import StockFundamentalsResponse
 
@@ -18,7 +17,7 @@ class StockAnalyzer:
     """Stock fundamentals and analysis engine."""
 
     def __init__(self):
-        self.ticker_data: Optional[yf.Ticker] = None
+        self.ticker_data: yf.Ticker | None = None
         self.symbol: str = ""
 
     async def get_fundamentals(self, symbol: str) -> StockFundamentalsResponse:
@@ -42,12 +41,14 @@ class StockAnalyzer:
             hist = self.ticker_data.history(period="5d")
 
             if hist.empty:
-                raise ValueError(f"'{symbol}' is not a valid stock symbol or the stock may be delisted. Please check the symbol and try again.")
+                raise ValueError(
+                    f"'{symbol}' is not a valid stock symbol or the stock may be delisted. Please check the symbol and try again."
+                )
 
             # Extract current price and changes
-            current_price = float(hist['Close'].iloc[-1])
+            current_price = float(hist["Close"].iloc[-1])
             if len(hist) >= 2:
-                prev_close = float(hist['Close'].iloc[-2])
+                prev_close = float(hist["Close"].iloc[-2])
                 price_change = current_price - prev_close
                 price_change_percent = (price_change / prev_close) * 100
             else:
@@ -55,7 +56,7 @@ class StockAnalyzer:
                 price_change_percent = 0.0
 
             # Extract fundamental metrics with proper type conversion
-            company_name = info.get('longName', symbol)
+            company_name = info.get("longName", symbol)
 
             # Safe numeric conversion functions
             def safe_float(value, default=0.0):
@@ -70,18 +71,32 @@ class StockAnalyzer:
                 if value is None:
                     return default
                 try:
-                    return int(float(value))  # Convert via float first to handle string numbers
+                    return int(
+                        float(value)
+                    )  # Convert via float first to handle string numbers
                 except (ValueError, TypeError):
                     return default
 
-            market_cap = safe_float(info.get('marketCap'), 0)
-            volume = int(hist['Volume'].iloc[-1]) if not hist.empty else 0
-            avg_volume = safe_int(info.get('averageVolume'), volume)
+            market_cap = safe_float(info.get("marketCap"), 0)
+            volume = int(hist["Volume"].iloc[-1]) if not hist.empty else 0
+            avg_volume = safe_int(info.get("averageVolume"), volume)
 
             # Valuation metrics - use None for missing data
-            pe_ratio = safe_float(info.get('trailingPE')) if info.get('trailingPE') is not None else None
-            pb_ratio = safe_float(info.get('priceToBook')) if info.get('priceToBook') is not None else None
-            dividend_yield_raw = safe_float(info.get('dividendYield')) if info.get('dividendYield') is not None else None
+            pe_ratio = (
+                safe_float(info.get("trailingPE"))
+                if info.get("trailingPE") is not None
+                else None
+            )
+            pb_ratio = (
+                safe_float(info.get("priceToBook"))
+                if info.get("priceToBook") is not None
+                else None
+            )
+            dividend_yield_raw = (
+                safe_float(info.get("dividendYield"))
+                if info.get("dividendYield") is not None
+                else None
+            )
             # yfinance returns dividendYield as decimal (0.025 for 2.5%), so convert to percentage
             # But handle edge cases where it might already be a percentage or invalid
             if dividend_yield_raw is not None and dividend_yield_raw > 0:
@@ -97,16 +112,28 @@ class StockAnalyzer:
                 dividend_yield = None
 
             # Risk metrics
-            beta = safe_float(info.get('beta')) if info.get('beta') is not None else None
+            beta = (
+                safe_float(info.get("beta")) if info.get("beta") is not None else None
+            )
 
             # 52-week range
-            fifty_two_week_high = safe_float(info.get('fiftyTwoWeekHigh'), current_price)
-            fifty_two_week_low = safe_float(info.get('fiftyTwoWeekLow'), current_price)
+            fifty_two_week_high = safe_float(
+                info.get("fiftyTwoWeekHigh"), current_price
+            )
+            fifty_two_week_low = safe_float(info.get("fiftyTwoWeekLow"), current_price)
 
             # Generate summary and insights
             fundamental_summary, key_metrics = self._generate_fundamental_insights(
-                symbol, company_name, current_price, market_cap, pe_ratio, pb_ratio,
-                dividend_yield, beta, fifty_two_week_high, fifty_two_week_low
+                symbol,
+                company_name,
+                current_price,
+                market_cap,
+                pe_ratio,
+                pb_ratio,
+                dividend_yield,
+                beta,
+                fifty_two_week_high,
+                fifty_two_week_low,
             )
 
             response = StockFundamentalsResponse(
@@ -126,7 +153,7 @@ class StockAnalyzer:
                 fifty_two_week_high=fifty_two_week_high,
                 fifty_two_week_low=fifty_two_week_low,
                 fundamental_summary=fundamental_summary,
-                key_metrics=key_metrics
+                key_metrics=key_metrics,
             )
 
             logger.info("Fundamentals analysis completed", symbol=symbol)
@@ -136,16 +163,28 @@ class StockAnalyzer:
             logger.error("Fundamentals analysis failed", symbol=symbol, error=str(e))
             raise
 
-    def _generate_fundamental_insights(self, symbol: str, company_name: str, current_price: float,
-                                     market_cap: float, pe_ratio: Optional[float],
-                                     pb_ratio: Optional[float], dividend_yield: Optional[float],
-                                     beta: Optional[float], week_52_high: float,
-                                     week_52_low: float) -> Tuple[str, List[str]]:
+    def _generate_fundamental_insights(
+        self,
+        symbol: str,
+        company_name: str,
+        current_price: float,
+        market_cap: float,
+        pe_ratio: float | None,
+        pb_ratio: float | None,
+        dividend_yield: float | None,
+        beta: float | None,
+        week_52_high: float,
+        week_52_low: float,
+    ) -> tuple[str, list[str]]:
         """Generate fundamental analysis insights."""
 
         # Calculate position in 52-week range
         price_range = week_52_high - week_52_low
-        position_in_range = ((current_price - week_52_low) / price_range * 100) if price_range > 0 else 50
+        position_in_range = (
+            ((current_price - week_52_low) / price_range * 100)
+            if price_range > 0
+            else 50
+        )
 
         # Market cap classification
         if market_cap > 200_000_000_000:
@@ -170,17 +209,25 @@ class StockAnalyzer:
         key_metrics = [
             f"52-Week Range: ${week_52_low:.2f} - ${week_52_high:.2f}",
             f"Position in Range: {position_in_range:.1f}%",
-            f"Market Cap Class: {cap_class.title()}"
+            f"Market Cap Class: {cap_class.title()}",
         ]
 
         # Add valuation metrics if available
         if pe_ratio is not None and pe_ratio > 0:
-            pe_interpretation = "expensive" if pe_ratio > 25 else "reasonable" if pe_ratio > 15 else "cheap"
+            pe_interpretation = (
+                "expensive"
+                if pe_ratio > 25
+                else "reasonable" if pe_ratio > 15 else "cheap"
+            )
             key_metrics.append(f"P/E Ratio: {pe_ratio:.1f} ({pe_interpretation})")
-            summary += f"P/E ratio of {pe_ratio:.1f} suggests {pe_interpretation} valuation. "
+            summary += (
+                f"P/E ratio of {pe_ratio:.1f} suggests {pe_interpretation} valuation. "
+            )
 
         if pb_ratio is not None and pb_ratio > 0:
-            pb_interpretation = "premium" if pb_ratio > 3 else "fair" if pb_ratio > 1 else "discount"
+            pb_interpretation = (
+                "premium" if pb_ratio > 3 else "fair" if pb_ratio > 1 else "discount"
+            )
             key_metrics.append(f"P/B Ratio: {pb_ratio:.1f} ({pb_interpretation})")
 
         if dividend_yield is not None and dividend_yield > 0:

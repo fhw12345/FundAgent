@@ -2,7 +2,8 @@
 FROM python:3.12-slim as builder
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -13,8 +14,9 @@ WORKDIR /app
 COPY pyproject.toml .
 
 # Install dependencies
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir .
+# hadolint ignore=DL3013
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir .
 
 # Production stage
 FROM python:3.12-slim as production
@@ -23,7 +25,8 @@ FROM python:3.12-slim as production
 RUN useradd --create-home --shell /bin/bash app
 
 # Install runtime dependencies including CA certificates for SSL/TLS
-RUN apt-get update && apt-get install -y \
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     && rm -rf /var/lib/apt/lists/* \

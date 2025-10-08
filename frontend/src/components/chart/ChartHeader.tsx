@@ -5,33 +5,43 @@
  * and provides controls for timezone and time interval.
  */
 
-import React from 'react'
-import { TimeInterval } from '../../services/market'
+import React from "react";
+import { TimeInterval } from "../../services/market";
 
-type SupportedTimezone = 'US/Eastern' | 'UTC' | 'Asia/Shanghai' | 'Europe/London' | 'Asia/Tokyo'
+type SupportedTimezone =
+  | "US/Eastern"
+  | "UTC"
+  | "Asia/Shanghai"
+  | "Europe/London"
+  | "Asia/Tokyo";
 
 const TIMEZONE_OPTIONS: { value: SupportedTimezone; label: string }[] = [
-  { value: 'US/Eastern', label: 'US Eastern (Market Time)' },
-  { value: 'UTC', label: 'UTC' },
-  { value: 'Asia/Shanghai', label: 'Asia/Shanghai (UTC+8)' },
-  { value: 'Europe/London', label: 'Europe/London' },
-  { value: 'Asia/Tokyo', label: 'Asia/Tokyo' },
-]
+  { value: "US/Eastern", label: "US Eastern (Market Time)" },
+  { value: "UTC", label: "UTC" },
+  { value: "Asia/Shanghai", label: "Asia/Shanghai (UTC+8)" },
+  { value: "Europe/London", label: "Europe/London" },
+  { value: "Asia/Tokyo", label: "Asia/Tokyo" },
+];
 
-const INTERVAL_BUTTONS: { key: TimeInterval; label: string; period: string }[] = [
-    { key: '1h', label: '1H', period: '1mo' },
-    { key: '1d', label: '1D', period: '6mo' },
-    { key: '1w', label: '1W', period: '1y' },
-    { key: '1mo', label: '1M', period: '2y' }
-]
+const INTERVAL_BUTTONS: { key: TimeInterval; label: string; period: string }[] =
+  [
+    { key: "1h", label: "1H", period: "1mo" },
+    { key: "1d", label: "1D", period: "6mo" },
+    { key: "1w", label: "1W", period: "1y" },
+    { key: "1mo", label: "1M", period: "2y" },
+  ];
 
 interface ChartHeaderProps {
-  symbol: string
-  interval: TimeInterval
-  selectedTimezone: SupportedTimezone
-  dateSelection: { startDate: string | null; endDate: string | null; clickCount: number }
-  onIntervalChange?: (interval: TimeInterval) => void
-  onTimezoneChange: (timezone: SupportedTimezone) => void
+  symbol: string;
+  interval: TimeInterval;
+  selectedTimezone: SupportedTimezone;
+  dateSelection: {
+    startDate: string | null;
+    endDate: string | null;
+    clickCount: number;
+  };
+  onIntervalChange?: (interval: TimeInterval) => void;
+  onTimezoneChange: (timezone: SupportedTimezone) => void;
 }
 
 export const ChartHeader: React.FC<ChartHeaderProps> = ({
@@ -64,7 +74,9 @@ export const ChartHeader: React.FC<ChartHeaderProps> = ({
       <div className="flex gap-2 items-center">
         <select
           value={selectedTimezone}
-          onChange={(e) => onTimezoneChange(e.target.value as SupportedTimezone)}
+          onChange={(e) =>
+            onTimezoneChange(e.target.value as SupportedTimezone)
+          }
           className="text-xs border border-gray-300 rounded px-2 py-1 bg-white min-w-[140px]"
         >
           {TIMEZONE_OPTIONS.map(({ value, label }) => (
@@ -81,8 +93,8 @@ export const ChartHeader: React.FC<ChartHeaderProps> = ({
               onClick={() => onIntervalChange?.(key)}
               className={`px-3 py-1 text-sm rounded transition-colors ${
                 interval === key
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-600 hover:bg-gray-200'
+                  ? "bg-blue-500 text-white"
+                  : "text-gray-600 hover:bg-gray-200"
               }`}
             >
               {label}
@@ -91,5 +103,5 @@ export const ChartHeader: React.FC<ChartHeaderProps> = ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};

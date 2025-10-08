@@ -11,21 +11,21 @@ Tests critical Pydantic model validation that caused production errors:
 These tests ensure robust API contract validation and prevent runtime errors.
 """
 
+from datetime import datetime
+
 import pytest
 from pydantic import ValidationError
-from datetime import datetime, date
-from typing import Dict, Any
 
 from src.api.models import (
-    FibonacciAnalysisResponse,
     FibonacciAnalysisRequest,
+    FibonacciAnalysisResponse,
     FibonacciLevel,
+    MacroAnalysisRequest,
+    MacroSentimentResponse,
     MarketStructure,
     PricePoint,
-    StockFundamentalsResponse,
     StockFundamentalsRequest,
-    MacroSentimentResponse,
-    MacroAnalysisRequest,
+    StockFundamentalsResponse,
 )
 
 
@@ -42,22 +42,13 @@ class TestFibonacciAnalysisValidation:
         """Valid Fibonacci levels for testing."""
         return [
             FibonacciLevel(
-                level=0.0,
-                price=200.0,
-                percentage="0.0%",
-                is_key_level=False
+                level=0.0, price=200.0, percentage="0.0%", is_key_level=False
             ),
             FibonacciLevel(
-                level=0.382,
-                price=180.9,
-                percentage="38.2%",
-                is_key_level=True
+                level=0.382, price=180.9, percentage="38.2%", is_key_level=True
             ),
             FibonacciLevel(
-                level=0.618,
-                price=169.1,
-                percentage="61.8%",
-                is_key_level=True
+                level=0.618, price=169.1, percentage="61.8%", is_key_level=True
             ),
         ]
 
@@ -69,10 +60,12 @@ class TestFibonacciAnalysisValidation:
             swing_high=PricePoint(price=200.0, date="2024-06-01"),
             swing_low=PricePoint(price=150.0, date="2024-01-01"),
             structure_quality="high",
-            phase="Near swing high - potential resistance"
+            phase="Near swing high - potential resistance",
         )
 
-    def test_fibonacci_response_with_valid_pressure_zone(self, valid_fibonacci_levels, valid_market_structure):
+    def test_fibonacci_response_with_valid_pressure_zone(
+        self, valid_fibonacci_levels, valid_market_structure
+    ):
         """
         CRITICAL REGRESSION TEST: Ensure pressure zone with numeric values validates.
 
@@ -83,8 +76,8 @@ class TestFibonacciAnalysisValidation:
         valid_pressure_zone = {
             "upper_bound": 180.9,
             "lower_bound": 169.1,
-            "strength": 0.9,       # Numeric, not "high"
-            "zone_width": 11.8     # Numeric, not "golden_ratio"
+            "strength": 0.9,  # Numeric, not "high"
+            "zone_width": 11.8,  # Numeric, not "golden_ratio"
         }
 
         # This should validate successfully
@@ -102,15 +95,17 @@ class TestFibonacciAnalysisValidation:
             trend_strength="strong",
             analysis_summary="Test analysis",
             key_insights=["Test insight"],
-            raw_data={}
+            raw_data={},
         )
 
         # Test that validation passes
         assert response.pressure_zone == valid_pressure_zone
         assert response.pressure_zone["strength"] == 0.9
-        assert isinstance(response.pressure_zone["strength"], (int, float))
+        assert isinstance(response.pressure_zone["strength"], int | float)
 
-    def test_fibonacci_response_rejects_string_pressure_zone_values(self, valid_fibonacci_levels, valid_market_structure):
+    def test_fibonacci_response_rejects_string_pressure_zone_values(
+        self, valid_fibonacci_levels, valid_market_structure
+    ):
         """
         REGRESSION TEST: Ensure invalid pressure zone with strings is rejected.
 
@@ -120,8 +115,8 @@ class TestFibonacciAnalysisValidation:
         invalid_pressure_zone = {
             "upper_bound": 180.9,
             "lower_bound": 169.1,
-            "strength": "high",           # ❌ String, should be numeric
-            "zone_type": "golden_ratio"   # ❌ String, should be numeric
+            "strength": "high",  # ❌ String, should be numeric
+            "zone_type": "golden_ratio",  # ❌ String, should be numeric
         }
 
         # This should raise ValidationError
@@ -140,12 +135,15 @@ class TestFibonacciAnalysisValidation:
                 trend_strength="strong",
                 analysis_summary="Test analysis",
                 key_insights=["Test insight"],
-                raw_data={}
+                raw_data={},
             )
 
         # Verify the error mentions the type issue
         error_message = str(exc_info.value)
-        assert "Input should be a valid number" in error_message or "float_parsing" in error_message
+        assert (
+            "Input should be a valid number" in error_message
+            or "float_parsing" in error_message
+        )
 
     def test_fibonacci_request_validation(self):
         """Test Fibonacci analysis request parameter validation."""
@@ -155,7 +153,7 @@ class TestFibonacciAnalysisValidation:
             start_date="2024-01-01",
             end_date="2024-06-01",
             timeframe="1d",
-            include_chart=True
+            include_chart=True,
         )
 
         assert valid_request.symbol == "AAPL"
@@ -168,17 +166,14 @@ class TestFibonacciAnalysisValidation:
                 start_date="2024-01-01",
                 end_date="2024-06-01",
                 timeframe="invalid_timeframe",  # Invalid
-                include_chart=True
+                include_chart=True,
             )
 
     def test_fibonacci_level_validation(self):
         """Test individual Fibonacci level validation."""
         # Valid Fibonacci level
         valid_level = FibonacciLevel(
-            level=0.618,
-            price=169.1,
-            percentage="61.8%",
-            is_key_level=True
+            level=0.618, price=169.1, percentage="61.8%", is_key_level=True
         )
 
         assert valid_level.level == 0.618
@@ -190,16 +185,18 @@ class TestFibonacciAnalysisValidation:
                 level=-0.1,  # Invalid negative level
                 price=169.1,
                 percentage="-10.0%",
-                is_key_level=False
+                is_key_level=False,
             )
 
-    def test_confidence_score_range_validation(self, valid_fibonacci_levels, valid_market_structure):
+    def test_confidence_score_range_validation(
+        self, valid_fibonacci_levels, valid_market_structure
+    ):
         """Test that confidence score is properly validated (0-1 range)."""
         valid_pressure_zone = {
             "upper_bound": 180.9,
             "lower_bound": 169.1,
             "strength": 0.9,
-            "zone_width": 11.8
+            "zone_width": 11.8,
         }
 
         # Test valid confidence scores
@@ -219,7 +216,7 @@ class TestFibonacciAnalysisValidation:
                 trend_strength="strong",
                 analysis_summary="Test analysis",
                 key_insights=["Test insight"],
-                raw_data={}
+                raw_data={},
             )
             assert response.confidence_score == score
 
@@ -241,7 +238,7 @@ class TestFibonacciAnalysisValidation:
                     trend_strength="strong",
                     analysis_summary="Test analysis",
                     key_insights=["Test insight"],
-                    raw_data={}
+                    raw_data={},
                 )
 
 
@@ -276,19 +273,19 @@ class TestStockFundamentalsValidation:
             fifty_two_week_high=198.23,
             fifty_two_week_low=124.17,
             fundamental_summary="Strong fundamentals",
-            key_metrics=["P/E: 25.5", "Dividend: 0.41%"]
+            key_metrics=["P/E: 25.5", "Dividend: 0.41%"],
         )
 
         # Verify dividend yield is reasonable
         assert response.dividend_yield == 0.41
-        assert 0 < response.dividend_yield < 10, (
-            f"Dividend yield {response.dividend_yield}% should be reasonable (0-10%)"
-        )
+        assert (
+            0 < response.dividend_yield < 10
+        ), f"Dividend yield {response.dividend_yield}% should be reasonable (0-10%)"
 
     def test_fundamentals_response_rejects_unrealistic_dividend_yield(self):
         """Test that unrealistic dividend yields are caught during validation."""
         # This would have been the bug: 41% dividend yield
-        with pytest.raises(ValidationError) as exc_info:
+        with pytest.raises(ValidationError):
             StockFundamentalsResponse(
                 symbol="AAPL",
                 company_name="Apple Inc.",
@@ -302,11 +299,10 @@ class TestStockFundamentalsValidation:
                 fifty_two_week_high=198.23,
                 fifty_two_week_low=124.17,
                 fundamental_summary="Strong fundamentals",
-                key_metrics=["P/E: 25.5"]
+                key_metrics=["P/E: 25.5"],
             )
 
         # Should fail validation due to unrealistic dividend yield
-        error_message = str(exc_info.value)
         # Note: This assumes we add dividend yield range validation to the model
 
     def test_fundamentals_optional_fields_handling(self):
@@ -321,14 +317,14 @@ class TestStockFundamentalsValidation:
             market_cap=800000000000,
             volume=30000000,
             avg_volume=35000000,
-            pe_ratio=None,          # Optional
-            pb_ratio=None,          # Optional
-            dividend_yield=None,    # Optional (Tesla doesn't pay dividends)
+            pe_ratio=None,  # Optional
+            pb_ratio=None,  # Optional
+            dividend_yield=None,  # Optional (Tesla doesn't pay dividends)
             beta=1.8,
             fifty_two_week_high=275.0,
             fifty_two_week_low=180.0,
             fundamental_summary="Growth-focused company",
-            key_metrics=["High beta", "No dividend"]
+            key_metrics=["High beta", "No dividend"],
         )
 
         assert response.dividend_yield is None
@@ -361,19 +357,15 @@ class TestMacroAnalysisValidation:
             vix_interpretation="low volatility",
             fear_greed_score=75,
             major_indices={"S&P 500": 1.2, "NASDAQ": 2.1},
-            sector_performance={
-                "Technology": 2.5,
-                "Healthcare": 1.2,
-                "Energy": -0.8
-            },
+            sector_performance={"Technology": 2.5, "Healthcare": 1.2, "Energy": -0.8},
             confidence_level=0.8,
             sentiment_summary="Overall positive sentiment.",
             market_outlook="Positive market conditions with low volatility",
             key_factors=[
                 "Strong earnings growth",
                 "Low VIX indicating confidence",
-                "Technology sector leadership"
-            ]
+                "Technology sector leadership",
+            ],
         )
 
         assert response.market_sentiment == "greedy"
@@ -389,8 +381,7 @@ class TestMacroAnalysisValidation:
 
         # Valid request with custom values
         custom_request = MacroAnalysisRequest(
-            include_sectors=False,
-            include_indices=True
+            include_sectors=False, include_indices=True
         )
         assert custom_request.include_sectors is False
         assert custom_request.include_indices is True
@@ -403,7 +394,6 @@ class TestDateValidation:
         """Test that date strings are properly validated."""
         # Test various date formats
         valid_dates = ["2024-01-01", "2024-12-31", "2023-06-15"]
-        invalid_dates = ["2024/01/01", "01-01-2024", "invalid-date", ""]
 
         # Test with Fibonacci request (which has date validation)
         for valid_date in valid_dates:
@@ -411,7 +401,7 @@ class TestDateValidation:
                 symbol="AAPL",
                 start_date=valid_date,
                 end_date="2024-12-31",
-                timeframe="1d"
+                timeframe="1d",
             )
             assert request.start_date == valid_date
 

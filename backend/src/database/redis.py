@@ -35,7 +35,7 @@ class RedisCache:
     async def disconnect(self) -> None:
         """Close Redis connection."""
         if self.client:
-            await self.client.aclose()
+            await self.client.close()  # type: ignore[attr-defined]
             logger.info("Redis connection closed")
 
     async def health_check(self) -> dict[str, bool | str]:

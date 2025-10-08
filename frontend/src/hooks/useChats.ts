@@ -193,3 +193,49 @@ export function useUpdateChatTitle() {
     );
   };
 }
+
+/**
+ * Hook to delete a chat with optimistic updates
+ */
+export function useDeleteChat() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (chatId: string) => chatService.deleteChat(chatId),
+
+    // Optimistic update
+    onMutate: async (chatId: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: chatKeys.lists() });
+
+      // Snapshot previous value
+      const currentPage = 1;
+      const includeArchived = false;
+      const queryKey = chatKeys.list(currentPage, includeArchived);
+      const previousData = queryClient.getQueryData<ChatListResponse>(queryKey);
+
+      // Optimistically remove from list
+      if (previousData) {
+        queryClient.setQueryData<ChatListResponse>(queryKey, {
+          ...previousData,
+          chats: previousData.chats.filter((chat) => chat.chat_id !== chatId),
+          total: previousData.total - 1,
+        });
+      }
+
+      return { previousData, queryKey };
+    },
+
+    // On error, rollback to previous value
+    onError: (_err, _chatId, context) => {
+      if (context?.previousData && context?.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousData);
+      }
+    },
+
+    // Always refetch after error or success
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+    },
+  });
+}

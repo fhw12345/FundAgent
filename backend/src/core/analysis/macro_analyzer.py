@@ -3,11 +3,12 @@ Macro market sentiment analysis engine.
 Analyzes VIX, major indices, and sector performance for market sentiment assessment.
 """
 
-import yfinance as yf
-import pandas as pd
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Literal
+
+import pandas as pd
 import structlog
+import yfinance as yf
 
 from ...api.models import MacroSentimentResponse
 
@@ -17,12 +18,14 @@ logger = structlog.get_logger()
 class MacroAnalyzer:
     """Macro market sentiment analyzer."""
 
-    def __init__(self):
-        self.vix_data: Optional[pd.DataFrame] = None
-        self.indices_data: Dict[str, pd.DataFrame] = {}
-        self.sectors_data: Dict[str, pd.DataFrame] = {}
+    def __init__(self) -> None:
+        self.vix_data: pd.DataFrame | None = None
+        self.indices_data: dict[str, pd.DataFrame] = {}
+        self.sectors_data: dict[str, pd.DataFrame] = {}
 
-    async def analyze(self, include_sectors: bool = True, include_indices: bool = True) -> MacroSentimentResponse:
+    async def analyze(
+        self, include_sectors: bool = True, include_indices: bool = True
+    ) -> MacroSentimentResponse:
         """
         Analyze macro market sentiment.
 
@@ -50,12 +53,18 @@ class MacroAnalyzer:
                 sector_performance = await self._analyze_sector_performance()
 
             # Overall sentiment assessment
-            market_sentiment = self._assess_overall_sentiment(fear_greed_score, major_indices)
-            confidence_level = self._calculate_confidence(vix_level, major_indices, sector_performance)
+            market_sentiment = self._assess_overall_sentiment(
+                fear_greed_score, major_indices
+            )
+            confidence_level = self._calculate_confidence(
+                vix_level, major_indices, sector_performance
+            )
 
             # Generate insights
-            sentiment_summary, market_outlook, key_factors = self._generate_macro_insights(
-                vix_level, vix_interpretation, major_indices, sector_performance
+            sentiment_summary, market_outlook, key_factors = (
+                self._generate_macro_insights(
+                    vix_level, vix_interpretation, major_indices, sector_performance
+                )
             )
 
             response = MacroSentimentResponse(
@@ -69,27 +78,31 @@ class MacroAnalyzer:
                 confidence_level=confidence_level,
                 sentiment_summary=sentiment_summary,
                 market_outlook=market_outlook,
-                key_factors=key_factors
+                key_factors=key_factors,
             )
 
-            logger.info("Macro sentiment analysis completed", sentiment=market_sentiment)
+            logger.info(
+                "Macro sentiment analysis completed", sentiment=market_sentiment
+            )
             return response
 
         except Exception as e:
             logger.error("Macro sentiment analysis failed", error=str(e))
             raise
 
-    async def _analyze_vix(self) -> Tuple[float, str, int]:
+    async def _analyze_vix(self) -> tuple[float, str, int]:
         """Analyze VIX for fear/greed sentiment."""
         try:
             vix_ticker = yf.Ticker("^VIX")
-            vix_data = vix_ticker.history(period="2d")  # Reduce to 2 days for faster fetch
+            vix_data = vix_ticker.history(
+                period="2d"
+            )  # Reduce to 2 days for faster fetch
 
             if vix_data.empty:
                 # Fallback values if VIX data unavailable
                 return 20.0, "neutral", 50
 
-            current_vix = float(vix_data['Close'].iloc[-1])
+            current_vix = float(vix_data["Close"].iloc[-1])
 
             # VIX interpretation
             if current_vix > 30:
@@ -108,13 +121,13 @@ class MacroAnalyzer:
             logger.warning("Failed to fetch VIX data", error=str(e))
             return 20.0, "neutral", 50
 
-    async def _analyze_major_indices(self) -> Dict[str, float]:
+    async def _analyze_major_indices(self) -> dict[str, float]:
         """Analyze major market indices performance."""
         indices = {
             "S&P 500": "^GSPC",
             "NASDAQ": "^IXIC",
             "DOW": "^DJI",
-            "Russell 2000": "^RUT"
+            "Russell 2000": "^RUT",
         }
 
         performance = {}
@@ -124,7 +137,10 @@ class MacroAnalyzer:
                 data = ticker.history(period="2d")  # Reduce to 2 days for faster fetch
 
                 if not data.empty and len(data) >= 2:
-                    change = ((data['Close'].iloc[-1] - data['Close'].iloc[-2]) / data['Close'].iloc[-2]) * 100
+                    change = (
+                        (data["Close"].iloc[-1] - data["Close"].iloc[-2])
+                        / data["Close"].iloc[-2]
+                    ) * 100
                     performance[name] = float(change)
                 else:
                     performance[name] = 0.0
@@ -135,7 +151,7 @@ class MacroAnalyzer:
 
         return performance
 
-    async def _analyze_sector_performance(self) -> Dict[str, float]:
+    async def _analyze_sector_performance(self) -> dict[str, float]:
         """Analyze sector ETF performance."""
         sectors = {
             "Technology": "XLK",
@@ -147,7 +163,7 @@ class MacroAnalyzer:
             "Communication": "XLC",
             "Consumer Staples": "XLP",
             "Utilities": "XLU",
-            "Real Estate": "XLRE"
+            "Real Estate": "XLRE",
         }
 
         performance = {}
@@ -157,7 +173,10 @@ class MacroAnalyzer:
                 data = ticker.history(period="2d")  # Reduce to 2 days for faster fetch
 
                 if not data.empty and len(data) >= 2:
-                    change = ((data['Close'].iloc[-1] - data['Close'].iloc[-2]) / data['Close'].iloc[-2]) * 100
+                    change = (
+                        (data["Close"].iloc[-1] - data["Close"].iloc[-2])
+                        / data["Close"].iloc[-2]
+                    ) * 100
                     performance[name] = float(change)
                 else:
                     performance[name] = 0.0
@@ -168,7 +187,9 @@ class MacroAnalyzer:
 
         return performance
 
-    def _assess_overall_sentiment(self, fear_greed_score: int, major_indices: Dict[str, float]) -> str:
+    def _assess_overall_sentiment(
+        self, fear_greed_score: int, major_indices: dict[str, float]
+    ) -> Literal["fearful", "neutral", "greedy"]:
         """Assess overall market sentiment."""
         # Weight fear/greed score and market performance
         if major_indices:
@@ -188,8 +209,12 @@ class MacroAnalyzer:
             else:
                 return "neutral"
 
-    def _calculate_confidence(self, vix_level: float, major_indices: Dict[str, float],
-                             sector_performance: Dict[str, float]) -> float:
+    def _calculate_confidence(
+        self,
+        vix_level: float,
+        major_indices: dict[str, float],
+        sector_performance: dict[str, float],
+    ) -> float:
         """Calculate confidence in sentiment analysis."""
         data_quality = 0.7  # Base confidence
 
@@ -205,9 +230,13 @@ class MacroAnalyzer:
 
         return min(1.0, max(0.0, data_quality))
 
-    def _generate_macro_insights(self, vix_level: float, vix_interpretation: str,
-                                major_indices: Dict[str, float],
-                                sector_performance: Dict[str, float]) -> Tuple[str, str, List[str]]:
+    def _generate_macro_insights(
+        self,
+        vix_level: float,
+        vix_interpretation: str,
+        major_indices: dict[str, float],
+        sector_performance: dict[str, float],
+    ) -> tuple[str, str, list[str]]:
         """Generate human-readable macro insights."""
 
         # Sentiment summary
@@ -216,13 +245,17 @@ class MacroAnalyzer:
         if major_indices:
             avg_performance = sum(major_indices.values()) / len(major_indices)
             if avg_performance > 0:
-                sentiment_summary += f"Major indices are up an average of {avg_performance:.1f}% today."
+                sentiment_summary += (
+                    f"Major indices are up an average of {avg_performance:.1f}% today."
+                )
             else:
                 sentiment_summary += f"Major indices are down an average of {abs(avg_performance):.1f}% today."
 
         # Market outlook
         if vix_level > 25:
-            outlook = "Elevated volatility suggests caution is warranted in the near term."
+            outlook = (
+                "Elevated volatility suggests caution is warranted in the near term."
+            )
         elif vix_level < 15:
             outlook = "Low volatility environment may indicate complacency or strong confidence."
         else:
@@ -236,15 +269,19 @@ class MacroAnalyzer:
         if major_indices:
             best_index = max(major_indices.items(), key=lambda x: x[1])
             worst_index = min(major_indices.items(), key=lambda x: x[1])
-            key_factors.extend([
-                f"Best performing index: {best_index[0]} ({best_index[1]:+.1f}%)",
-                f"Worst performing index: {worst_index[0]} ({worst_index[1]:+.1f}%)"
-            ])
+            key_factors.extend(
+                [
+                    f"Best performing index: {best_index[0]} ({best_index[1]:+.1f}%)",
+                    f"Worst performing index: {worst_index[0]} ({worst_index[1]:+.1f}%)",
+                ]
+            )
 
         if sector_performance:
             sector_items = list(sector_performance.items())
             if sector_items:
                 best_sector = max(sector_items, key=lambda x: x[1])
-                key_factors.append(f"Leading sector: {best_sector[0]} ({best_sector[1]:+.1f}%)")
+                key_factors.append(
+                    f"Leading sector: {best_sector[0]} ({best_sector[1]:+.1f}%)"
+                )
 
         return sentiment_summary, outlook, key_factors

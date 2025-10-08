@@ -12,7 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { useChats } from "../../hooks/useChats";
+import { useChats, useDeleteChat } from "../../hooks/useChats";
 import { ChatListItem } from "./ChatListItem";
 
 interface ChatSidebarProps {
@@ -31,9 +31,38 @@ export const ChatSidebar = memo(function ChatSidebar({
   onToggleCollapse,
 }: ChatSidebarProps) {
   const [showArchived, setShowArchived] = useState(false);
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
 
   // Fetch chats with React Query
   const { data, isLoading, isError, error } = useChats(1, 20, showArchived);
+
+  // Delete mutation
+  const { mutate: deleteChat } = useDeleteChat();
+
+  const handleDeleteChat = (chatId: string) => {
+    if (
+      window.confirm(
+        "Are you sure you want to delete this chat? This action cannot be undone.",
+      )
+    ) {
+      setDeletingChatId(chatId);
+      deleteChat(chatId, {
+        onSuccess: () => {
+          setDeletingChatId(null);
+          // If deleted chat was active, clear selection
+          if (chatId === activeChatId) {
+            onNewChat();
+          }
+        },
+        onError: (error) => {
+          setDeletingChatId(null);
+          alert(
+            `Failed to delete chat: ${error instanceof Error ? error.message : "Unknown error"}`,
+          );
+        },
+      });
+    }
+  };
 
   // If collapsed, show minimal sidebar
   if (isCollapsed) {
@@ -138,6 +167,7 @@ export const ChatSidebar = memo(function ChatSidebar({
             chat={chat}
             isActive={chat.chat_id === activeChatId}
             onClick={() => onChatSelect(chat.chat_id)}
+            onDelete={handleDeleteChat}
           />
         ))}
       </div>
