@@ -4,7 +4,7 @@
  * This component displays the trading chart and related controls,
  * such as symbol search and quick analysis buttons.
  */
-import React from "react";
+import React, { memo } from "react";
 import { SymbolSearch } from "../SymbolSearch";
 import { TradingChart } from "../TradingChart";
 import {
@@ -35,7 +35,7 @@ interface ChartPanelProps {
   ) => void;
 }
 
-export const ChartPanel: React.FC<ChartPanelProps> = ({
+const ChartPanelComponent: React.FC<ChartPanelProps> = ({
   currentSymbol,
   currentCompanyName,
   priceDataQuery,
@@ -206,3 +206,30 @@ export const ChartPanel: React.FC<ChartPanelProps> = ({
     </div>
   );
 };
+
+// Custom comparison function to prevent unnecessary re-renders
+// Only re-render if actual data changes, not query loading states
+const arePropsEqual = (prev: ChartPanelProps, next: ChartPanelProps) => {
+  return (
+    prev.currentSymbol === next.currentSymbol &&
+    prev.currentCompanyName === next.currentCompanyName &&
+    prev.selectedInterval === next.selectedInterval &&
+    prev.selectedDateRange.start === next.selectedDateRange.start &&
+    prev.selectedDateRange.end === next.selectedDateRange.end &&
+    prev.fibonacciAnalysis === next.fibonacciAnalysis &&
+    // Only compare query data, not loading states
+    prev.priceDataQuery.data === next.priceDataQuery.data &&
+    prev.priceDataQuery.isLoading === next.priceDataQuery.isLoading &&
+    prev.priceDataQuery.isError === next.priceDataQuery.isError &&
+    // Callbacks should be stable (useCallback in parent)
+    prev.handleSymbolSelect === next.handleSymbolSelect &&
+    prev.handleIntervalChange === next.handleIntervalChange &&
+    prev.handleDateRangeSelect === next.handleDateRangeSelect &&
+    prev.handleQuickAnalysis === next.handleQuickAnalysis &&
+    // Mutation pending state
+    prev.analysisMutation.isPending === next.analysisMutation.isPending
+  );
+};
+
+// Memoize to prevent unnecessary re-renders
+export const ChartPanel = memo(ChartPanelComponent, arePropsEqual);
