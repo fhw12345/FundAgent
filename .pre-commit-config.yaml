@@ -22,27 +22,37 @@ repos:
 
   # Python code quality
   - repo: https://github.com/psf/black
-    rev: 24.10.0
+    rev: 25.9.0
     hooks:
       - id: black
         files: ^backend/
         language_version: python3.12
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.14.0
     hooks:
       - id: ruff
         files: ^backend/
         args: [--fix]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.0
+    rev: v1.18.2
     hooks:
       - id: mypy
         files: ^backend/src/
         additional_dependencies:
           - types-redis
           - pydantic
+
+  # Radon complexity - optional (install: pip install radon)
+  # - repo: local
+  #   hooks:
+  #     - id: radon
+  #       name: Check code complexity (Radon)
+  #       entry: radon cc --min C -a -s
+  #       language: system
+  #       files: ^backend/.*\.py$
+  #       pass_filenames: false
 
   # Frontend code quality
   - repo: https://github.com/pre-commit/mirrors-prettier
@@ -54,7 +64,7 @@ repos:
 
   # General checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -65,9 +75,41 @@ repos:
       - id: check-merge-conflict
       - id: detect-private-key
 
+  # Security Scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.6
+    hooks:
+      - id: bandit
+        files: ^backend/src/
+        exclude: ^backend/(tests|scripts)/
+        args: ["-c", "backend/pyproject.toml", "-ll"]
+        additional_dependencies: ["bandit[toml]"]
+
+  - repo: https://github.com/zricethezav/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+
+  # Kubernetes Linting
+  - repo: local
+    hooks:
+      - id: kube-linter
+        name: Kubernetes Linter (kube-linter)
+        entry: bash -c 'if command -v kube-linter &> /dev/null; then kube-linter lint --config .kube-linter.yaml k8s/; else echo "kube-linter not installed, skipping"; fi'
+        language: system
+        files: ^k8s/.*\.yaml$
+        pass_filenames: false
+
+      - id: kubeconform
+        name: Kubernetes Validator (kubeconform)
+        entry: bash -c 'if command -v kubeconform &> /dev/null; then kubeconform -strict -summary k8s/*.yaml; else echo "kubeconform not installed, skipping"; fi'
+        language: system
+        files: ^k8s/.*\.yaml$
+        pass_filenames: false
+
   # Dockerfile linting
   - repo: https://github.com/hadolint/hadolint
-    rev: v2.12.0
+    rev: v2.14.0
     hooks:
       - id: hadolint-docker
         files: Dockerfile
