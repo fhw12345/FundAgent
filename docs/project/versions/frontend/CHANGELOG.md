@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-10-08
+
+### Added
+- feat(auth): Frontend dual-token JWT authentication with auto-refresh
+
+
 ## [0.6.1] - 2025-10-08
 
 ### Added

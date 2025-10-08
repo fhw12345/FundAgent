@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { HealthCheck } from "./components/HealthCheck";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
-import { authStorage } from "./services/authService";
+import { authStorage, logout } from "./services/authService";
 import "./App.css";
 
 function App() {
@@ -29,7 +29,20 @@ function App() {
     setIsAuthenticated(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const refreshToken = authStorage.getRefreshToken();
+
+    // Call backend logout to revoke refresh token
+    if (refreshToken) {
+      try {
+        await logout(refreshToken);
+      } catch (error) {
+        console.error("Logout error:", error);
+        // Continue with local logout even if API call fails
+      }
+    }
+
+    // Clear local storage
     authStorage.clear();
     setIsAuthenticated(false);
     setUsername("");

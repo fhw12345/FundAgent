@@ -17,7 +17,10 @@ export interface User {
 
 export interface LoginResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
+  expires_in: number;
+  refresh_expires_in: number;
   user: User;
 }
 
@@ -181,21 +184,118 @@ export async function getCurrentUser(token: string): Promise<User> {
 }
 
 /**
- * Auth token storage in localStorage
+ * Refresh access token using refresh token
+ */
+export async function refreshAccessToken(
+  refreshToken: string,
+): Promise<LoginResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Token refresh failed");
+  }
+
+  return response.json();
+}
+
+/**
+ * Logout by revoking refresh token
+ */
+export async function logout(refreshToken: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      refresh_token: refreshToken,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Logout failed");
+  }
+}
+
+/**
+ * Logout from all devices
+ */
+export async function logoutAll(accessToken: string): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/auth/logout-all?token=${accessToken}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Logout all failed");
+  }
+}
+
+/**
+ * Auth token storage in localStorage with dual-token support
  */
 export const authStorage = {
-  getToken(): string | null {
-    return localStorage.getItem("auth_token");
+  // Access token (short-lived, 30 min)
+  getAccessToken(): string | null {
+    return localStorage.getItem("access_token");
   },
 
-  setToken(token: string): void {
-    localStorage.setItem("auth_token", token);
+  setAccessToken(token: string): void {
+    localStorage.setItem("access_token", token);
   },
 
-  removeToken(): void {
-    localStorage.removeItem("auth_token");
+  removeAccessToken(): void {
+    localStorage.removeItem("access_token");
   },
 
+  // Refresh token (long-lived, 7 days)
+  getRefreshToken(): string | null {
+    return localStorage.getItem("refresh_token");
+  },
+
+  setRefreshToken(token: string): void {
+    localStorage.setItem("refresh_token", token);
+  },
+
+  removeRefreshToken(): void {
+    localStorage.removeItem("refresh_token");
+  },
+
+  // Token expiration tracking
+  getAccessTokenExpiry(): number | null {
+    const expiry = localStorage.getItem("access_token_expiry");
+    return expiry ? parseInt(expiry, 10) : null;
+  },
+
+  setAccessTokenExpiry(expiresIn: number): void {
+    const expiryTime = Date.now() + expiresIn * 1000;
+    localStorage.setItem("access_token_expiry", expiryTime.toString());
+  },
+
+  isAccessTokenExpiringSoon(): boolean {
+    const expiry = this.getAccessTokenExpiry();
+    if (!expiry) return true;
+    // Consider token expiring if less than 5 minutes remaining
+    return Date.now() > expiry - 5 * 60 * 1000;
+  },
+
+  // User data
   getUser(): User | null {
     const userStr = localStorage.getItem("auth_user");
     return userStr ? JSON.parse(userStr) : null;
@@ -209,8 +309,32 @@ export const authStorage = {
     localStorage.removeItem("auth_user");
   },
 
+  // Store full login response
+  saveLoginResponse(response: LoginResponse): void {
+    this.setAccessToken(response.access_token);
+    this.setRefreshToken(response.refresh_token);
+    this.setAccessTokenExpiry(response.expires_in);
+    this.setUser(response.user);
+  },
+
+  // Clear all auth data
   clear(): void {
-    this.removeToken();
+    this.removeAccessToken();
+    this.removeRefreshToken();
+    localStorage.removeItem("access_token_expiry");
     this.removeUser();
+  },
+
+  // Backward compatibility (for old code using "auth_token")
+  getToken(): string | null {
+    return this.getAccessToken();
+  },
+
+  setToken(token: string): void {
+    this.setAccessToken(token);
+  },
+
+  removeToken(): void {
+    this.removeAccessToken();
   },
 };

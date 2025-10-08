@@ -9,6 +9,7 @@ import type {
   Chat,
   StreamEvent,
 } from "../types/api";
+import { refreshTokenIfNeeded, retryWithRefreshToken } from "./tokenRefresh";
 
 // Configure axios with base URL
 // In production, use empty string for relative URLs (nginx proxy)
@@ -29,15 +30,10 @@ const api = axios.create({
 // Export the configured axios instance for use in other services
 export const apiClient = api;
 
-// Request interceptor for authentication (future)
+// Request interceptor for authentication with auto-refresh
 api.interceptors.request.use(
-  (config) => {
-    // Add auth token when available
-    const token = localStorage.getItem("auth_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
+  async (config) => {
+    return await refreshTokenIfNeeded(config);
   },
   (error) => {
     return Promise.reject(error);
@@ -49,12 +45,21 @@ api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle authentication errors
-      localStorage.removeItem("auth_token");
-      // Could redirect to login page
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const newToken = await retryWithRefreshToken(originalRequest);
+
+      if (newToken) {
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      }
     }
+
     return Promise.reject(error);
   },
 );
@@ -182,8 +187,8 @@ export const chatService = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(localStorage.getItem("auth_token")
-          ? { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
+        ...(localStorage.getItem("access_token")
+          ? { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
           : {}),
       },
       body: JSON.stringify({
@@ -354,8 +359,8 @@ export const chatService = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(localStorage.getItem("auth_token")
-          ? { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
+        ...(localStorage.getItem("access_token")
+          ? { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
           : {}),
       },
       body: JSON.stringify({

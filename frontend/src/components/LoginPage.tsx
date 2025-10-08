@@ -29,9 +29,8 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     try {
       const response = await loginWithPassword(username, password);
 
-      // Store token and user
-      authStorage.setToken(response.access_token);
-      authStorage.setUser(response.user);
+      // Store tokens and user
+      authStorage.saveLoginResponse(response);
 
       // Redirect to platform
       onLoginSuccess();

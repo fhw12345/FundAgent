@@ -62,9 +62,8 @@ export function ForgotPasswordFlow({
         newPassword,
       );
 
-      // Store token and user
-      authStorage.setToken(response.access_token);
-      authStorage.setUser(response.user);
+      // Store tokens and user
+      authStorage.saveLoginResponse(response);
 
       // Redirect to platform
       onSuccess();
