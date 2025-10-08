@@ -34,16 +34,25 @@ export function formatFibonacciResponse(
 ${trends
   .map((trend: any, index: number) => {
     const trendEmoji = trend.type.includes("Uptrend") ? "📈" : "📉";
-    const isMainTrend = index === 0;
+
+    // Calculate Golden Zone (61.8% retracement area) for this trend
+    const fibLevels = trend.fibonacci_levels || [];
+    const goldenLevel = fibLevels.find((l: any) => l.percentage === "61.8%");
+    let goldenZone = "";
+    if (goldenLevel) {
+      // Golden Zone is typically around 61.8% level (use a small range)
+      const lowerBound = goldenLevel.price * 0.995; // -0.5%
+      const upperBound = goldenLevel.price * 1.005; // +0.5%
+      goldenZone = `\n\n• **Golden Zone**: $${lowerBound.toFixed(2)} - $${upperBound.toFixed(2)}`;
+    }
 
     // Build Fibonacci levels collapsible section
-    const fibLevels = trend.fibonacci_levels || [];
     const fibSection =
       fibLevels.length > 0
         ? `
 
 <details>
-<summary><strong>📐 Fibonacci Levels</strong> (click to expand)</summary>
+<summary><strong>📐 Fibonacci Levels</strong> (expand)</summary>
 
 | Level | Price |
 |-------|-------|
@@ -53,13 +62,12 @@ ${fibLevels.map((level: any) => `| ${level.percentage} | $${level.price.toFixed(
         : "";
 
     return `**${index + 1}. ${trendEmoji} ${trend.type.toUpperCase()}**
-• Period: ${trend.period}
-• Magnitude: $${(trend.magnitude || 0).toFixed(2)} move
-• Range: $${trend.low?.toFixed(2)} → $${trend.high?.toFixed(2)}${
-      isMainTrend && result.pressure_zone
-        ? `\n• Golden Zone: $${result.pressure_zone.lower_bound.toFixed(2)} - $${result.pressure_zone.upper_bound.toFixed(2)}`
-        : ""
-    }${fibSection}`;
+
+• **Period**: ${trend.period}
+
+• **Magnitude**: $${(trend.magnitude || 0).toFixed(2)} move
+
+• **Range**: $${trend.low?.toFixed(2)} → $${trend.high?.toFixed(2)}${goldenZone}${fibSection}`;
   })
   .join("\n\n")}
 `;
@@ -67,11 +75,14 @@ ${fibLevels.map((level: any) => `| ${level.percentage} | $${level.price.toFixed(
 
   return `## 📊 Fibonacci Analysis - ${result.symbol}
 
-### ${trendEmoji} Bottom Line
+### 📋 Summary
 
 • **Trend**: ${result.market_structure.trend_direction.toUpperCase()}
+
 • **Current Price**: $${result.current_price.toFixed(2)}
+
 • **Confidence**: ${(result.confidence_score * 100).toFixed(1)}%
+
 • **Period**: ${result.start_date || "Dynamic"} to ${result.end_date || "Current"}
 ${trendsSection}
 `;
@@ -91,11 +102,11 @@ export function formatMacroResponse(result: MacroSentimentResponse): string {
 
   return `## 🌍 Macro Market Sentiment
 
-### ${sentimentEmoji} Bottom Line
+### 📋 Key Metrics
 
 | Metric | Value |
 |--------|-------|
-| Market Sentiment | ${result.market_sentiment.toUpperCase()} |
+| Market Sentiment | ${sentimentEmoji} ${result.market_sentiment.toUpperCase()} |
 | VIX Level | ${result.vix_level.toFixed(2)} (${result.vix_interpretation}) |
 | Fear/Greed Score | ${result.fear_greed_score}/100 |
 
@@ -127,11 +138,11 @@ export function formatFundamentalsResponse(
   return `## 💼 Fundamentals - ${result.symbol}
 *${result.company_name} • ${analysisDate}*
 
-### ${priceChangeEmoji} Bottom Line
+### 📋 Key Metrics
 
 | Metric | Value |
 |--------|-------|
-| Current Price | $${result.current_price.toFixed(2)} (${result.price_change >= 0 ? "+" : ""}${result.price_change_percent.toFixed(2)}%) |
+| Current Price | ${priceChangeEmoji} $${result.current_price.toFixed(2)} (${result.price_change >= 0 ? "+" : ""}${result.price_change_percent.toFixed(2)}%) |
 | Market Cap | $${(result.market_cap / 1e9).toFixed(2)}B |
 ${result.pe_ratio ? `| P/E Ratio | ${result.pe_ratio.toFixed(2)} |` : ""}
 ${result.pb_ratio ? `| P/B Ratio | ${result.pb_ratio.toFixed(2)} |` : ""}
@@ -156,6 +167,7 @@ export function formatStochasticResponse(
   let signalEmoji = "";
   let signalMeaning = "";
   let signalColor = "";
+  let textColor = "white"; // Default white text
 
   const kValue = result.current_k;
 
@@ -174,8 +186,9 @@ export function formatStochasticResponse(
     signalEmoji = "🟢";
     signalMeaning = "OVERSOLD (Potential Buy Zone)";
   } else {
-    // Yellow for neutral
+    // Yellow for neutral - use dark text for readability
     signalColor = "rgb(255, 215, 0)"; // Gold yellow
+    textColor = "#1f2937"; // Dark gray text (better contrast on yellow)
     signalEmoji = "🟡";
     signalMeaning = "NEUTRAL (No Clear Signal)";
   }
@@ -191,13 +204,13 @@ export function formatStochasticResponse(
   return `## 📊 Stochastic Oscillator - ${result.symbol}
 *${analysisDate} • ${result.timeframe} timeframe*
 
-### ${signalEmoji} Bottom Line
+### 📋 Key Metrics
 
 <table style="width: 100%; border-collapse: collapse; border: 1px solid #d1d5db; margin-bottom: 1rem;">
   <tbody>
     <tr style="border-bottom: 1px solid #d1d5db;">
       <td style="padding: 0.5rem 1rem; font-weight: 600; border-right: 1px solid #d1d5db;">Signal</td>
-      <td style="padding: 0.5rem 1rem; background-color: ${signalColor}; color: white; font-weight: 700; border-right: 1px solid #d1d5db;">${signalMeaning}</td>
+      <td style="padding: 0.5rem 1rem; background-color: ${signalColor}; color: ${textColor}; font-weight: 700; border-right: 1px solid #d1d5db;">${signalMeaning}</td>
     </tr>
     <tr style="border-bottom: 1px solid #d1d5db;">
       <td style="padding: 0.5rem 1rem; border-right: 1px solid #d1d5db;">Current Price</td>
