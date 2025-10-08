@@ -34,7 +34,7 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
         className={`px-6 py-4 rounded-xl ${
           msg.role === "user"
             ? "max-w-full lg:max-w-4xl bg-white text-gray-900 border-2 border-blue-500/30 shadow-sm"
-            : "max-w-full lg:max-w-3xl mr-8 bg-gray-50 text-gray-900 border border-gray-200"
+            : "w-full bg-gray-50 text-gray-900 border border-gray-200"
         }`}
       >
         <div className="markdown-content text-base max-w-none">
