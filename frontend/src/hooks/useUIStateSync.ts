@@ -23,7 +23,7 @@ export function useUIStateSync(props: UIStateSyncProps) {
     props;
 
   const updateMutation = useUpdateUIState();
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChatIdRef = useRef<string | null>(null);
   const isFirstRenderAfterChatChange = useRef(false);
 

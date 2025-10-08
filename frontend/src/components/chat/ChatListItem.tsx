@@ -98,7 +98,7 @@ export function ChatListItem({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <Clock size={12} />
-              <span>{formatTime(chat.last_message_at)}</span>
+              <span>{formatTime(chat.last_message_at || null)}</span>
             </div>
 
             {/* Delete Button */}

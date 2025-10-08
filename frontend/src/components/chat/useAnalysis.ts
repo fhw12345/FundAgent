@@ -27,11 +27,11 @@ import {
 
 // Chat hook - streams LLM responses in real-time
 export const useAnalysis = (
-  currentSymbol: string | null,
-  selectedDateRange: { start: string; end: string },
+  _currentSymbol: string | null,
+  _selectedDateRange: { start: string; end: string },
   setMessages: (updater: (prevMessages: any[]) => any[]) => void,
-  setSelectedDateRange: (range: { start: string; end: string }) => void,
-  selectedInterval?: string,
+  _setSelectedDateRange: (range: { start: string; end: string }) => void,
+  _selectedInterval?: string,
   chatId?: string | null,
   setChatId?: (id: string) => void,
 ) => {
@@ -126,7 +126,7 @@ export const useButtonAnalysis = (
   currentSymbol: string | null,
   selectedDateRange: { start: string; end: string },
   setMessages: (updater: (prevMessages: any[]) => any[]) => void,
-  setSelectedDateRange: (range: { start: string; end: string }) => void,
+  _setSelectedDateRange: (range: { start: string; end: string }) => void,
   selectedInterval?: string,
   chatId?: string | null,
   setChatId?: (id: string) => void,

@@ -34,7 +34,7 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Debounced search function
   const debouncedSearch = useCallback(

@@ -237,7 +237,7 @@ export const marketService = {
    * Debounced search function for autocomplete
    */
   createDebouncedSearch(delay: number = 300) {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     return (
       query: string,
