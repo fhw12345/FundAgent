@@ -17,6 +17,10 @@ spec:
         component: api
     spec:
       serviceAccountName: klinematrix-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
       - name: backend
         image: klinematrix/backend:test
@@ -24,6 +28,21 @@ spec:
         ports:
         - containerPort: 8000
           name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+        - name: home-cache
+          mountPath: /home/app/.cache
         # Environment variables defined in overlays
         resources:
           requests:
@@ -45,3 +64,10 @@ spec:
         #     port: 8000
         #   initialDelaySeconds: 10
         #   periodSeconds: 5
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      - name: home-cache
+        emptyDir: {}
