@@ -16,7 +16,7 @@ import {
   Zap,
   Activity,
 } from "lucide-react";
-import { TimeInterval, PriceDataPoint } from "../../services/market";
+import { TimeInterval } from "../../services/market";
 import type { FibonacciAnalysisResponse } from "../../services/analysis";
 
 interface ChartPanelProps {

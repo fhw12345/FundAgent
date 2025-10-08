@@ -13,10 +13,6 @@ import type {
 export function formatFibonacciResponse(
   result: FibonacciAnalysisResponse,
 ): string {
-  const keyLevels = result.fibonacci_levels.filter(
-    (level) => level.is_key_level,
-  );
-
   // Format Big 3 trends with Fibonacci levels
   let bigThreeSection = "";
   if (result.raw_data?.top_trends && result.raw_data.top_trends.length > 0) {

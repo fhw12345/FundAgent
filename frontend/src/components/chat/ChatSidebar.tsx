@@ -31,7 +31,6 @@ export const ChatSidebar = memo(function ChatSidebar({
   onToggleCollapse,
 }: ChatSidebarProps) {
   const [showArchived, setShowArchived] = useState(false);
-  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
 
   // Fetch chats with React Query
   const { data, isLoading, isError, error } = useChats(1, 20, showArchived);
@@ -45,17 +44,14 @@ export const ChatSidebar = memo(function ChatSidebar({
         "Are you sure you want to delete this chat? This action cannot be undone.",
       )
     ) {
-      setDeletingChatId(chatId);
       deleteChat(chatId, {
         onSuccess: () => {
-          setDeletingChatId(null);
           // If deleted chat was active, clear selection
           if (chatId === activeChatId) {
             onNewChat();
           }
         },
         onError: (error) => {
-          setDeletingChatId(null);
           alert(
             `Failed to delete chat: ${error instanceof Error ? error.message : "Unknown error"}`,
           );

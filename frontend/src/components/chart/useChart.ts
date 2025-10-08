@@ -5,7 +5,7 @@
  * It handles chart creation, series management, data updates, event handling, and resizing.
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import {
   createChart,
   IChartApi,

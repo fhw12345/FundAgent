@@ -4,7 +4,6 @@
  */
 
 import { useCallback } from "react";
-import { useChatDetail } from "./useChats";
 import type { ChatMessage } from "../types/api";
 import type { TimeInterval } from "../services/market";
 

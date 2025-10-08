@@ -206,7 +206,7 @@ export function EnhancedChatInterface() {
             {/* Chat History Sidebar */}
             <ChatSidebar
               activeChatId={chatId}
-              onChatSelect={handleChatSelect}
+              onChatSelect={(id) => void handleChatSelect(id)}
               onNewChat={handleNewChat}
               isCollapsed={isSidebarCollapsed}
               onToggleCollapse={() =>

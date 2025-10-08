@@ -44,7 +44,7 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
 
   // Search function
   const performSearch = useCallback(
-    async (searchQuery: string) => {
+    (searchQuery: string) => {
       if (searchQuery.trim().length < 1) {
         setResults([]);
         setIsOpen(false);

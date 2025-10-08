@@ -84,7 +84,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     }
   };
 
-  const handleVerifyCode = async (e: React.FormEvent) => {
+  const handleVerifyCode = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -159,7 +159,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     }
   };
 
-  const handleForgotPasswordVerifyCode = async (e: React.FormEvent) => {
+  const handleForgotPasswordVerifyCode = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setForgotPasswordStep("new-password");
@@ -219,7 +219,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/50 p-8">
           {mode === "login" && (
             // ===== LOGIN FORM =====
-            <form onSubmit={handleLogin} className="space-y-6">
+            <form onSubmit={(e) => void handleLogin(e)} className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
                   Welcome back
@@ -302,7 +302,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             // ===== REGISTRATION FLOW =====
             <>
               {registerStep === "email" && (
-                <form onSubmit={handleSendCode} className="space-y-6">
+                <form
+                  onSubmit={(e) => void handleSendCode(e)}
+                  className="space-y-6"
+                >
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">
                       Create account
@@ -426,7 +429,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               )}
 
               {registerStep === "credentials" && (
-                <form onSubmit={handleRegister} className="space-y-6">
+                <form
+                  onSubmit={(e) => void handleRegister(e)}
+                  className="space-y-6"
+                >
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">
                       Create credentials
@@ -514,7 +520,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             <>
               {forgotPasswordStep === "email" && (
                 <form
-                  onSubmit={handleForgotPasswordSendCode}
+                  onSubmit={(e) => void handleForgotPasswordSendCode(e)}
                   className="space-y-6"
                 >
                   <div>
@@ -644,7 +650,10 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               )}
 
               {forgotPasswordStep === "new-password" && (
-                <form onSubmit={handleResetPassword} className="space-y-6">
+                <form
+                  onSubmit={(e) => void handleResetPassword(e)}
+                  className="space-y-6"
+                >
                   <div>
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">
                       Create new password

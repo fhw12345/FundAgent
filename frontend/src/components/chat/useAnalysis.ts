@@ -6,18 +6,11 @@
  * - Button clicks → Direct analysis endpoints
  */
 
-import { useRef } from "react";
 import { flushSync } from "react-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { analysisService } from "../../services/analysis";
 import { chatService } from "../../services/api";
 import { chatKeys } from "../../hooks/useChats";
-import type {
-  FibonacciAnalysisResponse,
-  MacroSentimentResponse,
-  StockFundamentalsResponse,
-  StochasticAnalysisResponse,
-} from "../../services/analysis";
 import {
   formatFibonacciResponse,
   formatMacroResponse,
@@ -70,7 +63,7 @@ export const useAnalysis = (
 
       // Stream response using persistent MongoDB endpoint
       return new Promise((resolve, reject) => {
-        const cleanup = chatService.sendMessageStreamPersistent(
+        chatService.sendMessageStreamPersistent(
           userMessage,
           chatId || null,
           (chunk: string) => {
@@ -101,7 +94,7 @@ export const useAnalysis = (
             // Title generated callback - could update UI if needed
             console.log("📝 Chat title generated:", title);
           },
-          (finalChatId: string, messageCount: number) => {
+          () => {
             // Stream complete - use accumulated content (SAFE)
             resolve({ type: "chat", content: accumulatedContent });
             // Invalidate chat list ONCE after stream completes
@@ -245,7 +238,7 @@ export const useButtonAnalysis = (
       // Save to MongoDB using streaming endpoint (analysis sources skip LLM)
       if (response) {
         return new Promise((resolve, reject) => {
-          const cleanup = chatService.sendMessageStreamPersistent(
+          chatService.sendMessageStreamPersistent(
             response.content,
             chatId || null,
             () => {
@@ -261,7 +254,7 @@ export const useButtonAnalysis = (
             () => {
               // No title generation with custom title
             },
-            (finalChatId: string, messageCount: number) => {
+            () => {
               // Done callback - invalidate chat list ONCE after completion
               resolve(response);
               queryClient.invalidateQueries({ queryKey: chatKeys.lists() });

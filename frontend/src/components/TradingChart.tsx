@@ -101,7 +101,11 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     onDateRangeSelect?.(startDate, endDate);
   };
 
-  const { chartRef, seriesRef, setChartData } = useChart(
+  const {
+    chartRef: _chartRef,
+    seriesRef: _seriesRef,
+    setChartData,
+  } = useChart(
     chartContainerRef,
     chartType,
     handleDateRangeSelect,
