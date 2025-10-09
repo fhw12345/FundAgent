@@ -17,6 +17,7 @@ from ..core.financial_analysis import (
     StockAnalyzer,
 )
 from ..database.redis import RedisCache
+from .dependencies.auth import get_current_user_id
 from .health import get_redis
 from .models import (
     ChartGenerationResponse,
@@ -89,6 +90,7 @@ router = APIRouter(prefix="/api/analysis", tags=["Financial Analysis"])
 @router.post("/fibonacci", response_model=FibonacciAnalysisResponse)
 async def fibonacci_analysis(
     request: FibonacciAnalysisRequest,
+    user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
 ) -> FibonacciAnalysisResponse:
     """
@@ -229,6 +231,7 @@ async def fibonacci_analysis(
 @router.post("/macro", response_model=MacroSentimentResponse)
 async def macro_sentiment_analysis(
     request: MacroAnalysisRequest,
+    user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
 ) -> MacroSentimentResponse:
     """
@@ -264,6 +267,7 @@ async def macro_sentiment_analysis(
 @router.post("/fundamentals", response_model=StockFundamentalsResponse)
 async def stock_fundamentals(
     request: StockFundamentalsRequest,
+    user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
 ) -> StockFundamentalsResponse:
     """
@@ -298,6 +302,7 @@ async def stock_fundamentals(
 @router.post("/stochastic", response_model=StochasticAnalysisResponse)
 async def stochastic_analysis(
     request: StochasticAnalysisRequest,
+    user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
 ) -> StochasticAnalysisResponse:
     """
@@ -433,6 +438,7 @@ async def stochastic_analysis(
 @router.post("/chart", response_model=ChartGenerationResponse)
 async def generate_chart(
     request: ChartRequest,
+    user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
 ) -> ChartGenerationResponse:
     """

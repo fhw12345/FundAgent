@@ -8,13 +8,14 @@ from typing import Any
 
 import pandas as pd
 import yfinance as yf
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..core.utils import (
     get_valid_frontend_intervals,
     map_timeframe_to_yfinance_interval,
 )
+from .dependencies.auth import get_current_user_id
 
 router = APIRouter(prefix="/api/market", tags=["Market Data"])
 
@@ -71,7 +72,8 @@ async def search_symbols(
         min_length=1,
         max_length=50,
         description="Search query (company name or partial symbol)",
-    )
+    ),
+    user_id: str = Depends(get_current_user_id),
 ) -> SymbolSearchResponse:
     """
     Search for stock symbols using company names or partial symbols.
@@ -287,6 +289,7 @@ async def search_symbols(
 @router.get("/price/{symbol}", response_model=PriceDataResponse)
 async def get_price_data(
     symbol: str,
+    user_id: str = Depends(get_current_user_id),
     interval: str = Query(
         default="1d",
         description="Data interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo",
@@ -426,7 +429,9 @@ async def get_price_data(
 
 
 @router.get("/info/{symbol}")
-async def get_symbol_info(symbol: str) -> dict[str, Any]:
+async def get_symbol_info(
+    symbol: str, user_id: str = Depends(get_current_user_id)
+) -> dict[str, Any]:
     """
     Get basic information about a symbol for autocomplete enhancement.
 
