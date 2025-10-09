@@ -64,6 +64,7 @@ class UserRepository:
             username=username,
             password_hash=password_hash,
             email_verified=False,  # Will be set to True after email verification
+            is_admin=False,  # Default to non-admin
             created_at=datetime.utcnow(),
             last_login=None,
         )

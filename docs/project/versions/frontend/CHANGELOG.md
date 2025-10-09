@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-10-10
+
+### Added
+- Add admin health dashboard page with database statistics, implement admin-only navigation
+
+
 ## [0.7.7] - 2025-10-08
 
 ### Added

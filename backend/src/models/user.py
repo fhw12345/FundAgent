@@ -27,8 +27,19 @@ class User(BaseModel):
     username: str = Field(..., description="Username for login (unique)")
     password_hash: str | None = Field(None, description="Bcrypt password hash")
     email_verified: bool = Field(False, description="Email verification status")
+    is_admin: bool = Field(False, description="Admin privileges flag")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: datetime | None = Field(None, description="Last login timestamp")
+
+    @property
+    def admin(self) -> bool:
+        """
+        Check if user has admin privileges.
+
+        MVP: Hardcoded username check OR database flag.
+        Future: Migrate to database-driven role system.
+        """
+        return self.username == "allenpan" or self.is_admin
 
     class Config:
         json_schema_extra = {
@@ -38,6 +49,7 @@ class User(BaseModel):
                 "phone_number": None,
                 "wechat_openid": None,
                 "username": "User_163",
+                "is_admin": False,
                 "created_at": "2025-10-05T10:00:00Z",
                 "last_login": "2025-10-05T10:00:00Z",
             }

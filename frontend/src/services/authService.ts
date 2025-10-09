@@ -11,6 +11,7 @@ export interface User {
   phone_number: string | null;
   wechat_openid: string | null;
   username: string;
+  is_admin: boolean;
   created_at: string;
   last_login: string | null;
 }

@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { HealthCheck } from "./components/HealthCheck";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
+import HealthPage from "./pages/HealthPage";
 import { authStorage, logout } from "./services/authService";
 
 function App() {
   const [activeTab, setActiveTab] = useState<"health" | "chat">("chat");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -17,6 +18,7 @@ function App() {
     if (token && user) {
       setIsAuthenticated(true);
       setUsername(user.username);
+      setIsAdmin(user.is_admin || user.username === "allenpan");
     }
   }, []);
 
@@ -24,6 +26,7 @@ function App() {
     const user = authStorage.getUser();
     if (user) {
       setUsername(user.username);
+      setIsAdmin(user.is_admin || user.username === "allenpan");
     }
     setIsAuthenticated(true);
   };
@@ -45,6 +48,7 @@ function App() {
     authStorage.clear();
     setIsAuthenticated(false);
     setUsername("");
+    setIsAdmin(false);
   };
 
   // Show login page if not authenticated
@@ -72,16 +76,18 @@ function App() {
               </div>
             </div>
             <nav className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveTab("health")}
-                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
-                  activeTab === "health"
-                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
-                    : "text-gray-700 hover:bg-gray-100/80"
-                }`}
-              >
-                Health
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveTab("health")}
+                  className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                    activeTab === "health"
+                      ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
+                      : "text-gray-700 hover:bg-gray-100/80"
+                  }`}
+                >
+                  Health
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("chat")}
                 className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
@@ -107,23 +113,7 @@ function App() {
       </header>
 
       <main className="mx-auto py-0">
-        {activeTab === "health" && (
-          <div className="max-w-7xl mx-auto px-6 lg:px-8 py-8">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  System Health Status
-                </h2>
-                <p className="text-gray-600 mb-6">
-                  Real-time status of backend services and dependencies. This
-                  demonstrates the &ldquo;walking skeleton&rdquo; - end-to-end
-                  connectivity from frontend → FastAPI → MongoDB → Redis.
-                </p>
-              </div>
-              <HealthCheck />
-            </div>
-          </div>
-        )}
+        {activeTab === "health" && isAdmin && <HealthPage />}
 
         {activeTab === "chat" && <EnhancedChatInterface />}
       </main>
