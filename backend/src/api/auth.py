@@ -14,6 +14,7 @@ from ..models.refresh_token import TokenPair
 from ..models.user import User
 from ..services.auth_service import AuthService
 from ..services.token_service import TokenService
+from .dependencies.auth import get_mongodb, get_user_repository
 from .schemas.auth_schemas import (
     LoginRequest,
     LoginResponse,
@@ -34,24 +35,11 @@ router = APIRouter(prefix="/api/auth", tags=["authentication"])
 # ===== Dependencies =====
 
 
-def get_mongodb() -> MongoDB:
-    """Get MongoDB instance from app state."""
-    from ..main import app
-
-    return app.state.mongodb
-
-
 def get_redis() -> RedisCache:
     """Get Redis instance from app state."""
     from ..main import app
 
     return app.state.redis
-
-
-def get_user_repository(mongodb: MongoDB = Depends(get_mongodb)) -> UserRepository:
-    """Get user repository instance."""
-    users_collection = mongodb.get_collection("users")
-    return UserRepository(users_collection)
 
 
 def get_refresh_token_repository(
@@ -73,7 +61,7 @@ def get_auth_service(
     user_repo: UserRepository = Depends(get_user_repository),
     redis_cache: RedisCache = Depends(get_redis),
 ) -> AuthService:
-    """Get auth service instance."""
+    """Get auth service with Redis cache for code verification."""
     return AuthService(user_repo, redis_cache)
 
 

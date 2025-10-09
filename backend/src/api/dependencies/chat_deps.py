@@ -5,7 +5,6 @@ Dependencies for chat API endpoints.
 from fastapi import Depends
 
 from ...agent.chat_agent import ChatAgent
-from ...agent.session_manager import SessionManager, get_session_manager
 from ...core.config import Settings, get_settings
 from ...database.mongodb import MongoDB
 from ...database.repositories.chat_repository import ChatRepository
@@ -44,14 +43,13 @@ def get_chat_service(
 
 def get_chat_agent(
     settings: Settings = Depends(get_settings),
-    session_manager: SessionManager = Depends(get_session_manager),
 ) -> ChatAgent:
     """
     Get or create chat agent instance.
 
-    In production, this would be a singleton managed at app startup.
+    Lightweight LLM wrapper, no session management needed.
     """
-    return ChatAgent(settings=settings, session_manager=session_manager)
+    return ChatAgent(settings=settings)
 
 
 # Re-export get_current_user_id for backward compatibility

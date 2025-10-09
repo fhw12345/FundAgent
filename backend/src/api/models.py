@@ -317,13 +317,3 @@ class StochasticAnalysisRequest(BaseModel):
         le=20,
         description="D% period for signal line smoothing",
     )
-
-
-# Error response model
-class ErrorResponse(BaseModel):
-    """Standard error response."""
-
-    error: str = Field(..., description="Error message")
-    error_code: str = Field(..., description="Error code for programmatic handling")
-    details: dict[str, Any] | None = Field(None, description="Additional error details")
-    timestamp: str = Field(..., description="Error timestamp")

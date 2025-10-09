@@ -13,7 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
-from .agent.session_manager import get_session_manager
 from .api.analysis import router as analysis_router
 from .api.auth import router as auth_router
 from .api.chat import router as chat_router
@@ -50,7 +49,7 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan management for database connections and session cleanup."""
+    """Application lifespan management for database connections."""
     settings = get_settings()
 
     logger.info("Starting Financial Agent Backend", environment=settings.environment)
@@ -59,15 +58,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     mongodb = MongoDB()
     redis_cache = RedisCache()
 
-    # Initialize session manager
-    session_manager = get_session_manager()
-
     try:
         await mongodb.connect(settings.mongodb_url)
         await redis_cache.connect(settings.redis_url)
-
-        # Start session manager cleanup task
-        await session_manager.start()
 
         # Create database indexes for refresh tokens
         from .database.repositories.refresh_token_repository import (
@@ -84,16 +77,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.mongodb = mongodb
         app.state.redis = redis_cache
 
-        logger.info("Database connections and session manager started")
+        logger.info("Database connections started")
 
         yield
 
     finally:
-        # Cleanup connections and session manager
-        await session_manager.stop()
+        # Cleanup database connections
         await mongodb.disconnect()
         await redis_cache.disconnect()
-        logger.info("Database connections and session manager stopped")
+        logger.info("Database connections stopped")
 
 
 def create_app() -> FastAPI:

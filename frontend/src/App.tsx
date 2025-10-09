@@ -3,7 +3,6 @@ import { HealthCheck } from "./components/HealthCheck";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
 import { authStorage, logout } from "./services/authService";
-import "./App.css";
 
 function App() {
   const [activeTab, setActiveTab] = useState<"health" | "chat">("chat");

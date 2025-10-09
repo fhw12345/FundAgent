@@ -49,15 +49,6 @@ class ChatRequest(BaseModel):
     )
 
 
-class AddContextRequest(BaseModel):
-    """Request to add context (algorithm results) to session."""
-
-    content: str = Field(
-        ..., min_length=1, description="Content to add as assistant message"
-    )
-    session_id: str = Field(..., description="Session ID")
-
-
 class UpdateUIStateRequest(BaseModel):
     """Request to update chat UI state."""
 
@@ -65,14 +56,6 @@ class UpdateUIStateRequest(BaseModel):
 
 
 # ===== Response Models =====
-
-
-class ChatResponse(BaseModel):
-    """Chat response to user."""
-
-    response: str = Field(..., description="Assistant's response")
-    session_id: str = Field(..., description="Session ID for this conversation")
-    message_count: int = Field(..., description="Total messages in conversation")
 
 
 class ChatListResponse(BaseModel):

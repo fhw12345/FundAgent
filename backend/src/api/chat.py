@@ -326,7 +326,7 @@ async def chat_stream_persistent(
                 yield f"data: {json.dumps(chat_info)}\n\n"
 
             # Save message to MongoDB
-            msg = await chat_service.add_message(
+            await chat_service.add_message(
                 chat_id=chat_id,
                 user_id=user_id,
                 role=request.role,
@@ -407,24 +407,26 @@ async def chat_stream_persistent(
             # Get conversation history from MongoDB
             messages = await chat_service.get_chat_messages(chat_id, user_id)
 
-            # Create temporary session and populate with MongoDB history
-            session = await agent.create_session(user_id=user_id)
-            session_id = session.session_id
+            # Convert MongoDB messages to LLM format
+            # Include only user and assistant messages (skip system messages)
+            conversation_history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in messages
+                if msg.role in ("user", "assistant")
+            ]
 
-            # Populate session with existing messages (excluding the user message we just added)
-            for msg in messages[:-1]:  # Exclude last message (the one we just added)
-                session.add_message(msg.role, msg.content)
+            logger.info(
+                "Prepared conversation for LLM",
+                chat_id=chat_id,
+                total_messages=len(messages),
+                llm_messages=len(conversation_history),
+            )
 
-            # Update session in manager
-            agent.session_manager.update_session(session)
-
-            # Stream LLM response
+            # Stream LLM response directly (no session management)
             full_response = ""
             import asyncio
 
-            async for chunk in agent.stream_chat(
-                session_id=session_id, user_message=request.message
-            ):
+            async for chunk in agent.stream_chat(messages=conversation_history):
                 full_response += chunk
                 chunk_data = {"content": chunk, "type": "content"}
                 yield f"data: {json.dumps(chunk_data)}\n\n"
