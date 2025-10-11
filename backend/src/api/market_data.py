@@ -15,6 +15,10 @@ from ..core.utils import (
     get_valid_frontend_intervals,
     map_timeframe_to_yfinance_interval,
 )
+from ..services.market import (
+    calculate_match_confidence,
+    should_replace_duplicate,
+)
 from .dependencies.auth import get_current_user_id
 
 router = APIRouter(prefix="/api/market", tags=["Market Data"])
@@ -123,6 +127,9 @@ async def search_symbols(
             "berkshire": "BRK-B",
         }
 
+        # Deduplicate results across all sources
+        seen_companies = {}  # company_name_lower -> best_result
+
         # Check for direct mapping first
         query_lower = query.lower().strip()
         if query_lower in COMMON_MAPPINGS:
@@ -132,16 +139,18 @@ async def search_symbols(
                 ticker = yf.Ticker(symbol)
                 info = ticker.info
                 if info and "symbol" in info:
-                    results.append(
-                        SymbolSearchResult(
-                            symbol=symbol,
-                            name=info.get("shortName", info.get("longName", "")),
-                            exchange=info.get("exchange", ""),
-                            type=info.get("quoteType", "EQUITY"),
-                            match_type="name_prefix",
-                            confidence=1.0,
-                        )
+                    company_name = info.get("shortName", info.get("longName", ""))
+                    result = SymbolSearchResult(
+                        symbol=symbol,
+                        name=company_name,
+                        exchange=info.get("exchange", ""),
+                        type=info.get("quoteType", "EQUITY"),
+                        match_type="name_prefix",
+                        confidence=1.0,
                     )
+                    # Add to dedup dict
+                    if company_name:
+                        seen_companies[company_name.lower().strip()] = result
             except Exception:
                 pass
 
@@ -156,26 +165,16 @@ async def search_symbols(
                 exchange = result.get("exchange", "") or ""
                 quote_type = result.get("quoteType", "") or ""
 
-                q_lower = query.lower()
-                symbol_lower = symbol.lower()
-                name_lower = name.lower()
+                # Skip if no name (can't deduplicate)
+                if not name:
+                    continue
 
-                if symbol_lower == q_lower:
-                    match_type = "exact_symbol"
-                    confidence = 1.0
-                elif symbol_lower.startswith(q_lower):
-                    match_type = "symbol_prefix"
-                    confidence = 0.9 - (len(symbol_lower) - len(q_lower)) * 0.01
-                elif name_lower.startswith(q_lower):
-                    match_type = "name_prefix"
-                    confidence = 0.75
-                else:
-                    # Simple fuzzy: containment
-                    if q_lower in symbol_lower or q_lower in name_lower:
-                        match_type = "fuzzy"
-                        confidence = 0.5
-                    else:
-                        continue
+                # Calculate match type and confidence using helper
+                match_result = calculate_match_confidence(query, symbol, name)
+                if not match_result:
+                    continue
+
+                match_type, confidence = match_result
 
                 symbol_result = SymbolSearchResult(
                     symbol=symbol,
@@ -185,7 +184,19 @@ async def search_symbols(
                     match_type=match_type,
                     confidence=confidence,
                 )
-                results.append(symbol_result)
+
+                # Deduplicate: keep result with higher confidence or better exchange
+                company_key = name.lower().strip()
+                if company_key in seen_companies:
+                    if should_replace_duplicate(
+                        seen_companies[company_key], confidence, exchange
+                    ):
+                        seen_companies[company_key] = symbol_result
+                else:
+                    seen_companies[company_key] = symbol_result
+
+            # Convert deduped results to list
+            results = list(seen_companies.values())
 
             # Sort results by confidence then symbol
             results.sort(key=lambda r: (-r.confidence, r.symbol))
@@ -198,31 +209,24 @@ async def search_symbols(
                 lookup = yf.Lookup()
                 lookup_results = lookup.lookup(query)
 
+                # Reset deduplication for fallback path
+                seen_companies = {}
+
                 for result in lookup_results[:50]:
                     symbol = result.get("symbol", "") or ""
                     name = result.get("name", "") or ""
                     exchange = result.get("exchange", "") or ""
                     quote_type = result.get("type", "") or ""
 
-                    q_lower = query.lower()
-                    symbol_lower = symbol.lower()
-                    name_lower = name.lower()
+                    if not name:
+                        continue
 
-                    if symbol_lower == q_lower:
-                        match_type = "exact_symbol"
-                        confidence = 1.0
-                    elif symbol_lower.startswith(q_lower):
-                        match_type = "symbol_prefix"
-                        confidence = 0.9 - (len(symbol_lower) - len(q_lower)) * 0.01
-                    elif name_lower.startswith(q_lower):
-                        match_type = "name_prefix"
-                        confidence = 0.75
-                    else:
-                        if q_lower in symbol_lower or q_lower in name_lower:
-                            match_type = "fuzzy"
-                            confidence = 0.5
-                        else:
-                            continue
+                    # Calculate match type and confidence using helper
+                    match_result = calculate_match_confidence(query, symbol, name)
+                    if not match_result:
+                        continue
+
+                    match_type, confidence = match_result
 
                     symbol_result = SymbolSearchResult(
                         symbol=symbol,
@@ -232,8 +236,19 @@ async def search_symbols(
                         match_type=match_type,
                         confidence=confidence,
                     )
-                    results.append(symbol_result)
 
+                    # Deduplicate using helper
+                    company_key = name.lower().strip()
+                    if company_key in seen_companies:
+                        if should_replace_duplicate(
+                            seen_companies[company_key], confidence, exchange
+                        ):
+                            seen_companies[company_key] = symbol_result
+                    else:
+                        seen_companies[company_key] = symbol_result
+
+                # Convert deduped results (Lookup fallback)
+                results = list(seen_companies.values())
                 results.sort(key=lambda r: (-r.confidence, r.symbol))
                 results = results[:10]
 
