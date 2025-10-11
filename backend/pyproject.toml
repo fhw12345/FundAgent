@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "financial-agent-backend"
-version = "0.5.0"
+version = "0.5.1"
 description = "AI-Enhanced Financial Analysis Platform Backend"
 authors = [
     {name = "Financial Agent Team", email = "team@financialagent.com"},
@@ -37,6 +37,7 @@ dependencies = [
     "tenacity>=8.2.0",                  # Retry logic
     "tencentcloud-sdk-python-ses>=3.0.0",  # Tencent Cloud SES for email
     "bcrypt>=4.0.0",                    # Password hashing
+    "kubernetes>=30.0.0",               # Kubernetes client for metrics
 ]
 
 [project.optional-dependencies]
@@ -109,6 +110,7 @@ module = [
     "matplotlib.*",
     "redis.*",
     "scipy.*",
+    "kubernetes.*",
 ]
 ignore_missing_imports = true
 

@@ -12,6 +12,7 @@ resources:
 - ../../base
 - alibaba-config.yaml
 - secrets.yaml
+- rbac.yaml
 
 # Test environment overrides
 patchesStrategicMerge:
