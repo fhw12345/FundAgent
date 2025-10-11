@@ -108,6 +108,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     setTooltip,
     interval,
     fibonacciAnalysis,
+    data,
   );
   const { convertToChartData } = useChartData(
     data,
@@ -119,6 +120,28 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     const chartData = convertToChartData();
     setChartData(chartData, highlightDateRange);
   }, [data, convertToChartData, setChartData, highlightDateRange]);
+
+  // Calculate date range from data (memoized for performance)
+  const dateRangeText = React.useMemo(() => {
+    if (!data || data.length === 0) return null;
+
+    const startDate = new Date(data[0].time);
+    const endDate = new Date(data[data.length - 1].time);
+
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    };
+
+    const daysDiff = Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    return `Showing data from ${formatDate(startDate)} to ${formatDate(endDate)} (${daysDiff} ${daysDiff === 1 ? "day" : "days"})`;
+  }, [data]);
 
   return (
     <div className={`relative ${className}`}>
@@ -140,6 +163,13 @@ export const TradingChart: React.FC<TradingChartProps> = ({
           chartContainerRef={chartContainerRef}
         />
       </div>
+      {dateRangeText && (
+        <div className="mt-6 mb-4 flex justify-center">
+          <div className="inline-block px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-medium shadow-sm">
+            {dateRangeText}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

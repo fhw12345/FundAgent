@@ -38,6 +38,15 @@ interface FibonacciAnalysisData {
   raw_data?: any;
 }
 
+interface PriceDataPoint {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export const useChart = (
   chartContainerRef: React.RefObject<HTMLDivElement>,
   chartType: ChartType,
@@ -45,6 +54,7 @@ export const useChart = (
   setTooltip?: (tooltip: any) => void,
   interval?: string,
   fibonacciAnalysis?: FibonacciAnalysisData | null,
+  originalData?: PriceDataPoint[],
 ) => {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line" | "Candlestick"> | null>(null);
@@ -52,6 +62,26 @@ export const useChart = (
   const onDateRangeSelectRef = useRef(onDateRangeSelect);
   const setTooltipRef = useRef(setTooltip);
   const lastTooltipRef = useRef<any>(null);
+
+  // Build timestamp → volume map for O(1) lookups (performance optimization)
+  const volumeMapRef = useRef<Map<string, number>>(new Map());
+
+  // Update volume map when data changes
+  useEffect(() => {
+    if (!originalData) {
+      volumeMapRef.current.clear();
+      return;
+    }
+
+    const newVolumeMap = new Map<string, number>();
+    for (const point of originalData) {
+      const dateKey = point.time.includes("T")
+        ? point.time.split("T")[0]
+        : point.time;
+      newVolumeMap.set(dateKey, point.volume);
+    }
+    volumeMapRef.current = newVolumeMap;
+  }, [originalData]);
 
   // Update refs when props change
   useEffect(() => {
@@ -179,9 +209,24 @@ export const useChart = (
       }
 
       const price = "value" in data ? data.value : data.close;
-      const volume = "volume" in data ? data.volume : undefined;
       const isGreen =
         "close" in data && "open" in data ? data.close >= data.open : undefined;
+
+      // Extract OHLC data for candlestick charts
+      const open = "open" in data ? data.open : undefined;
+      const high = "high" in data ? data.high : undefined;
+      const low = "low" in data ? data.low : undefined;
+      const close = "close" in data ? data.close : undefined;
+
+      // Look up volume from pre-built map (O(1) instead of O(n))
+      let volume: number | undefined = undefined;
+      if (param.time) {
+        const timeDate =
+          typeof param.time === "number"
+            ? new Date(param.time * 1000).toISOString().split("T")[0]
+            : param.time.toString();
+        volume = volumeMapRef.current.get(timeDate);
+      }
 
       let timeStr: string;
       if (typeof param.time === "number") {
@@ -208,6 +253,10 @@ export const useChart = (
         y: param.point.y,
         time: timeStr,
         price: price,
+        open,
+        high,
+        low,
+        close,
         volume,
         isGreen,
       };

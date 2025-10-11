@@ -11,7 +11,11 @@ interface TooltipData {
   x: number;
   y: number;
   time: string;
-  price: number;
+  price: number; // For backward compatibility (close price)
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
   volume?: number;
   isGreen?: boolean;
 }
@@ -47,28 +51,60 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({
     return null;
   }
 
+  // Show OHLC if available, otherwise show single price
+  const hasOHLC =
+    tooltipData.open !== undefined &&
+    tooltipData.high !== undefined &&
+    tooltipData.low !== undefined &&
+    tooltipData.close !== undefined;
+
+  const directionArrow = tooltipData.isGreen ? "↑" : "↓";
+  const colorClass = tooltipData.isGreen
+    ? "text-green-400"
+    : tooltipData.isGreen === false
+      ? "text-red-400"
+      : "text-white";
+
   return (
     <div
-      className="absolute z-10 bg-black bg-opacity-90 text-white text-xs rounded px-2 py-1 pointer-events-none"
+      className="absolute z-10 bg-black bg-opacity-90 text-white text-xs rounded px-3 py-2 pointer-events-none font-mono shadow-lg"
       style={{
-        left: `${Math.min(tooltipData.x + 10, (chartContainerRef.current?.clientWidth || 0) - 150)}px`,
+        left: `${Math.min(tooltipData.x + 10, (chartContainerRef.current?.clientWidth || 0) - 180)}px`,
         top: `${Math.max(tooltipData.y - 10, 0)}px`,
+        minWidth: "160px",
       }}
     >
-      <div>{tooltipData.time}</div>
-      <div
-        className={
-          tooltipData.isGreen !== undefined
-            ? tooltipData.isGreen
-              ? "text-green-400"
-              : "text-red-400"
-            : "text-white"
-        }
-      >
-        {formatPrice(tooltipData.price)}
-      </div>
+      <div className="font-semibold mb-1">{tooltipData.time}</div>
+
+      {hasOHLC ? (
+        // Show OHLC format
+        <div className="space-y-0.5">
+          <div className="flex justify-between">
+            <span className="text-gray-400">Open:</span>
+            <span>{formatPrice(tooltipData.open!)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">High:</span>
+            <span>{formatPrice(tooltipData.high!)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-400">Low:</span>
+            <span>{formatPrice(tooltipData.low!)}</span>
+          </div>
+          <div className={`flex justify-between font-semibold ${colorClass}`}>
+            <span className="text-gray-400 font-normal">Close:</span>
+            <span>
+              {formatPrice(tooltipData.close!)} {directionArrow}
+            </span>
+          </div>
+        </div>
+      ) : (
+        // Fallback to single price display
+        <div className={colorClass}>{formatPrice(tooltipData.price)}</div>
+      )}
+
       {tooltipData.volume !== undefined && (
-        <div className="text-gray-300">
+        <div className="text-gray-400 mt-1 pt-1 border-t border-gray-700">
           Vol: {formatVolume(tooltipData.volume)}
         </div>
       )}
