@@ -17,6 +17,7 @@ from .api.admin import router as admin_router
 from .api.analysis import router as analysis_router
 from .api.auth import router as auth_router
 from .api.chat import router as chat_router
+from .api.feedback import router as feedback_router
 from .api.health import router as health_router
 from .api.market_data import router as market_data_router
 from .core.config import get_settings
@@ -63,7 +64,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await mongodb.connect(settings.mongodb_url)
         await redis_cache.connect(settings.redis_url)
 
-        # Create database indexes for refresh tokens
+        # Create database indexes for optimal query performance
+        from .database.repositories.comment_repository import CommentRepository
+        from .database.repositories.feedback_repository import FeedbackRepository
         from .database.repositories.refresh_token_repository import (
             RefreshTokenRepository,
         )
@@ -73,6 +76,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         await refresh_token_repo.ensure_indexes()
         logger.info("Refresh token indexes created")
+
+        feedback_repo = FeedbackRepository(mongodb.get_collection("feedback_items"))
+        await feedback_repo.ensure_indexes()
+        logger.info("Feedback item indexes created")
+
+        comment_repo = CommentRepository(mongodb.get_collection("comments"))
+        await comment_repo.ensure_indexes()
+        logger.info("Comment indexes created")
 
         # Store in app state for dependency injection
         app.state.mongodb = mongodb
@@ -149,6 +160,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis_router)
     app.include_router(market_data_router)
     app.include_router(chat_router)  # Persistent MongoDB-based chat
+    app.include_router(feedback_router)  # Feedback & Community Roadmap platform
 
     @app.get("/")
     async def root():

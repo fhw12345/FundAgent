@@ -240,11 +240,11 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 - ❌ Resource limits shared across all containers
 
 ### Development Environment
-- Local: Docker Compose (deprecated)
-- Cloud: AKS test namespace
+- Local: Docker Compose for infrastructure (MongoDB, Redis), native Python/Node.js for code with hot reload
+- Cloud (Test): AKS test namespace (`klinematrix-test`)
 - Minimal resources (1 replica per pod)
 - In-cluster Redis (non-persistent)
-- Local JWT authentication
+- JWT authentication with email verification (Tencent Cloud SES)
 
 ### Production Environment
 - Multi-region AKS deployment

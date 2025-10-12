@@ -414,11 +414,12 @@ kubectl exec -n klinematrix-test deployment/backend -- \
 
 ### Local Development (Not in K8s)
 - **Location**: Developer machine
-- **Method**: Docker Compose
-- **Secrets**: `.env.development`
+- **Method**: Docker Compose for infrastructure (MongoDB, Redis), native Python/Node.js for code
+- **Secrets**: `.env.development` file
 - **Email**: Bypass mode (no real emails)
-- **Database**: Local MongoDB container
-- **Access**: http://localhost:3000
+- **Database**: Local MongoDB container (port 27017)
+- **Cache**: Local Redis container (port 6379)
+- **Access**: http://localhost:5173 (frontend), http://localhost:8000 (backend)
 
 ### Test (Cloud - AKS)
 - **Namespace**: `klinematrix-test`

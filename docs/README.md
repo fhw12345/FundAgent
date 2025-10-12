@@ -122,11 +122,11 @@ make fmt && make test && make lint
 ## Deployment Environments
 
 ### Local Development
-- **Platform**: Docker Compose (developer machine)
-- **Database**: Local MongoDB container
-- **Cache**: Local Redis container
+- **Platform**: Kubernetes (kubectl port-forward to access services)
+- **Database**: MongoDB (accessed via port-forward or cloud)
+- **Cache**: Redis (accessed via port-forward or cloud)
 - **Email**: Bypass mode (no real emails)
-- **Secrets**: `.env.development`
+- **Secrets**: `.env.development` or Azure Key Vault
 - **URL**: http://localhost:3000
 - **Note**: Never deployed to K8s
 
@@ -196,11 +196,17 @@ For questions, issues, or contributions:
 
 ## Version History
 
-- **v0.4.2** (Current): Type safety and error handling improvements
+- **v0.8.2 / v0.5.1** (Current as of 2025-10-12):
+  - **Backend v0.5.1**: Symbol search deduplication with exchange priority, module extraction
+  - **Frontend v0.8.2**: OHLC tooltips with volume, chat scroll fix, performance optimizations
+  - Production deployment at https://klinematrix.com
+  - See [Version Management](project/versions/README.md) for complete release notes and compatibility
+
+> **Note**: For the most current versions and detailed release notes, always refer to [Version Management](project/versions/README.md) and individual version docs.
+
+- **v0.4.2**: Type safety and error handling improvements
   - Backend: v0.4.2 - Improved type safety, error handling, metadata validation
   - Frontend: v0.4.1 - Chat restoration with metadata persistence
-  - Production deployment at https://klinematrix.com
-  - See [Version Matrix](project/versions/VERSION_MATRIX.md) for compatibility
 
 - **v0.3.0**: Test environment ready
   - Authentication with email verification

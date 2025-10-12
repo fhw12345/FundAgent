@@ -56,16 +56,16 @@ touch docs/features/<feature-name>.md
 # Backend changes
 cd backend && make test && make lint
 
-# Frontend changes - MUST run inside Docker
+# Frontend changes - MUST run inside Docker container
 docker compose exec frontend npm run lint
 docker compose exec frontend npm run type-check
 docker compose exec frontend npm test
 
-# Install new frontend dependencies
+# Install new frontend dependencies - MUST run inside Docker container
 docker compose exec frontend npm install --save-dev <package-name>
 ```
 
-**⚠️ Frontend Lint/Type Check**: Always run inside Docker container to ensure correct dependencies and ESLint plugins are available.
+**⚠️ Frontend Commands**: Always run `npm` commands through `docker compose exec frontend` to ensure correct dependencies and environment. Do NOT run `npm` directly on host machine.
 
 ### 3. Bump Version (Required)
 ```bash
@@ -112,19 +112,6 @@ curl https://klinematrix.com/api/health
 
 **See [docs/development/coding-standards.md](docs/development/coding-standards.md) for patterns & debugging**
 
-### Docker Hot Reload
-
-**Restart Required ❌**
-- New dependencies (`pip install`, `npm install`)
-- Module-level changes (DB connections, decorators)
-- Docker config (docker-compose.yml, Dockerfile)
-
-**Hot Reload Works ✅**
-- Function logic, new routes, UI changes
-- ~90% of development changes
-
-**Test**: `print(f"🔄 Code updated: {datetime.now()}")` - No print = restart needed
-
 ## Project Methodology
 
 **See [docs/development/verification.md](docs/development/verification.md) for validation procedures**
@@ -136,7 +123,6 @@ curl https://klinematrix.com/api/health
 make test           # Run all tests
 make fmt            # Format code
 make lint           # Check code quality
-docker-compose up   # Start local services (deprecated - use kubectl)
 
 # Kubernetes Deployment
 kubectl get pods -n klinematrix-test                    # Check status
@@ -165,7 +151,7 @@ kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 
 **🚨 CRITICAL: TEST FIRST, THEN COMMIT**
 - **ALWAYS test changes before committing**
-- Restart services (`docker restart <service>`) to verify hot reload worked
+- Restart pods if needed: `kubectl rollout restart deployment/<service> -n klinematrix-test`
 - Check browser console for errors
 - Test the actual user flow (click buttons, check UI updates)
 - **DO NOT commit without testing**

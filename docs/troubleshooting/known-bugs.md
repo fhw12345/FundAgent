@@ -75,10 +75,6 @@ None currently.
    - CORS allows all origins (`["*"]`) in dev
    - Must restrict for production
 
-5. **Docker Compose Deprecated**
-   - Local development still references Docker Compose
-   - Should migrate to Kubernetes-based local dev (future)
-
 ---
 
 ## Recently Fixed Issues

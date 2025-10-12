@@ -30,6 +30,10 @@ class User(BaseModel):
     is_admin: bool = Field(False, description="Admin privileges flag")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: datetime | None = Field(None, description="Last login timestamp")
+    feedbackVotes: list[str] = Field(
+        default_factory=list,
+        description="List of feedback item IDs this user has voted for",
+    )
 
     @property
     def admin(self) -> bool:

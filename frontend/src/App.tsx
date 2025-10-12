@@ -2,10 +2,13 @@ import { useState, useEffect } from "react";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
 import HealthPage from "./pages/HealthPage";
+import FeedbackPage from "./pages/FeedbackPage";
 import { authStorage, logout } from "./services/authService";
 
 function App() {
-  const [activeTab, setActiveTab] = useState<"health" | "chat">("chat");
+  const [activeTab, setActiveTab] = useState<"health" | "chat" | "feedback">(
+    "chat",
+  );
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -98,6 +101,16 @@ function App() {
               >
                 Platform
               </button>
+              <button
+                onClick={() => setActiveTab("feedback")}
+                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                  activeTab === "feedback"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
+                    : "text-gray-700 hover:bg-gray-100/80"
+                }`}
+              >
+                Feedback
+              </button>
               <div className="ml-4 flex items-center gap-3 pl-4 border-l border-gray-200">
                 <span className="text-sm text-gray-700">👤 {username}</span>
                 <button
@@ -116,6 +129,8 @@ function App() {
         {activeTab === "health" && isAdmin && <HealthPage />}
 
         {activeTab === "chat" && <EnhancedChatInterface />}
+
+        {activeTab === "feedback" && <FeedbackPage />}
       </main>
 
       <footer className="bg-white border-t mt-auto">

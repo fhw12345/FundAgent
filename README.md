@@ -162,7 +162,7 @@ financial_agent/
 make build-prod
 
 # Deploy to Kubernetes (requires kubectl config)
-kubectl apply -f infra/k8s/
+kubectl apply -f .pipeline/k8s/
 
 # Or using Helm
 helm install financial-agent infra/helm/financials/
@@ -177,7 +177,7 @@ helm install financial-agent infra/helm/financials/
 ## 🎯 Current Status: Production-Ready Platform ✅
 
 **Milestone 1 Complete: Walking Skeleton**
-- [x] Docker Compose infrastructure
+- [x] Kubernetes infrastructure on Azure AKS
 - [x] FastAPI backend with health endpoints
 - [x] React frontend with health monitoring
 - [x] MongoDB and Redis connectivity

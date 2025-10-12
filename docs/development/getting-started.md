@@ -159,10 +159,11 @@ financial_agent/
 - Modern chat interface
 
 ### Infrastructure
-- **Docker Compose** for local development
-- **Kubernetes** for production deployment
+- **Docker Compose** for local development infrastructure (MongoDB, Redis)
+- **Kubernetes (AKS)** for test and production deployments
 - **GitHub Actions** for CI/CD
-- **Azure** for cloud hosting
+- **Azure** for cloud hosting (compute, container registry)
+- **Alibaba Cloud** for specialized services (AI models)
 
 ## Local Development Workflow
 

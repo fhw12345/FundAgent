@@ -358,11 +358,12 @@ Each analysis automatically includes AI-generated summary:
 ## Deployment Topology
 
 ### Development Environment
-- **Platform**: Docker Compose (local) or AKS (cloud dev)
-- **Database**: In-cluster MongoDB or Cosmos DB
-- **Cache**: In-cluster Redis (non-persistent)
-- **Authentication**: Mock or development credentials
-- **Resources**: Minimal (cost optimization)
+- **Local**: Docker Compose for infrastructure (MongoDB, Redis), native Python/Node.js for code
+- **Cloud (Test)**: AKS test namespace (`klinematrix-test`)
+- **Database**: Local MongoDB (dev) or Azure Cosmos DB (test)
+- **Cache**: Local Redis (dev) or in-cluster Redis (test, non-persistent)
+- **Authentication**: Bypass mode (local) or JWT with email verification (test)
+- **Resources**: Minimal (1 replica per pod in test, cost optimization)
 
 ### Staging Environment
 - **Platform**: AKS dedicated namespace

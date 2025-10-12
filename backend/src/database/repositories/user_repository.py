@@ -105,6 +105,30 @@ class UserRepository:
 
         return User(**user_dict)
 
+    async def get_by_ids(self, user_ids: list[str]) -> dict[str, User]:
+        """
+        Batch fetch multiple users by IDs (solves N+1 query problem).
+
+        Args:
+            user_ids: List of user identifiers
+
+        Returns:
+            Dictionary mapping user_id to User object
+        """
+        if not user_ids:
+            return {}
+
+        # Fetch all users in one query
+        cursor = self.collection.find({"user_id": {"$in": user_ids}})
+
+        users_map = {}
+        async for user_dict in cursor:
+            user_dict.pop("_id", None)
+            user = User(**user_dict)
+            users_map[user.user_id] = user
+
+        return users_map
+
     async def get_by_email(self, email: str) -> User | None:
         """
         Get user by email address.
@@ -190,3 +214,73 @@ class UserRepository:
         logger.info("User last_login updated", user_id=user_id)
 
         return User(**result)
+
+    async def add_vote(self, user_id: str, item_id: str, session=None) -> bool:
+        """
+        Add a feedback item ID to user's voted items list.
+
+        Args:
+            user_id: User identifier
+            item_id: Feedback item identifier to add
+            session: Optional MongoDB session for transactions
+
+        Returns:
+            True if successful, False if user not found
+        """
+        result = await self.collection.update_one(
+            {"user_id": user_id},
+            {"$addToSet": {"feedbackVotes": item_id}},  # $addToSet prevents duplicates
+            session=session,
+        )
+
+        if result.matched_count == 0:
+            logger.warning("Failed to add vote - user not found", user_id=user_id)
+            return False
+
+        logger.info("Vote added to user", user_id=user_id, item_id=item_id)
+        return True
+
+    async def remove_vote(self, user_id: str, item_id: str, session=None) -> bool:
+        """
+        Remove a feedback item ID from user's voted items list.
+
+        Args:
+            user_id: User identifier
+            item_id: Feedback item identifier to remove
+            session: Optional MongoDB session for transactions
+
+        Returns:
+            True if successful, False if user not found
+        """
+        result = await self.collection.update_one(
+            {"user_id": user_id},
+            {"$pull": {"feedbackVotes": item_id}},
+            session=session,
+        )
+
+        if result.matched_count == 0:
+            logger.warning("Failed to remove vote - user not found", user_id=user_id)
+            return False
+
+        logger.info("Vote removed from user", user_id=user_id, item_id=item_id)
+        return True
+
+    async def get_user_votes(self, user_id: str) -> list[str]:
+        """
+        Get all feedback item IDs that a user has voted for.
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            List of feedback item IDs (empty list if user not found or no votes)
+        """
+        user_dict = await self.collection.find_one(
+            {"user_id": user_id},
+            {"feedbackVotes": 1},  # Only fetch feedbackVotes field
+        )
+
+        if not user_dict:
+            return []
+
+        return user_dict.get("feedbackVotes", [])
