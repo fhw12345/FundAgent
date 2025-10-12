@@ -196,9 +196,9 @@ For questions, issues, or contributions:
 
 ## Version History
 
-- **v0.8.2 / v0.5.1** (Current as of 2025-10-12):
-  - **Backend v0.5.1**: Symbol search deduplication with exchange priority, module extraction
-  - **Frontend v0.8.2**: OHLC tooltips with volume, chat scroll fix, performance optimizations
+- **v0.8.3 / v0.5.2** (Current as of 2025-10-12):
+  - **Backend v0.5.2**: Feedback platform with rate limiting, N+1 query optimization, database indexes
+  - **Frontend v0.8.3**: Feedback platform UI with gamification (trophy badges), admin status dropdown
   - Production deployment at https://klinematrix.com
   - See [Version Management](project/versions/README.md) for complete release notes and compatibility
 
