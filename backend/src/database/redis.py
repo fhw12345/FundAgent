@@ -35,7 +35,7 @@ class RedisCache:
     async def disconnect(self) -> None:
         """Close Redis connection."""
         if self.client:
-            await self.client.close()  # type: ignore[attr-defined]
+            await self.client.close()
             logger.info("Redis connection closed")
 
     async def health_check(self) -> dict[str, bool | str]:
@@ -117,7 +117,7 @@ class RedisCache:
             raise RuntimeError("Redis connection not established")
 
         try:
-            result = await self.client.delete(key)
+            result: int = await self.client.delete(key)
             return result > 0
         except Exception as e:
             logger.error("Redis delete operation failed", key=key, error=str(e))
@@ -129,7 +129,7 @@ class RedisCache:
             raise RuntimeError("Redis connection not established")
 
         try:
-            result = await self.client.exists(key)
+            result: int = await self.client.exists(key)
             return result > 0
         except Exception as e:
             logger.error("Redis exists operation failed", key=key, error=str(e))

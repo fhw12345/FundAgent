@@ -17,7 +17,8 @@ def get_mongodb() -> MongoDB:
     """Get MongoDB instance from app state."""
     from ...main import app
 
-    return app.state.mongodb
+    mongodb: MongoDB = app.state.mongodb
+    return mongodb
 
 
 def get_feedback_repository(

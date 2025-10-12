@@ -25,7 +25,7 @@ class RefreshTokenRepository:
         """
         self.collection = collection
 
-    async def ensure_indexes(self):
+    async def ensure_indexes(self) -> None:
         """Create indexes for efficient queries."""
         await self.collection.create_index("token_hash", unique=True)
         await self.collection.create_index("user_id")
@@ -290,8 +290,9 @@ class RefreshTokenRepository:
             user_id=user_id,
             count=result.modified_count,
         )
+        modified_count: int = result.modified_count
 
-        return result.modified_count
+        return modified_count
 
     async def cleanup_expired(self) -> int:
         """
@@ -303,11 +304,12 @@ class RefreshTokenRepository:
         result = await self.collection.delete_many(
             {"expires_at": {"$lt": datetime.utcnow()}}
         )
+        deleted_count: int = result.deleted_count
 
-        if result.deleted_count > 0:
-            logger.info("Expired refresh tokens cleaned up", count=result.deleted_count)
+        if deleted_count > 0:
+            logger.info("Expired refresh tokens cleaned up", count=deleted_count)
 
-        return result.deleted_count
+        return deleted_count
 
     async def count_active_by_user(self, user_id: str) -> int:
         """
@@ -320,7 +322,7 @@ class RefreshTokenRepository:
             Number of active tokens
         """
         now = datetime.utcnow()
-        count = await self.collection.count_documents(
+        count: int = await self.collection.count_documents(
             {
                 "user_id": user_id,
                 "revoked": False,

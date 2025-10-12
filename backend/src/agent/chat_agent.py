@@ -6,6 +6,8 @@ v0.3.0+: Will integrate with LangGraph for tool orchestration
 v0.5.0: Simplified to direct LLM wrapper (removed SessionManager)
 """
 
+from collections.abc import AsyncGenerator
+
 import structlog
 
 from ..core.config import Settings
@@ -35,7 +37,9 @@ class ChatAgent:
 
         logger.info("ChatAgent initialized")
 
-    async def stream_chat(self, messages: list[dict[str, str]]):
+    async def stream_chat(
+        self, messages: list[dict[str, str]]
+    ) -> AsyncGenerator[str, None]:
         """
         Stream LLM response for conversation history.
 

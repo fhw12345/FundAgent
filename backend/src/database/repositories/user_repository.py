@@ -4,6 +4,7 @@ Handles CRUD operations for user collection.
 """
 
 from datetime import datetime
+from typing import Any
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -215,7 +216,7 @@ class UserRepository:
 
         return User(**result)
 
-    async def add_vote(self, user_id: str, item_id: str, session=None) -> bool:
+    async def add_vote(self, user_id: str, item_id: str, session: Any = None) -> bool:
         """
         Add a feedback item ID to user's voted items list.
 
@@ -240,7 +241,9 @@ class UserRepository:
         logger.info("Vote added to user", user_id=user_id, item_id=item_id)
         return True
 
-    async def remove_vote(self, user_id: str, item_id: str, session=None) -> bool:
+    async def remove_vote(
+        self, user_id: str, item_id: str, session: Any = None
+    ) -> bool:
         """
         Remove a feedback item ID from user's voted items list.
 
@@ -283,4 +286,5 @@ class UserRepository:
         if not user_dict:
             return []
 
-        return user_dict.get("feedbackVotes", [])
+        votes: list[str] = user_dict.get("feedbackVotes", [])
+        return votes

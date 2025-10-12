@@ -19,12 +19,14 @@ router = APIRouter()
 
 def get_mongodb(request: Request) -> MongoDB:
     """Dependency to get MongoDB instance from app state."""
-    return request.app.state.mongodb
+    mongodb: MongoDB = request.app.state.mongodb
+    return mongodb
 
 
 def get_redis(request: Request) -> RedisCache:
     """Dependency to get Redis instance from app state."""
-    return request.app.state.redis
+    redis: RedisCache = request.app.state.redis
+    return redis
 
 
 @router.get("/health")

@@ -2,7 +2,7 @@
 Request/Response models for chat API endpoints.
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -43,7 +43,7 @@ class ChatRequest(BaseModel):
         "user",
         description="Message source: 'user' (call LLM), 'fibonacci'/'stochastic'/'macro'/'fundamentals' (skip LLM), or 'llm'",
     )
-    metadata: MessageMetadata | dict | None = Field(
+    metadata: MessageMetadata | dict[str, Any] | None = Field(
         None,
         description="Analysis metadata for overlays (Fibonacci levels, Stochastic signals, etc.)",
     )

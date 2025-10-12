@@ -4,7 +4,11 @@ Following Factor 3: External Dependencies as Services.
 """
 
 import structlog
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from motor.motor_asyncio import (
+    AsyncIOMotorClient,
+    AsyncIOMotorCollection,
+    AsyncIOMotorDatabase,
+)
 
 from ..core.exceptions import ConfigurationError, DatabaseError
 
@@ -109,7 +113,7 @@ class MongoDB:
             logger.error("MongoDB health check failed", error=str(e))
             return {"connected": False, "error": str(e)}
 
-    def get_collection(self, collection_name: str):
+    def get_collection(self, collection_name: str) -> AsyncIOMotorCollection:
         """Get a MongoDB collection."""
         if self.database is None:
             raise DatabaseError(

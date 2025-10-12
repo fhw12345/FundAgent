@@ -7,6 +7,8 @@ Legacy session-based endpoints are in chat_legacy.py.
 """
 
 import json
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -227,7 +229,7 @@ async def update_chat_ui_state(
     request: UpdateUIStateRequest,
     user_id: str = Depends(get_current_user_id),
     chat_service: ChatService = Depends(get_chat_service),
-):
+) -> Any:
     """
     Update chat UI state (debounced from frontend).
 
@@ -299,7 +301,7 @@ async def chat_stream_persistent(
     **Response:** Stream of Server-Sent Events with incremental content
     """
 
-    async def generate_stream_with_persistence():
+    async def generate_stream_with_persistence() -> AsyncGenerator[str, None]:
         """Generate SSE stream and persist to MongoDB."""
         chat_id = None
 

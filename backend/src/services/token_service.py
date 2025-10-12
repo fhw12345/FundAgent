@@ -7,6 +7,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 import structlog
 from jose import JWTError, jwt
@@ -114,7 +115,7 @@ class TokenService:
             "jti": str(uuid.uuid4()),  # Unique token ID
         }
 
-        token = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
+        token: str = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
         return token
 
     def _create_refresh_token_jwt(self, user: User, token_value: str) -> str:
@@ -140,7 +141,7 @@ class TokenService:
             "jti": str(uuid.uuid4()),
         }
 
-        token = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
+        token: str = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
         return token
 
     def _hash_token(self, token: str) -> str:
@@ -260,7 +261,7 @@ class TokenService:
             logger.warning("Refresh token JWT decode failed", error=str(e))
             raise ValueError(f"Invalid refresh token: {e}") from e
 
-    def _create_access_token_from_payload(self, refresh_payload: dict) -> str:
+    def _create_access_token_from_payload(self, refresh_payload: dict[str, Any]) -> str:
         """Create access token from refresh token payload."""
         now = datetime.utcnow()
         expire = now + timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -276,7 +277,8 @@ class TokenService:
             "jti": str(uuid.uuid4()),
         }
 
-        return jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
+        token: str = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
+        return token
 
     def _create_refresh_token_jwt_from_user_id(
         self, user_id: str, token_value: str
@@ -294,7 +296,8 @@ class TokenService:
             "jti": str(uuid.uuid4()),
         }
 
-        return jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
+        token: str = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
+        return token
 
     def verify_access_token(self, token: str) -> str | None:
         """

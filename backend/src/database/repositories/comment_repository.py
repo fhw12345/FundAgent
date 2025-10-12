@@ -170,5 +170,5 @@ class CommentRepository:
         Returns:
             Number of comments
         """
-        count = await self.collection.count_documents({"itemId": item_id})
+        count: int = await self.collection.count_documents({"itemId": item_id})
         return count

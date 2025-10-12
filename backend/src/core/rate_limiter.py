@@ -3,6 +3,8 @@ Rate limiting utilities for API endpoints.
 Uses Redis for distributed rate limiting.
 """
 
+from typing import Any
+
 import structlog
 from fastapi import HTTPException, status
 
@@ -12,7 +14,7 @@ logger = structlog.get_logger()
 class RateLimiter:
     """Redis-based rate limiter for API endpoints."""
 
-    def __init__(self, redis_cache):
+    def __init__(self, redis_cache: Any) -> None:
         """
         Initialize rate limiter.
 

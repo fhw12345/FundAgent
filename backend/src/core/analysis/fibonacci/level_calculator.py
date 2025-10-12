@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 class LevelCalculator:
     """Calculates Fibonacci retracement levels and pressure zones."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize calculator with standard Fibonacci constants."""
         self.constants = FibonacciConstants()
 
@@ -209,7 +209,7 @@ class LevelCalculator:
             trend_diversity_bonus = 0.0
 
         # Final confidence capped at 95%
-        final_confidence = min(base_confidence + trend_diversity_bonus, 0.95)
+        final_confidence: float = min(base_confidence + trend_diversity_bonus, 0.95)
 
         return max(final_confidence, 0.1)  # Minimum 10% confidence
 

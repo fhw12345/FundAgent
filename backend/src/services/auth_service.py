@@ -4,7 +4,7 @@ Handles JWT tokens and delegates verification to auth providers (email, SMS, WeC
 """
 
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 import structlog
 from jose import JWTError, jwt
@@ -26,7 +26,7 @@ class AuthService:
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
-    def __init__(self, user_repository: UserRepository, redis_cache=None):
+    def __init__(self, user_repository: UserRepository, redis_cache: Any = None):
         """
         Initialize auth service with pluggable providers.
 
@@ -321,7 +321,7 @@ class AuthService:
         }
 
         # Encode JWT
-        token = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
+        token: str = jwt.encode(payload, settings.secret_key, algorithm=self.ALGORITHM)
 
         logger.info("Access token created", user_id=user_id, expires_at=expire)
 

@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 class StockAnalyzer:
     """Stock fundamentals and analysis engine."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ticker_data: yf.Ticker | None = None
         self.symbol: str = ""
 
@@ -59,7 +59,7 @@ class StockAnalyzer:
             company_name = info.get("longName", symbol)
 
             # Safe numeric conversion functions
-            def safe_float(value, default=0.0):
+            def safe_float(value: float | None, default: float = 0.0) -> float:
                 if value is None:
                     return default
                 try:
@@ -67,7 +67,7 @@ class StockAnalyzer:
                 except (ValueError, TypeError):
                     return default
 
-            def safe_int(value, default=0):
+            def safe_int(value: int | None, default: int = 0) -> int:
                 if value is None:
                     return default
                 try:
@@ -99,6 +99,7 @@ class StockAnalyzer:
             )
             # yfinance returns dividendYield as decimal (0.025 for 2.5%), so convert to percentage
             # But handle edge cases where it might already be a percentage or invalid
+            dividend_yield: float | None
             if dividend_yield_raw is not None and dividend_yield_raw > 0:
                 # If value is > 1, assume it's already a percentage (yfinance inconsistency)
                 if dividend_yield_raw > 1:

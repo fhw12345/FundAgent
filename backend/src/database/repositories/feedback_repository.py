@@ -5,6 +5,7 @@ Handles CRUD operations for feedback_items collection.
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -168,7 +169,7 @@ class FeedbackRepository:
         return items
 
     async def increment_vote_count(
-        self, item_id: str, delta: int, session=None
+        self, item_id: str, delta: int, session: Any = None
     ) -> bool:
         """
         Atomically increment vote count for a feedback item.

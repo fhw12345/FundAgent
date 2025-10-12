@@ -3,6 +3,8 @@ Alibaba Cloud Qwen LLM client wrapper.
 Using DashScope SDK for qwen-vl-30b-a3b-thinking model.
 """
 
+from collections.abc import AsyncGenerator, Generator
+
 import dashscope
 import structlog
 from dashscope import Generation
@@ -67,7 +69,7 @@ class QwenClient:
             )
 
             if response.status_code == 200:
-                content = response.output.choices[0].message.content
+                content: str = response.output.choices[0].message.content
                 logger.info(
                     "Qwen chat completed",
                     tokens_used=response.usage.total_tokens,
@@ -113,7 +115,7 @@ class QwenClient:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 3000,
-    ):
+    ) -> Generator[str, None, None]:
         """
         Stream chat completion response chunk by chunk.
 
@@ -171,7 +173,7 @@ class QwenClient:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 3000,
-    ):
+    ) -> AsyncGenerator[str, None]:
         """
         Async generator for streaming chat completion.
 

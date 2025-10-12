@@ -4,6 +4,7 @@ Orchestrates trend detection, level calculation, and pressure zone analysis usin
 """
 
 from datetime import datetime
+from typing import Any
 
 import pandas as pd
 import structlog
@@ -11,7 +12,7 @@ import yfinance as yf
 
 from ....api.models import FibonacciAnalysisResponse
 from ...utils import map_timeframe_to_yfinance_interval
-from .config import TimeframeConfigs
+from .config import TimeframeConfig, TimeframeConfigs
 from .level_calculator import LevelCalculator
 from .trend_detector import TrendDetector
 
@@ -21,12 +22,12 @@ logger = structlog.get_logger()
 class FibonacciAnalyzer:
     """Advanced Fibonacci pressure level analyzer with modular architecture."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize analyzer with modular components."""
         self.data: pd.DataFrame | None = None
         self.symbol: str = ""
         self.timeframe: str = "1d"
-        self.config = None
+        self.config: TimeframeConfig | None = None
         self.trend_detector: TrendDetector | None = None
         self.level_calculator = LevelCalculator()
 
@@ -190,7 +191,12 @@ class FibonacciAnalyzer:
             logger.error("Failed to fetch stock data", symbol=self.symbol, error=str(e))
             raise
 
-    def _generate_pressure_insights(self, trends, fibonacci_levels, current_price):
+    def _generate_pressure_insights(
+        self,
+        trends: list[dict[str, Any]],
+        fibonacci_levels: list[Any],
+        current_price: float,
+    ) -> tuple[str, list[str]]:
         """Generate analysis insights focused on pressure zones and trend strength."""
         if not trends:
             return "No significant trends detected.", []
@@ -229,8 +235,20 @@ class FibonacciAnalyzer:
 
         return summary, insights
 
-    def _build_raw_data(self, stock_data, top_trends, timeframe):
+    def _build_raw_data(
+        self, stock_data: pd.DataFrame, top_trends: list[dict[str, Any]], timeframe: str
+    ) -> dict[str, Any]:
         """Build comprehensive raw data for debugging and agent use."""
+        # Handle None config case
+        if self.config is None:
+            swing_lookback = 20
+            prominence = 0.02
+            window_size = 5
+        else:
+            swing_lookback = self.config.swing_lookback
+            prominence = self.config.prominence
+            window_size = self.config.rolling_window_size
+
         return {
             "timeframe": timeframe,
             "data_points": len(stock_data),
@@ -243,9 +261,9 @@ class FibonacciAnalyzer:
                 "low": float(stock_data["Low"].min()),
             },
             "swing_detection_params": {
-                "lookback": self.config.swing_lookback,
-                "prominence": self.config.prominence,
-                "window_size": self.config.rolling_window_size,
+                "lookback": swing_lookback,
+                "prominence": prominence,
+                "window_size": window_size,
             },
             "top_trends": [
                 {

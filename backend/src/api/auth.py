@@ -39,7 +39,8 @@ def get_redis() -> RedisCache:
     """Get Redis instance from app state."""
     from ..main import app
 
-    return app.state.redis
+    redis: RedisCache = app.state.redis
+    return redis
 
 
 def get_refresh_token_repository(
@@ -72,7 +73,7 @@ def get_auth_service(
 async def send_verification_code(
     request: SendCodeRequest,
     auth_service: AuthService = Depends(get_auth_service),
-):
+) -> SendCodeResponse:
     """
     Send verification code via email or SMS.
 
@@ -116,7 +117,7 @@ async def verify_code_and_login(
     http_request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     token_service: TokenService = Depends(get_token_service),
-):
+) -> LoginResponse:
     """
     Verify code and login user.
 
@@ -174,7 +175,7 @@ async def register_user(
     http_request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     token_service: TokenService = Depends(get_token_service),
-):
+) -> LoginResponse:
     """
     Register a new user with email verification.
 
@@ -232,7 +233,7 @@ async def login_with_password(
     http_request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     token_service: TokenService = Depends(get_token_service),
-):
+) -> LoginResponse:
     """
     Login with username and password.
 
@@ -285,7 +286,7 @@ async def reset_password(
     http_request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     token_service: TokenService = Depends(get_token_service),
-):
+) -> LoginResponse:
     """
     Reset password using email verification.
 
@@ -338,7 +339,7 @@ async def reset_password(
 async def get_current_user(
     token: str,
     auth_service: AuthService = Depends(get_auth_service),
-):
+) -> User:
     """
     Get current authenticated user.
 
@@ -359,7 +360,7 @@ async def get_current_user(
 async def refresh_access_token(
     request: RefreshTokenRequest,
     token_service: TokenService = Depends(get_token_service),
-):
+) -> TokenPair:
     """
     Refresh access token using refresh token.
 
@@ -399,7 +400,7 @@ async def refresh_access_token(
 async def logout(
     request: LogoutRequest,
     token_service: TokenService = Depends(get_token_service),
-):
+) -> dict[str, str]:
     """
     Logout by revoking refresh token.
 
@@ -428,7 +429,7 @@ async def logout_all_devices(
     token: str,
     auth_service: AuthService = Depends(get_auth_service),
     token_service: TokenService = Depends(get_token_service),
-):
+) -> dict[str, str]:
     """
     Logout from all devices by revoking all refresh tokens.
 

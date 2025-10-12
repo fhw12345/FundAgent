@@ -175,10 +175,11 @@ class MessageRepository:
             Number of messages deleted
         """
         result = await self.collection.delete_many({"chat_id": chat_id})
+        deleted_count: int = result.deleted_count
 
-        logger.info("Messages deleted", chat_id=chat_id, count=result.deleted_count)
+        logger.info("Messages deleted", chat_id=chat_id, count=deleted_count)
 
-        return result.deleted_count
+        return deleted_count
 
     async def count_by_chat(self, chat_id: str) -> int:
         """
@@ -190,5 +191,5 @@ class MessageRepository:
         Returns:
             Message count
         """
-        count = await self.collection.count_documents({"chat_id": chat_id})
+        count: int = await self.collection.count_documents({"chat_id": chat_id})
         return count

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "financial-agent-backend"
-version = "0.5.2"
+version = "0.5.3"
 description = "AI-Enhanced Financial Analysis Platform Backend"
 authors = [
     {name = "Financial Agent Team", email = "team@financialagent.com"},
@@ -111,6 +111,14 @@ module = [
     "redis.*",
     "scipy.*",
     "kubernetes.*",
+    "motor.*",
+    "fastapi.*",
+    "pydantic_settings.*",
+    "tencentcloud.*",
+    "pandas.*",
+    "jose.*",
+    "dashscope.*",
+    "uvicorn.*",
 ]
 ignore_missing_imports = true
 

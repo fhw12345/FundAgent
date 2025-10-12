@@ -163,7 +163,7 @@ def create_app() -> FastAPI:
     app.include_router(feedback_router)  # Feedback & Community Roadmap platform
 
     @app.get("/")
-    async def root():
+    async def root() -> dict[str, str]:
         """Root endpoint for basic connectivity check."""
         return {
             "message": "Financial Agent API",

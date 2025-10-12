@@ -160,10 +160,18 @@ async def search_symbols(
             raw_quotes = search.quotes or []
 
             for result in raw_quotes[:50]:
-                symbol = result.get("symbol", "") or ""
-                name = result.get("shortname", result.get("longname", "")) or ""
-                exchange = result.get("exchange", "") or ""
-                quote_type = result.get("quoteType", "") or ""
+                # Handle both dict (yfinance) and object responses
+                if isinstance(result, dict):
+                    symbol = result.get("symbol", "") or ""
+                    name = result.get("shortname", result.get("longname", "")) or ""
+                    exchange = result.get("exchange", "") or ""
+                    quote_type = result.get("quoteType", "") or ""
+                else:
+                    # SymbolSearchResult object
+                    symbol = result.symbol if hasattr(result, "symbol") else ""
+                    name = result.name if hasattr(result, "name") else ""
+                    exchange = result.exchange if hasattr(result, "exchange") else ""
+                    quote_type = result.type if hasattr(result, "type") else ""
 
                 # Skip if no name (can't deduplicate)
                 if not name:
@@ -213,10 +221,20 @@ async def search_symbols(
                 seen_companies = {}
 
                 for result in lookup_results[:50]:
-                    symbol = result.get("symbol", "") or ""
-                    name = result.get("name", "") or ""
-                    exchange = result.get("exchange", "") or ""
-                    quote_type = result.get("type", "") or ""
+                    # Handle both dict (yfinance) and object responses
+                    if isinstance(result, dict):
+                        symbol = result.get("symbol", "") or ""
+                        name = result.get("name", "") or ""
+                        exchange = result.get("exchange", "") or ""
+                        quote_type = result.get("type", "") or ""
+                    else:
+                        # SymbolSearchResult object
+                        symbol = result.symbol if hasattr(result, "symbol") else ""
+                        name = result.name if hasattr(result, "name") else ""
+                        exchange = (
+                            result.exchange if hasattr(result, "exchange") else ""
+                        )
+                        quote_type = result.type if hasattr(result, "type") else ""
 
                     if not name:
                         continue

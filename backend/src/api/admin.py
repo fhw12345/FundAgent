@@ -12,7 +12,7 @@ from ..models.user import User
 from ..services.database_stats_service import DatabaseStatsService
 from ..services.kubernetes_metrics_service import KubernetesMetricsService
 from .dependencies.auth import get_current_user, get_mongodb, require_admin
-from .schemas.admin_models import HealthResponse, SystemMetrics
+from .schemas.admin_models import DatabaseStats, HealthResponse, SystemMetrics
 
 logger = structlog.get_logger()
 
@@ -122,7 +122,7 @@ async def get_system_health(
 async def get_database_stats(
     _: None = Depends(require_admin),
     db_stats_service: DatabaseStatsService = Depends(get_database_stats_service),
-):
+) -> list[DatabaseStats]:
     """
     Get database collection statistics only.
 
