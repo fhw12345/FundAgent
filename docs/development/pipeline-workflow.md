@@ -1,5 +1,13 @@
 # AI Automation Workflow and Pipeline
 
+> **⚠️ STATUS: PLANNED/FUTURE**
+>
+> This document describes a planned CI/CD automation workflow that **has not been implemented yet**.
+>
+> **Current deployment uses manual workflow** documented in [docs/deployment/workflow.md](../deployment/workflow.md).
+>
+> Keep this document as a reference for future automation, but it does not reflect current processes.
+
 ## Trigger Sources
 
 - Push / PR

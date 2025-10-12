@@ -219,6 +219,19 @@ For questions, issues, or contributions:
   - Financial analysis tools
   - Conversational interface
 
+- **v0.5.3** (Latest): Type safety overhaul
+  - Complete mypy coverage (107 errors → 0)
+  - Strict type checking across 69 source files
+  - Better IDE support and error detection
+  - See [v0.5.3 Release Notes](project/versions/backend/v0.5.3.md)
+
+- **v0.4.x-v0.5.x**: Feature development
+  - Authentication system (JWT, email verification, password reset)
+  - Feedback & roadmap platform
+  - Chat restoration with UI state persistence
+  - Security hardening (non-root users, read-only filesystems)
+  - Cost optimization (2-node AKS cluster)
+
 - **v0.1.0**: Walking skeleton complete
   - End-to-end connectivity
   - Health monitoring

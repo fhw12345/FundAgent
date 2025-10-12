@@ -93,4 +93,4 @@ Unique index configuration, handling NULL values in multi-auth systems
 If you encounter a critical production issue:
 1. Check [deployment/workflow.md](../deployment/workflow.md) for rollback procedures
 2. Review logs: `kubectl logs -f deployment/backend -n klinematrix-test`
-3. Check health: `curl https://klinematrix-test.koreacentral.cloudapp.azure.com/api/health`
+3. Check health: `curl https://klinematrix.com/api/health`

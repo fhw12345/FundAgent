@@ -33,6 +33,46 @@ def analyze_fibonacci(symbol: str, timeframe: str = "6mo") -> dict[str, Any]:
     pass
 ```
 
+### Type Safety (v0.5.3+)
+
+**Strict Type Checking**: All code must pass `mypy` with zero errors.
+
+**Required Patterns**:
+```python
+# 1. Explicit return types for all functions
+async def get_user(user_id: str) -> User | None:
+    return await user_repo.get_by_id(user_id)
+
+# 2. Type annotations on intermediate variables (prevent Any propagation)
+count: int = await collection.count_documents({"status": "active"})
+return count
+
+# 3. Proper generator typing
+from collections.abc import Generator, AsyncGenerator
+
+def stream_data() -> Generator[str, None, None]:
+    yield "chunk"
+
+async def astream_data() -> AsyncGenerator[str, None]:
+    yield "chunk"
+
+# 4. None checks for optional types
+if self.config is None:
+    use_defaults()
+else:
+    value = self.config.some_property
+
+# 5. Type guards for unions
+if isinstance(result, dict):
+    value = result.get("key")
+else:
+    value = result.key  # Pydantic model
+```
+
+**Pre-commit Validation**: mypy runs automatically on all commits. Fix all errors before committing.
+
+**Learn More**: See [v0.5.3 Release Notes](../project/versions/backend/v0.5.3.md) for comprehensive type safety improvements.
+
 ### Code Organization
 ```python
 """
@@ -254,7 +294,7 @@ const mutation = useMutation({
 
 ### Debugging Strategy
 1. Log user messages AND parsed parameters
-2. Check Redis cache keys: `docker-compose exec redis redis-cli keys "fibonacci:*"`
+2. Check Redis cache keys: `kubectl exec -n klinematrix-test deployment/redis -- redis-cli keys "fibonacci:*"`
 3. Add structured logging: `logging.basicConfig(level=logging.INFO)`
 4. Use "zero-closure" patterns for complex state dependencies
 
@@ -301,33 +341,54 @@ if (!timeframe) {
 3. Test parsing logic with all valid values
 4. Ensure business logic handles all cases
 
-## Docker Hot Reload Rules
+## Development Hot Reload
 
-### When Restart Required ❌
-- **New dependencies**: `pip install` / `npm install`
-- **Global/module-level objects**: DB connections, clients, constants, decorators
-- **Docker config changes**: docker-compose.yml, Dockerfile
-- **When hot reload visibly fails**: Old behavior persists despite code changes
+### Backend (uvicorn --reload)
 
-### When Hot Reload Works ✅
-- **Function/method logic**: Business rules, calculations, API logic
-- **New routes/endpoints**: Adding FastAPI routes, React components
-- **Local variables/operations**: Any code inside functions
-- **UI changes**: CSS, HTML, component updates
+**Restart Required ❌**
+- **New dependencies**: `pip install`
+- **Module-level changes**: DB connections, decorators, constants
+- **Environment variable changes**: .env modifications
 
-### Development Workflow
-1. **Make change**
-2. **Test immediately**
-3. **If old behavior persists** → `docker-compose restart [service]`
+**Hot Reload Works ✅**
+- **Function logic**: Business rules, calculations, API logic
+- **New routes**: Adding FastAPI endpoints
+- **Pydantic models**: Request/response models, validation rules
+- **~90% of development changes**
 
-### Quick Test
+**Quick Test**:
 ```python
 print(f"🔄 Code updated: {datetime.now()}")
 ```
 No print = restart needed.
 
+**Restart Command**: `Ctrl+C` then `uvicorn src.main:app --reload`
+
+### Frontend (Vite dev server)
+
+**Restart Required ❌**
+- **New dependencies**: `npm install`
+- **Vite config changes**: vite.config.ts modifications
+- **Environment variable changes**: .env modifications
+
+**Hot Module Reload Works ✅**
+- **React components**: UI logic, state management
+- **TypeScript files**: Business logic, utilities
+- **CSS/styling**: TailwindCSS, stylesheets
+- **~95% of development changes**
+
+**Restart Command**: `Ctrl+C` then `npm run dev`
+
+### Deployed Services (Kubernetes)
+
+For deployed services, restart pods after image changes:
+```bash
+kubectl rollout restart deployment/backend -n klinematrix-test
+kubectl rollout restart deployment/frontend -n klinematrix-test
+```
+
 ### Golden Rule
-**Hot reload works for ~90% of changes. When in doubt, restart - 10 seconds vs 10 minutes debugging.**
+**Hot reload works for ~90-95% of changes. When in doubt, restart - 10 seconds vs 10 minutes debugging.**
 
 ## Testing Standards
 
