@@ -181,27 +181,31 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
 }) => {
   const lastUserMessageRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastScrolledUserMessageRef = useRef<string | null>(null);
 
-  // Auto-scroll to latest user message (like Gemini chat)
-  // This shows the user's question and lets the response appear below
+  // Scroll ONCE when new user message appears, then let user control scroll
   useEffect(() => {
-    // Find the last user message index (reverse search)
-    let lastUserIndex = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        lastUserIndex = i;
-        break;
-      }
+    // Find the last user message
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((msg) => msg.role === "user");
+
+    if (!lastUserMessage) {
+      // No user messages yet - scroll to bottom for initial load
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      return;
     }
 
-    // If there's a recent user message (within last 2 messages), scroll to it
-    // Otherwise scroll to bottom (for restored chats or initial load)
-    if (lastUserIndex !== -1 && lastUserIndex >= messages.length - 2) {
+    // Generate unique ID for this user message
+    const userMessageId = lastUserMessage._id || lastUserMessage.timestamp;
+
+    // Only scroll if this is a NEW user message (haven't scrolled to it yet)
+    if (lastScrolledUserMessageRef.current !== userMessageId) {
       lastUserMessageRef.current?.scrollIntoView({ behavior: "smooth" });
-    } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      lastScrolledUserMessageRef.current = userMessageId;
     }
-  }, [messages, isAnalysisPending]);
+    // During streaming: don't scroll - user has control
+  }, [messages]);
 
   // Find last user message index once (used for ref attachment)
   let lastUserIdx = -1;
