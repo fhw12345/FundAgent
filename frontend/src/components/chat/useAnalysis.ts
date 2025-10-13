@@ -80,8 +80,6 @@ export const useAnalysis = (
                 ),
               );
             });
-            // Force browser to repaint by reading layout (this triggers reflow)
-            document.body.offsetHeight;
           },
           (newChatId: string) => {
             // Chat created callback - save new chat ID
@@ -177,7 +175,7 @@ export const useButtonAnalysis = (
             symbol: currentSymbol,
             start_date: dateRange.start,
             end_date: dateRange.end,
-            timeframe: selectedInterval || "1d",
+            timeframe: (selectedInterval || "1d") as "1h" | "1d" | "1w" | "1mo",
           });
           response = {
             type: "fibonacci",
@@ -278,25 +276,27 @@ export const useButtonAnalysis = (
 
       return response;
     },
-    onSuccess: (response) => {
+    onSuccess: (response: any) => {
       console.log("✅ Button analysis complete:", {
-        type: response.type,
-        hasAnalysisData: !!response.analysis_data,
-        analysisData: response.analysis_data,
+        type: response?.type,
+        hasAnalysisData: !!response?.analysis_data,
+        analysisData: response?.analysis_data,
       });
 
       // Add to frontend messages
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: response.content,
-          timestamp: new Date().toISOString(),
-          analysis_data: response.analysis_data,
-        },
-      ]);
+      if (response) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: response.content,
+            timestamp: new Date().toISOString(),
+            analysis_data: response.analysis_data,
+          },
+        ]);
 
-      console.log("📝 Message added to state with analysis_data");
+        console.log("📝 Message added to state with analysis_data");
+      }
     },
     onError: (error: any) => {
       const errorContent =

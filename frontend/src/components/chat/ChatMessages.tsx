@@ -197,7 +197,9 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
     }
 
     // Generate unique ID for this user message
-    const userMessageId = lastUserMessage._id || lastUserMessage.timestamp;
+    const userMessageId = String(
+      lastUserMessage._id || lastUserMessage.timestamp,
+    );
 
     // Only scroll if this is a NEW user message (haven't scrolled to it yet)
     if (lastScrolledUserMessageRef.current !== userMessageId) {

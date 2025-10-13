@@ -133,7 +133,7 @@ export default function HealthPage() {
   };
 
   useEffect(() => {
-    fetchMetrics();
+    void fetchMetrics();
   }, []);
 
   if (loading) {

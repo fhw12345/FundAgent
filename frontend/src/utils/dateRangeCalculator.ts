@@ -4,7 +4,7 @@
  * Centralizes date range calculation logic to avoid duplication across components.
  */
 
-export type TimeInterval = "1h" | "1d" | "1w" | "1mo";
+import type { TimeInterval } from "../services/market";
 
 export interface DateRange {
   start: string;
@@ -64,7 +64,9 @@ export function calculateDateRange(
  * @param interval - Time interval
  * @returns Period string for API (e.g., "1mo", "6mo", "1y", "2y")
  */
-export function getPeriodForInterval(interval: TimeInterval): string {
+export function getPeriodForInterval(
+  interval: TimeInterval,
+): "1mo" | "6mo" | "1y" | "2y" {
   switch (interval) {
     case "1h":
       return "1mo";

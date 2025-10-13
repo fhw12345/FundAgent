@@ -208,7 +208,8 @@ export const useChart = (
         return;
       }
 
-      const price = "value" in data ? data.value : data.close;
+      const price =
+        "value" in data ? data.value : "close" in data ? data.close : 0;
       const isGreen =
         "close" in data && "open" in data ? data.close >= data.open : undefined;
 

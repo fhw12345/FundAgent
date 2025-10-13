@@ -60,7 +60,7 @@ export function extractFibonacciMetadata(
 
   return {
     symbol: analysis.symbol || "",
-    timeframe: analysis.timeframe || "1d",
+    timeframe: (analysis.raw_data?.timeframe as string) || "1d",
     start_date: analysis.start_date || "",
     end_date: analysis.end_date || "",
     fibonacci_levels: analysis.fibonacci_levels || [],
@@ -82,9 +82,9 @@ export function extractFibonacciMetadata(
 export function extractStochasticMetadata(
   analysis: StochasticAnalysisResponse,
 ): StochasticMetadata {
-  // Defensive: Check if arrays exist
-  const kArray = analysis.stochastic_k || [];
-  const dArray = analysis.stochastic_d || [];
+  // Defensive: Check if arrays exist - arrays might be in raw_data
+  const kArray = (analysis.raw_data?.stochastic_k as number[]) || [];
+  const dArray = (analysis.raw_data?.stochastic_d as number[]) || [];
 
   // Get latest K and D values
   const latestK = kArray.length > 0 ? kArray[kArray.length - 1] : 50;
@@ -112,10 +112,10 @@ export function extractStochasticMetadata(
   }
 
   return {
-    symbol: analysis.symbol,
-    timeframe: analysis.timeframe,
-    start_date: analysis.start_date,
-    end_date: analysis.end_date,
+    symbol: analysis.symbol || "",
+    timeframe: analysis.timeframe || "1d",
+    start_date: analysis.start_date || "",
+    end_date: analysis.end_date || "",
     current_k: latestK,
     current_d: latestD,
     signal,

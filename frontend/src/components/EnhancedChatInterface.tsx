@@ -83,7 +83,9 @@ export function EnhancedChatInterface() {
       fibonacciData: fibMessage?.analysis_data,
     });
 
-    return fibMessage?.analysis_data as FibonacciMetadata | null;
+    // Type guard to ensure proper typing
+    if (!fibMessage?.analysis_data) return null;
+    return fibMessage.analysis_data as unknown as FibonacciMetadata;
   }, [messages, currentSymbol, selectedInterval]);
 
   // Chat mutation for user messages
@@ -182,7 +184,7 @@ export function EnhancedChatInterface() {
       buttonMutation.mutate(type);
     },
     [
-      buttonMutation.mutate,
+      buttonMutation,
       setMessages,
       currentSymbol,
       selectedInterval,
@@ -195,7 +197,7 @@ export function EnhancedChatInterface() {
     if (!message.trim()) return;
     chatMutation.mutate(message); // All user messages go to LLM
     setMessage("");
-  }, [message, chatMutation.mutate]);
+  }, [message, chatMutation]);
 
   const isRestoringRef = useRef(false);
 

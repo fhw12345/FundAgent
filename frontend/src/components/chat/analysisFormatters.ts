@@ -13,15 +13,6 @@ import type {
 export function formatFibonacciResponse(
   result: FibonacciAnalysisResponse,
 ): string {
-  // Get trend emoji
-  const trendEmoji = result.market_structure.trend_direction
-    .toLowerCase()
-    .includes("up")
-    ? "📈"
-    : result.market_structure.trend_direction.toLowerCase().includes("down")
-      ? "📉"
-      : "➡️";
-
   // Build trends section
   let trendsSection = "";
   if (result.raw_data?.top_trends && result.raw_data.top_trends.length > 0) {
@@ -164,7 +155,6 @@ export function formatStochasticResponse(
   result: StochasticAnalysisResponse,
 ): string {
   // Signal interpretation with dynamic color intensity
-  let signalEmoji = "";
   let signalMeaning = "";
   let signalColor = ""; // Background color
   let textColor = "white"; // Text color
@@ -177,7 +167,6 @@ export function formatStochasticResponse(
     const red = Math.round(139 + (intensity / 100) * 116); // 139 (dark) → 255 (bright)
     signalColor = `rgb(${red}, 0, 0)`;
     textColor = "white";
-    signalEmoji = "🔴";
     signalMeaning = "OVERBOUGHT (Potential Sell Zone)";
   } else if (result.current_signal === "oversold") {
     // Green background: darker as %K approaches 0
@@ -185,13 +174,11 @@ export function formatStochasticResponse(
     const green = Math.round(100 + (intensity / 100) * 155); // 100 (dark) → 255 (bright)
     signalColor = `rgb(0, ${green}, 0)`;
     textColor = "white";
-    signalEmoji = "🟢";
     signalMeaning = "OVERSOLD (Potential Buy Zone)";
   } else {
     // Neutral: Yellow text on white background
     signalColor = "white"; // White background for contrast
     textColor = "rgb(255, 215, 0)"; // Gold yellow text
-    signalEmoji = "🟡";
     signalMeaning = "NEUTRAL (No Clear Signal)";
   }
 

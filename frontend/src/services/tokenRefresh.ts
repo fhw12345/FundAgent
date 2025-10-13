@@ -3,7 +3,7 @@
  * Handles automatic access token refresh before expiry
  */
 
-import type { AxiosRequestConfig } from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 
 // Token refresh state
 let isRefreshing = false;
@@ -23,8 +23,8 @@ function onTokenRefreshed(token: string) {
  * Returns updated config with new token
  */
 export async function refreshTokenIfNeeded(
-  config: AxiosRequestConfig,
-): Promise<AxiosRequestConfig> {
+  config: InternalAxiosRequestConfig,
+): Promise<InternalAxiosRequestConfig> {
   const accessToken = localStorage.getItem("access_token");
   const refreshToken = localStorage.getItem("refresh_token");
   const expiry = localStorage.getItem("access_token_expiry");
@@ -104,8 +104,8 @@ export async function refreshTokenIfNeeded(
  * Retry failed 401 request after refreshing token
  */
 export async function retryWithRefreshToken(
-  originalRequest: AxiosRequestConfig,
-): Promise<Response | null> {
+  originalRequest: InternalAxiosRequestConfig,
+): Promise<string | null> {
   const refreshToken = localStorage.getItem("refresh_token");
 
   if (refreshToken && !isRefreshing) {

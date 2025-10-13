@@ -67,7 +67,7 @@ export function FeedbackListItem({
     },
     onSettled: () => {
       // Refetch to ensure sync with server
-      queryClient.invalidateQueries({ queryKey: ["feedback", item.type] });
+      void queryClient.invalidateQueries({ queryKey: ["feedback", item.type] });
     },
   });
 

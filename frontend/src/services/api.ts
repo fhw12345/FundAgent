@@ -1,8 +1,6 @@
 import axios from "axios";
 import type {
   HealthResponse,
-  ChatRequest,
-  ChatResponse,
   ChatListResponse,
   ChatDetailResponse,
   UpdateUIStateRequest,
@@ -245,7 +243,6 @@ export const chatService = {
                 onChatCreated(data.chat_id);
               } else if (data.type === "content" && data.content) {
                 onChunk(data.content);
-                await new Promise((resolve) => setTimeout(resolve, 0));
               } else if (
                 data.type === "title_generated" &&
                 onTitleGenerated &&

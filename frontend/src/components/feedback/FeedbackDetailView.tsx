@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { FeedbackItem, FeedbackStatus } from "../../types/feedback";
+import type { FeedbackStatus } from "../../types/feedback";
 import { feedbackApi } from "../../services/feedbackApi";
 import { STATUS_LABELS, STATUS_COLORS } from "../../types/feedback";
 import { authStorage } from "../../services/authService";
@@ -57,8 +57,10 @@ export function FeedbackDetailView({
     },
     onSuccess: () => {
       // Invalidate both detail view and list
-      queryClient.invalidateQueries({ queryKey: ["feedback-item", itemId] });
-      queryClient.invalidateQueries({ queryKey: ["feedback"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["feedback-item", itemId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["feedback"] });
     },
   });
 
@@ -69,11 +71,13 @@ export function FeedbackDetailView({
       // Clear form and refetch
       setCommentContent("");
       setCommentError("");
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({
         queryKey: ["feedback-comments", itemId],
       });
-      queryClient.invalidateQueries({ queryKey: ["feedback-item", itemId] });
-      queryClient.invalidateQueries({ queryKey: ["feedback"] }); // Update comment count in list
+      void queryClient.invalidateQueries({
+        queryKey: ["feedback-item", itemId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["feedback"] }); // Update comment count in list
     },
   });
 
@@ -83,8 +87,10 @@ export function FeedbackDetailView({
       feedbackApi.updateStatus(itemId, newStatus),
     onSuccess: () => {
       // Refetch to show updated status
-      queryClient.invalidateQueries({ queryKey: ["feedback-item", itemId] });
-      queryClient.invalidateQueries({ queryKey: ["feedback"] }); // Update list view
+      void queryClient.invalidateQueries({
+        queryKey: ["feedback-item", itemId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["feedback"] }); // Update list view
     },
   });
 

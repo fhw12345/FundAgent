@@ -17,7 +17,7 @@ import {
   Activity,
 } from "lucide-react";
 import { TimeInterval } from "../../services/market";
-import type { FibonacciAnalysisResponse } from "../../services/analysis";
+import type { FibonacciMetadata } from "../../utils/analysisMetadataExtractor";
 
 interface ChartPanelProps {
   currentSymbol: string;
@@ -26,7 +26,7 @@ interface ChartPanelProps {
   selectedInterval: TimeInterval;
   selectedDateRange: { start: string; end: string };
   analysisMutation: any;
-  fibonacciAnalysis: FibonacciAnalysisResponse | null;
+  fibonacciAnalysis: FibonacciMetadata | null;
   handleSymbolSelect: (symbol: string, name: string) => void;
   handleIntervalChange: (interval: TimeInterval) => void;
   handleDateRangeSelect: (startDate: string, endDate: string) => void;
@@ -78,11 +78,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
           )}
         </div>
 
-        <SymbolSearch
-          onSymbolSelect={handleSymbolSelect}
-          className="mb-4"
-          autoFocus
-        />
+        <SymbolSearch onSymbolSelect={handleSymbolSelect} className="mb-4" />
 
         {currentSymbol && (
           <div className="flex gap-2 flex-wrap">
@@ -163,7 +159,8 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
               <LineChart className="h-12 w-12 mx-auto mb-4 text-gray-400" />
               <p>Search for a stock symbol above to view its chart</p>
               <p className="text-xs mt-2">
-                Try searching "apple", "tesla", or any company name
+                Try searching &quot;apple&quot;, &quot;tesla&quot;, or any
+                company name
               </p>
             </div>
           </div>
@@ -207,7 +204,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                   ? selectedDateRange
                   : undefined
               }
-              fibonacciAnalysis={fibonacciAnalysis}
+              fibonacciAnalysis={fibonacciAnalysis as any}
               className="bg-white rounded-lg border h-full"
             />
             {selectedDateRange.start && selectedDateRange.end && (

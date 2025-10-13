@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef } from "react";
-import { PriceDataPoint, TimeInterval } from "../../services/market";
+import { PriceDataPoint, TimeInterval } from "../services/market";
 import { ChartHeader } from "./chart/ChartHeader";
 import { ChartTooltip } from "./chart/ChartTooltip";
 import { useChart } from "./chart/useChart";

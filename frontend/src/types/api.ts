@@ -29,6 +29,7 @@ export interface ChatMessage {
   timestamp: string;
   chart_url?: string;
   analysis_data?: Record<string, unknown>;
+  _id?: string | number; // Optional ID for frontend tracking
 }
 
 export interface ChatRequest {

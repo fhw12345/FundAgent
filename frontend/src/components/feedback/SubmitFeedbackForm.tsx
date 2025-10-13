@@ -27,7 +27,7 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
     mutationFn: feedbackApi.createItem,
     onSuccess: () => {
       // Invalidate both leaderboards to refetch
-      queryClient.invalidateQueries({ queryKey: ["feedback"] });
+      void queryClient.invalidateQueries({ queryKey: ["feedback"] });
       onClose();
     },
   });

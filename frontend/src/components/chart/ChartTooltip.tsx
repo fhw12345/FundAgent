@@ -81,20 +81,20 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({
         <div className="space-y-0.5">
           <div className="flex justify-between">
             <span className="text-gray-400">Open:</span>
-            <span>{formatPrice(tooltipData.open!)}</span>
+            <span>{formatPrice(tooltipData.open ?? 0)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400">High:</span>
-            <span>{formatPrice(tooltipData.high!)}</span>
+            <span>{formatPrice(tooltipData.high ?? 0)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-400">Low:</span>
-            <span>{formatPrice(tooltipData.low!)}</span>
+            <span>{formatPrice(tooltipData.low ?? 0)}</span>
           </div>
           <div className={`flex justify-between font-semibold ${colorClass}`}>
             <span className="text-gray-400 font-normal">Close:</span>
             <span>
-              {formatPrice(tooltipData.close!)} {directionArrow}
+              {formatPrice(tooltipData.close ?? 0)} {directionArrow}
             </span>
           </div>
         </div>
