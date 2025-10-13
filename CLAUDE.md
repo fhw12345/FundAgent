@@ -25,6 +25,37 @@
 
 > 📖 **See [System Design](docs/architecture/system-design.md) for architecture details**
 
+## 🌍 Environment Rules
+
+**We have 3 environments with different deployment methods:**
+
+| Environment | Deployment Method | Access | Purpose |
+|-------------|------------------|--------|---------|
+| **Dev/Local** | Docker Compose | `localhost:3000` | Local development on your machine |
+| **Test** | Kubernetes (AKS) | `https://klinematrix.com` | Cloud testing environment |
+| **Prod** | *(Not yet deployed)* | *(Planned)* | Production environment |
+
+### Dev/Local Environment
+- **How to run**: `make dev` (starts docker-compose)
+- **Services**: Backend, Frontend, MongoDB, Redis (all in containers)
+- **Frontend commands**: `docker compose exec frontend npm ...`
+- **Backend commands**: `cd backend && make test && make lint`
+- **Hot reload**: ✅ Works for 90% of changes
+- **When to use**: Daily development, testing features locally
+
+### Test Environment (Kubernetes)
+- **How to deploy**: Build images → Push to ACR → Restart pods
+- **Access**: https://klinematrix.com
+- **Commands**: `kubectl get pods -n klinematrix-test`
+- **When to use**: Testing before merging, verifying cloud integration
+- **Note**: This is the ONLY cloud environment right now
+
+### Prod Environment
+- **Status**: Not yet deployed
+- **Planned**: Will be separate K8s namespace with production data
+
+**Golden Rule**: Develop locally with docker-compose, deploy to Test (K8s) for verification.
+
 ## Development Workflow
 
 ### 1. Feature Specification (Required for New Features)
@@ -76,7 +107,7 @@ docker compose exec frontend npm install --save-dev <package-name>
 # Pre-commit hook validates version increment
 ```
 
-### 4. Deploy to Test
+### 4. Deploy to Test Environment (Kubernetes)
 ```bash
 # Build versioned images in Azure Container Registry
 BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
@@ -89,7 +120,9 @@ az acr build --registry financialAgent \
 kubectl delete pod -l app=backend -n klinematrix-test
 ```
 
-### 5. Verify
+**Note**: This deploys to Test (K8s) environment at https://klinematrix.com
+
+### 5. Verify Test Deployment
 ```bash
 # Check deployment status
 kubectl get pods -n klinematrix-test
@@ -119,12 +152,15 @@ curl https://klinematrix.com/api/health
 ## Quick Reference Commands
 
 ```bash
-# Local Development
+# Dev/Local Environment (Docker Compose)
+make dev            # Start all services (docker-compose up -d)
 make test           # Run all tests
 make fmt            # Format code
 make lint           # Check code quality
+docker compose exec frontend npm run lint       # Frontend linting
+docker compose logs -f backend                  # View backend logs
 
-# Kubernetes Deployment
+# Test Environment (Kubernetes)
 kubectl get pods -n klinematrix-test                    # Check status
 kubectl logs -f deployment/backend -n klinematrix-test  # View logs
 kubectl delete pod -l app=backend -n klinematrix-test   # Restart with new image
@@ -137,7 +173,8 @@ az acr build --registry financialAgent --image klinematrix/backend:test-v${BACKE
 az acr build --registry financialAgent --image klinematrix/frontend:test-v${FRONTEND_VERSION} --target production --file frontend/Dockerfile frontend/
 
 # Health Checks
-curl https://klinematrix.com/api/health
+curl http://localhost:8000/api/health         # Dev/Local
+curl https://klinematrix.com/api/health       # Test (K8s)
 
 # Cost Monitoring (prevent unexpected autoscaling)
 kubectl get nodes                          # Should show 2 nodes (not 3-4)
