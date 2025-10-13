@@ -56,20 +56,16 @@ touch docs/features/<feature-name>.md
 # Backend changes
 cd backend && make test && make lint
 
-# Frontend changes - Run natively
-cd frontend
-npm run lint
-npm run type-check
-npm test
+# Frontend changes - MUST run inside Docker
+docker compose exec frontend npm run lint
+docker compose exec frontend npm run type-check
+docker compose exec frontend npm test
 
 # Install new frontend dependencies
-npm install --save-dev <package-name>
+docker compose exec frontend npm install --save-dev <package-name>
 ```
 
-**Note**: For local testing against deployed backend, use `kubectl port-forward` if needed:
-```bash
-kubectl port-forward -n klinematrix-test svc/backend 8000:8000
-```
+**⚠️ Frontend Commands**: Always run `npm` commands through `docker compose exec frontend` to ensure correct dependencies and environment. The `/app/node_modules` volume mount keeps node_modules isolated inside the container.
 
 ### 3. Bump Version (Required)
 ```bash
