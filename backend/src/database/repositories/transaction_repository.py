@@ -38,6 +38,12 @@ class TransactionRepository:
         await self.collection.create_index([("status", 1), ("created_at", 1)])
         await self.collection.create_index("chat_id")
 
+        # Compound index for efficient user transaction queries
+        # Supports: filter by user_id, optional status filter, sort by created_at DESC
+        await self.collection.create_index(
+            [("user_id", 1), ("status", 1), ("created_at", -1)]
+        )
+
         logger.info("Transaction indexes created")
 
     async def create_pending(

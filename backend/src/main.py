@@ -68,6 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Create database indexes for optimal query performance
         from .database.repositories.comment_repository import CommentRepository
         from .database.repositories.feedback_repository import FeedbackRepository
+        from .database.repositories.message_repository import MessageRepository
         from .database.repositories.refresh_token_repository import (
             RefreshTokenRepository,
         )
@@ -92,6 +93,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         transaction_repo = TransactionRepository(mongodb.get_collection("transactions"))
         await transaction_repo.ensure_indexes()
         logger.info("Transaction indexes created")
+
+        message_repo = MessageRepository(mongodb.get_collection("messages"))
+        await message_repo.ensure_indexes()
+        logger.info("Message indexes created")
 
         # Store in app state for dependency injection
         app.state.mongodb = mongodb

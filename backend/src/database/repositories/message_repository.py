@@ -25,6 +25,17 @@ class MessageRepository:
         """
         self.collection = collection
 
+    async def ensure_indexes(self) -> None:
+        """
+        Create indexes for optimal query performance.
+        Called during application startup.
+        """
+        await self.collection.create_index("chat_id")
+        await self.collection.create_index([("chat_id", 1), ("timestamp", 1)])
+        await self.collection.create_index("metadata.transaction_id", sparse=True)
+
+        logger.info("Message indexes created")
+
     async def create(self, message_create: MessageCreate) -> Message:
         """
         Create a new message.
@@ -193,3 +204,25 @@ class MessageRepository:
         """
         count: int = await self.collection.count_documents({"chat_id": chat_id})
         return count
+
+    async def get_by_transaction_id(self, transaction_id: str) -> Message | None:
+        """
+        Get message by transaction ID (for reconciliation).
+
+        Args:
+            transaction_id: Transaction identifier from metadata
+
+        Returns:
+            Message if found, None otherwise
+        """
+        message_dict = await self.collection.find_one(
+            {"metadata.transaction_id": transaction_id}
+        )
+
+        if not message_dict:
+            return None
+
+        # Remove MongoDB _id field
+        message_dict.pop("_id", None)
+
+        return Message(**message_dict)

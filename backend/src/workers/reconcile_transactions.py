@@ -82,14 +82,8 @@ async def reconcile_stuck_transactions(
 
         # Find the message linked to this transaction
         # Note: Message might not exist if LLM call failed before message was saved
-        messages = await message_repo.get_by_chat(chat_id)
-
-        # Find message by transaction_id in metadata
-        linked_message = None
-        for msg in messages:
-            if msg.metadata and msg.metadata.transaction_id == transaction_id:
-                linked_message = msg
-                break
+        # Use direct lookup by transaction_id to avoid N+1 query
+        linked_message = await message_repo.get_by_transaction_id(transaction_id)
 
         if not linked_message:
             # No message found - LLM call likely failed
