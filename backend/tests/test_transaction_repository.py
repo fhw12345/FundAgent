@@ -77,8 +77,8 @@ class TestTransactionRepositoryIndexes:
         """Test that all required indexes are created."""
         await transaction_repo.ensure_indexes()
 
-        # Verify all indexes were created
-        assert mock_collection.create_index.call_count == 4
+        # Verify all indexes were created (5 total: transaction_id, user_id, status+created_at, chat_id, compound)
+        assert mock_collection.create_index.call_count == 5
 
         # Verify specific index calls
         calls = mock_collection.create_index.call_args_list

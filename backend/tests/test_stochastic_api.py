@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.dependencies.auth import get_current_user_id
 from src.api.health import get_redis
 from src.api.models import StochasticAnalysisResponse
 from src.core.analysis.stochastic_analyzer import StochasticAnalyzer
@@ -23,6 +24,13 @@ class TestStochasticAPIEndpoint:
     @pytest.fixture
     def client(self):
         """Create test client with mocked dependencies."""
+        # Mock MongoDB in app state
+        mock_mongodb = MagicMock()
+        app.state.mongodb = mock_mongodb
+
+        # Mock authentication dependency
+        async def get_user_id_override():
+            return "test-user-123"
 
         # Mock the Redis dependency
         def get_redis_override():
@@ -31,13 +39,16 @@ class TestStochasticAPIEndpoint:
             mock_redis.set = AsyncMock(return_value=None)
             return mock_redis
 
+        app.dependency_overrides[get_current_user_id] = get_user_id_override
         app.dependency_overrides[get_redis] = get_redis_override
         client = TestClient(app)
 
         yield client
 
-        # Clean up overrides
+        # Clean up overrides and state
         app.dependency_overrides.clear()
+        if hasattr(app.state, "mongodb"):
+            delattr(app.state, "mongodb")
 
     @pytest.fixture
     def sample_stochastic_data(self):
@@ -240,6 +251,16 @@ class TestStochasticAPICaching:
     @pytest.fixture
     def client_with_cache_control(self):
         """Create test client that allows cache mocking."""
+        # Mock MongoDB in app state
+        mock_mongodb = MagicMock()
+        app.state.mongodb = mock_mongodb
+
+        # Mock authentication dependency
+        async def get_user_id_override():
+            return "test-user-123"
+
+        app.dependency_overrides[get_current_user_id] = get_user_id_override
+
         # Set up mock Redis in app state for health endpoint compatibility
         mock_redis = MagicMock()
         mock_redis.get = AsyncMock(return_value=None)
@@ -252,9 +273,12 @@ class TestStochasticAPICaching:
         client = TestClient(app)
         yield client
 
-        # Clean up app state
+        # Clean up app state and overrides
+        app.dependency_overrides.clear()
         if hasattr(app.state, "redis"):
             delattr(app.state, "redis")
+        if hasattr(app.state, "mongodb"):
+            delattr(app.state, "mongodb")
 
     def test_stochastic_cache_key_generation(self, client_with_cache_control):
         """Test that cache keys are generated correctly."""
@@ -425,6 +449,13 @@ class TestStochasticEndToEndIntegration:
     @pytest.fixture
     def client(self):
         """Create test client with mocked dependencies."""
+        # Mock MongoDB in app state
+        mock_mongodb = MagicMock()
+        app.state.mongodb = mock_mongodb
+
+        # Mock authentication dependency
+        async def get_user_id_override():
+            return "test-user-123"
 
         # Mock the Redis dependency
         def get_redis_override():
@@ -433,13 +464,16 @@ class TestStochasticEndToEndIntegration:
             mock_redis.set = AsyncMock(return_value=None)
             return mock_redis
 
+        app.dependency_overrides[get_current_user_id] = get_user_id_override
         app.dependency_overrides[get_redis] = get_redis_override
         client = TestClient(app)
 
         yield client
 
-        # Clean up overrides
+        # Clean up overrides and state
         app.dependency_overrides.clear()
+        if hasattr(app.state, "mongodb"):
+            delattr(app.state, "mongodb")
 
     def test_full_stochastic_analysis_workflow(self, client):
         """Test complete analysis workflow with realistic data."""
@@ -616,6 +650,13 @@ class TestStochasticAPIPerformance:
     @pytest.fixture
     def client(self):
         """Create test client with mocked dependencies."""
+        # Mock MongoDB in app state
+        mock_mongodb = MagicMock()
+        app.state.mongodb = mock_mongodb
+
+        # Mock authentication dependency
+        async def get_user_id_override():
+            return "test-user-123"
 
         # Mock the Redis dependency
         def get_redis_override():
@@ -624,13 +665,16 @@ class TestStochasticAPIPerformance:
             mock_redis.set = AsyncMock(return_value=None)
             return mock_redis
 
+        app.dependency_overrides[get_current_user_id] = get_user_id_override
         app.dependency_overrides[get_redis] = get_redis_override
         client = TestClient(app)
 
         yield client
 
-        # Clean up overrides
+        # Clean up overrides and state
         app.dependency_overrides.clear()
+        if hasattr(app.state, "mongodb"):
+            delattr(app.state, "mongodb")
 
     def test_stochastic_analysis_logging(self, client, caplog):
         """Test that proper logging occurs during analysis."""
