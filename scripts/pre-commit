@@ -1,0 +1,77 @@
+#!/bin/bash
+# Pre-commit hook for Financial Agent
+# Runs both backend and frontend unit tests before allowing commit
+
+echo "🔍 Pre-commit hook: Running tests..."
+echo ""
+
+# Track overall success
+TESTS_PASSED=true
+
+# ===== Backend Tests =====
+echo "🐍 Running backend unit tests..."
+echo ""
+
+# Run backend tests locally (not in Docker to avoid complexity)
+cd backend || exit 1
+if python -m pytest tests/ -q --tb=short 2>&1; then
+    echo ""
+    echo "✅ Backend tests passed"
+    BACKEND_SUCCESS=true
+else
+    echo ""
+    echo "❌ Backend tests failed"
+    BACKEND_SUCCESS=false
+    TESTS_PASSED=false
+fi
+cd .. || exit 1
+
+echo ""
+
+# ===== Frontend Tests =====
+echo "⚛️  Running frontend unit tests..."
+echo ""
+
+# Run frontend tests via Docker Compose
+if docker-compose exec -T frontend npm test -- --run --reporter=basic 2>&1; then
+    echo ""
+    echo "✅ Frontend tests passed"
+    FRONTEND_SUCCESS=true
+else
+    echo ""
+    echo "❌ Frontend tests failed"
+    FRONTEND_SUCCESS=false
+    TESTS_PASSED=false
+fi
+
+echo ""
+
+# ===== Summary =====
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [ "$BACKEND_SUCCESS" = true ]; then
+    echo "✅ Backend:  PASSED"
+else
+    echo "❌ Backend:  FAILED"
+fi
+
+if [ "$FRONTEND_SUCCESS" = true ]; then
+    echo "✅ Frontend: PASSED"
+else
+    echo "❌ Frontend: FAILED"
+fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# ===== Final Result =====
+if [ "$TESTS_PASSED" = false ]; then
+    echo "❌ COMMIT BLOCKED: Tests failed"
+    echo ""
+    echo "Fix the failing tests before committing."
+    echo "Run 'make test' to see detailed output."
+    echo ""
+    exit 1
+fi
+
+echo "✅ All tests passed - commit allowed"
+echo ""
+exit 0
