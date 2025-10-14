@@ -76,36 +76,53 @@ export function useAdjustCredits() {
 /**
  * Hook to optimistically deduct credits before LLM call.
  * Updates cache immediately, then syncs with backend via refetch.
+ * Provides rollback function if operation fails.
  *
- * @param estimatedCost - Estimated cost in credits for the request
+ * @returns Object with deduct and rollback functions
  */
 export function useOptimisticCreditDeduction() {
   const queryClient = useQueryClient();
 
-  return (estimatedCost: number) => {
-    // Get current profile from cache
-    const currentProfile = queryClient.getQueryData<UserProfile>(
-      creditKeys.profile(),
-    );
+  return {
+    deduct: (estimatedCost: number) => {
+      // Get current profile from cache
+      const currentProfile = queryClient.getQueryData<UserProfile>(
+        creditKeys.profile(),
+      );
 
-    if (!currentProfile) {
-      console.warn("No user profile in cache - cannot optimistically deduct");
-      return;
-    }
+      if (!currentProfile) {
+        console.warn("No user profile in cache - cannot optimistically deduct");
+        return { rollback: () => {} };
+      }
 
-    // Optimistically deduct credits
-    const optimisticProfile: UserProfile = {
-      ...currentProfile,
-      credits: Math.max(0, currentProfile.credits - estimatedCost),
-    };
+      // Save original for potential rollback
+      const originalProfile = currentProfile;
 
-    queryClient.setQueryData<UserProfile>(
-      creditKeys.profile(),
-      optimisticProfile,
-    );
+      // Optimistically deduct credits
+      const optimisticProfile: UserProfile = {
+        ...currentProfile,
+        credits: Math.max(0, currentProfile.credits - estimatedCost),
+      };
 
-    // Trigger refetch in background (backend is source of truth)
-    void queryClient.invalidateQueries({ queryKey: creditKeys.profile() });
+      queryClient.setQueryData<UserProfile>(
+        creditKeys.profile(),
+        optimisticProfile,
+      );
+
+      // Trigger refetch in background (backend is source of truth)
+      void queryClient.invalidateQueries({ queryKey: creditKeys.profile() });
+
+      // Return rollback function
+      return {
+        rollback: () => {
+          queryClient.setQueryData<UserProfile>(
+            creditKeys.profile(),
+            originalProfile,
+          );
+          console.warn("Credit deduction rolled back");
+        },
+      };
+    },
   };
 }
 

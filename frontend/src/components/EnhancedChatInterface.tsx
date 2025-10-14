@@ -67,16 +67,21 @@ export function EnhancedChatInterface() {
     });
 
     // Find the most recent Fibonacci analysis for current symbol AND timeframe
-    const fibMessage = [...messages]
-      .reverse()
-      .find(
-        (msg) =>
-          msg.role === "assistant" &&
-          msg.analysis_data &&
-          msg.analysis_data.symbol === currentSymbol &&
-          msg.analysis_data.fibonacci_levels &&
-          msg.analysis_data.timeframe === selectedInterval,
-      );
+    // Iterate backwards without creating array copy for better performance
+    let fibMessage = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (
+        msg.role === "assistant" &&
+        msg.analysis_data &&
+        msg.analysis_data.symbol === currentSymbol &&
+        msg.analysis_data.fibonacci_levels &&
+        msg.analysis_data.timeframe === selectedInterval
+      ) {
+        fibMessage = msg;
+        break;
+      }
+    }
 
     console.log("📊 Fibonacci analysis result:", {
       found: !!fibMessage,
@@ -137,14 +142,54 @@ export function EnhancedChatInterface() {
   const handleSymbolSelect = useCallback((symbol: string, name: string) => {
     setCurrentSymbol(symbol);
     setCurrentCompanyName(name);
-    setDateRangeStart("");
-    setDateRangeEnd("");
-  }, []);
+
+    // Calculate date range for current interval
+    const today = new Date();
+    let daysBack: number;
+
+    switch (selectedInterval) {
+      case "1h":
+        daysBack = 30;
+        break;
+      case "1w":
+        daysBack = 365;
+        break;
+      case "1mo":
+        daysBack = 730;
+        break;
+      default:
+        daysBack = 180;
+    }
+
+    const startDate = new Date(today.getTime() - daysBack * 24 * 60 * 60 * 1000);
+    setDateRangeStart(startDate.toISOString().split("T")[0]);
+    setDateRangeEnd(today.toISOString().split("T")[0]);
+  }, [selectedInterval]);
 
   const handleIntervalChange = useCallback((interval: TimeInterval) => {
     setSelectedInterval(interval);
-    setDateRangeStart("");
-    setDateRangeEnd("");
+
+    // Calculate appropriate date range for this interval
+    const today = new Date();
+    let daysBack: number;
+
+    switch (interval) {
+      case "1h":
+        daysBack = 30; // 1-hour interval: last 30 days
+        break;
+      case "1w":
+        daysBack = 365; // 1-week interval: last 1 year
+        break;
+      case "1mo":
+        daysBack = 730; // 1-month interval: last 2 years
+        break;
+      default:
+        daysBack = 180; // 1-day interval (default): last 6 months
+    }
+
+    const startDate = new Date(today.getTime() - daysBack * 24 * 60 * 60 * 1000);
+    setDateRangeStart(startDate.toISOString().split("T")[0]);
+    setDateRangeEnd(today.toISOString().split("T")[0]);
   }, []);
 
   const handleDateRangeSelect = useCallback(
