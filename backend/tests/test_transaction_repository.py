@@ -8,7 +8,7 @@ Tests database access layer for credit transactions including:
 - Stuck transaction detection
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
@@ -160,8 +160,8 @@ class TestTransactionRepositoryGetById:
             "output_tokens": 1000,
             "total_tokens": 1500,
             "actual_cost": 7.5,
-            "created_at": datetime.utcnow(),
-            "completed_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
+            "completed_at": datetime.now(UTC),
             "model": "qwen-plus",
             "request_type": "chat",
         }
@@ -203,8 +203,8 @@ class TestTransactionRepositoryCompleteTransaction:
             "output_tokens": 1000,
             "total_tokens": 1500,
             "actual_cost": 7.5,
-            "created_at": datetime.utcnow(),
-            "completed_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
+            "completed_at": datetime.now(UTC),
             "model": "qwen-plus",
             "request_type": "chat",
         }
@@ -250,8 +250,8 @@ class TestTransactionRepositoryCompleteTransaction:
             "output_tokens": 1000,
             "total_tokens": 1500,
             "actual_cost": 7.5,
-            "created_at": datetime.utcnow(),
-            "completed_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
+            "completed_at": datetime.now(UTC),
             "model": "qwen-plus",
             "request_type": "chat",
         }
@@ -320,8 +320,8 @@ class TestTransactionRepositoryFailTransaction:
             "chat_id": "chat456",
             "status": "FAILED",
             "estimated_cost": 10.0,
-            "created_at": datetime.utcnow(),
-            "completed_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
+            "completed_at": datetime.now(UTC),
             "model": "qwen-plus",
             "request_type": "chat",
         }
@@ -352,7 +352,7 @@ class TestTransactionRepositoryFindStuck:
 
     async def test_find_stuck_transactions(self, transaction_repo, mock_collection):
         """Test finding transactions stuck in PENDING."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         old_transaction = {
             "_id": "mongo_id_1",
             "transaction_id": "txn123",
@@ -395,7 +395,7 @@ class TestTransactionRepositoryFindStuck:
         self, transaction_repo, mock_collection
     ):
         """Test finding stuck transactions with custom age threshold."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         old_transaction = {
             "_id": "mongo_id_1",
             "transaction_id": "txn123",
@@ -432,7 +432,7 @@ class TestTransactionRepositoryGetUserTransactions:
                 "chat_id": f"chat{i}",
                 "status": "COMPLETED",
                 "estimated_cost": 10.0,
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.now(UTC),
                 "model": "qwen-plus",
                 "request_type": "chat",
             }
@@ -467,7 +467,7 @@ class TestTransactionRepositoryGetUserTransactions:
                 "chat_id": "chat1",
                 "status": "COMPLETED",
                 "estimated_cost": 10.0,
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.now(UTC),
                 "model": "qwen-plus",
                 "request_type": "chat",
             }
@@ -550,8 +550,8 @@ class TestTransactionRepositoryGetByMessageId:
             "output_tokens": 1000,
             "total_tokens": 1500,
             "actual_cost": 7.5,
-            "created_at": datetime.utcnow(),
-            "completed_at": datetime.utcnow(),
+            "created_at": datetime.now(UTC),
+            "completed_at": datetime.now(UTC),
             "model": "qwen-plus",
             "request_type": "chat",
         }

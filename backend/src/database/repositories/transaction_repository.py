@@ -4,7 +4,7 @@ Handles CRUD operations for transactions collection.
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -71,7 +71,7 @@ class TransactionRepository:
             output_tokens=None,
             total_tokens=None,
             actual_cost=None,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             completed_at=None,
             model=transaction_create.model,
             request_type=transaction_create.request_type,
@@ -150,7 +150,7 @@ class TransactionRepository:
                     "output_tokens": output_tokens,
                     "total_tokens": total_tokens,
                     "actual_cost": actual_cost,
-                    "completed_at": datetime.utcnow(),
+                    "completed_at": datetime.now(UTC),
                 }
             },
             return_document=ReturnDocument.AFTER,
@@ -193,7 +193,7 @@ class TransactionRepository:
         """
         result = await self.collection.find_one_and_update(
             {"transaction_id": transaction_id, "status": "PENDING"},
-            {"$set": {"status": "FAILED", "completed_at": datetime.utcnow()}},
+            {"$set": {"status": "FAILED", "completed_at": datetime.now(UTC)}},
             return_document=ReturnDocument.AFTER,
             session=session,
         )
@@ -224,7 +224,7 @@ class TransactionRepository:
         Returns:
             List of stuck transactions
         """
-        cutoff_time = datetime.utcnow() - timedelta(minutes=age_minutes)
+        cutoff_time = datetime.now(UTC) - timedelta(minutes=age_minutes)
 
         cursor = self.collection.find(
             {"status": "PENDING", "created_at": {"$lt": cutoff_time}}

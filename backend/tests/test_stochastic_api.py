@@ -596,7 +596,7 @@ class TestStochasticEndToEndIntegration:
                 "Close": np.random.uniform(95, 105, 100),
             }
         )
-        mock_data.index = pd.date_range("2024-01-01", periods=100, freq="H")
+        mock_data.index = pd.date_range("2024-01-01", periods=100, freq="h")
 
         timeframes = ["1h", "1d", "1w", "1M"]
 

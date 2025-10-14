@@ -3,7 +3,7 @@ Pydantic models for Financial Analysis API responses.
 Designed to be easily consumable by both frontend and future LangChain agents.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -54,7 +54,7 @@ class FibonacciAnalysisResponse(BaseModel):
     timeframe: str = Field(..., description="Analysis timeframe (1d, 1w, 1M)")
     current_price: float = Field(..., description="Current stock price")
     analysis_date: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Analysis date in ISO format",
     )
 
@@ -91,7 +91,7 @@ class MacroSentimentResponse(BaseModel):
     """Macro market sentiment analysis response."""
 
     analysis_date: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Analysis date in ISO format",
     )
 
@@ -135,7 +135,7 @@ class StockFundamentalsResponse(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
     company_name: str = Field(..., description="Company name")
     analysis_date: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Analysis date in ISO format",
     )
 
@@ -207,7 +207,7 @@ class StochasticAnalysisResponse(BaseModel):
     timeframe: str = Field(..., description="Analysis timeframe (1h, 1d, 1w, 1M)")
     current_price: float = Field(..., description="Current stock price")
     analysis_date: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="Analysis date in ISO format",
     )
 
