@@ -123,11 +123,12 @@ make clean        # Clean up Docker resources
 
 ## 🔐 Security
 
-- OAuth2/OIDC authentication (planned)
-- JWT token validation
-- Rate limiting and request validation
-- Secure Docker image builds
-- Environment-based secrets management
+- 🔐 JWT authentication with email verification (Tencent Cloud SES)
+- 🔄 Refresh token rotation with 30-day TTL automatic cleanup
+- 🛡️ Non-root containers with read-only filesystems
+- 🔑 Azure Key Vault + External Secrets Operator for secret management
+- 🚦 Rate limiting and request validation
+- 🔒 OAuth2/OIDC social authentication (planned)
 
 ## 📁 Project Structure
 
@@ -176,39 +177,31 @@ helm install financial-agent infra/helm/financials/
 
 ## 🎯 Current Status: Production-Ready Platform ✅
 
-**Milestone 1 Complete: Walking Skeleton**
-- [x] Kubernetes infrastructure on Azure AKS
-- [x] FastAPI backend with health endpoints
-- [x] React frontend with health monitoring
-- [x] MongoDB and Redis connectivity
-- [x] End-to-end request flow verified
+**Current Versions** (as of 2025-10-14):
+- ✅ **Backend v0.5.3**: Token-based credit economy, refresh token TTL, performance optimizations
+- ✅ **Frontend v0.8.4**: CJK-aware token estimation, credit rollback, test infrastructure
+- ✅ **Production**: https://klinematrix.com (Azure Kubernetes + Alibaba Cloud AI)
 
-**Milestone 2 Complete: Financial Analysis Engine**
-- [x] Fibonacci retracement analysis with multi-trend detection
-- [x] Stochastic oscillator with 100% test coverage
-- [x] Interactive TradingView charts with date range selection
-- [x] Unified ticker data caching system
-- [x] Symbol search with yfinance validation
+**Recent Milestones**:
+- ✅ **v0.5.3**: Token credit system with transaction tracking and reconciliation (2025-10-14)
+- ✅ **v0.5.2**: Type safety milestone - resolved 107 mypy type errors (2025-10-12)
+- ✅ **v0.4.5/v0.6.1**: Security hardening (non-root containers, read-only filesystems) (2025-10-08)
+- ✅ **v0.3.0-v0.4.0**: AI integration and cloud deployment foundation (2025-10-07)
 
-**Milestone 3 Complete: AI Integration (v0.3.0)**
-- [x] DashScope Qwen LLM integration with streaming
-- [x] Real-time token-by-token response streaming (SSE)
-- [x] Wall Street analyst persona with "Compact Logic Book" structure
-- [x] Session-based chat management
-- [x] Modern glassmorphism UI design
-
-**Milestone 4 Complete: Cloud Deployment**
-- [x] Azure AKS Kubernetes infrastructure
-- [x] CI/CD pipeline with GitHub Actions
-- [x] Azure Container Registry integration
-- [x] Automated deployment workflows
-- [x] Production-grade monitoring and health checks
+**Core Features Delivered**:
+- [x] **Financial Analysis**: Fibonacci retracements, stochastic oscillator, market structure
+- [x] **AI Chat**: DashScope Qwen streaming with Wall Street analyst persona
+- [x] **Interactive Charts**: TradingView Lightweight Charts with date range selection
+- [x] **Credit Economy**: Token-based billing with optimistic updates and rollback
+- [x] **Authentication**: JWT with refresh token rotation and 30-day TTL cleanup
+- [x] **Cloud Infrastructure**: Azure AKS + Alibaba Cloud hybrid deployment
+- [x] **Test Coverage**: 187 backend + 11 frontend tests with pre-commit enforcement
 
 **Next Milestones:**
-- [ ] Authentication and user management (OAuth2/OIDC)
-- [ ] Chart generation and OSS storage
+- [ ] OAuth2/OIDC social authentication (Google, GitHub)
+- [ ] Transaction history UI and credit purchase flow
+- [ ] Chart generation with AI interpretation
 - [ ] Multi-user session isolation
-- [ ] Advanced analytics and insights
 
 ## 🤝 Contributing
 

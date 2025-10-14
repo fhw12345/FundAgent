@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2025-10-14
+
+### Added
+- Fix MongoDB index name conflict causing backend startup failure
+
+
 ## [0.5.3] - 2025-10-13
 
 ### Added

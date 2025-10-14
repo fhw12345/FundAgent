@@ -29,12 +29,18 @@ class MessageRepository:
         """
         Create indexes for optimal query performance.
         Called during application startup.
-        """
-        await self.collection.create_index("chat_id")
-        await self.collection.create_index([("chat_id", 1), ("timestamp", 1)])
-        await self.collection.create_index("metadata.transaction_id", sparse=True)
 
-        logger.info("Message indexes created")
+        Note: Uses existing index names to avoid conflicts with previously created indexes.
+        """
+        await self.collection.create_index("chat_id", name="chat_id_1")
+        await self.collection.create_index(
+            [("chat_id", 1), ("timestamp", 1)], name="idx_chat_messages"
+        )
+        await self.collection.create_index(
+            "metadata.transaction_id", sparse=True, name="metadata.transaction_id_1"
+        )
+
+        logger.info("Message indexes ensured")
 
     async def create(self, message_create: MessageCreate) -> Message:
         """
