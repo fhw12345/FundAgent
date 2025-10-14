@@ -35,6 +35,18 @@ class User(BaseModel):
         description="List of feedback item IDs this user has voted for",
     )
 
+    # Credit system fields
+    credits: float = Field(
+        default=1000.0,
+        description="User's current credit balance (1元 = 100 credits)",
+    )
+    total_tokens_used: int = Field(
+        default=0, description="Lifetime total tokens consumed"
+    )
+    total_credits_spent: float = Field(
+        default=0.0, description="Lifetime total credits spent"
+    )
+
     @property
     def admin(self) -> bool:
         """

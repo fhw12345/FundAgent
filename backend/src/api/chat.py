@@ -18,11 +18,13 @@ from ..agent.chat_agent import ChatAgent
 from ..core.exceptions import NotFoundError
 from ..models.chat import ChatUpdate
 from ..services.chat_service import ChatService
+from ..services.credit_service import CreditService
 from .dependencies.chat_deps import (
     get_chat_agent,
     get_chat_service,
     get_current_user_id,
 )
+from .dependencies.credit_deps import get_credit_service
 from .schemas.chat_models import (
     ChatDetailResponse,
     ChatListResponse,
@@ -284,6 +286,7 @@ async def chat_stream_persistent(
     user_id: str = Depends(get_current_user_id),
     chat_service: ChatService = Depends(get_chat_service),
     agent: ChatAgent = Depends(get_chat_agent),
+    credit_service: CreditService = Depends(get_credit_service),
 ) -> StreamingResponse:
     """
     Send a message and receive streaming response with MongoDB persistence.
@@ -406,6 +409,38 @@ async def chat_stream_persistent(
                 )
                 return
 
+            # ===== CREDIT SYSTEM INTEGRATION =====
+            # Check balance before expensive LLM call
+            has_credits = await credit_service.check_balance(
+                user_id=user_id,
+                estimated_cost=10.0,  # Conservative estimate
+            )
+
+            if not has_credits:
+                error_data = {
+                    "error": "Insufficient credits. Minimum 10 credits required.",
+                    "error_code": "INSUFFICIENT_CREDITS",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                logger.warning(
+                    "Request blocked - insufficient credits", user_id=user_id
+                )
+                return
+
+            # Create PENDING transaction (safety net)
+            transaction = await credit_service.create_pending_transaction(
+                user_id=user_id,
+                chat_id=chat_id,
+                estimated_cost=10.0,
+            )
+
+            logger.info(
+                "Credits checked and transaction created",
+                user_id=user_id,
+                transaction_id=transaction.transaction_id,
+            )
+
             # Get conversation history from MongoDB
             messages = await chat_service.get_chat_messages(chat_id, user_id)
 
@@ -434,13 +469,69 @@ async def chat_stream_persistent(
                 yield f"data: {json.dumps(chunk_data)}\n\n"
                 await asyncio.sleep(0)  # Flush buffer
 
-            # Save assistant response to MongoDB
-            await chat_service.add_message(
+            # Get token usage from LLM client
+            token_usage = agent.get_last_token_usage()
+
+            if not token_usage:
+                logger.error(
+                    "No token usage available after streaming",
+                    transaction_id=transaction.transaction_id,
+                )
+                # Fail the transaction - no charge
+                await credit_service.fail_transaction(transaction.transaction_id)
+                error_data = {
+                    "error": "Failed to track token usage. No charge applied.",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
+
+            # Save assistant response to MongoDB with transaction linkage
+            from ..models.message import MessageMetadata
+
+            assistant_message = await chat_service.add_message(
                 chat_id=chat_id,
                 user_id=user_id,
                 role="assistant",
                 content=full_response,
                 source="llm",
+                metadata=MessageMetadata(
+                    model="qwen-plus",
+                    tokens=token_usage.total_tokens,
+                    input_tokens=token_usage.input_tokens,
+                    output_tokens=token_usage.output_tokens,
+                    transaction_id=transaction.transaction_id,
+                ),
+            )
+
+            # Complete transaction and deduct credits atomically
+            updated_transaction, updated_user = (
+                await credit_service.complete_transaction_with_deduction(
+                    transaction_id=transaction.transaction_id,
+                    message_id=assistant_message.message_id,
+                    input_tokens=token_usage.input_tokens,
+                    output_tokens=token_usage.output_tokens,
+                )
+            )
+
+            if not updated_transaction or not updated_user:
+                logger.error(
+                    "Failed to complete transaction",
+                    transaction_id=transaction.transaction_id,
+                )
+                error_data = {
+                    "error": "Failed to process payment. Please contact support.",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
+
+            logger.info(
+                "Transaction completed successfully",
+                transaction_id=transaction.transaction_id,
+                tokens=token_usage.total_tokens,
+                cost=updated_transaction.actual_cost,
+                new_balance=updated_user.credits,
             )
 
             # Generate title on first message (only if not provided)

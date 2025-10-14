@@ -44,7 +44,16 @@ class MessageMetadata(BaseModel):
 
     # LLM-specific
     model: str | None = Field(default=None, description="LLM model used")
-    tokens: int | None = Field(default=None, description="Token count")
+    tokens: int | None = Field(default=None, description="Total token count")
+    input_tokens: int | None = Field(default=None, description="Input tokens consumed")
+    output_tokens: int | None = Field(
+        default=None, description="Output tokens generated"
+    )
+
+    # Credit transaction linkage
+    transaction_id: str | None = Field(
+        default=None, description="Links to credit transaction for this message"
+    )
 
     # Extensible - any additional data
     raw_data: dict[str, Any] | None = Field(

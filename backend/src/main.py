@@ -17,6 +17,7 @@ from .api.admin import router as admin_router
 from .api.analysis import router as analysis_router
 from .api.auth import router as auth_router
 from .api.chat import router as chat_router
+from .api.credits import router as credits_router
 from .api.feedback import router as feedback_router
 from .api.health import router as health_router
 from .api.market_data import router as market_data_router
@@ -70,6 +71,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from .database.repositories.refresh_token_repository import (
             RefreshTokenRepository,
         )
+        from .database.repositories.transaction_repository import (
+            TransactionRepository,
+        )
 
         refresh_token_repo = RefreshTokenRepository(
             mongodb.get_collection("refresh_tokens")
@@ -84,6 +88,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         comment_repo = CommentRepository(mongodb.get_collection("comments"))
         await comment_repo.ensure_indexes()
         logger.info("Comment indexes created")
+
+        transaction_repo = TransactionRepository(mongodb.get_collection("transactions"))
+        await transaction_repo.ensure_indexes()
+        logger.info("Transaction indexes created")
 
         # Store in app state for dependency injection
         app.state.mongodb = mongodb
@@ -160,6 +168,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis_router)
     app.include_router(market_data_router)
     app.include_router(chat_router)  # Persistent MongoDB-based chat
+    app.include_router(credits_router)  # Token-based credit economy
     app.include_router(feedback_router)  # Feedback & Community Roadmap platform
 
     @app.get("/")

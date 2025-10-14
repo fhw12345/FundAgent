@@ -129,6 +129,12 @@ install-frontend:
 install: install-backend install-frontend
 	@echo "📦 All dependencies installed!"
 
+# Reconciliation worker
+reconcile:
+	@echo "🔄 Running transaction reconciliation..."
+	docker-compose exec backend python -m src.workers.reconcile_transactions
+	@echo "✅ Reconciliation complete"
+
 # Git hooks setup
 setup-hooks:
 	@echo "🪝 Setting up git hooks..."

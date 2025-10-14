@@ -18,6 +18,7 @@ resources:
 patchesStrategicMerge:
 - backend-test-patch.yaml
 - frontend-test-patch.yaml
+- cronjob-test-patch.yaml
 
 # Environment-specific labels
 commonLabels:

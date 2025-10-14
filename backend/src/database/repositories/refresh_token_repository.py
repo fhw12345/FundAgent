@@ -26,12 +26,20 @@ class RefreshTokenRepository:
         self.collection = collection
 
     async def ensure_indexes(self) -> None:
-        """Create indexes for efficient queries."""
+        """Create indexes for efficient queries and TTL cleanup."""
         await self.collection.create_index("token_hash", unique=True)
         await self.collection.create_index("user_id")
         await self.collection.create_index("expires_at")
         await self.collection.create_index([("user_id", 1), ("revoked", 1)])
-        logger.info("Refresh token indexes created")
+
+        # TTL index: Auto-delete revoked tokens after 30 days
+        # Only affects documents where revoked_at is set (active tokens have revoked_at=null)
+        await self.collection.create_index(
+            "revoked_at",
+            expireAfterSeconds=30 * 24 * 60 * 60  # 30 days = 2,592,000 seconds
+        )
+
+        logger.info("Refresh token indexes created (including 30-day TTL for revoked tokens)")
 
     async def create(self, token: RefreshToken) -> RefreshToken:
         """

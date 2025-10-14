@@ -4,6 +4,7 @@ Using DashScope SDK for qwen-vl-30b-a3b-thinking model.
 """
 
 from collections.abc import AsyncGenerator, Generator
+from dataclasses import dataclass
 
 import dashscope
 import structlog
@@ -12,6 +13,19 @@ from dashscope import Generation
 from ..core.config import Settings
 
 logger = structlog.get_logger()
+
+
+@dataclass
+class TokenUsage:
+    """Token usage information from LLM API."""
+
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+    # Future: Add caching info when DashScope provides it
+    # cached_tokens: int | None = None
+    # cache_creation_tokens: int | None = None
 
 
 class QwenClient:
@@ -36,6 +50,9 @@ class QwenClient:
         dashscope.api_key = self.api_key
         # Use China region (Alibaba Cloud Bailian)
         dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
+
+        # Track last token usage for retrieval after streaming
+        self.last_token_usage: TokenUsage | None = None
 
         logger.info("QwenClient initialized", model=self.model)
 
@@ -141,7 +158,6 @@ class QwenClient:
                 incremental_output=True,  # Get incremental chunks
             )
 
-            total_tokens = 0
             for response in responses:
                 if response.status_code == 200:
                     # Extract incremental content from this chunk
@@ -152,17 +168,44 @@ class QwenClient:
                     # Track token usage from final response
                     finish_reason = response.output.choices[0].get("finish_reason")
                     if finish_reason == "stop" and hasattr(response, "usage"):
-                        total_tokens = response.usage.total_tokens
+                        usage = response.usage
+                        # Get granular token counts - fail if not available
+                        input_tokens = getattr(usage, "input_tokens", None)
+                        output_tokens = getattr(usage, "output_tokens", None)
+                        total_tokens = usage.total_tokens
+
+                        if input_tokens is None or output_tokens is None:
+                            logger.error(
+                                "DashScope API did not provide granular token breakdown",
+                                total_tokens=total_tokens,
+                                usage_attrs=dir(usage),
+                            )
+                            raise ValueError(
+                                f"API missing input/output token breakdown. "
+                                f"Only got total_tokens={total_tokens}. "
+                                f"Available fields: {dir(usage)}"
+                            )
+
+                        self.last_token_usage = TokenUsage(
+                            input_tokens=input_tokens,
+                            output_tokens=output_tokens,
+                            total_tokens=total_tokens,
+                        )
                 else:
                     error_msg = f"Qwen API error: {response.code} - {response.message}"
                     logger.error("Qwen streaming failed", error=error_msg)
                     raise Exception(error_msg)
 
-            logger.info(
-                "Qwen streaming completed",
-                tokens_used=total_tokens,
-                message_count=len(messages),
-            )
+            if self.last_token_usage:
+                logger.info(
+                    "Qwen streaming completed",
+                    input_tokens=self.last_token_usage.input_tokens,
+                    output_tokens=self.last_token_usage.output_tokens,
+                    total_tokens=self.last_token_usage.total_tokens,
+                    message_count=len(messages),
+                )
+            else:
+                logger.warning("Qwen streaming completed without token usage data")
 
         except Exception as e:
             logger.error("Qwen streaming chat failed", error=str(e))
@@ -189,6 +232,15 @@ class QwenClient:
         # In production, consider implementing with httpx for true async
         for chunk in self.stream_chat(messages, temperature, max_tokens):
             yield chunk
+
+    def get_last_token_usage(self) -> TokenUsage | None:
+        """
+        Get token usage from the last streaming/chat operation.
+
+        Returns:
+            TokenUsage if available, None otherwise
+        """
+        return self.last_token_usage
 
     def chat_with_system_prompt(
         self,

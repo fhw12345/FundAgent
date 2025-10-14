@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { analysisService } from "../../services/analysis";
 import { chatService } from "../../services/api";
 import { chatKeys } from "../../hooks/useChats";
+import { useOptimisticCreditDeduction, creditKeys } from "../../hooks/useCredits";
 import {
   formatFibonacciResponse,
   formatMacroResponse,
@@ -36,6 +37,7 @@ export const useAnalysis = (
   setChatId?: (id: string) => void,
 ) => {
   const queryClient = useQueryClient();
+  const optimisticDeduction = useOptimisticCreditDeduction();
 
   return useMutation({
     mutationKey: ["chat", chatId],
@@ -57,6 +59,9 @@ export const useAnalysis = (
       };
 
       setMessages((prev) => [...prev, userMessageObj, assistantMessageObj]);
+
+      // Optimistically deduct credits (10 credits estimated cost)
+      optimisticDeduction(10.0);
 
       // Local accumulator to avoid race conditions
       let accumulatedContent = "";
@@ -97,6 +102,8 @@ export const useAnalysis = (
             resolve({ type: "chat", content: accumulatedContent });
             // Invalidate chat list ONCE after stream completes
             void queryClient.invalidateQueries({ queryKey: chatKeys.lists() });
+            // Refresh credits to show actual cost deducted by backend
+            void queryClient.invalidateQueries({ queryKey: creditKeys.profile() });
           },
           (error: string) => {
             // Error callback
@@ -257,6 +264,10 @@ export const useButtonAnalysis = (
               resolve(response);
               void queryClient.invalidateQueries({
                 queryKey: chatKeys.lists(),
+              });
+              // Refresh credits to show actual cost deducted by backend
+              void queryClient.invalidateQueries({
+                queryKey: creditKeys.profile(),
               });
             },
             (error: string) => {

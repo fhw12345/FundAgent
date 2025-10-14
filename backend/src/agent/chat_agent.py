@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 import structlog
 
 from ..core.config import Settings
-from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT, QwenClient
+from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT, QwenClient, TokenUsage
 
 logger = structlog.get_logger()
 
@@ -70,3 +70,12 @@ class ChatAgent:
             yield chunk
 
         logger.info("Streaming chat completed")
+
+    def get_last_token_usage(self) -> TokenUsage | None:
+        """
+        Get token usage from the last chat operation.
+
+        Returns:
+            TokenUsage if available, None otherwise
+        """
+        return self.llm_client.get_last_token_usage()

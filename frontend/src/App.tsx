@@ -3,12 +3,14 @@ import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
 import HealthPage from "./pages/HealthPage";
 import FeedbackPage from "./pages/FeedbackPage";
+import { TransactionHistory } from "./pages/TransactionHistory";
+import { CreditBalance } from "./components/credits/CreditBalance";
 import { authStorage, logout } from "./services/authService";
 
 function App() {
-  const [activeTab, setActiveTab] = useState<"health" | "chat" | "feedback">(
-    "chat",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "health" | "chat" | "feedback" | "transactions"
+  >("chat");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -111,10 +113,23 @@ function App() {
               >
                 Feedback
               </button>
+              <button
+                onClick={() => setActiveTab("transactions")}
+                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                  activeTab === "transactions"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
+                    : "text-gray-700 hover:bg-gray-100/80"
+                }`}
+              >
+                Transactions
+              </button>
               <div className="ml-4 flex items-center gap-3 pl-4 border-l border-gray-200">
+                <CreditBalance className="w-56" />
                 <span className="text-sm text-gray-700">👤 {username}</span>
                 <button
-                  onClick={handleLogout}
+                  onClick={() => {
+                    void handleLogout();
+                  }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100/80 rounded-lg transition-all"
                 >
                   Logout
@@ -131,6 +146,8 @@ function App() {
         {activeTab === "chat" && <EnhancedChatInterface />}
 
         {activeTab === "feedback" && <FeedbackPage />}
+
+        {activeTab === "transactions" && <TransactionHistory />}
       </main>
 
       <footer className="bg-white border-t mt-auto">

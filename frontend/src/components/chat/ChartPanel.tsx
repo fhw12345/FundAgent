@@ -49,7 +49,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
   handleQuickAnalysis,
 }) => {
   return (
-    <div className="flex flex-col w-1/2">
+    <div className="flex flex-col w-1/2 h-full">
       <div className="border-b p-4 bg-gray-50">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -152,7 +152,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
         )}
       </div>
 
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-4 overflow-y-auto">
         {!currentSymbol && (
           <div className="h-full border rounded-lg flex items-center justify-center text-sm text-gray-500 bg-gray-50">
             <div className="text-center">
@@ -207,12 +207,6 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
               fibonacciAnalysis={fibonacciAnalysis as any}
               className="bg-white rounded-lg border h-full"
             />
-            {selectedDateRange.start && selectedDateRange.end && (
-              <div className="text-sm text-gray-600 mt-2 px-4">
-                📊 Chart synchronized with analysis date range:{" "}
-                {selectedDateRange.start} to {selectedDateRange.end}
-              </div>
-            )}
             {priceDataQuery.isRefetching && (
               <div className="text-xs text-gray-500 mt-1 flex items-center">
                 <Loader2 className="h-3 w-3 animate-spin mr-1" />

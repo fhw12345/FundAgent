@@ -260,6 +260,7 @@ export function EnhancedChatInterface() {
                 onSendMessage={handleSendMessage}
                 isPending={chatMutation.isPending || buttonMutation.isPending}
                 currentSymbol={currentSymbol}
+                messages={messages}
               />
             </div>
 
