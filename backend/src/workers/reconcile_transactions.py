@@ -16,7 +16,7 @@ Environment variables:
 
 import asyncio
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import structlog
 
@@ -48,7 +48,7 @@ async def reconcile_stuck_transactions(
     Returns:
         Dict with counts: {"completed": N, "failed": N, "skipped": N}
     """
-    cutoff_time = datetime.utcnow() - timedelta(minutes=age_minutes)
+    cutoff_time = datetime.now(UTC) - timedelta(minutes=age_minutes)
 
     logger.info(
         "Starting transaction reconciliation",
