@@ -17,10 +17,10 @@ export default function FeedbackPage() {
       <div className="max-w-7xl mx-auto px-6">
         {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-2">
             Feedback & Community Roadmap
           </h1>
-          <p className="mt-2 text-lg text-gray-600">
+          <p className="text-gray-600">
             Shape the future of KlineMatrix by voting on features and reporting
             bugs
           </p>

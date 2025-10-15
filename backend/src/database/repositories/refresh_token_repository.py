@@ -36,10 +36,12 @@ class RefreshTokenRepository:
         # Only affects documents where revoked_at is set (active tokens have revoked_at=null)
         await self.collection.create_index(
             "revoked_at",
-            expireAfterSeconds=30 * 24 * 60 * 60  # 30 days = 2,592,000 seconds
+            expireAfterSeconds=30 * 24 * 60 * 60,  # 30 days = 2,592,000 seconds
         )
 
-        logger.info("Refresh token indexes created (including 30-day TTL for revoked tokens)")
+        logger.info(
+            "Refresh token indexes created (including 30-day TTL for revoked tokens)"
+        )
 
     async def create(self, token: RefreshToken) -> RefreshToken:
         """

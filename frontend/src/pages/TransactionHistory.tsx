@@ -59,12 +59,9 @@ export function TransactionHistory() {
             >
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white shadow-md">
-                <History size={20} />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900">Transaction History</h1>
-            </div>
+            <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
+              Transaction History
+            </h1>
           </div>
 
           {/* Filter */}

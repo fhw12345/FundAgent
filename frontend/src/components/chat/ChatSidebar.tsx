@@ -63,15 +63,16 @@ export const ChatSidebar = memo(function ChatSidebar({
   // If collapsed, show minimal sidebar
   if (isCollapsed) {
     return (
-      <aside className="w-12 h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl border-r border-gray-200/50 items-center py-4">
+      <aside className="w-12 h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl border-r border-gray-200/50 items-center justify-center relative">
         <button
           onClick={onToggleCollapse}
-          className="p-2 hover:bg-gray-100/80 rounded-lg transition-all group"
+          className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-white/90 p-1 rounded group"
           title="Expand sidebar"
         >
           <ChevronRight
             size={20}
-            className="text-gray-600 group-hover:text-gray-900"
+            className="text-gray-500 hover:text-gray-700 transition-all duration-200 hover:scale-110"
+            strokeWidth={2.5}
           />
         </button>
       </aside>
@@ -80,22 +81,22 @@ export const ChatSidebar = memo(function ChatSidebar({
 
   return (
     <aside className="w-80 h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl border-r border-gray-200/50 relative">
-      {/* Collapse Button */}
+      {/* Collapse Button - Centered vertically on right edge */}
       <button
         onClick={onToggleCollapse}
-        className="absolute top-4 right-2 p-1.5 hover:bg-gray-100/80 rounded-lg transition-all z-10 group"
+        className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-white/90 p-1 rounded z-10 group"
         title="Collapse sidebar"
       >
         <ChevronLeft
-          size={18}
-          className="text-gray-500 group-hover:text-gray-900"
+          size={20}
+          className="text-gray-500 hover:text-gray-700 transition-all duration-200 hover:scale-110"
+          strokeWidth={2.5}
         />
       </button>
 
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-200/50">
-        <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <span className="text-xl">💬</span>
+        <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-3">
           Chat History
         </h2>
 

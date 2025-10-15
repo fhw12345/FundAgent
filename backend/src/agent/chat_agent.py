@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 import structlog
 
 from ..core.config import Settings
-from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT, QwenClient, TokenUsage
+from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT, DashScopeClient, TokenUsage
 
 logger = structlog.get_logger()
 
@@ -20,7 +20,7 @@ class ChatAgent:
     """
     Conversational agent for financial analysis.
 
-    Lightweight wrapper around QwenClient for LLM streaming.
+    Lightweight wrapper around DashScopeClient for LLM streaming.
     Message history managed by MongoDB, not in-memory sessions.
     """
 
@@ -34,14 +34,14 @@ class ChatAgent:
         self.settings = settings
         self.system_prompt = FINANCIAL_AGENT_SYSTEM_PROMPT
         # Cache LLM clients by model to avoid recreation
-        self._client_cache: dict[str, QwenClient] = {}
+        self._client_cache: dict[str, DashScopeClient] = {}
 
         logger.info("ChatAgent initialized")
 
-    def _get_client(self, model: str) -> QwenClient:
+    def _get_client(self, model: str) -> DashScopeClient:
         """Get or create LLM client for the specified model."""
         if model not in self._client_cache:
-            self._client_cache[model] = QwenClient(self.settings, model=model)
+            self._client_cache[model] = DashScopeClient(self.settings, model=model)
             logger.info("Created new LLM client", model=model)
         return self._client_cache[model]
 

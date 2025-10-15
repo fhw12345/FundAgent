@@ -287,7 +287,7 @@ export function EnhancedChatInterface() {
       {/* Full-width trading interface with sidebar */}
       <div className="mx-auto">
         <div className="overflow-hidden">
-          <div className="flex h-[calc(100vh-10rem)]">
+          <div className="flex h-[calc(100vh-8rem)]">
             {/* Chat History Sidebar */}
             <ChatSidebar
               activeChatId={chatId}

@@ -62,11 +62,11 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Fashionable glassmorphism header */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-gray-200/50 shadow-sm">
         <div className="mx-auto px-6 lg:px-8">
-          <div className="flex justify-between items-center py-3">
+          <div className="flex justify-between items-center py-2">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 ring-2 ring-white/50">
                 <span className="text-2xl">📊</span>
@@ -140,7 +140,7 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto py-0">
+      <main className="flex-1 mx-auto w-full">
         {activeTab === "health" && isAdmin && <HealthPage />}
 
         {activeTab === "chat" && <EnhancedChatInterface />}
@@ -150,8 +150,8 @@ function App() {
         {activeTab === "transactions" && <TransactionHistory />}
       </main>
 
-      <footer className="bg-white border-t mt-auto">
-        <div className="mx-auto py-4 px-6 lg:px-8">
+      <footer className="bg-white border-t">
+        <div className="mx-auto py-3 px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500">
             KlineMatrix - AI-Powered Financial Intelligence
           </p>

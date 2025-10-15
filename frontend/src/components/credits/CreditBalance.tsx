@@ -4,7 +4,8 @@
  * Optimistically updates on LLM calls, syncs every 30s with backend.
  */
 
-import { Coins, TrendingUp, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Coins, TrendingUp, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useUserProfile } from "../../hooks/useCredits";
 
 interface CreditBalanceProps {
@@ -17,6 +18,7 @@ export function CreditBalance({
   showDetails = false,
 }: CreditBalanceProps) {
   const { data: profile, isLoading, isError } = useUserProfile();
+  const [isBlurred, setIsBlurred] = useState(false);
 
   // Loading state
   if (isLoading) {
@@ -75,7 +77,7 @@ export function CreditBalance({
 
   return (
     <div
-      className={`px-3 py-3 rounded-xl bg-white/60 border border-gray-200/50 hover:bg-white/80 transition-all duration-200 ${className}`}
+      className={`px-3 py-3 rounded-xl bg-white/60 hover:bg-white/80 transition-all duration-200 ${className}`}
     >
       <div className="flex items-center gap-3">
         {/* Icon */}
@@ -90,13 +92,22 @@ export function CreditBalance({
           <p className="text-xs text-gray-600 font-medium mb-0.5">
             Credit Balance
           </p>
-          <p className={`text-lg font-bold ${balanceColor}`}>
-            {profile.credits.toFixed(1)}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className={`text-lg font-bold ${balanceColor} ${isBlurred ? 'blur-sm select-none' : ''} transition-all`}>
+              {profile.credits.toFixed(1)}
+            </p>
+            <button
+              onClick={() => setIsBlurred(!isBlurred)}
+              className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+              title={isBlurred ? "Show balance" : "Hide balance"}
+            >
+              {isBlurred ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
 
           {/* Details (optional) */}
           {showDetails && (
-            <div className="mt-2 pt-2 border-t border-gray-200/50 space-y-1">
+            <div className={`mt-2 pt-2 border-t border-gray-200/50 space-y-1 ${isBlurred ? 'blur-sm select-none' : ''} transition-all`}>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-600 flex items-center gap-1">
                   <TrendingUp size={12} />
