@@ -8,8 +8,8 @@
 
 All previously reported issues have been resolved. See [fixed-bugs.md](fixed-bugs.md) for complete history.
 
-**Last Updated**: 2025-10-07
-**Current Versions**: Backend v0.4.2, Frontend v0.4.4
+**Last Updated**: 2025-10-15
+**Current Versions**: Backend v0.5.4, Frontend v0.8.4
 
 ---
 

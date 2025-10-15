@@ -177,16 +177,16 @@ helm install financial-agent infra/helm/financials/
 
 ## 🎯 Current Status: Production-Ready Platform ✅
 
-**Current Versions** (as of 2025-10-14):
-- ✅ **Backend v0.5.3**: Token-based credit economy, refresh token TTL, performance optimizations
-- ✅ **Frontend v0.8.4**: CJK-aware token estimation, credit rollback, test infrastructure
-- ✅ **Production**: https://klinematrix.com (Azure Kubernetes + Alibaba Cloud AI)
+**Current Versions** (as of 2025-10-15):
+- ✅ **Backend v0.5.4**: LLM model selection, code quality improvements, datetime deprecation fixes
+- ✅ **Frontend v0.8.4**: CJK-aware token estimation, credit rollback, UI enhancements
+- ✅ **Test Environment**: https://klinematrix.com (Azure Kubernetes + Alibaba Cloud AI)
 
 **Recent Milestones**:
+- ✅ **v0.5.4**: LLM model selection with per-model pricing + code quality improvements (2025-10-15)
 - ✅ **v0.5.3**: Token credit system with transaction tracking and reconciliation (2025-10-14)
 - ✅ **v0.5.2**: Type safety milestone - resolved 107 mypy type errors (2025-10-12)
 - ✅ **v0.4.5/v0.6.1**: Security hardening (non-root containers, read-only filesystems) (2025-10-08)
-- ✅ **v0.3.0-v0.4.0**: AI integration and cloud deployment foundation (2025-10-07)
 
 **Core Features Delivered**:
 - [x] **Financial Analysis**: Fibonacci retracements, stochastic oscillator, market structure

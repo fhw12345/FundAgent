@@ -2,6 +2,25 @@
 
 Comprehensive documentation for the AI-Enhanced Financial Analysis Platform.
 
+---
+
+## Current Versions
+
+**Last Updated:** 2025-10-15
+
+| Component | Version | Environment | Status |
+|-----------|---------|-------------|--------|
+| Backend   | v0.5.4  | Test (K8s)  | ✅ Stable |
+| Frontend  | v0.8.4  | Test (K8s)  | ✅ Stable |
+| Production | -      | Not deployed | ⏳ Planned |
+
+**Test Environment:** https://klinematrix.com
+**Production:** Not yet deployed
+
+For detailed version history and release notes, see [Version Management](project/versions/README.md).
+
+---
+
 ## Quick Links
 
 - **Getting Started**: [Development Setup Guide](development/getting-started.md)
@@ -138,7 +157,7 @@ make fmt && make test && make lint
 - **Secrets**: Azure Key Vault (`klinematrix-test-kv`)
 - **URL**: https://klinematrix.com
 - **Users**: 10 beta testers
-- **Current Versions**: Backend v0.4.2, Frontend v0.4.4 (as of 2025-10-07)
+- **Current Versions**: Backend v0.5.4, Frontend v0.8.4 (as of 2025-10-15)
 
 ### Production (Planned)
 - **Platform**: AKS multi-region (`klinematrix-prod` namespace)
@@ -196,50 +215,54 @@ For questions, issues, or contributions:
 
 ## Version History
 
-- **v0.8.3 / v0.5.2** (Current as of 2025-10-12):
-  - **Backend v0.5.2**: Feedback platform with rate limiting, N+1 query optimization, database indexes
-  - **Frontend v0.8.3**: Feedback platform UI with gamification (trophy badges), admin status dropdown
-  - Production deployment at https://klinematrix.com
-  - See [Version Management](project/versions/README.md) for complete release notes and compatibility
+**Recent Releases:**
 
-> **Note**: For the most current versions and detailed release notes, always refer to [Version Management](project/versions/README.md) and individual version docs.
+- **v0.5.4 / v0.8.4** (2025-10-15) - **Current**
+  - **Backend v0.5.4**: LLM model selection with per-model pricing, code quality improvements, datetime deprecation fixes
+    - Multi-model support (qwen-plus, qwen3-max, deepseek-v3, deepseek-v3.2-exp)
+    - Per-model pricing (1 credit = ¥0.001 CNY baseline)
+    - Thinking mode support (qwen-plus 4x cost, deepseek-v3.2-exp same cost)
+    - Input validation for negative tokens
+    - Modern Python 3.12+ type annotations (X | Y syntax)
+    - Transaction reconciliation worker tested (processed 8 stuck PENDING transactions)
+  - **Frontend v0.8.4**: Credit balance privacy toggle, UI layout improvements
+    - Credit blur/show toggle for screen sharing
+    - Flexbox layout improvements
+    - Centered sidebar collapse button
+    - Memoization for expensive computations
+    - Eliminated `any` types (proper React Query types)
+  - See [Feature Spec: LLM Model Selection](features/llm-model-selection.md) for complete details
 
-- **v0.4.2**: Type safety and error handling improvements
-  - Backend: v0.4.2 - Improved type safety, error handling, metadata validation
-  - Frontend: v0.4.1 - Chat restoration with metadata persistence
-
-- **v0.3.0**: Test environment ready
-  - Authentication with email verification
-  - LLM chat integration with streaming responses
-  - Modernized glassmorphism UI
-  - Clean environment separation (local dev vs cloud test)
-
-- **v0.2.0**: Agent core
-  - LangChain integration
-  - Financial analysis tools
-  - Conversational interface
-
-- **v0.5.3** (Latest): Type safety overhaul
-  - Complete mypy coverage (107 errors → 0)
-  - Strict type checking across 69 source files
-  - Better IDE support and error detection
+- **v0.5.3** (2025-10-14)
+  - Token credit system with transaction tracking and reconciliation
   - See [v0.5.3 Release Notes](project/versions/backend/v0.5.3.md)
 
-- **v0.4.x-v0.5.x**: Feature development
-  - Authentication system (JWT, email verification, password reset)
-  - Feedback & roadmap platform
-  - Chat restoration with UI state persistence
+- **v0.5.2 / v0.8.3** (2025-10-12)
+  - **Backend v0.5.2**: Feedback platform with rate limiting, N+1 query optimization
+  - **Frontend v0.8.3**: Feedback platform UI with gamification (trophy badges)
+  - Type safety overhaul (107 mypy errors → 0)
+  - See [Version Management](project/versions/README.md) for complete release notes
+
+- **v0.4.5 / v0.6.1** (2025-10-08)
   - Security hardening (non-root users, read-only filesystems)
   - Cost optimization (2-node AKS cluster)
+
+- **v0.3.0-v0.4.0** (2025-10-07)
+  - Authentication with email verification
+  - LLM chat integration with streaming responses
+  - Chat restoration with UI state persistence
 
 - **v0.1.0**: Walking skeleton complete
   - End-to-end connectivity
   - Health monitoring
   - Basic infrastructure
-  - Documentation organization
 
-- **v1.0.0** (Future): Production release
+**Future Releases:**
+
+- **v1.0.0** (Planned): Production release
+  - Frontend model selection UI
   - AI chart interpretation
   - Production deployment
-  - Performance optimization
   - Multi-user support
+
+> **Note**: For detailed release notes and compatibility information, see [Version Management](project/versions/README.md).
