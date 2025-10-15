@@ -52,7 +52,16 @@ def calculate_cost_in_credits(
 
     Returns:
         Cost in credits (rounded to 2 decimals)
+
+    Raises:
+        ValueError: If input_tokens or output_tokens is negative
     """
+    # Validate inputs
+    if input_tokens < 0:
+        raise ValueError(f"input_tokens must be non-negative, got {input_tokens}")
+    if output_tokens < 0:
+        raise ValueError(f"output_tokens must be non-negative, got {output_tokens}")
+
     # Calculate input cost
     input_cost_cny = (input_tokens / 1000) * model_config.pricing.input_cost_per_1k
 
@@ -63,8 +72,10 @@ def calculate_cost_in_credits(
         else 1.0
     )
     output_cost_cny = (
-        output_tokens / 1000
-    ) * model_config.pricing.output_cost_per_1k * output_multiplier
+        (output_tokens / 1000)
+        * model_config.pricing.output_cost_per_1k
+        * output_multiplier
+    )
 
     # Total cost in CNY
     total_cost_cny = input_cost_cny + output_cost_cny
@@ -103,7 +114,7 @@ MODELS = {
         ),
         max_tokens=65536,
         default_max_tokens=4000,
-        supports_thinking=False,
+        supports_thinking=False,  # Empirically tested: thinking mode not working
         description="Premium - Flagship model",
         order=4,
     ),

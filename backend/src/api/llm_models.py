@@ -7,7 +7,7 @@ import structlog
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from ..core.model_config import MODELS, ModelConfig
+from ..core.model_config import DEFAULT_MODEL, MODELS
 
 logger = structlog.get_logger()
 
@@ -21,7 +21,9 @@ class ModelPricingResponse(BaseModel):
     """Model pricing information."""
 
     input_cost_per_1k: float = Field(..., description="Input cost (CNY per 1K tokens)")
-    output_cost_per_1k: float = Field(..., description="Output cost (CNY per 1K tokens)")
+    output_cost_per_1k: float = Field(
+        ..., description="Output cost (CNY per 1K tokens)"
+    )
     thinking_output_multiplier: float = Field(
         ..., description="Cost multiplier for thinking mode (e.g., 4.0 = 4x)"
     )
@@ -145,5 +147,5 @@ async def list_available_models() -> ModelsListResponse:
 
     return ModelsListResponse(
         models=model_responses,
-        default_model="qwen-plus",  # Default recommendation
+        default_model=DEFAULT_MODEL,
     )

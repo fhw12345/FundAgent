@@ -5,7 +5,7 @@
  * assistant responses, and loading indicators.
  */
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -45,9 +45,12 @@ const parseThinkingContent = (content: string): { thinking: string[]; mainConten
 
 // Memoized message component to prevent re-renders
 const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
-  const { thinking, mainContent } = msg.role === "assistant"
-    ? parseThinkingContent(msg.content)
-    : { thinking: [], mainContent: msg.content };
+  // Memoize thinking content parsing to avoid re-parsing on every render
+  const { thinking, mainContent } = useMemo(() => {
+    return msg.role === "assistant"
+      ? parseThinkingContent(msg.content)
+      : { thinking: [], mainContent: msg.content };
+  }, [msg.role, msg.content]);
 
   return (
     <div
@@ -62,13 +65,18 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
       >
         {/* Thinking Content (Collapsible) */}
         {thinking.length > 0 && (
-          <details className="mb-4 border border-blue-300 rounded-lg p-3 bg-blue-50">
-            <summary className="cursor-pointer font-medium text-blue-700 hover:text-blue-900 select-none flex items-center gap-2">
-              <span>🤔 Thinking Process</span>
-              <span className="text-xs text-blue-600">({thinking.join('').length} characters)</span>
+          <details className="mb-3 group">
+            <summary className="cursor-pointer select-none px-3 py-2 flex items-center gap-2 bg-blue-50/60 hover:bg-blue-50 rounded-lg border border-blue-200/50 transition-colors">
+              <svg className="w-4 h-4 text-blue-600 flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-xs font-medium text-blue-700">Thinking Process</span>
+              <span className="text-xs text-blue-600/70 ml-auto">{thinking.join('').length} chars</span>
             </summary>
-            <div className="mt-3 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-blue-200">
-              {thinking.join('\n\n')}
+            <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+{thinking.join('\n\n')}
+              </pre>
             </div>
           </details>
         )}
@@ -256,7 +264,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-      {messages.map((msg: any, index: number) => {
+      {messages.map((msg: ChatMessage, index: number) => {
         const isLastUserMessage = msg.role === "user" && index === lastUserIdx;
 
         return (

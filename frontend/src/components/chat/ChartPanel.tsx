@@ -4,7 +4,8 @@
  * This component displays the trading chart and related controls,
  * such as symbol search and quick analysis buttons.
  */
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
+import { UseQueryResult, UseMutationResult } from "@tanstack/react-query";
 import { SymbolSearch } from "../SymbolSearch";
 import { TradingChart } from "../TradingChart";
 import {
@@ -15,17 +16,19 @@ import {
   LineChart,
   Zap,
   Activity,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
-import { TimeInterval } from "../../services/market";
+import { TimeInterval, PriceDataResponse } from "../../services/market";
 import type { FibonacciMetadata } from "../../utils/analysisMetadataExtractor";
 
 interface ChartPanelProps {
   currentSymbol: string;
   currentCompanyName: string;
-  priceDataQuery: any;
+  priceDataQuery: UseQueryResult<PriceDataResponse, Error>;
   selectedInterval: TimeInterval;
   selectedDateRange: { start: string; end: string };
-  analysisMutation: any;
+  analysisMutation: UseMutationResult<unknown, Error, string>;
   fibonacciAnalysis: FibonacciMetadata | null;
   handleSymbolSelect: (symbol: string, name: string) => void;
   handleIntervalChange: (interval: TimeInterval) => void;
@@ -48,15 +51,39 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
   handleDateRangeSelect,
   handleQuickAnalysis,
 }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
-    <div className="flex flex-col w-1/2 h-full">
+    <div className={`flex flex-col h-full transition-all duration-200 relative ${isCollapsed ? 'w-12' : 'w-1/2'}`}>
+      {/* Collapse/Expand Button - Centered vertically on left edge */}
+      {isCollapsed && (
+        <div className="w-12 h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl border-l border-gray-200/50 items-center justify-center relative">
+          <button
+            onClick={() => setIsCollapsed(false)}
+            className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 p-1 rounded group"
+            title="Expand chart panel"
+          >
+            <ChevronLeft size={20} className="text-gray-500 hover:text-gray-700 transition-all duration-200 hover:scale-110" strokeWidth={2.5} />
+          </button>
+        </div>
+      )}
+
+      <button
+        onClick={() => setIsCollapsed(true)}
+        className={`absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 p-1 rounded z-10 group ${isCollapsed ? 'hidden' : ''}`}
+        title="Collapse chart panel"
+      >
+        <ChevronRight size={20} className="text-gray-500 hover:text-gray-700 transition-all duration-200 hover:scale-110" strokeWidth={2.5} />
+      </button>
+
+      <div className={isCollapsed ? 'hidden' : 'flex flex-col h-full'}>
       <div className="border-b p-4 bg-gray-50">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-medium text-gray-900">
+            <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
               Trading Charts
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mt-1">
               Search symbols and view interactive charts
             </p>
           </div>
@@ -215,6 +242,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
             )}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

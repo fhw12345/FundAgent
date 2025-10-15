@@ -1,14 +1,17 @@
 """
-Alibaba Cloud Qwen LLM client wrapper.
-Using DashScope SDK for qwen-vl-30b-a3b-thinking model.
+LangChain-based LLM client wrapper for Qwen and DeepSeek models.
+
+Uses ChatTongyi (langchain-community) for ALL models via Alibaba Cloud DashScope:
+- Qwen models: qwen-plus, qwen3-max
+- DeepSeek models: deepseek-v3, deepseek-v3.2-exp (available on DashScope)
 """
 
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
-import dashscope
 import structlog
-from dashscope import Generation
+from langchain_community.chat_models import ChatTongyi
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from ..core.config import Settings
 
@@ -23,238 +26,70 @@ class TokenUsage:
     output_tokens: int
     total_tokens: int
 
-    # Future: Add caching info when DashScope provides it
-    # cached_tokens: int | None = None
-    # cache_creation_tokens: int | None = None
 
-
-class QwenClient:
+class DashScopeClient:
     """
-    Client for Alibaba Cloud DashScope models.
+    LangChain-based client for Qwen and DeepSeek models via DashScope.
 
     Supports multi-turn conversations with model selection and thinking mode.
+    Uses ChatTongyi for ALL models (Qwen + DeepSeek) through Alibaba Cloud DashScope API.
     """
 
     def __init__(self, settings: Settings, model: str = "qwen-plus"):
         """
-        Initialize DashScope client.
+        Initialize LangChain chat model client.
 
         Args:
-            settings: Application settings with DASHSCOPE_API_KEY
+            settings: Application settings with API keys
             model: Model ID (qwen-plus, qwen3-max, deepseek-v3, deepseek-v3.2-exp)
+                   All models available through DashScope API
         """
-        self.api_key = settings.dashscope_api_key
         self.model = model
+        self.settings = settings
 
-        # Set API key and base URL for DashScope
-        dashscope.api_key = self.api_key
-        # Use China region (Alibaba Cloud Bailian)
-        dashscope.base_http_api_url = "https://dashscope.aliyuncs.com/api/v1"
+        # Use ChatTongyi for ALL models - they're all available via DashScope
+        # This includes: qwen-plus, qwen3-max, deepseek-v3, deepseek-v3.2-exp
+        # Note: temperature, max_tokens, enable_thinking are passed per-request via bind()
+        self.chat = ChatTongyi(  # type: ignore[call-arg]  # LangChain stubs incomplete
+            model_name=model,
+            dashscope_api_key=settings.dashscope_api_key,
+            streaming=True,
+            model_kwargs={
+                "result_format": "message"  # Required for thinking mode support
+            },
+        )
+        logger.info("ChatTongyi client initialized", model=model)
 
         # Track last token usage for retrieval after streaming
         self.last_token_usage: TokenUsage | None = None
 
-        logger.info("DashScope client initialized", model=self.model)
-
-    def chat(
-        self,
-        messages: list[dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 2000,
-    ) -> str:
+    def _convert_to_langchain_messages(
+        self, messages: list[dict[str, str]]
+    ) -> list[SystemMessage | HumanMessage | AIMessage]:
         """
-        Send chat completion request to Qwen model.
+        Convert dict messages to LangChain message objects.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
-            temperature: Sampling temperature (0-1)
-            max_tokens: Maximum tokens in response
 
         Returns:
-            Model response content
-
-        Raises:
-            Exception: If API call fails
+            List of LangChain message objects
         """
-        try:
-            response = Generation.call(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                result_format="message",  # Return in message format
-            )
+        lc_messages: list[SystemMessage | HumanMessage | AIMessage] = []
+        for msg in messages:
+            role = msg["role"]
+            content = msg["content"]
 
-            if response.status_code == 200:
-                content: str = response.output.choices[0].message.content
-                logger.info(
-                    "Qwen chat completed",
-                    tokens_used=response.usage.total_tokens,
-                    message_count=len(messages),
-                )
-                return content
+            if role == "system":
+                lc_messages.append(SystemMessage(content=content))
+            elif role == "user":
+                lc_messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                lc_messages.append(AIMessage(content=content))
             else:
-                error_msg = f"Qwen API error: {response.code} - {response.message}"
-                logger.error("Qwen API failed", error=error_msg)
-                raise Exception(error_msg)
+                logger.warning("Unknown message role", role=role)
 
-        except Exception as e:
-            logger.error("Qwen chat failed", error=str(e))
-            raise
-
-    async def achat(
-        self,
-        messages: list[dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 3000,
-    ) -> str:
-        """
-        Async version of chat completion.
-
-        Note: DashScope SDK doesn't have native async support yet,
-        so this wraps the sync call. For production, consider
-        using asyncio.to_thread() or httpx for direct API calls.
-
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            temperature: Sampling temperature (0-1)
-            max_tokens: Maximum tokens in response (default: 3000)
-
-        Returns:
-            Model response content
-        """
-        # For now, calling sync version
-        # TODO: Implement true async with httpx in future version
-        return self.chat(messages, temperature, max_tokens)
-
-    def stream_chat(
-        self,
-        messages: list[dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 3000,
-        thinking_enabled: bool = False,
-    ) -> Generator[str, None, None]:
-        """
-        Stream chat completion response chunk by chunk.
-
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            temperature: Sampling temperature (0-1)
-            max_tokens: Maximum tokens in response (default: 3000)
-            thinking_enabled: Enable thinking mode for supported models (qwen-plus, deepseek-v3.2-exp)
-
-        Yields:
-            str: Response content chunks as they arrive
-
-        Raises:
-            Exception: If API call fails
-        """
-        try:
-            # Build API call parameters
-            api_params = {
-                "model": self.model,
-                "messages": messages,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "result_format": "message",
-                "stream": True,
-                "incremental_output": True,
-            }
-
-            # Add thinking mode parameter for supported models
-            if thinking_enabled:
-                api_params["enable_thinking"] = True
-
-            responses = Generation.call(**api_params)
-
-            # Track if we've logged response structure for debugging
-            logged_structure = False
-
-            for response in responses:
-                if response.status_code == 200:
-                    # Extract incremental content from this chunk
-                    choice = response.output.choices[0]
-                    message_obj = choice.message
-
-                    # Log response structure once for debugging (only when thinking enabled)
-                    if thinking_enabled and not logged_structure:
-                        logger.info(
-                            "DashScope streaming response structure (first chunk)",
-                            has_reasoning_content=hasattr(message_obj, 'reasoning_content'),
-                            has_content=hasattr(message_obj, 'content'),
-                            message_attrs=[attr for attr in dir(message_obj) if not attr.startswith('_')],
-                        )
-                        logged_structure = True
-
-                    # Extract reasoning_content (thinking mode) if enabled
-                    # DashScope returns reasoning in the 'reasoning_content' field (NOT 'thinking')
-                    reasoning_content = None
-                    if thinking_enabled:
-                        try:
-                            # Check for reasoning_content attribute on message
-                            if hasattr(message_obj, 'reasoning_content') and message_obj.reasoning_content:
-                                reasoning_content = message_obj.reasoning_content
-                                logger.debug(
-                                    "Reasoning content chunk received",
-                                    chunk_length=len(reasoning_content),
-                                )
-                        except Exception as e:
-                            logger.debug("Error extracting reasoning content", error=str(e))
-
-                    # Yield reasoning content wrapped in <thinking> tags for frontend parsing
-                    if reasoning_content:
-                        yield f"<thinking>{reasoning_content}</thinking>"
-
-                    # Extract regular content
-                    chunk_content = message_obj.content
-                    if chunk_content:
-                        yield chunk_content
-
-                    # Track token usage from final response
-                    finish_reason = response.output.choices[0].get("finish_reason")
-                    if finish_reason == "stop" and hasattr(response, "usage"):
-                        usage = response.usage
-                        # Get granular token counts - fail if not available
-                        input_tokens = getattr(usage, "input_tokens", None)
-                        output_tokens = getattr(usage, "output_tokens", None)
-                        total_tokens = usage.total_tokens
-
-                        if input_tokens is None or output_tokens is None:
-                            logger.error(
-                                "DashScope API did not provide granular token breakdown",
-                                total_tokens=total_tokens,
-                                usage_attrs=dir(usage),
-                            )
-                            raise ValueError(
-                                f"API missing input/output token breakdown. "
-                                f"Only got total_tokens={total_tokens}. "
-                                f"Available fields: {dir(usage)}"
-                            )
-
-                        self.last_token_usage = TokenUsage(
-                            input_tokens=input_tokens,
-                            output_tokens=output_tokens,
-                            total_tokens=total_tokens,
-                        )
-                else:
-                    error_msg = f"Qwen API error: {response.code} - {response.message}"
-                    logger.error("Qwen streaming failed", error=error_msg)
-                    raise Exception(error_msg)
-
-            if self.last_token_usage:
-                logger.info(
-                    "Qwen streaming completed",
-                    input_tokens=self.last_token_usage.input_tokens,
-                    output_tokens=self.last_token_usage.output_tokens,
-                    total_tokens=self.last_token_usage.total_tokens,
-                    message_count=len(messages),
-                )
-            else:
-                logger.warning("Qwen streaming completed without token usage data")
-
-        except Exception as e:
-            logger.error("Qwen streaming chat failed", error=str(e))
-            raise
+        return lc_messages
 
     async def astream_chat(
         self,
@@ -264,21 +99,115 @@ class QwenClient:
         thinking_enabled: bool = False,
     ) -> AsyncGenerator[str, None]:
         """
-        Async generator for streaming chat completion.
+        Async generator for streaming chat completion with LangChain.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum tokens in response (default: 3000)
-            thinking_enabled: Enable thinking mode for supported models
+            thinking_enabled: Enable thinking mode (extracted from reasoning_content)
 
         Yields:
             str: Response content chunks as they arrive
+                 Reasoning content wrapped in <thinking> tags
         """
-        # DashScope SDK uses sync generators, so we yield from the sync version
-        # In production, consider implementing with httpx for true async
-        for chunk in self.stream_chat(messages, temperature, max_tokens, thinking_enabled):
-            yield chunk
+        try:
+            # Convert dict messages to LangChain format
+            lc_messages = self._convert_to_langchain_messages(messages)
+
+            logger.info(
+                "Streaming chat with LangChain",
+                model=self.model,
+                thinking_enabled=thinking_enabled,
+                message_count=len(messages),
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+            # Track if we've logged response structure and thinking state
+            logged_structure = False
+            thinking_started = False
+
+            # Bind dynamic parameters (temperature, max_tokens, enable_thinking)
+            # The bind() method passes parameters to DashScope API
+            chat_with_params = self.chat.bind(
+                temperature=temperature,
+                max_tokens=max_tokens,
+                enable_thinking=thinking_enabled,  # Pass to DashScope API
+            )
+
+            # Stream response from chat model
+            async for chunk in chat_with_params.astream(lc_messages):
+                # Log structure once for debugging
+                if thinking_enabled and not logged_structure:
+                    logger.info(
+                        "LangChain streaming response structure (first chunk)",
+                        has_reasoning_content="reasoning_content"
+                        in chunk.additional_kwargs,
+                        has_content=bool(chunk.content),
+                        additional_kwargs_keys=list(chunk.additional_kwargs.keys()),
+                    )
+                    logged_structure = True
+
+                # Extract reasoning_content (thinking mode) from additional_kwargs
+                reasoning = chunk.additional_kwargs.get("reasoning_content", "")
+                if reasoning:
+                    # Send opening tag only once at the start of thinking
+                    if not thinking_started:
+                        yield "<thinking>"
+                        thinking_started = True
+                        logger.debug("Thinking mode started")
+
+                    # Stream reasoning content without tags
+                    yield reasoning
+
+                # Yield regular content
+                if chunk.content:
+                    # Close thinking tag if we were in thinking mode
+                    if thinking_started:
+                        yield "</thinking>"
+                        thinking_started = False
+                        logger.debug("Thinking mode ended")
+
+                    yield chunk.content  # type: ignore[misc]  # LangChain chunk.content can be list
+
+                # Extract token usage from final chunk
+                if chunk.response_metadata.get("finish_reason") == "stop":
+                    token_usage = chunk.response_metadata.get("token_usage", {})
+                    if token_usage:
+                        self.last_token_usage = TokenUsage(
+                            input_tokens=token_usage.get("input_tokens", 0),
+                            output_tokens=token_usage.get("output_tokens", 0),
+                            total_tokens=token_usage.get("total_tokens", 0),
+                        )
+                        logger.info(
+                            "LangChain streaming completed",
+                            input_tokens=self.last_token_usage.input_tokens,
+                            output_tokens=self.last_token_usage.output_tokens,
+                            total_tokens=self.last_token_usage.total_tokens,
+                        )
+                    else:
+                        logger.warning(
+                            "Token usage not available in final chunk",
+                            response_metadata=chunk.response_metadata,
+                        )
+
+        except (ValueError, KeyError, AttributeError) as e:
+            logger.error(
+                "LangChain streaming chat failed - data error",
+                error=str(e),
+                model=self.model,
+                error_type=type(e).__name__,
+            )
+            raise
+        except Exception as e:
+            logger.error(
+                "LangChain streaming chat failed - unexpected error",
+                error=str(e),
+                model=self.model,
+                error_type=type(e).__name__,
+            )
+            raise
 
     def get_last_token_usage(self) -> TokenUsage | None:
         """
@@ -288,32 +217,6 @@ class QwenClient:
             TokenUsage if available, None otherwise
         """
         return self.last_token_usage
-
-    def chat_with_system_prompt(
-        self,
-        user_message: str,
-        system_prompt: str,
-        conversation_history: list[dict[str, str]] | None = None,
-    ) -> str:
-        """
-        Chat with a system prompt and optional history.
-
-        Args:
-            user_message: Current user message
-            system_prompt: System instructions for the model
-            conversation_history: Previous messages (without system prompt)
-
-        Returns:
-            Model response
-        """
-        messages = [{"role": "system", "content": system_prompt}]
-
-        if conversation_history:
-            messages.extend(conversation_history)
-
-        messages.append({"role": "user", "content": user_message})
-
-        return self.chat(messages)
 
 
 # Default system prompt for financial analysis
