@@ -183,6 +183,10 @@ export const chatService = {
       role?: string;
       source?: string;
       metadata?: any; // Analysis metadata for overlays
+      // LLM Configuration
+      model?: string;
+      thinking_enabled?: boolean;
+      max_tokens?: number;
     },
   ): () => void {
     const baseURL =
@@ -210,6 +214,10 @@ export const chatService = {
         role: options?.role ?? "user",
         source: options?.source ?? "user",
         metadata: options?.metadata,
+        // LLM Configuration
+        model: options?.model ?? "qwen-plus",
+        thinking_enabled: options?.thinking_enabled ?? false,
+        max_tokens: options?.max_tokens ?? 3000,
       }),
       signal: controller.signal,
     })

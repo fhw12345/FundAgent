@@ -11,6 +11,7 @@ import { useChatRestoration } from "../hooks/useChatRestoration";
 import { useUIStateSync } from "../hooks/useUIStateSync";
 import type { FibonacciMetadata } from "../utils/analysisMetadataExtractor";
 import { getPeriodForInterval } from "../utils/dateRangeCalculator";
+import type { ModelSettings } from "../types/models";
 
 export function EnhancedChatInterface() {
   const [message, setMessage] = useState("");
@@ -20,6 +21,13 @@ export function EnhancedChatInterface() {
   const [dateRangeStart, setDateRangeStart] = useState("");
   const [dateRangeEnd, setDateRangeEnd] = useState("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // LLM Model settings
+  const [modelSettings, setModelSettings] = useState<ModelSettings>({
+    model: "qwen-plus",
+    thinking_enabled: false,
+    max_tokens: 3000,
+  });
 
   // Memoize selectedDateRange object to prevent recreation on every render
   const selectedDateRange = useMemo(
@@ -102,6 +110,7 @@ export function EnhancedChatInterface() {
     selectedInterval,
     chatId,
     setChatId,
+    modelSettings,
   );
 
   // Button analysis mutation for quick analysis buttons
@@ -306,6 +315,8 @@ export function EnhancedChatInterface() {
                 isPending={chatMutation.isPending || buttonMutation.isPending}
                 currentSymbol={currentSymbol}
                 messages={messages}
+                modelSettings={modelSettings}
+                onModelSettingsChange={setModelSettings}
               />
             </div>
 

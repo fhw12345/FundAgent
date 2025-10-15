@@ -20,6 +20,7 @@ from .api.chat import router as chat_router
 from .api.credits import router as credits_router
 from .api.feedback import router as feedback_router
 from .api.health import router as health_router
+from .api.llm_models import router as llm_models_router
 from .api.market_data import router as market_data_router
 from .core.config import get_settings
 from .core.exceptions import AppError
@@ -174,6 +175,7 @@ def create_app() -> FastAPI:
     app.include_router(market_data_router)
     app.include_router(chat_router)  # Persistent MongoDB-based chat
     app.include_router(credits_router)  # Token-based credit economy
+    app.include_router(llm_models_router)  # LLM model selection and pricing
     app.include_router(feedback_router)  # Feedback & Community Roadmap platform
 
     @app.get("/")

@@ -32,13 +32,25 @@ class ChatAgent:
             settings: Application settings
         """
         self.settings = settings
-        self.llm_client = QwenClient(settings)
         self.system_prompt = FINANCIAL_AGENT_SYSTEM_PROMPT
+        # Cache LLM clients by model to avoid recreation
+        self._client_cache: dict[str, QwenClient] = {}
 
         logger.info("ChatAgent initialized")
 
+    def _get_client(self, model: str) -> QwenClient:
+        """Get or create LLM client for the specified model."""
+        if model not in self._client_cache:
+            self._client_cache[model] = QwenClient(self.settings, model=model)
+            logger.info("Created new LLM client", model=model)
+        return self._client_cache[model]
+
     async def stream_chat(
-        self, messages: list[dict[str, str]]
+        self,
+        messages: list[dict[str, str]],
+        model: str = "qwen-plus",
+        thinking_enabled: bool = False,
+        max_tokens: int = 3000,
     ) -> AsyncGenerator[str, None]:
         """
         Stream LLM response for conversation history.
@@ -46,6 +58,9 @@ class ChatAgent:
         Args:
             messages: Conversation history (without system prompt)
                      Format: [{"role": "user", "content": "..."}, ...]
+            model: Model ID (qwen-plus, qwen3-max, deepseek-v3, deepseek-v3.2-exp)
+            thinking_enabled: Enable thinking mode for supported models
+            max_tokens: Maximum output tokens
 
         Yields:
             str: Response content chunks as they arrive
@@ -57,25 +72,38 @@ class ChatAgent:
 
         logger.info(
             "Streaming chat to LLM",
+            model=model,
+            thinking_enabled=thinking_enabled,
+            max_tokens=max_tokens,
             message_count=len(messages),
             total_with_system=len(conversation_history),
         )
 
+        # Get client for the specified model
+        llm_client = self._get_client(model)
+
         # Stream LLM response
-        async for chunk in self.llm_client.astream_chat(
+        async for chunk in llm_client.astream_chat(
             messages=conversation_history,
             temperature=0.7,
-            max_tokens=3000,
+            max_tokens=max_tokens,
+            thinking_enabled=thinking_enabled,
         ):
             yield chunk
 
-        logger.info("Streaming chat completed")
+        logger.info("Streaming chat completed", model=model)
 
-    def get_last_token_usage(self) -> TokenUsage | None:
+    def get_last_token_usage(self, model: str = "qwen-plus") -> TokenUsage | None:
         """
         Get token usage from the last chat operation.
+
+        Args:
+            model: Model ID to get usage from
 
         Returns:
             TokenUsage if available, None otherwise
         """
-        return self.llm_client.get_last_token_usage()
+        client = self._client_cache.get(model)
+        if not client:
+            return None
+        return client.get_last_token_usage()

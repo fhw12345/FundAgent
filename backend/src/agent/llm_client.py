@@ -30,21 +30,21 @@ class TokenUsage:
 
 class QwenClient:
     """
-    Client for Alibaba Cloud Qwen VL model.
+    Client for Alibaba Cloud DashScope models.
 
-    Supports multi-turn conversations with financial analysis context.
+    Supports multi-turn conversations with model selection and thinking mode.
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, model: str = "qwen-plus"):
         """
-        Initialize Qwen client.
+        Initialize DashScope client.
 
         Args:
             settings: Application settings with DASHSCOPE_API_KEY
+            model: Model ID (qwen-plus, qwen3-max, deepseek-v3, deepseek-v3.2-exp)
         """
         self.api_key = settings.dashscope_api_key
-        # Using Qwen text model (VL models require different endpoint)
-        self.model = "qwen-plus"  # High-performance text model
+        self.model = model
 
         # Set API key and base URL for DashScope
         dashscope.api_key = self.api_key
@@ -54,7 +54,7 @@ class QwenClient:
         # Track last token usage for retrieval after streaming
         self.last_token_usage: TokenUsage | None = None
 
-        logger.info("QwenClient initialized", model=self.model)
+        logger.info("DashScope client initialized", model=self.model)
 
     def chat(
         self,
@@ -132,6 +132,7 @@ class QwenClient:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 3000,
+        thinking_enabled: bool = False,
     ) -> Generator[str, None, None]:
         """
         Stream chat completion response chunk by chunk.
@@ -140,6 +141,7 @@ class QwenClient:
             messages: List of message dicts with 'role' and 'content'
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum tokens in response (default: 3000)
+            thinking_enabled: Enable thinking mode for supported models (qwen-plus, deepseek-v3.2-exp)
 
         Yields:
             str: Response content chunks as they arrive
@@ -148,20 +150,63 @@ class QwenClient:
             Exception: If API call fails
         """
         try:
-            responses = Generation.call(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                result_format="message",
-                stream=True,  # Enable streaming
-                incremental_output=True,  # Get incremental chunks
-            )
+            # Build API call parameters
+            api_params = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "result_format": "message",
+                "stream": True,
+                "incremental_output": True,
+            }
+
+            # Add thinking mode parameter for supported models
+            if thinking_enabled:
+                api_params["enable_thinking"] = True
+
+            responses = Generation.call(**api_params)
+
+            # Track if we've logged response structure for debugging
+            logged_structure = False
 
             for response in responses:
                 if response.status_code == 200:
                     # Extract incremental content from this chunk
-                    chunk_content = response.output.choices[0].message.content
+                    choice = response.output.choices[0]
+                    message_obj = choice.message
+
+                    # Log response structure once for debugging (only when thinking enabled)
+                    if thinking_enabled and not logged_structure:
+                        logger.info(
+                            "DashScope streaming response structure (first chunk)",
+                            has_reasoning_content=hasattr(message_obj, 'reasoning_content'),
+                            has_content=hasattr(message_obj, 'content'),
+                            message_attrs=[attr for attr in dir(message_obj) if not attr.startswith('_')],
+                        )
+                        logged_structure = True
+
+                    # Extract reasoning_content (thinking mode) if enabled
+                    # DashScope returns reasoning in the 'reasoning_content' field (NOT 'thinking')
+                    reasoning_content = None
+                    if thinking_enabled:
+                        try:
+                            # Check for reasoning_content attribute on message
+                            if hasattr(message_obj, 'reasoning_content') and message_obj.reasoning_content:
+                                reasoning_content = message_obj.reasoning_content
+                                logger.debug(
+                                    "Reasoning content chunk received",
+                                    chunk_length=len(reasoning_content),
+                                )
+                        except Exception as e:
+                            logger.debug("Error extracting reasoning content", error=str(e))
+
+                    # Yield reasoning content wrapped in <thinking> tags for frontend parsing
+                    if reasoning_content:
+                        yield f"<thinking>{reasoning_content}</thinking>"
+
+                    # Extract regular content
+                    chunk_content = message_obj.content
                     if chunk_content:
                         yield chunk_content
 
@@ -216,6 +261,7 @@ class QwenClient:
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 3000,
+        thinking_enabled: bool = False,
     ) -> AsyncGenerator[str, None]:
         """
         Async generator for streaming chat completion.
@@ -224,13 +270,14 @@ class QwenClient:
             messages: List of message dicts with 'role' and 'content'
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum tokens in response (default: 3000)
+            thinking_enabled: Enable thinking mode for supported models
 
         Yields:
             str: Response content chunks as they arrive
         """
         # DashScope SDK uses sync generators, so we yield from the sync version
         # In production, consider implementing with httpx for true async
-        for chunk in self.stream_chat(messages, temperature, max_tokens):
+        for chunk in self.stream_chat(messages, temperature, max_tokens, thinking_enabled):
             yield chunk
 
     def get_last_token_usage(self) -> TokenUsage | None:

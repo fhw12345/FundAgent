@@ -145,7 +145,7 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   }, [data]);
 
   // Use highlightDateRange if available (from Fibonacci/Stochastic), otherwise use actual data range
-  const displayDateRange = highlightDateRange || actualDateRange;
+  const displayDateRange = highlightDateRange || actualDateRange || undefined;
 
   return (
     <div className={`relative ${className}`}>

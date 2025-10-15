@@ -21,32 +21,34 @@ from src.database.repositories.transaction_repository import TransactionReposito
 from src.database.repositories.user_repository import UserRepository
 from src.models.transaction import CreditTransaction, TransactionCreate
 from src.models.user import User
-from src.services.credit_service import CreditService, TOKENS_PER_CREDIT
+from src.services.credit_service import CreditService
 
 
 class TestCreditServiceCostCalculation:
-    """Test cost calculation logic."""
+    """Test cost calculation logic with new model-based pricing."""
 
-    def test_calculate_cost_basic(self):
-        """Test basic cost calculation: tokens / 200."""
-        assert CreditService.calculate_cost(200) == 1.0
-        assert CreditService.calculate_cost(400) == 2.0
-        assert CreditService.calculate_cost(1000) == 5.0
+    def test_calculate_cost_qwen_plus_basic(self):
+        """Test cost calculation for qwen-plus model."""
+        # qwen-plus: input ¥0.0008/1K, output ¥0.002/1K, 1 credit = ¥0.001
+        # 500 input + 1000 output = (500/1000)*0.0008 + (1000/1000)*0.002 = 0.0004 + 0.002 = 0.0024 CNY = 2.4 credits
+        assert CreditService.calculate_cost(500, 1000, "qwen-plus") == 2.4
 
-    def test_calculate_cost_rounding(self):
-        """Test cost rounding to 2 decimal places."""
-        assert CreditService.calculate_cost(150) == 0.75  # 150/200 = 0.75
-        assert CreditService.calculate_cost(333) == 1.67  # 333/200 = 1.665 → 1.67
-        assert CreditService.calculate_cost(1) == 0.01  # 1/200 = 0.005 → 0.01
+    def test_calculate_cost_with_thinking_mode(self):
+        """Test cost calculation with thinking mode (4x output multiplier)."""
+        # qwen-plus with thinking: output cost * 4
+        # 500 input + 1000 output thinking = (500/1000)*0.0008 + (1000/1000)*0.002*4 = 0.0004 + 0.008 = 0.0084 CNY = 8.4 credits
+        assert CreditService.calculate_cost(500, 1000, "qwen-plus", thinking_enabled=True) == 8.4
 
     def test_calculate_cost_zero_tokens(self):
         """Test cost calculation with zero tokens."""
-        assert CreditService.calculate_cost(0) == 0.0
+        assert CreditService.calculate_cost(0, 0, "qwen-plus") == 0.0
 
-    def test_calculate_cost_large_numbers(self):
-        """Test cost calculation with large token counts."""
-        assert CreditService.calculate_cost(100000) == 500.0
-        assert CreditService.calculate_cost(1000000) == 5000.0
+    def test_calculate_cost_different_models(self):
+        """Test that different models have different costs."""
+        # qwen3-max is more expensive than qwen-plus
+        qwen_plus_cost = CreditService.calculate_cost(1000, 1000, "qwen-plus")
+        qwen_max_cost = CreditService.calculate_cost(1000, 1000, "qwen3-max")
+        assert qwen_max_cost > qwen_plus_cost
 
 
 @pytest.mark.asyncio
@@ -237,7 +239,7 @@ class TestCreditServiceCompleteTransaction:
             input_tokens=500,
             output_tokens=1000,
             total_tokens=1500,
-            actual_cost=7.5,
+            actual_cost=2.4,  # qwen-plus: 500 input + 1000 output = 2.4 credits
             model="qwen-plus",
             request_type="chat",
         )
@@ -245,9 +247,9 @@ class TestCreditServiceCompleteTransaction:
         updated_user = User(
             user_id="user123",
             username="testuser",
-            credits=92.5,  # 100 - 7.5
+            credits=97.6,  # 100 - 2.4
             total_tokens_used=1500,
-            total_credits_spent=7.5,
+            total_credits_spent=2.4,
         )
 
         # Mock MongoDB transaction support with proper async context manager
@@ -279,11 +281,11 @@ class TestCreditServiceCompleteTransaction:
 
         assert transaction == completed_transaction
         assert user == updated_user
-        assert user.credits == 92.5
+        assert user.credits == 97.6
         credit_service.transaction_repo.complete_transaction.assert_called_once()
         credit_service.user_repo.deduct_credits.assert_called_once_with(
             user_id="user123",
-            cost=7.5,
+            cost=2.4,
             tokens=1500,
             session=mock_session,
         )
@@ -358,7 +360,7 @@ class TestCreditServiceCompleteTransaction:
             input_tokens=500,
             output_tokens=1000,
             total_tokens=1500,
-            actual_cost=7.5,
+            actual_cost=2.4,  # qwen-plus: 500 input + 1000 output = 2.4 credits
             model="qwen-plus",
             request_type="chat",
         )
@@ -366,9 +368,9 @@ class TestCreditServiceCompleteTransaction:
         updated_user = User(
             user_id="user123",
             username="testuser",
-            credits=92.5,
+            credits=97.6,
             total_tokens_used=1500,
-            total_credits_spent=7.5,
+            total_credits_spent=2.4,
         )
 
         credit_service.transaction_repo.complete_transaction.return_value = (
@@ -390,7 +392,7 @@ class TestCreditServiceCompleteTransaction:
         # Should fall back to sequential operations (without session parameter)
         credit_service.user_repo.deduct_credits.assert_called_once_with(
             user_id="user123",
-            cost=7.5,
+            cost=2.4,
             tokens=1500,
         )
 
@@ -453,7 +455,7 @@ class TestCreditServiceCompleteTransaction:
             input_tokens=500,
             output_tokens=1000,
             total_tokens=1500,
-            actual_cost=7.5,
+            actual_cost=2.4,  # qwen-plus: 500 input + 1000 output = 2.4 credits
             model="qwen-plus",
             request_type="chat",
         )

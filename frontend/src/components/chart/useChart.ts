@@ -5,7 +5,7 @@
  * It handles chart creation, series management, data updates, event handling, and resizing.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import {
   createChart,
   IChartApi,
@@ -365,7 +365,7 @@ export const useChart = (
     });
   }, [fibonacciAnalysis]);
 
-  const setChartData = (
+  const setChartData = useCallback((
     data: (LineData | CandlestickData)[],
     highlightDateRange?: { start: string; end: string },
   ) => {
@@ -375,7 +375,7 @@ export const useChart = (
         chartRef.current?.timeScale().fitContent();
       }
     }
-  };
+  }, []); // Empty deps - refs are stable
 
   return { chartRef, seriesRef, setChartData };
 };

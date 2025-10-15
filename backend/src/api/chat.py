@@ -433,11 +433,14 @@ async def chat_stream_persistent(
                 user_id=user_id,
                 chat_id=chat_id,
                 estimated_cost=10.0,
+                model=request.model,
             )
 
             logger.info(
                 "Credits checked and transaction created",
                 user_id=user_id,
+                model=request.model,
+                thinking_enabled=request.thinking_enabled,
                 transaction_id=transaction.transaction_id,
             )
 
@@ -463,14 +466,19 @@ async def chat_stream_persistent(
             full_response = ""
             import asyncio
 
-            async for chunk in agent.stream_chat(messages=conversation_history):
+            async for chunk in agent.stream_chat(
+                messages=conversation_history,
+                model=request.model,
+                thinking_enabled=request.thinking_enabled,
+                max_tokens=request.max_tokens,
+            ):
                 full_response += chunk
                 chunk_data = {"content": chunk, "type": "content"}
                 yield f"data: {json.dumps(chunk_data)}\n\n"
                 await asyncio.sleep(0)  # Flush buffer
 
             # Get token usage from LLM client
-            token_usage = agent.get_last_token_usage()
+            token_usage = agent.get_last_token_usage(model=request.model)
 
             if not token_usage:
                 logger.error(
@@ -496,7 +504,7 @@ async def chat_stream_persistent(
                 content=full_response,
                 source="llm",
                 metadata=MessageMetadata(
-                    model="qwen-plus",
+                    model=request.model,
                     tokens=token_usage.total_tokens,
                     input_tokens=token_usage.input_tokens,
                     output_tokens=token_usage.output_tokens,
@@ -511,6 +519,8 @@ async def chat_stream_persistent(
                     message_id=assistant_message.message_id,
                     input_tokens=token_usage.input_tokens,
                     output_tokens=token_usage.output_tokens,
+                    model=request.model,
+                    thinking_enabled=request.thinking_enabled,
                 )
             )
 

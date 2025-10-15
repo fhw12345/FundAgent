@@ -24,8 +24,31 @@ const formatTimestamp = (timestamp: string) => {
   });
 };
 
+// Parse thinking content from message
+const parseThinkingContent = (content: string): { thinking: string[]; mainContent: string } => {
+  const thinkingRegex = /<thinking>(.*?)<\/thinking>/gs;
+  const thinkingMatches: string[] = [];
+  let match;
+
+  while ((match = thinkingRegex.exec(content)) !== null) {
+    thinkingMatches.push(match[1]);
+  }
+
+  // Remove thinking tags from main content
+  const mainContent = content.replace(thinkingRegex, '').trim();
+
+  return {
+    thinking: thinkingMatches,
+    mainContent: mainContent || content, // Fallback to original if empty
+  };
+};
+
 // Memoized message component to prevent re-renders
 const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
+  const { thinking, mainContent } = msg.role === "assistant"
+    ? parseThinkingContent(msg.content)
+    : { thinking: [], mainContent: msg.content };
+
   return (
     <div
       className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -37,6 +60,19 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
             : "w-full bg-gray-50 text-gray-900 border border-gray-200"
         }`}
       >
+        {/* Thinking Content (Collapsible) */}
+        {thinking.length > 0 && (
+          <details className="mb-4 border border-blue-300 rounded-lg p-3 bg-blue-50">
+            <summary className="cursor-pointer font-medium text-blue-700 hover:text-blue-900 select-none flex items-center gap-2">
+              <span>🤔 Thinking Process</span>
+              <span className="text-xs text-blue-600">({thinking.join('').length} characters)</span>
+            </summary>
+            <div className="mt-3 text-sm text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-blue-200">
+              {thinking.join('\n\n')}
+            </div>
+          </details>
+        )}
+
         <div className="markdown-content text-base max-w-none">
           {msg.role === "user" ? (
             <p className="text-base">{msg.content}</p>
@@ -161,7 +197,7 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
                 ),
               }}
             >
-              {msg.content}
+              {mainContent}
             </ReactMarkdown>
           )}
         </div>

@@ -47,6 +47,21 @@ class ChatRequest(BaseModel):
         None,
         description="Analysis metadata for overlays (Fibonacci levels, Stochastic signals, etc.)",
     )
+    # LLM Configuration
+    model: str = Field(
+        "qwen-plus",
+        description="Model ID: qwen-plus, qwen3-max, deepseek-v3, deepseek-v3.2-exp",
+    )
+    thinking_enabled: bool = Field(
+        False,
+        description="Enable thinking mode (4x cost for qwen-plus, not supported on qwen3-max/deepseek-v3)",
+    )
+    max_tokens: int = Field(
+        3000,
+        ge=500,
+        le=32768,
+        description="Maximum output tokens (500-32768)",
+    )
 
 
 class UpdateUIStateRequest(BaseModel):

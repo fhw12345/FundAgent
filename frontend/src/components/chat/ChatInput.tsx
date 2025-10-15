@@ -2,13 +2,15 @@
  * ChatInput Component
  *
  * Provides a text input field and a send button for users to interact with the chatbot.
- * Shows cost estimation and low balance warnings.
+ * Shows cost estimation, low balance warnings, and model settings.
  */
 
-import React, { useMemo } from "react";
-import { Send, AlertCircle, Coins } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Send, AlertCircle, Coins, Settings } from "lucide-react";
 import { useCurrentBalance } from "../../hooks/useCredits";
 import { estimateChatCost } from "../../utils/tokenEstimator";
+import { ModelSettings as IModelSettings } from "../../types/models";
+import { ModelSettings } from "./ModelSettings";
 
 interface ChatInputProps {
   message: string;
@@ -17,6 +19,8 @@ interface ChatInputProps {
   isPending: boolean;
   currentSymbol: string | null;
   messages: Array<{ role: string; content: string }>;
+  modelSettings: IModelSettings;
+  onModelSettingsChange: (settings: IModelSettings) => void;
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -26,12 +30,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   isPending,
   currentSymbol,
   messages,
+  modelSettings,
+  onModelSettingsChange,
 }) => {
   const currentBalance = useCurrentBalance();
+  const [showSettings, setShowSettings] = useState(false);
 
   // Calculate estimated cost based on context + input
   const costEstimate = useMemo(() => {
-    if (!message.trim()) return { estimatedCredits: 0 };
+    if (!message.trim()) return { estimatedCredits: 0, contextTokens: 0, inputTokens: 0, totalTokens: 0 };
     return estimateChatCost(messages, message);
   }, [messages, message]);
 
@@ -81,6 +88,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
+      {/* Model Settings Panel */}
+      {showSettings && (
+        <div className="mb-4">
+          <ModelSettings
+            settings={modelSettings}
+            onChange={onModelSettingsChange}
+          />
+        </div>
+      )}
+
       <div className="flex gap-3">
         <div className="flex-1">
           <input
@@ -111,6 +128,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           )}
         </div>
+        {/* Settings Button */}
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="bg-gray-100 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-200 transition-colors"
+          title="Model settings"
+        >
+          <Settings className="h-5 w-5" />
+        </button>
         <button
           onClick={onSendMessage}
           disabled={!message.trim() || isPending || hasInsufficientCredits}

@@ -35,6 +35,7 @@ export const useAnalysis = (
   _selectedInterval?: string,
   chatId?: string | null,
   setChatId?: (id: string) => void,
+  modelSettings?: { model: string; thinking_enabled: boolean; max_tokens: number },
 ) => {
   const queryClient = useQueryClient();
   const optimisticDeduction = useOptimisticCreditDeduction();
@@ -121,6 +122,12 @@ export const useAnalysis = (
             );
             reject(new Error(error));
           },
+          // LLM Configuration options
+          modelSettings ? {
+            model: modelSettings.model,
+            thinking_enabled: modelSettings.thinking_enabled,
+            max_tokens: modelSettings.max_tokens,
+          } : undefined,
         );
       });
     },

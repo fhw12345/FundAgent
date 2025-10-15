@@ -7,6 +7,7 @@ import structlog
 
 from ..core.config import Settings
 from ..core.exceptions import ValidationError
+from ..core.model_config import calculate_cost_in_credits, get_model_config
 from ..database.mongodb import MongoDB
 from ..database.repositories.transaction_repository import TransactionRepository
 from ..database.repositories.user_repository import UserRepository
@@ -17,7 +18,6 @@ logger = structlog.get_logger()
 
 # Constants
 MIN_CREDIT_THRESHOLD = 10.0  # Minimum credits required to make a request
-TOKENS_PER_CREDIT = 200  # Conversion rate: 1 credit = 200 tokens
 
 
 class CreditService:
@@ -45,18 +45,32 @@ class CreditService:
         self.settings = settings
 
     @staticmethod
-    def calculate_cost(tokens: int) -> float:
+    def calculate_cost(
+        input_tokens: int,
+        output_tokens: int,
+        model_id: str = "qwen-plus",
+        thinking_enabled: bool = False,
+    ) -> float:
         """
-        Calculate credit cost from token count.
+        Calculate credit cost based on model-specific pricing.
 
         Args:
-            tokens: Total tokens used (input + output)
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens
+            model_id: Model identifier (default: qwen-plus)
+            thinking_enabled: Whether thinking mode is enabled
 
         Returns:
             Credit cost (rounded to 2 decimals)
         """
-        cost = tokens / TOKENS_PER_CREDIT
-        return round(cost, 2)
+        model_config = get_model_config(model_id)
+
+        return calculate_cost_in_credits(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            model_config=model_config,
+            thinking_enabled=thinking_enabled,
+        )
 
     async def check_balance(self, user_id: str, estimated_cost: float) -> bool:
         """
@@ -96,7 +110,11 @@ class CreditService:
         return has_sufficient
 
     async def create_pending_transaction(
-        self, user_id: str, chat_id: str, estimated_cost: float
+        self,
+        user_id: str,
+        chat_id: str,
+        estimated_cost: float,
+        model: str = "qwen-plus",
     ) -> CreditTransaction:
         """
         Create a PENDING transaction (safety net before LLM call).
@@ -105,6 +123,7 @@ class CreditService:
             user_id: User identifier
             chat_id: Chat context
             estimated_cost: Estimated cost in credits
+            model: Model identifier (default: qwen-plus)
 
         Returns:
             Created transaction with PENDING status
@@ -113,7 +132,7 @@ class CreditService:
             user_id=user_id,
             chat_id=chat_id,
             estimated_cost=estimated_cost,
-            model="qwen-plus",
+            model=model,
             request_type="chat",
         )
 
@@ -123,6 +142,7 @@ class CreditService:
             "Pending transaction created",
             transaction_id=transaction.transaction_id,
             user_id=user_id,
+            model=model,
             estimated_cost=estimated_cost,
         )
 
@@ -134,6 +154,8 @@ class CreditService:
         message_id: str,
         input_tokens: int,
         output_tokens: int,
+        model: str = "qwen-plus",
+        thinking_enabled: bool = False,
     ) -> tuple[CreditTransaction | None, User | None]:
         """
         Complete transaction and deduct credits atomically.
@@ -148,12 +170,19 @@ class CreditService:
             message_id: Assistant message identifier
             input_tokens: Input tokens (prompt + history)
             output_tokens: Output tokens (LLM response)
+            model: Model identifier
+            thinking_enabled: Whether thinking mode was used
 
         Returns:
             Tuple of (updated transaction, updated user) or (None, None) if failed
         """
         total_tokens = input_tokens + output_tokens
-        actual_cost = self.calculate_cost(total_tokens)
+        actual_cost = self.calculate_cost(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            model_id=model,
+            thinking_enabled=thinking_enabled,
+        )
 
         # Get transaction to find user_id
         transaction = await self.transaction_repo.get_by_id(transaction_id)
