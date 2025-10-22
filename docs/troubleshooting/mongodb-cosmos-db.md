@@ -69,6 +69,75 @@ async def create_user(email: str):
 
 **When to Use Collection Throughput**: Critical uniqueness constraints (user emails, API keys) where database-level enforcement is required for data integrity.
 
+### Unique Indexes with NULL Values (Multi-Auth Pattern)
+
+**Problem**: When implementing multi-auth (email, phone, WeChat) where users sign up with ANY ONE method, you need:
+- Each auth method to be unique (no duplicate emails/phones/WeChat IDs)
+- Support for NULL in unused auth fields
+- **Multiple users with NULL in the same field**
+
+**Broken Approach** (Sparse indexes):
+```python
+# ❌ FAILS - Only allows ONE NULL value per field
+await users.create_index("phone_number", unique=True, sparse=True)
+await users.create_index("email", unique=True, sparse=True)
+```
+
+**Why It Fails**: Sparse indexes in MongoDB 7.0+ still enforce uniqueness on NULL values. MongoDB treats NULL as a value and only allows ONE document with NULL for that field.
+
+**Working Solution** (Partial indexes with type filtering):
+```python
+# ✅ WORKS - Allows unlimited NULLs, enforces uniqueness on strings
+await users.create_index(
+    "phone_number",
+    unique=True,
+    partialFilterExpression={"phone_number": {"$type": "string"}},
+    name="idx_phone_number"
+)
+
+await users.create_index(
+    "email",
+    unique=True,
+    partialFilterExpression={"email": {"$type": "string"}},
+    name="idx_email"
+)
+```
+
+**How It Works**:
+- `partialFilterExpression: {"field": {"$type": "string"}}` means: **only index documents where the field is a STRING**
+- NULL values are **completely ignored** (not in the index at all)
+- Uniqueness is **only enforced on actual string values**
+
+**Example Behavior**:
+```javascript
+// ✅ Both users work (unlimited NULLs allowed)
+{email: "alice@163.com", phone_number: null}  // NULL ignored
+{email: null, phone_number: "+86123456"}      // NULL ignored
+
+// ❌ Duplicate email blocked
+{email: "alice@163.com", phone_number: null}  // ERROR!
+```
+
+**Migration Steps**:
+```python
+# 1. Drop broken sparse indexes
+await users.drop_index("idx_email")
+
+# 2. Create working partial indexes
+await users.create_index(
+    "email",
+    unique=True,
+    partialFilterExpression={"email": {"$type": "string"}},
+    name="idx_email"
+)
+```
+
+**Key Takeaway**: For optional unique fields, use **partial indexes with type filtering**, not sparse indexes.
+
+**References**:
+- [MongoDB Partial Indexes](https://www.mongodb.com/docs/manual/core/index-partial/)
+- [MongoDB Sparse Indexes](https://www.mongodb.com/docs/manual/core/index-sparse/)
+
 ## Connection String Parsing
 
 ### Issue: Database Name Extraction from Connection String

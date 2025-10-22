@@ -733,7 +733,7 @@ Multiple namespaces running duplicate/old workloads that weren't cleaned up duri
 ### Real-World Example (Oct 2025)
 - **Before**: 2 nodes expected (1 agentpool + 1 userpool)
 - **After autoscale**: 4 nodes running (both pools scaled 1→2)
-- **Cause**: Old v0.4.2 deployments in `default` namespace + current v0.4.5/v0.6.1 in `klinematrix-test`
+- **Cause**: Old v0.4.2 deployments in `default` namespace + newer versions in `klinematrix-test` (then v0.4.5/v0.6.1, now v0.5.4/v0.8.4)
 - **Memory waste**: ~640Mi consumed by duplicate pods
 - **Cost impact**: $53/month → $106/month (100% increase)
 

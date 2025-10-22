@@ -25,7 +25,7 @@ git push origin main
 
 ### Step 2: Build and Push Docker Images
 
-**Image Naming**: Use `klinematrix/` prefix with versioned tags (e.g., `test-v0.3.0`)
+**Image Naming**: Use `klinematrix/` prefix with versioned tags (e.g., `test-v${BACKEND_VERSION}`). Current versions: backend v0.5.4, frontend v0.8.4.
 
 #### Option A: Build Both Images Together
 
@@ -180,7 +180,7 @@ az acr build --registry financialAgent \
 
 # 4. Update image tag in kustomization
 vim .pipeline/k8s/base/kustomization.yaml
-# Update: newTag: "test-v0.3.1"
+# Update: newTag: "test-v${BACKEND_VERSION}" (e.g., "test-v0.5.5")
 
 # 5. Apply changes
 kubectl apply -k .pipeline/k8s/overlays/test/
@@ -331,7 +331,7 @@ git checkout main
 
 1. **Always test locally first** with Docker Compose before building images
 2. **Bump version** for every commit (enforced by pre-commit hook)
-3. **Use versioned tags** (e.g., `test-v0.3.0`) for test stability
+3. **Use versioned tags** (e.g., `test-v${BACKEND_VERSION}`) for test stability
 4. **Deploy during low-traffic periods** when possible (pod restart causes ~5-10s downtime)
 5. **Monitor logs after deployment** for 5-10 minutes
 6. **Update kustomization tags** after building new images

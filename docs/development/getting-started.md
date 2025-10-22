@@ -149,7 +149,7 @@ financial_agent/
 - **MongoDB** for document storage
 - **Redis** for caching
 - **LangChain + LangGraph** for AI agent orchestration
-- **LangSmith** for observability
+- **Langfuse (self-hosted)** for observability
 
 ### Frontend
 - **React 18** with TypeScript 5.x
@@ -404,10 +404,11 @@ kubectl port-forward -n klinematrix-test svc/redis-service 6379:6379 &
 ```bash
 # Rebuild image with new version
 ./scripts/bump-version.sh backend patch
-az acr build --registry financialagent --image klinematrix/backend:test-v{VERSION} --file backend/Dockerfile backend/
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+az acr build --registry financialagent --image klinematrix/backend:test-v${BACKEND_VERSION} --file backend/Dockerfile backend/
 
 # Update deployment
-kubectl set image deployment/backend backend=financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v{VERSION} -n klinematrix-test
+kubectl set image deployment/backend backend=financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v${BACKEND_VERSION} -n klinematrix-test
 
 # Or force pod restart
 kubectl rollout restart deployment/backend -n klinematrix-test

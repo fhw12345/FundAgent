@@ -395,7 +395,7 @@ Keep **1 credit = 200 tokens** as the *reference* for qwen-plus, but calculate a
 - Memoization for expensive computations (ChatMessages parsing)
 - Comprehensive test coverage (187 backend + 11 frontend tests)
 
-**Production Deployment:** Ready for deployment to Test environment (https://klinematrix.com)
+**Test Environment Deployment:** Deployed to Test environment (https://klinematrix.com)
 
 **Verification:**
 - ✅ All 4 models configured in model registry

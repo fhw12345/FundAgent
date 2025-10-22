@@ -1,11 +1,11 @@
 # The 12-Factor Agent Playbook
 
-This guide synthesizes the 12-Factor philosophy with modern LangChain tools (LangSmith, LangGraph, LCEL) to create reliable, observable, and scalable AI agents.
+This guide synthesizes the 12-Factor philosophy with modern LangChain tools (Langfuse, LangGraph, LCEL) to create reliable, observable, and scalable AI agents.
 
 ## Executive Summary
 
 1. **Adopt the Philosophy**: Start with the 12-Factor Agent principles as your architectural North Star.
-2. **Instrument First**: Use **LangSmith** from day one for observability. Don't fly blind.
+2. **Instrument First**: Use **Langfuse** (self-hosted) from day one for observability. Don't fly blind.
 3. **Design for Control**: Use **LangGraph** to define an explicit state machine, not a single LLM loop. You own the control flow.
 4. **Build Small, Compose Big**: Create small, specialized tools and agents using **LCEL** and orchestrate them within your LangGraph.
 5. **Deploy as a Stateless Service**: Wrap your agent in a standard API to make it triggerable and scalable.
@@ -17,14 +17,14 @@ This is the setup phase where you establish the principles and tools for your pr
 ### 1. Adopt the 12-Factor Mindset
 Before writing any code, internalize the core principles. Your goal is not to build a single, magical prompt, but a robust software system. Key tenets: own your prompts, manage state explicitly, and build small, composable units.
 
-### 2. Instrument Everything with LangSmith (Factor 9: Error Handling)
+### 2. Instrument Everything with Langfuse (Factor 9: Error Handling)
 This is your first and most critical step.
-- **Action**: Configure your environment variables for LangSmith tracing (`LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`).
-- **Why**: You gain immediate, transparent visibility into every step of your agent. Debugging is no longer guesswork. You can see the exact inputs/outputs, latencies, and errors for every component, which is essential for handling failures gracefully.
+- **Action**: Configure your environment variables for Langfuse tracing (`LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`).
+- **Why**: You gain immediate, transparent visibility into every step of your agent. Debugging is no longer guesswork. You can see the exact inputs/outputs, latencies, and errors for every component, which is essential for handling failures gracefully. Self-hosting ensures data sovereignty for compliance requirements.
 
-### 3. Centralize Prompts in the LangSmith Hub (Factor 2: Own Your Prompts)
-- **Action**: Instead of hardcoding prompts as strings, pull them from the LangSmith Hub.
-- **Why**: This treats prompts as first-class assets. They can be versioned, tested, and updated independently of your application code, promoting collaboration and rapid iteration.
+### 3. Manage Prompts as Code (Factor 2: Own Your Prompts)
+- **Action**: Version control your prompts as code files or configuration, with Langfuse tracking prompt versions.
+- **Why**: This treats prompts as first-class assets. They can be versioned, tested, and updated independently of your application code, promoting collaboration and rapid iteration. Langfuse provides prompt management features to track different prompt versions.
 
 ## Phase 2: Architecture & Design
 

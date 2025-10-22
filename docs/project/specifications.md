@@ -243,7 +243,7 @@ Each analysis automatically includes AI-generated summary:
 - **Custom Metrics**: Request latency, error rates, analysis duration
 
 #### Tracing
-- **Service**: LangSmith for agent execution
+- **Service**: Langfuse (self-hosted) for agent execution
 - **Coverage**: Complete agent workflow visibility
 - **Integration**: Correlation with application logs
 
@@ -393,7 +393,7 @@ Each analysis automatically includes AI-generated summary:
 - Financial analysis tool integration
 - Conversational interface
 - State management with LangGraph
-- LangSmith observability
+- Langfuse observability
 
 ### Phase 3: Production (Planned)
 - Azure AD B2C authentication

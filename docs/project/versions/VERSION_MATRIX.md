@@ -6,8 +6,8 @@ This document tracks compatibility between Financial Agent components across dif
 
 | Component | Version | Status | Released |
 |-----------|---------|--------|----------|
-| Backend | 0.4.2 | ✅ Current | 2025-10-07 |
-| Frontend | 0.4.4 | ✅ Current | 2025-10-07 |
+| Backend | 0.5.4 | ✅ Current | 2025-10-15 |
+| Frontend | 0.8.4 | ✅ Current | 2025-10-15 |
 
 ## Compatibility Table
 
@@ -150,5 +150,5 @@ If you discover an incompatible version combination:
 
 ---
 
-**Last Updated**: 2025-10-07
-**Current Stable**: v0.4.1 (Backend + Frontend)
+**Last Updated**: 2025-10-15
+**Current Stable**: Backend v0.5.4 + Frontend v0.8.4

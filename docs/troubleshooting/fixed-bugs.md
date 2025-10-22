@@ -610,3 +610,348 @@ curl https://klinematrix.com/api/health
 ```
 
 **Version**: Backend v0.4.2
+
+---
+
+## Analysis Button Slow Response (30+ seconds) - Fixed 2025-10-20
+
+**Problem**: Fibonacci/Stochastic analysis button clicks took 30+ seconds with inconsistent responses
+
+**Symptoms**:
+- Button click sends pre-generated markdown to backend
+- Backend invokes LangGraph agent + LLM (30s+ API latency)
+- User sees slow loading, occasionally sees unstructured response
+
+**Evidence from logs**:
+```
+"event": "Invoking LangGraph agent with tool calling"
+"message_preview": "## 📊 Fibonacci Analysis - AAPL..."
+Fibonacci analysis: 156ms (fast)
+LLM synthesis: 31 seconds (slow)
+```
+
+**Root Cause**: Backend always invoking LLM regardless of message source/role
+- Frontend sent pre-generated analysis as assistant message
+- Backend treated ALL messages as user messages → LLM processing
+- Result: 30s delay for content that was already complete
+
+**Initial Fix Attempt (WRONG)**:
+```python
+# source-based checking (too hardcoded)
+if request.source != "user":
+    # Skip LLM
+```
+
+**User Feedback**: "you should genericly just take the button analysis as a message, so we do not harcode logic if user or what, llm should be able to flexibly tell to call or not to call base on the router and context"
+
+**Correct Solution**: Role-based routing for maximum LLM flexibility
+
+`backend/src/api/chat_langgraph.py:93-141`
+```python
+# Check role to determine if we need LLM processing
+if request.role == "assistant":
+    # Pre-generated content (analysis buttons, etc.) - save without LLM
+    logger.info(
+        "Assistant message - saving without LLM processing",
+        chat_id=chat_id,
+        source=request.source,
+        content_length=len(request.message),
+    )
+
+    # Save assistant message directly
+    await chat_service.add_message(
+        chat_id=chat_id,
+        user_id=user_id,
+        role="assistant",
+        content=request.message,
+        source=request.source,
+        metadata=request.metadata,
+    )
+
+    # Stream content back immediately (no LLM delay)
+    for char in request.message:
+        chunk_data = {"content": char, "type": "content"}
+        yield f"data: {json.dumps(chunk_data)}\n\n"
+        await asyncio.sleep(0.001)
+
+    # Send completion
+    completion_data = {
+        "type": "done",
+        "chat_id": chat_id,
+        "message_count": len(await chat_service.get_chat_messages(chat_id, user_id)),
+    }
+    yield f"data: {json.dumps(completion_data)}\n\n"
+    return
+
+# User message - process with LLM agent (agent decides tool usage)
+```
+
+**Additional Fix**: Backend was hardcoding role/source
+```python
+# BEFORE (ignoring request parameters)
+role="user",
+source="user",
+
+# AFTER (use request values)
+role=request.role,
+source=request.source,
+metadata=request.metadata,
+```
+
+**Benefits**:
+- ✅ Analysis buttons now instant (no LLM delay)
+- ✅ LLM has full flexibility via routing
+- ✅ Previous analysis becomes context for conversation
+- ✅ No hardcoded source checking
+
+**Files Changed**:
+- `backend/src/api/chat_langgraph.py:93-141` (role-based routing)
+- `frontend/src/components/chat/useAnalysis.ts:274-280` (send role="assistant")
+
+**Verification**:
+```bash
+# Click Fibonacci button - should be instant
+# Backend logs should show:
+"event": "Assistant message - saving without LLM processing"
+"source": "fibonacci"
+"content_length": 2534
+
+# User follow-up: "what does this mean?"
+# Backend logs should show:
+"event": "Invoking LangGraph agent with tool calling"
+# (LLM has full context including previous analysis)
+```
+
+**Version**: Backend v0.5.4
+
+---
+
+## Empty Synthesis Response After Tool Execution - Fixed 2025-10-20
+
+**Problem**: Tool execution succeeded but synthesis returned empty content, showing only tool message to user
+
+**Symptoms**:
+- User query: "analyze AAPL"
+- Tool executes successfully (Fibonacci analysis: 156ms)
+- Synthesis returns empty content
+- Final output: Only "Fibonacci analysis completed for AAPL. Current price: $258.01, Confidence: 0.5%"
+
+**Evidence from logs**:
+```json
+{
+  "trace_id": "4cbbff7b2dd6efe5b75edd7259f2496d",
+  "response_type": "AIMessage",
+  "content_value": "",  // ← EMPTY!
+  "content_length": 0,
+  "total_messages": 4
+}
+```
+
+**Root Cause**: AIMessages with `tool_calls` attribute included in synthesis prompt confused LLM
+
+**Why it happened**:
+1. LangGraph agent calls tool → creates AIMessage with `tool_calls=["fibonacci_tool"]`
+2. Tool executes → creates ToolMessage with result
+3. Synthesis receives: [HumanMessage, AIMessage(tool_calls=[...]), ToolMessage]
+4. LLM sees `tool_calls` attribute → tries to make another tool call instead of synthesizing
+5. Result: Empty content because it's waiting for tool execution
+
+**Investigation**:
+Added detailed logging to capture synthesis response:
+```python
+logger.info(
+    "Calling LLM for synthesis",
+    trace_id=trace_id,
+    clean_messages_count=len(clean_messages),
+)
+
+response = await synthesis_llm.ainvoke(synthesis_messages)
+
+logger.info(
+    "LLM synthesis response received",
+    trace_id=trace_id,
+    response_type=type(response).__name__,
+    content_value=str(response.content) if hasattr(response, "content") else None,
+    content_length=len(str(response.content)) if hasattr(response, "content") else 0,
+)
+```
+
+**Solution**: Filter out AIMessages with `tool_calls` from synthesis prompt
+
+`backend/src/agent/langgraph_agent.py:579-590`
+```python
+# Build clean message history for synthesis (exclude tool_calling AIMessages)
+# Only include HumanMessages and ToolMessages to avoid LLM confusion
+clean_messages = []
+for msg in state["messages"]:
+    # Keep user messages and tool results, skip AI messages with tool calls
+    if isinstance(msg, (HumanMessage, ToolMessage)):
+        clean_messages.append(msg)
+    elif isinstance(msg, AIMessage) and not hasattr(msg, "tool_calls"):
+        # Keep AI messages that don't have tool calls (regular conversation)
+        clean_messages.append(msg)
+
+synthesis_messages = [synthesis_prompt] + clean_messages
+```
+
+**Result**: Synthesis now receives clean history:
+- [HumanMessage("analyze AAPL"), ToolMessage("Fibonacci analysis result...")]
+- LLM generates proper synthesis without confusion
+
+**Files Changed**:
+- `backend/src/agent/langgraph_agent.py:579-590` (filter tool_calls)
+- `backend/src/agent/langgraph_agent.py:603-617` (add detailed logging)
+
+**Verification**:
+```bash
+# Backend logs should show:
+"event": "Calling LLM for synthesis"
+"clean_messages_count": 2  # HumanMessage + ToolMessage only
+"event": "LLM synthesis response received"
+"content_length": 1234  # ✅ Non-zero!
+"response_length": 1234  # Final response has content
+
+# User should see full synthesis:
+"Based on the Fibonacci analysis, AAPL is currently in an uptrend with..."
+# (Not just "Fibonacci analysis completed for AAPL")
+```
+
+**Version**: Backend v0.5.4
+
+---
+
+## Langfuse Traces Not Appearing Despite Successful Flush - Fixed 2025-10-20
+
+**Problem**: @observe decorators creating spans but zero traces in Langfuse database
+
+**Symptoms**:
+- `_langfuse_client.flush()` succeeds without errors
+- Database query: `SELECT COUNT(*) FROM traces; → 0`
+- No API requests to Langfuse server in logs
+- Console shows 404 errors: `Failed to export span batch code: 404`
+
+**Root Cause**: Langfuse SDK v3.x incompatible with Langfuse server v2.x
+
+**Version Incompatibility**:
+
+| Component | Version | Status |
+|-----------|---------|--------|
+| **Langfuse Python SDK** | v3.6.2 | ❌ INCOMPATIBLE |
+| **Langfuse Server** | v2.95.9 | ✅ Compatible with v2.x SDK |
+| **Required SDK** | v2.60.10 | ✅ COMPATIBLE |
+
+**Architecture Mismatch**:
+```
+SDK v3.x Architecture:
+├─ Uses OpenTelemetry/OTLP exclusively
+├─ Sends spans to: /v1/traces (OTLP endpoint)
+└─ @observe decorators → OpenTelemetry → 404 errors
+
+Langfuse Server v2.x Architecture:
+├─ Native ingestion API only
+├─ Endpoint: /api/public/ingestion
+└─ No OTLP endpoint support
+```
+
+**Evidence**:
+```bash
+# SDK v3.x produces this error:
+Failed to export span batch code: 404, reason: <!DOCTYPE html>...Loading...</html>
+
+# Database shows zero traces
+docker compose exec langfuse-postgres psql -U langfuse -d langfuse \
+  -c "SELECT COUNT(*) FROM traces;"
+# count → 0
+```
+
+**Investigation Steps**:
+1. Verified API keys loaded correctly in container
+2. Tested native API directly with curl → works
+3. Tested @observe decorator → no traces in DB
+4. Discovered SDK v3 uses OTLP, server v2 doesn't support it
+
+**Solution**: Downgrade to Langfuse SDK v2.x
+
+**Step 1**: Pin version in `backend/pyproject.toml:27`
+```toml
+"langfuse>=2.0.0,<3.0.0",  # Pin to v2.x (v3.x incompatible with server v2.x)
+```
+
+**Step 2**: Install correct version
+```bash
+docker compose exec backend pip install 'langfuse>=2.0.0,<3.0.0'
+# Verify: pip show langfuse | grep Version
+# Should output: Version: 2.60.10
+```
+
+**Step 3**: Update imports (SDK v2.x API)
+```python
+# BEFORE (SDK v3.x API)
+from langfuse import get_client, observe
+
+langfuse_client = get_client()  # ❌ Not available in v2.x
+langfuse_client.flush()
+
+# AFTER (SDK v2.x API)
+from langfuse import Langfuse, observe
+
+global _langfuse_client
+_langfuse_client = Langfuse(
+    public_key=settings.langfuse_public_key,
+    secret_key=settings.langfuse_secret_key,
+    host=settings.langfuse_host,
+)
+_langfuse_client.flush()
+```
+
+**Files Changed**:
+- `backend/pyproject.toml:27` (pin version)
+- `backend/src/agent/langgraph_agent.py:44` (remove get_client import)
+- `backend/src/agent/langgraph_agent.py:721-734` (update flush pattern)
+
+**Verification**:
+```bash
+# Check SDK version
+docker compose exec backend pip show langfuse | grep Version
+# Version: 2.60.10 ✅
+
+# Send test trace
+docker compose exec backend python -c "
+from langfuse import Langfuse
+import os
+
+client = Langfuse(
+    public_key=os.getenv('LANGFUSE_PUBLIC_KEY'),
+    secret_key=os.getenv('LANGFUSE_SECRET_KEY'),
+    host=os.getenv('LANGFUSE_HOST'),
+)
+
+span = client.start_span(name='test_verification')
+span.update(input='test', output='success')
+span.end()
+client.flush()
+"
+
+# Check database
+docker compose exec langfuse-postgres psql -U langfuse -d langfuse \
+  -c "SELECT COUNT(*) FROM traces WHERE name = 'test_verification';"
+# Should return: 1 ✅
+
+# Check Langfuse portal
+# Navigate to http://localhost:3000 (dev) or https://langfuse.klinematrix.com (test)
+# Project: klinematrix → financial-agent
+# Should see trace in dashboard ✅
+```
+
+**Additional Configuration** (optional):
+```bash
+# Suppress OTLP errors in logs during transition period
+# backend/src/main.py:45-47
+logging.getLogger("opentelemetry.exporter.otlp.proto.http.trace_exporter").setLevel(
+    logging.CRITICAL
+)
+```
+
+**Version**: Backend v0.5.4
+
+**Documentation**: See [langfuse-observability.md](../features/langfuse-observability.md) for comprehensive observability troubleshooting guide

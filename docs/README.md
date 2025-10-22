@@ -33,7 +33,7 @@ For detailed version history and release notes, see [Version Management](project
 ### Architecture
 Design and architectural decisions for the Financial Agent platform.
 
-- **[12-Factor Agent Playbook](architecture/agent-12-factors.md)**: Guide to implementing production-ready AI agents with LangChain, LangGraph, and LangSmith
+- **[12-Factor Agent Playbook](architecture/agent-12-factors.md)**: Guide to implementing production-ready AI agents with LangChain, LangGraph, and Langfuse
 - **[Agent Architecture](architecture/agent-architecture.md)**: Detailed implementation of the 12-factor agent principles for financial analysis
 - **[System Design](architecture/system-design.md)**: Complete system architecture overview, technology stack, and design patterns
 
@@ -51,6 +51,9 @@ Feature specifications and requirements documentation.
 
 - **[Feature Specs](features/README.md)**: Template and guidelines for creating feature specifications before implementation
 - **Active Features**: Browse `features/` directory for approved and in-progress feature specs
+
+**Agent Implementation:**
+- **[SDK ReAct Agent](features/langgraph-sdk-react-agent.md)**: LangGraph SDK-based agent with autonomous tool chaining and flexible auto-planning
 
 ### Development
 Developer guides and best practices.
@@ -88,6 +91,13 @@ Bug fixes, common issues, and debugging guides.
 - AI chart interpretation via Qwen-VL multimodal model
 - Automated report generation
 - Context-aware responses
+
+**Agent Architecture**:
+- **SDK ReAct Agent** (`/api/chat/stream-react`)
+  - Autonomous tool chaining (LLM decides next tool)
+  - Flexible, context-driven routing
+  - Compressed tool results for efficiency
+  - Built-in message history and state management
 
 ### Technology Stack
 See [Architecture → System Design](architecture/system-design.md) for complete tech stack and architecture overview.

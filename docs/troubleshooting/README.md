@@ -8,7 +8,9 @@ This directory contains documentation for bugs, fixes, and common issues encount
 - [CORS & API Connectivity](cors-api-connectivity.md) - CORS errors, localhost issues, nginx proxy problems
 - [Data Validation](data-validation-issues.md) - Pydantic validation errors, data format mismatches
 - [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems, service selectors
-- [MongoDB Indexes](mongodb-unique-indexes-with-nulls.md) - Unique index handling with NULL values
+- [MongoDB Cosmos DB](mongodb-cosmos-db.md) - Throughput modes, indexes, unique constraints with NULL values
+- [Git History Rewrite](git-history-rewrite.md) - Team awareness for git history rewrites, recovery steps
+- [Transaction Reconciliation Fix](transaction-reconciliation-datetime-fix.md) - Datetime deprecation fix
 
 ### Bug Reports
 - [Known Bugs](known-bugs.md) - Current open issues and workarounds
@@ -85,8 +87,8 @@ Pydantic validation failures, type mismatches, data format issues
 ### Deployment Issues
 Kubernetes problems, image pulls, pod crashes, health check failures
 
-### MongoDB Indexes
-Unique index configuration, handling NULL values in multi-auth systems
+### MongoDB Cosmos DB
+Azure Cosmos DB limitations, throughput modes, index configuration, unique constraints with NULL values
 
 ## Emergency Contacts
 

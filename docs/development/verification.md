@@ -391,10 +391,10 @@ kubectl get pods -n klinematrix-test -o json | \
   jq -r '.items[] | "\(.metadata.name): \(.spec.containers[0].image)"'
 ```
 
-**Expected**:
+**Expected** (current versions as of 2025-10-15):
 ```
-backend-xxx: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v0.4.5
-frontend-xxx: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend:test-v0.6.1
+backend-xxx: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v0.5.4
+frontend-xxx: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend:test-v0.8.4
 redis-xxx: redis:7.2-alpine
 ```
 

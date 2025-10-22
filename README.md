@@ -21,7 +21,8 @@ This project transforms a sophisticated CLI financial analysis tool into a produ
 > 📖 **See [Getting Started Guide](docs/development/getting-started.md) for detailed setup instructions**
 
 **Access deployed application:**
-- Production: https://klinematrix.com
+- Test: https://klinematrix.com
+- Production: Not yet deployed
 - API Docs: https://klinematrix.com/api/docs
 - Health Check: https://klinematrix.com/api/health
 
@@ -116,9 +117,10 @@ make clean        # Clean up Docker resources
 - `GET /api/health/live` - Kubernetes liveness probe
 
 ### Observability
-- **Structured Logging**: JSON logs with correlation IDs
-- **LangSmith Tracing**: Complete agent execution traces
-- **Metrics**: Prometheus-compatible application metrics
+- **Structured Logging**: JSON logs with trace_id correlation
+- **OpenTelemetry**: Distributed tracing with trace_id propagation
+- **Tencent CLS**: Centralized log aggregation and analysis
+- **Metrics**: Application performance monitoring
 - **Error Tracking**: Automatic error capture and alerting
 
 ## 🔐 Security

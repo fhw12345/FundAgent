@@ -84,10 +84,15 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 ### AI & Analytics
 - **Service**: Alibaba Cloud Model Studio (Bailian)
 - **Model**: Qwen-VL-Max (multimodal vision-language model)
+- **Agent Framework**: LangGraph SDK ReAct Agent
+  - `create_react_agent` with autonomous tool chaining
+  - Flexible, context-driven routing
+  - Compressed tool results for efficiency
 - **Use Cases**:
   1. Chart interpretation and analysis
-  2. Natural language query processing
+  2. Natural language query processing with tool calling
   3. Automated report generation
+  4. Autonomous financial analysis with multi-tool chaining
 
 ### Infrastructure & DevOps
 
@@ -110,9 +115,11 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
   6. Progressive rollout with health checks
 
 #### Observability
-- **Logging**: Structured JSON logs with correlation IDs
-- **Metrics**: Prometheus-compatible application metrics
-- **Tracing**: LangSmith for agent execution traces
+- **Logging**: Structured JSON logs with trace_id correlation
+- **Metrics**: Application performance monitoring
+- **Tracing**:
+  - **Current (v0.5.4)**: OpenTelemetry + Tencent CLS for distributed tracing and log aggregation
+  - **Planned (Phase 2)**: Langfuse (self-hosted) for agent execution traces and LLM observability
 - **Monitoring**: Azure Monitor with custom dashboards
 - **Alerting**: Automated alerts for critical conditions
 
@@ -125,7 +132,7 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 
 ### 12-Factor Agent Principles
 1. **Own Configuration**: Environment-based settings via Pydantic
-2. **Own Prompts**: LangSmith Hub for centralized prompt management
+2. **Own Prompts**: Version-controlled prompts with Langfuse tracking
 3. **External Dependencies**: Clean service interfaces
 4. **Environment Parity**: Consistent environments via Kubernetes
 5. **Unified State**: Single state object through LangGraph
@@ -269,26 +276,60 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 - Azure Cosmos DB for persistence
 - Redis for caching
 
+## Agent Architecture
+
+The platform uses **LangGraph's SDK ReAct Agent** for autonomous financial analysis.
+
+**Endpoint**: `/api/chat/stream-react`
+
+**Approach**: LangGraph SDK-based with autonomous tool chaining
+
+**Key Features**:
+- Auto-loop pattern with `create_react_agent`
+- LLM-driven tool selection and chaining
+- Compressed tool results (99.5% size reduction)
+- Built-in message history with `MemorySaver`
+- ~300 lines of implementation code
+- Flexible, context-driven routing
+
+**Capabilities**:
+- Autonomous multi-tool chaining (LLM decides sequence)
+- Adapts to complex queries dynamically
+- Compressed tool results reduce tokens by 99.5%
+- Thread-based conversation isolation
+- Streaming responses with Server-Sent Events
+
+**See**: [Agent Architecture Details](agent-architecture.md) | [SDK ReAct Agent Feature Spec](../features/langgraph-sdk-react-agent.md)
+
+**Current Deployment**: Deployed to Test (K8s) environment at https://klinematrix.com
+
+---
+
 ## Roadmap
 
-### Phase 1: Foundation (Current)
-- Infrastructure setup and walking skeleton
-- Basic health monitoring and logging
-- End-to-end connectivity verification
+### Phase 1: Foundation (✅ COMPLETED)
+- ✅ Infrastructure setup and walking skeleton
+- ✅ Basic health monitoring and logging
+- ✅ End-to-end connectivity verification
 
-### Phase 2: Agent Core
-- LangChain agent implementation
-- Financial analysis tool integration
-- Conversational interface
-- State management and persistence
+### Phase 2: Agent Core (✅ COMPLETED)
+- ✅ LangGraph SDK ReAct Agent implementation
+  - Autonomous tool chaining with flexible routing
+  - Compressed tool results (99.5% token reduction)
+  - Built-in state management with MemorySaver
+- ✅ Financial analysis tool integration
+- ✅ Conversational interface with streaming responses
+- ✅ Thread-based conversation persistence
 
-### Phase 3: Production
-- Authentication and authorization
-- AI chart interpretation
-- Cloud deployment automation
-- Monitoring and alerting
+### Phase 3: Production (🚧 IN PROGRESS)
+- ✅ Authentication and authorization
+- ✅ SDK ReAct Agent deployed to Test environment
+- ⏳ Frontend integration for agent chat interface
+- ⏳ AI chart interpretation
+- ✅ Cloud deployment automation
+- ✅ Monitoring and alerting (OpenTelemetry + Tencent CLS)
 
-### Phase 4: Scale
+### Phase 4: Scale (PLANNED)
 - Advanced analytics and insights
 - Multi-user support
 - Performance optimization
