@@ -27,6 +27,7 @@ export function EnhancedChatInterface() {
     model: "qwen-plus",
     thinking_enabled: false,
     max_tokens: 3000,
+    debug_enabled: false,
   });
 
   // Memoize selectedDateRange object to prevent recreation on every render

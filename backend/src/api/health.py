@@ -68,7 +68,9 @@ async def health_check(
             "redis": redis_status,
         },
         "configuration": {
-            "langsmith_enabled": bool(settings.langsmith_api_key),
+            "langfuse_enabled": bool(
+                settings.langfuse_public_key and settings.langfuse_secret_key
+            ),
             "database_name": settings.database_name,
         },
     }

@@ -432,10 +432,10 @@ class TestStochasticAPICaching:
                 mock_redis.get.assert_called_once()
                 mock_redis.set.assert_called_once()
 
-                # Verify cache TTL is 5 minutes (300 seconds)
+                # Verify cache TTL is 1 hour (3600 seconds)
                 call_args, call_kwargs = mock_redis.set.call_args
                 cache_key, cache_value = call_args
-                assert call_kwargs["ttl_seconds"] == 300
+                assert call_kwargs["ttl_seconds"] == 3600
                 assert "stochastic:AAPL:" in cache_key
 
         finally:
@@ -676,7 +676,7 @@ class TestStochasticAPIPerformance:
         if hasattr(app.state, "mongodb"):
             delattr(app.state, "mongodb")
 
-    def test_stochastic_analysis_logging(self, client, caplog):
+    def test_stochastic_analysis_logging(self, client, caplog, capsys):
         """Test that proper logging occurs during analysis."""
         mock_data = pd.DataFrame(
             {"High": [110, 115, 112], "Low": [100, 105, 102], "Close": [105, 110, 107]}
@@ -693,13 +693,9 @@ class TestStochasticAPIPerformance:
             except Exception:
                 pass  # Expected to fail with insufficient data
 
-            # Check that logging occurred
-            log_records = [
-                record
-                for record in caplog.records
-                if "stochastic" in record.message.lower()
-            ]
-            assert len(log_records) > 0
+            # Check that logging occurred (using capsys since we use structlog, not stdlib logging)
+            captured = capsys.readouterr()
+            assert "stochastic" in captured.out.lower() or "Stochastic" in captured.out
 
     def test_stochastic_request_timing(self, client):
         """Test that timing information is logged."""

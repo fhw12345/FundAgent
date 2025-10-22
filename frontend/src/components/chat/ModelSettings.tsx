@@ -65,6 +65,14 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
     }
   };
 
+  // Handle debug toggle
+  const handleDebugToggle = () => {
+    onChange({
+      ...settings,
+      debug_enabled: !settings.debug_enabled,
+    });
+  };
+
   // Handle max tokens change
   const handleMaxTokensChange = (value: number) => {
     onChange({
@@ -162,6 +170,37 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
             Not supported on this model
           </p>
         )}
+      </div>
+
+      {/* Debug Mode Toggle */}
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-gray-700">
+            Debug Mode
+          </label>
+          <button
+            type="button"
+            onClick={handleDebugToggle}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              settings.debug_enabled
+                ? 'bg-yellow-500'
+                : 'bg-gray-300'
+            } cursor-pointer`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.debug_enabled
+                  ? 'translate-x-6'
+                  : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          {settings.debug_enabled
+            ? '🔍 Full LLM prompts logged to backend'
+            : 'Disabled - No debug logging'}
+        </p>
       </div>
 
       {/* Max Tokens Slider */}

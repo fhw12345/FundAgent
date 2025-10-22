@@ -183,10 +183,13 @@ export const chatService = {
       role?: string;
       source?: string;
       metadata?: any; // Analysis metadata for overlays
+      // Agent Configuration
+      agent_version?: "v2" | "v3"; // v2: simple chat, v3: ReAct agent with tools (default: v3)
       // LLM Configuration
       model?: string;
       thinking_enabled?: boolean;
       max_tokens?: number;
+      debug_enabled?: boolean; // Enable debug logging in backend
     },
   ): () => void {
     const baseURL =
@@ -196,7 +199,7 @@ export const chatService = {
           ? ""
           : "http://localhost:8000";
 
-    const url = `${baseURL}/api/chat/stream-v2`;
+    const url = `${baseURL}/api/chat/stream`;
     const controller = new AbortController();
 
     fetch(url, {
@@ -206,6 +209,7 @@ export const chatService = {
         ...(localStorage.getItem("access_token")
           ? { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
           : {}),
+        ...(options?.debug_enabled ? { "X-Debug": "true" } : {}),
       },
       body: JSON.stringify({
         message,
@@ -214,6 +218,8 @@ export const chatService = {
         role: options?.role ?? "user",
         source: options?.source ?? "user",
         metadata: options?.metadata,
+        // Agent Configuration
+        agent_version: options?.agent_version ?? "v3", // Default to v3 (ReAct agent)
         // LLM Configuration
         model: options?.model ?? "qwen-plus",
         thinking_enabled: options?.thinking_enabled ?? false,
@@ -255,7 +261,7 @@ export const chatService = {
                 data.chat_id
               ) {
                 onChatCreated(data.chat_id);
-              } else if (data.type === "content" && data.content) {
+              } else if (data.type === "chunk" && data.content) {
                 onChunk(data.content);
               } else if (
                 data.type === "title_generated" &&

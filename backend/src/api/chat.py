@@ -6,15 +6,17 @@ This module contains persistent chat management endpoints using MongoDB.
 Legacy session-based endpoints are in chat_legacy.py.
 """
 
+import asyncio
 import json
 from collections.abc import AsyncGenerator
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
 from ..agent.chat_agent import ChatAgent
+from ..agent.langgraph_react_agent import FinancialAnalysisReActAgent
 from ..core.exceptions import NotFoundError
 from ..models.chat import ChatUpdate
 from ..services.chat_service import ChatService
@@ -23,6 +25,7 @@ from .dependencies.chat_deps import (
     get_chat_agent,
     get_chat_service,
     get_current_user_id,
+    get_react_agent,
 )
 from .dependencies.credit_deps import get_credit_service
 from .schemas.chat_models import (
@@ -280,7 +283,294 @@ async def update_chat_ui_state(
         ) from e
 
 
-@router.post("/stream-v2")
+# ===== Unified Versioned Streaming Endpoint =====
+
+
+@router.post("/stream")
+async def chat_stream_unified(
+    request: ChatRequest,
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service),
+    simple_agent: ChatAgent = Depends(get_chat_agent),
+    react_agent: FinancialAnalysisReActAgent = Depends(get_react_agent),
+    credit_service: CreditService = Depends(get_credit_service),
+    x_debug: str | None = Header(None, alias="X-Debug"),
+) -> StreamingResponse:
+    """
+    Unified streaming endpoint with version selection.
+
+    **Authentication**: Requires Bearer token in Authorization header.
+
+    **Agent Versions:**
+    - **v2** (default): Simple ChatAgent - Basic LLM wrapper for general chat
+    - **v3**: SDK ReAct Agent - Autonomous tool chaining for financial analysis
+
+    **Request:**
+    ```json
+    {
+      "message": "Analyze AAPL with Fibonacci",
+      "chat_id": "chat_abc123",      // Optional
+      "agent_version": "v3",          // Optional: "v2" or "v3" (default: v3)
+      "model": "qwen-plus",           // Optional LLM model
+      "thinking_enabled": false       // Optional thinking mode
+    }
+    ```
+
+    **Response:** Server-Sent Events stream
+
+    **Example:**
+    ```bash
+    # Use v3 (SDK ReAct Agent with tools)
+    curl -X POST https://klinematrix.com/api/chat/stream \\
+      -H "Authorization: Bearer $TOKEN" \\
+      -d '{"message": "Analyze AAPL", "agent_version": "v3"}'
+
+    # Use v2 (simple chat)
+    curl -X POST https://klinematrix.com/api/chat/stream \\
+      -H "Authorization: Bearer $TOKEN" \\
+      -d '{"message": "Hello", "agent_version": "v2"}'
+    ```
+    """
+    logger.info(
+        "Unified stream request",
+        agent_version=request.agent_version,
+        user_id=user_id,
+        chat_id=request.chat_id,
+    )
+
+    # Route to appropriate agent based on version
+    if request.agent_version == "v2":
+        # Use simple ChatAgent (basic LLM wrapper)
+        return await _stream_with_simple_agent(
+            request, user_id, chat_service, simple_agent, credit_service
+        )
+    elif request.agent_version == "v3":
+        # Use SDK ReAct Agent (tool chaining)
+        debug_enabled = x_debug and x_debug.lower() in ("true", "1", "yes")
+        return await _stream_with_react_agent(
+            request, user_id, chat_service, react_agent, debug_enabled
+        )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid agent_version: {request.agent_version}. Must be 'v2' or 'v3'",
+        )
+
+
+async def _stream_with_simple_agent(
+    request: ChatRequest,
+    user_id: str,
+    chat_service: ChatService,
+    agent: ChatAgent,
+    credit_service: CreditService,
+) -> StreamingResponse:
+    """Stream using simple ChatAgent (v2)."""
+
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        chat_id = None
+
+        try:
+            # Create or get chat
+            if request.chat_id:
+                chat = await chat_service.get_chat(request.chat_id, user_id)
+                chat_id = chat.chat_id
+            else:
+                chat_title = request.title if request.title else "New Chat"
+                chat = await chat_service.create_chat(user_id, title=chat_title)
+                chat_id = chat.chat_id
+                yield f"data: {json.dumps({'chat_id': chat_id, 'type': 'chat_created'})}\n\n"
+
+            # Save user message
+            await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                role=request.role,
+                content=request.message,
+                source=request.source,
+                metadata=request.metadata,
+            )
+
+            # Only invoke LLM for user messages (not tool/assistant messages)
+            if request.role != "user":
+                yield f"data: {json.dumps({'type': 'done', 'chat_id': chat_id})}\n\n"
+                return
+
+            # Stream LLM response
+            full_response = ""
+            async for chunk in agent.astream(
+                message=request.message,
+                chat_id=chat_id,
+                model=request.model,
+                thinking_enabled=request.thinking_enabled,
+                max_tokens=request.max_tokens,
+            ):
+                full_response += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+            # Save assistant message
+            await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                role="assistant",
+                content=full_response,
+                source="llm",
+            )
+
+            # Deduct credits
+            await credit_service.deduct_credits_for_message(
+                user_id=user_id,
+                message_content=full_response,
+                model=request.model,
+                thinking_enabled=request.thinking_enabled,
+            )
+
+            yield f"data: {json.dumps({'type': 'done', 'chat_id': chat_id})}\n\n"
+
+        except Exception as e:
+            logger.error("Stream error (v2)", error=str(e), chat_id=chat_id)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(generate_stream(), media_type="text/event-stream")
+
+
+async def _stream_with_react_agent(
+    request: ChatRequest,
+    user_id: str,
+    chat_service: ChatService,
+    agent: FinancialAnalysisReActAgent,
+    debug: bool = False,
+) -> StreamingResponse:
+    """Stream using SDK ReAct Agent (v3).
+
+    Args:
+        request: Chat request with message and options
+        user_id: Current user ID
+        chat_service: Chat service instance
+        agent: ReAct agent instance
+        debug: If True, log full LLM prompts for debugging
+    """
+
+    async def generate_stream() -> AsyncGenerator[str, None]:
+        chat_id = None
+
+        try:
+            # Create or get chat
+            if request.chat_id:
+                chat = await chat_service.get_chat(request.chat_id, user_id)
+                chat_id = chat.chat_id
+            else:
+                chat_title = request.title if request.title else "New Chat"
+                chat = await chat_service.create_chat(user_id, title=chat_title)
+                chat_id = chat.chat_id
+                yield f"data: {json.dumps({'chat_id': chat_id, 'type': 'chat_created'})}\n\n"
+
+            # Save message
+            await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                role=request.role,
+                content=request.message,
+                source=request.source or "chat",
+                metadata=request.metadata,
+            )
+
+            # Only invoke LLM for user messages (not tool/assistant messages)
+            if request.role != "user":
+                yield f"data: {json.dumps({'type': 'done', 'chat_id': chat_id})}\n\n"
+                return
+
+            # Get conversation history for context
+            # Messages are already in chronological order (oldest first) from get_chat_messages
+            messages = await chat_service.get_chat_messages(chat_id, user_id, limit=10)
+            conversation_history = [
+                {"role": msg.role, "content": msg.content} for msg in messages
+            ]
+
+            # Exclude the last user message if it matches the current message
+            # (we saved it to DB first, but will pass it separately to the agent)
+            if (
+                conversation_history
+                and conversation_history[-1]["role"] == "user"
+                and conversation_history[-1]["content"] == request.message
+            ):
+                conversation_history = conversation_history[:-1]
+
+            logger.info(
+                "Conversation history prepared for agent",
+                chat_id=chat_id,
+                total_messages=len(messages),
+                conversation_history_count=len(conversation_history),
+                preview=[{"role": msg["role"], "content": msg["content"][:50]} for msg in conversation_history[-3:]],
+            )
+
+            # Invoke ReAct agent (auto-loop handles tool chaining)
+            result = await agent.ainvoke(
+                user_message=request.message,
+                conversation_history=conversation_history,
+                debug=debug,
+            )
+
+            final_answer = result["final_answer"]
+            tool_executions = result.get("tool_executions", 0)
+            trace_id = result.get("trace_id", "unknown")
+
+            logger.info(
+                "ReAct agent execution completed",
+                chat_id=chat_id,
+                trace_id=trace_id,
+                tool_executions=tool_executions,
+                answer_length=len(final_answer),
+            )
+
+            # Send tool execution count (optional metadata)
+            if tool_executions > 0:
+                tool_info = {
+                    "type": "tool_info",
+                    "tool_executions": tool_executions,
+                    "trace_id": trace_id,
+                }
+                yield f"data: {json.dumps(tool_info)}\n\n"
+
+            # Stream final answer character-by-character
+            for char in final_answer:
+                chunk = {"type": "chunk", "content": char}
+                yield f"data: {json.dumps(chunk)}\n\n"
+                await asyncio.sleep(0.01)  # Smooth streaming
+
+            # Save assistant message with metadata
+            await chat_service.add_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                role="assistant",
+                content=final_answer,
+                source="llm",
+                metadata={
+                    "tool_executions": tool_executions,
+                    "trace_id": trace_id,
+                    "agent_type": "react_sdk",
+                },
+            )
+
+            # Send completion event
+            completion_event = {
+                "type": "done",
+                "chat_id": chat_id,
+                "tool_executions": tool_executions,
+                "trace_id": trace_id,
+            }
+            yield f"data: {json.dumps(completion_event)}\n\n"
+
+        except Exception as e:
+            logger.error("Stream error (v3)", error=str(e), chat_id=chat_id)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(generate_stream(), media_type="text/event-stream")
+
+
+# ===== Legacy Endpoints (Deprecated) =====
+
+
+@router.post("/stream-v2", deprecated=True)
 async def chat_stream_persistent(
     request: ChatRequest,
     user_id: str = Depends(get_current_user_id),
@@ -351,16 +641,15 @@ async def chat_stream_persistent(
                 if symbol or timeframe:
                     from ..models.chat import UIState
 
-                    # Build active_overlays based on analysis source
+                    # Build active_overlays based on selected tool in metadata
                     active_overlays = {}
-                    if request.source == "fibonacci":
-                        active_overlays["fibonacci"] = {"enabled": True}
-                    elif request.source == "stochastic":
-                        active_overlays["stochastic"] = {"enabled": True}
-                    elif request.source == "macro":
-                        active_overlays["macro"] = {"enabled": True}
-                    elif request.source == "fundamentals":
-                        active_overlays["fundamentals"] = {"enabled": True}
+                    selected_tool = (
+                        request.metadata.selected_tool
+                        if request.metadata and hasattr(request.metadata, "selected_tool")
+                        else None
+                    )
+                    if selected_tool:
+                        active_overlays[selected_tool] = {"enabled": True}
 
                     ui_state = UIState(
                         current_symbol=symbol,
@@ -384,13 +673,14 @@ async def chat_stream_persistent(
                         overlays=list(active_overlays.keys()),
                     )
 
-            # If source is analysis (not "user"), skip LLM (results already provided)
-            if request.source in ("fibonacci", "stochastic", "macro", "fundamentals"):
+            # If source is tool output (not "user"), skip LLM (results already provided)
+            if request.source == "tool":
                 logger.info(
-                    "Analysis results - skipping LLM",
+                    "Tool results - skipping LLM",
                     chat_id=chat_id,
                     role=request.role,
                     source=request.source,
+                    selected_tool=request.metadata.selected_tool if request.metadata else None,
                 )
 
                 # Send completion event
@@ -403,9 +693,10 @@ async def chat_stream_persistent(
                 yield f"data: {json.dumps(completion_data)}\n\n"
 
                 logger.info(
-                    "Analysis results saved without LLM call",
+                    "Tool results saved without LLM call",
                     chat_id=chat_id,
                     message_count=len(messages),
+                    selected_tool=request.metadata.selected_tool if request.metadata else None,
                 )
                 return
 

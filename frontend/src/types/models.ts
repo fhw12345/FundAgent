@@ -30,4 +30,5 @@ export interface ModelSettings {
   model: string; // Selected model ID
   thinking_enabled: boolean;
   max_tokens: number;
+  debug_enabled: boolean; // Enable debug logging (shows full LLM prompts in backend logs)
 }

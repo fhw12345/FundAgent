@@ -94,7 +94,10 @@ class TickerDataService:
         if cached_data is not None:
             logger.info("Cache hit", cache_key=cache_key)
             # Deserialize DataFrame from cached dict
-            return pd.DataFrame(cached_data)
+            df = pd.DataFrame(cached_data)
+            # Convert string index back to DatetimeIndex (was converted to str for Redis)
+            df.index = pd.to_datetime(df.index)
+            return df
 
         logger.info("Cache miss", cache_key=cache_key)
 
@@ -107,7 +110,10 @@ class TickerDataService:
         if not df.empty:
             ttl = self._calculate_ttl(interval, normalized_start, normalized_end)
             # Serialize DataFrame to dict for Redis storage
-            await self.redis_cache.set(cache_key, df.to_dict(), ttl_seconds=ttl)
+            # Convert Timestamp index to strings (Redis only accepts basic types)
+            df_copy = df.copy()
+            df_copy.index = df_copy.index.astype(str)
+            await self.redis_cache.set(cache_key, df_copy.to_dict(), ttl_seconds=ttl)
             logger.info(
                 "Cached ticker data", cache_key=cache_key, ttl=ttl, rows=len(df)
             )

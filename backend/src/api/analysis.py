@@ -188,9 +188,10 @@ async def fibonacci_analysis(
             analysis_duration_ms=round(analysis_duration * 1000, 2),
         )
 
-        # Cache the result for 5 minutes
+        # Cache for 1 hour - Fibonacci levels don't change significantly intraday
+        # Date-based cache key ensures data refreshes daily
         cache_store_start_time = time.time()
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=300)
+        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)
         cache_store_duration = time.time() - cache_store_start_time
 
         total_duration = time.time() - request_start_time
@@ -241,7 +242,10 @@ async def macro_sentiment_analysis(
     """
     try:
         # Check cache first (shorter cache time for macro data)
-        cache_key = f"macro:{request.include_sectors}:{request.include_indices}"
+        # Include date to prevent serving stale data from previous day
+        from datetime import datetime, UTC
+        current_date = datetime.now(UTC).strftime("%Y-%m-%d")
+        cache_key = f"macro:{current_date}:{request.include_sectors}:{request.include_indices}"
         cached_result = await redis_cache.get(cache_key)
         if cached_result:
             return MacroSentimentResponse.model_validate(cached_result)
@@ -253,8 +257,9 @@ async def macro_sentiment_analysis(
             include_indices=request.include_indices,
         )
 
-        # Cache for 2 minutes (macro data changes frequently)
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=120)
+        # Cache for 1 hour - Macro sentiment provides daily market overview
+        # Date-based cache key ensures fresh data each day
+        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)
 
         return result
 
@@ -277,7 +282,10 @@ async def stock_fundamentals(
     """
     try:
         # Check cache first
-        cache_key = f"fundamentals:{request.symbol}"
+        # Include date to prevent serving stale price data from previous day
+        from datetime import datetime, UTC
+        current_date = datetime.now(UTC).strftime("%Y-%m-%d")
+        cache_key = f"fundamentals:{request.symbol}:{current_date}"
         cached_result = await redis_cache.get(cache_key)
         if cached_result:
             return StockFundamentalsResponse.model_validate(cached_result)
@@ -286,8 +294,9 @@ async def stock_fundamentals(
         analyzer = StockAnalyzer()
         result = await analyzer.get_fundamentals(symbol=request.symbol)
 
-        # Cache for 30 minutes (fundamental data doesn't change frequently)
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=1800)
+        # Cache for 4 hours - Fundamentals change quarterly (earnings), only price updates intraday
+        # Date-based cache key ensures fresh daily data
+        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
 
         return result
 
@@ -395,9 +404,10 @@ async def stochastic_analysis(
             analysis_duration_ms=round(analysis_duration * 1000, 2),
         )
 
-        # Cache the result for 5 minutes (same as technical indicators)
+        # Cache for 1 hour - Stochastic oscillator values stable for daily analysis
+        # Date-based cache key ensures data refreshes daily
         cache_store_start_time = time.time()
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=300)
+        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)
         cache_store_duration = time.time() - cache_store_start_time
 
         total_duration = time.time() - request_start_time

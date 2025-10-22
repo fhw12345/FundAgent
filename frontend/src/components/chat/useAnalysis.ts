@@ -127,6 +127,7 @@ export const useAnalysis = (
             model: modelSettings.model,
             thinking_enabled: modelSettings.thinking_enabled,
             max_tokens: modelSettings.max_tokens,
+            debug_enabled: modelSettings.debug_enabled,
           } : undefined,
         );
       });
@@ -173,7 +174,7 @@ export const useButtonAnalysis = (
         : analysisTitle;
 
       // Source matches analysis type for MongoDB filtering
-      const sourceType = analysisType;
+      const sourceType = "tool"; // All analysis types use 'tool' source
 
       switch (analysisType) {
         case "fibonacci": {
