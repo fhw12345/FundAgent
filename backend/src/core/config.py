@@ -46,10 +46,10 @@ class Settings(BaseSettings):
     ]  # Allow all hosts (override via ALLOWED_HOSTS env var)
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
-    # LangSmith configuration (Factor 2: Own Your Prompts)
-    langsmith_tracing_v2: bool = True
-    langsmith_api_key: str = ""
-    langsmith_project: str = "financial-agent"
+    # Langfuse observability configuration (Factor 2: Own Your Prompts)
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "http://langfuse-server:3000"
 
     # External APIs
     openai_api_key: str = ""

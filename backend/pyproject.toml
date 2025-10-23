@@ -24,6 +24,7 @@ dependencies = [
     "langchain-community>=0.3.0",
     "langgraph>=0.2.0",
     "langsmith>=0.2.0",
+    "langfuse>=3.0.0,<4.0.0",  # LLM observability (v3.x with OTLP, requires ClickHouse + Redis server)
     "dashscope>=1.20.0",      # Alibaba Cloud Qwen API
     "yfinance>=0.2.0",
     "pandas>=2.1.0",
@@ -38,6 +39,8 @@ dependencies = [
     "tencentcloud-sdk-python-ses>=3.0.0",  # Tencent Cloud SES for email
     "bcrypt>=4.0.0",                    # Password hashing
     "kubernetes>=30.0.0",               # Kubernetes client for metrics
+    "opentelemetry-api>=1.20.0",        # OpenTelemetry API
+    "opentelemetry-sdk>=1.20.0",        # OpenTelemetry SDK
 ]
 
 [project.optional-dependencies]
@@ -122,6 +125,7 @@ module = [
     "langchain.*",
     "langchain_community.*",
     "langchain_core.*",
+    "opentelemetry.*",
 ]
 ignore_missing_imports = true
 

@@ -37,7 +37,12 @@
 
 ### Dev/Local Environment
 - **How to run**: `make dev` (starts docker-compose)
-- **Services**: Backend, Frontend, MongoDB, Redis (all in containers)
+- **Services**: Backend, Frontend, MongoDB, Redis, Langfuse Stack (all in containers)
+- **Access Points**:
+  - Frontend: http://localhost:3000
+  - Backend API: http://localhost:8000
+  - Langfuse UI: http://localhost:3001 (LLM trace visualization)
+  - MinIO Console: http://localhost:9003 (S3 storage)
 - **Frontend commands**: `docker compose exec frontend npm ...`
 - **Backend commands**: `cd backend && make test && make lint`
 - **Hot reload**: ✅ Works for 90% of changes
@@ -173,8 +178,14 @@ az acr build --registry financialAgent --image klinematrix/backend:test-v${BACKE
 az acr build --registry financialAgent --image klinematrix/frontend:test-v${FRONTEND_VERSION} --target production --file frontend/Dockerfile frontend/
 
 # Health Checks
-curl http://localhost:8000/api/health         # Dev/Local
+curl http://localhost:8000/api/health         # Dev/Local Backend
 curl https://klinematrix.com/api/health       # Test (K8s)
+
+# Langfuse Observability (Dev/Local)
+open http://localhost:3001                    # Langfuse UI (trace visualization)
+open http://localhost:9003                    # MinIO Console (S3 storage)
+docker compose logs langfuse-server --tail=50 # Check Langfuse server logs
+docker compose ps | grep langfuse             # Check Langfuse services status
 
 # Cost Monitoring (prevent unexpected autoscaling)
 kubectl get nodes                          # Should show 2 nodes (not 3-4)

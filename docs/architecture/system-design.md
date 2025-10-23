@@ -115,11 +115,9 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
   6. Progressive rollout with health checks
 
 #### Observability
-- **Logging**: Structured JSON logs with trace_id correlation
+- **Logging**: Structured JSON logs
 - **Metrics**: Application performance monitoring
-- **Tracing**:
-  - **Current (v0.5.4)**: OpenTelemetry + Tencent CLS for distributed tracing and log aggregation
-  - **Planned (Phase 2)**: Langfuse (self-hosted) for agent execution traces and LLM observability
+- **Tracing**: Langfuse (self-hosted) for agent execution traces and LLM observability
 - **Monitoring**: Azure Monitor with custom dashboards
 - **Alerting**: Automated alerts for critical conditions
 
@@ -327,7 +325,7 @@ The platform uses **LangGraph's SDK ReAct Agent** for autonomous financial analy
 - ⏳ Frontend integration for agent chat interface
 - ⏳ AI chart interpretation
 - ✅ Cloud deployment automation
-- ✅ Monitoring and alerting (OpenTelemetry + Tencent CLS)
+- ✅ Monitoring and alerting (Langfuse)
 
 ### Phase 4: Scale (PLANNED)
 - Advanced analytics and insights

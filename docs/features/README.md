@@ -231,10 +231,16 @@ Feature is complete when:
 - **YYYY-MM-DD**: Approved and implementation started
 ```
 
-## Example Feature Specs
+## Completed Feature Specs
 
 Browse existing feature specs in this directory for examples:
-- [Example coming soon]
+
+### Observability & Monitoring
+- **[Langfuse Observability](langfuse-observability.md)** - LLM trace visualization with Langfuse v3.x (PostgreSQL, ClickHouse, MinIO, Redis)
+
+### AI & Agent System
+- **[LangGraph SDK ReAct Agent](langgraph-sdk-react-agent.md)** - SDK-based ReAct agent implementation with autonomous tool selection
+- **[LLM Model Selection](llm-model-selection.md)** - Multi-provider LLM support with dynamic model switching
 
 ## Workflow
 
