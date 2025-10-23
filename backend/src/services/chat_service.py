@@ -132,9 +132,7 @@ class ChatService:
         user_id: str,
         role: Literal["user", "assistant", "system"],
         content: str,
-        source: Literal[
-            "user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"
-        ],
+        source: Literal["user", "llm", "tool"],
         metadata: MessageMetadata | dict[str, Any] | None = None,
     ) -> Message:
         """
@@ -145,7 +143,7 @@ class ChatService:
             user_id: User identifier (for ownership check)
             role: Message role (user/assistant/system)
             content: Message content
-            source: Message source (user/llm/fibonacci/etc.)
+            source: Message source (user/llm/tool)
             metadata: Optional message metadata (MessageMetadata or dict)
 
         Returns:

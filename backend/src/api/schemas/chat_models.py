@@ -37,15 +37,18 @@ class ChatRequest(BaseModel):
         "user",
         description="Message role: 'user', 'assistant', or 'system'",
     )
-    source: Literal[
-        "user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"
-    ] = Field(
+    source: Literal["user", "llm", "tool"] = Field(
         "user",
-        description="Message source: 'user' (call LLM), 'fibonacci'/'stochastic'/'macro'/'fundamentals' (skip LLM), or 'llm'",
+        description="Message source: 'user' (user input, calls LLM), 'tool' (tool output, skip LLM), 'llm' (LLM response). Use metadata.selected_tool to identify specific tool.",
     )
     metadata: MessageMetadata | dict[str, Any] | None = Field(
         None,
         description="Analysis metadata for overlays (Fibonacci levels, Stochastic signals, etc.)",
+    )
+    # Agent Configuration
+    agent_version: Literal["v2", "v3"] = Field(
+        "v3",
+        description="Agent version: 'v2' (simple ChatAgent), 'v3' (SDK ReAct Agent with tool chaining)",
     )
     # LLM Configuration
     model: str = Field(

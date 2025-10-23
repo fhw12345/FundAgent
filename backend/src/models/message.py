@@ -55,6 +55,18 @@ class MessageMetadata(BaseModel):
         default=None, description="Links to credit transaction for this message"
     )
 
+    # LangGraph agent tracing
+    trace_id: str | None = Field(
+        default=None, description="OpenTelemetry trace ID for observability"
+    )
+    selected_tool: str | None = Field(
+        default=None,
+        description="Tool selected by LangGraph agent (fibonacci/stochastic)",
+    )
+    has_tool_result: bool | None = Field(
+        default=None, description="Whether agent executed a tool in this response"
+    )
+
     # Extensible - any additional data
     raw_data: dict[str, Any] | None = Field(
         default=None, description="Raw analysis data"
@@ -83,7 +95,7 @@ class MessageCreate(BaseModel):
     chat_id: str
     role: Literal["user", "assistant", "system"]
     content: str
-    source: Literal["user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"]
+    source: Literal["user", "llm", "tool"]
     metadata: MessageMetadata = MessageMetadata()
 
 
@@ -100,9 +112,10 @@ class Message(BaseModel):
         ..., description="Message role"
     )
     content: str = Field(..., description="Message text content")
-    source: Literal[
-        "user", "llm", "fibonacci", "stochastic", "macro", "fundamentals"
-    ] = Field(..., description="Message source/type")
+    source: Literal["user", "llm", "tool"] = Field(
+        ...,
+        description="Message source: 'user' (user input), 'llm' (LLM response), 'tool' (tool output). Use metadata.selected_tool to identify specific tool.",
+    )
 
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     metadata: MessageMetadata = Field(

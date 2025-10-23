@@ -144,7 +144,7 @@ export type StreamEvent =
       chat_id: string;
     }
   | {
-      type: "content";
+      type: "chunk";
       content: string;
     }
   | {

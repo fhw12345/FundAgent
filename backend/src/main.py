@@ -30,24 +30,6 @@ from .database.redis import RedisCache
 # Set the root logger level to INFO so we can see detailed logs
 logging.basicConfig(level=logging.INFO)
 
-# Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-        structlog.processors.JSONRenderer(),
-    ],
-    wrapper_class=structlog.stdlib.BoundLogger,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    cache_logger_on_first_use=True,
-)
-
 logger = structlog.get_logger()
 
 
@@ -173,7 +155,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(analysis_router)
     app.include_router(market_data_router)
-    app.include_router(chat_router)  # Persistent MongoDB-based chat
+    app.include_router(chat_router)  # Unified chat endpoint with v2/v3 agent selection
     app.include_router(credits_router)  # Token-based credit economy
     app.include_router(llm_models_router)  # LLM model selection and pricing
     app.include_router(feedback_router)  # Feedback & Community Roadmap platform

@@ -144,29 +144,34 @@ class MessageRepository:
 
         return messages
 
-    async def get_fibonacci_messages(
+    async def get_tool_messages(
         self,
         chat_id: str,
+        tool_name: str | None = None,
         symbol: str | None = None,
         limit: int = 20,
     ) -> list[Message]:
         """
-        Get Fibonacci analysis messages for a chat.
-        Optionally filter by symbol.
+        Get tool output messages for a chat.
+        Optionally filter by tool name and/or symbol.
 
         Args:
             chat_id: Chat identifier
+            tool_name: Optional tool name to filter by (e.g., "fibonacci", "stochastic")
             symbol: Optional symbol to filter by
             limit: Maximum number of messages to return
 
         Returns:
-            List of Fibonacci messages sorted by timestamp descending
+            List of tool messages sorted by timestamp descending
         """
         # Build query
         query = {
             "chat_id": chat_id,
-            "source": "fibonacci",
+            "source": "tool",
         }
+
+        if tool_name:
+            query["metadata.selected_tool"] = tool_name
 
         if symbol:
             query["metadata.symbol"] = symbol
