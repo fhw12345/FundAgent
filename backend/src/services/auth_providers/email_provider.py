@@ -26,6 +26,50 @@ settings = get_settings()
 CODE_MIN = 100000  # 6-digit minimum
 CODE_MAX = 999999  # 6-digit maximum
 
+# Module-level SES client (singleton pattern)
+_ses_client_singleton: ses_client.SesClient | None = None
+_ses_client_initialized = False
+
+
+def _get_or_create_ses_client() -> ses_client.SesClient | None:
+    """
+    Get or create SES client singleton.
+
+    This prevents recreating the client on every request.
+    Returns None if credentials are not configured.
+    """
+    global _ses_client_singleton, _ses_client_initialized
+
+    if _ses_client_initialized:
+        return _ses_client_singleton
+
+    # Mark as initialized to avoid repeated attempts
+    _ses_client_initialized = True
+
+    if not settings.tencent_secret_id or not settings.tencent_secret_key:
+        logger.warning("Tencent Cloud SES credentials not configured")
+        return None
+
+    try:
+        cred = credential.Credential(
+            settings.tencent_secret_id, settings.tencent_secret_key
+        )
+        http_profile = HttpProfile()
+        http_profile.endpoint = "ses.tencentcloudapi.com"
+
+        client_profile = ClientProfile()
+        client_profile.httpProfile = http_profile
+
+        # Initialize client with region
+        _ses_client_singleton = ses_client.SesClient(
+            cred, settings.tencent_ses_region, client_profile
+        )
+        logger.info("Tencent Cloud SES client initialized (singleton)")
+        return _ses_client_singleton
+    except Exception as e:
+        logger.error("Failed to initialize SES client", error=str(e))
+        return None
+
 
 class EmailAuthProvider(AuthProvider):
     """Email-based authentication using Tencent Cloud SES."""
@@ -38,27 +82,8 @@ class EmailAuthProvider(AuthProvider):
             redis_cache: Optional Redis instance for storing codes
         """
         self.redis = redis_cache
-        self.ses_client = None
-
-        # Initialize SES client if credentials are available
-        if settings.tencent_secret_id and settings.tencent_secret_key:
-            try:
-                cred = credential.Credential(
-                    settings.tencent_secret_id, settings.tencent_secret_key
-                )
-                http_profile = HttpProfile()
-                http_profile.endpoint = "ses.tencentcloudapi.com"
-
-                client_profile = ClientProfile()
-                client_profile.httpProfile = http_profile
-
-                # Initialize client with region
-                self.ses_client = ses_client.SesClient(
-                    cred, settings.tencent_ses_region, client_profile
-                )
-                logger.info("Tencent Cloud SES client initialized")
-            except Exception as e:
-                logger.error("Failed to initialize SES client", error=str(e))
+        # Use singleton SES client (initialized once per process)
+        self.ses_client = _get_or_create_ses_client()
 
     def _make_redis_key(self, email: str) -> str:
         """Generate Redis key for email verification code."""
