@@ -53,6 +53,42 @@ chats_collection.create_index([("user_id", 1), ("created_at", -1)])
 
 **Rule**: Index fields in order of query filters (left to right)
 
+### Sorting with Compound Filters - CRITICAL LIMITATION
+
+**⚠️ BREAKING DIFFERENCE**: Cosmos DB MongoDB API **does NOT support sorting by `_id`** when you have compound filter queries.
+
+**What FAILS in Cosmos DB** (works in regular MongoDB):
+```python
+# ❌ FAILS in Cosmos DB - even with compound index!
+collection.find({"user_id": "123", "is_archived": False}).sort("_id", -1)
+
+# Error: "The index path corresponding to the specified order-by item is excluded"
+```
+
+**What WORKS** (both MongoDB and Cosmos DB):
+```python
+# ✅ WORKS - use explicit timestamp fields for sorting
+collection.find({"user_id": "123", "is_archived": False}).sort("updated_at", -1)
+```
+
+**Required Index**:
+```python
+# For the working query above
+collection.create_index([("user_id", 1), ("is_archived", 1), ("updated_at", -1)])
+```
+
+**Why This Happens**:
+- Regular MongoDB: `_id` is always indexed and can be used for sorting
+- Cosmos DB: When filtering by fields, sorting by `_id` requires it to be in the compound index, but Cosmos DB's indexing policy may exclude `_id` from compound indexes
+
+**Migration Impact**:
+- Code that works in local dev (MongoDB) will **FAIL in production** (Cosmos DB)
+- All queries with filters + `_id` sorting must be changed to use explicit timestamp fields
+
+**Detailed Guide**: See [Cosmos DB MongoDB Compatibility Guide](../deployment/cosmos-db-mongodb-compatibility.md)
+
+**Fixed in**: Backend v0.5.5 - Changed `chat_repository.py` to sort by `updated_at` instead of `_id`
+
 ### Unique Index Limitations
 
 **Cosmos DB Restriction**: Unique indexes require collection-level throughput

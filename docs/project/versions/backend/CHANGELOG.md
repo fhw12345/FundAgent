@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2025-10-24
+
+### Added
+- fix(database): Change chat list query to use updated_at sorting for Cosmos DB compatibility
+
+
+## [0.5.5] - 2025-10-23
+
+### Added
+- Add production Langfuse observability configuration
+
+
 ## [0.5.4] - 2025-10-14
 
 ### Added
