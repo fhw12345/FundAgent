@@ -8,6 +8,7 @@ This directory contains documentation for bugs, fixes, and common issues encount
 - [CORS & API Connectivity](cors-api-connectivity.md) - CORS errors, localhost issues, nginx proxy problems
 - [Data Validation](data-validation-issues.md) - Pydantic validation errors, data format mismatches
 - [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems, service selectors
+- [External Secrets Sync](external-secrets-sync.md) - Secrets not updating from Azure Key Vault, force-sync procedures
 - [MongoDB Cosmos DB](mongodb-cosmos-db.md) - Throughput modes, indexes, unique constraints with NULL values
 - [Git History Rewrite](git-history-rewrite.md) - Team awareness for git history rewrites, recovery steps
 - [Transaction Reconciliation Fix](transaction-reconciliation-datetime-fix.md) - Datetime deprecation fix
@@ -86,6 +87,9 @@ Pydantic validation failures, type mismatches, data format issues
 
 ### Deployment Issues
 Kubernetes problems, image pulls, pod crashes, health check failures
+
+### External Secrets Sync
+Azure Key Vault secret updates not syncing, force-sync procedures, secret rotation workflows
 
 ### MongoDB Cosmos DB
 Azure Cosmos DB limitations, throughput modes, index configuration, unique constraints with NULL values
