@@ -155,7 +155,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(analysis_router)
     app.include_router(market_data_router)
-    app.include_router(chat_router)  # Unified chat endpoint with v2/v3 agent selection
+    app.include_router(chat_router)  # Persistent MongoDB-based chat
     app.include_router(credits_router)  # Token-based credit economy
     app.include_router(llm_models_router)  # LLM model selection and pricing
     app.include_router(feedback_router)  # Feedback & Community Roadmap platform
