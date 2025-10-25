@@ -40,17 +40,17 @@ class RateLimiter:
         Returns:
             Tuple of (is_allowed, current_count, remaining)
         """
-        if not self.redis.redis:
+        if not self.redis.client:
             # Redis not available - allow request (fail open)
             logger.warning("Redis not available for rate limiting - allowing request")
             return True, 0, limit
 
         # Use Redis INCR with expiry
-        current = await self.redis.redis.incr(key)
+        current = await self.redis.client.incr(key)
 
         if current == 1:
             # First request - set expiry
-            await self.redis.redis.expire(key, window_seconds)
+            await self.redis.client.expire(key, window_seconds)
 
         remaining = max(0, limit - current)
         is_allowed = current <= limit

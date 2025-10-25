@@ -26,22 +26,59 @@ class RefreshTokenRepository:
         self.collection = collection
 
     async def ensure_indexes(self) -> None:
-        """Create indexes for efficient queries and TTL cleanup."""
-        await self.collection.create_index("token_hash", unique=True)
-        await self.collection.create_index("user_id")
-        await self.collection.create_index("expires_at")
-        await self.collection.create_index([("user_id", 1), ("revoked", 1)])
+        """
+        Create indexes for efficient queries and TTL cleanup.
 
-        # TTL index: Auto-delete revoked tokens after 30 days
-        # Only affects documents where revoked_at is set (active tokens have revoked_at=null)
-        await self.collection.create_index(
-            "revoked_at",
-            expireAfterSeconds=30 * 24 * 60 * 60,  # 30 days = 2,592,000 seconds
-        )
+        For Cosmos DB compatibility, this method checks if indexes already exist
+        before creating them, and handles the case where unique indexes cannot
+        be created on collections with existing documents.
+        """
+        try:
+            # Get existing indexes
+            existing_indexes = await self.collection.index_information()
+            index_names = set(existing_indexes.keys())
 
-        logger.info(
-            "Refresh token indexes created (including 30-day TTL for revoked tokens)"
-        )
+            # Create token_hash unique index if it doesn't exist
+            if "token_hash_1" not in index_names:
+                try:
+                    await self.collection.create_index("token_hash", unique=True)
+                    logger.info("Created unique index on token_hash")
+                except Exception as e:
+                    # Cosmos DB: Cannot create unique index on non-empty collection
+                    # Log warning and continue - index will be created on next deployment
+                    logger.warning(
+                        "Failed to create unique index on token_hash",
+                        error=str(e),
+                        recommendation="Clear collection or create index before inserting documents"
+                    )
+
+            # Create other indexes (these can be created on non-empty collections)
+            if "user_id_1" not in index_names:
+                await self.collection.create_index("user_id")
+                logger.info("Created index on user_id")
+
+            if "expires_at_1" not in index_names:
+                await self.collection.create_index("expires_at")
+                logger.info("Created index on expires_at")
+
+            if "user_id_1_revoked_1" not in index_names:
+                await self.collection.create_index([("user_id", 1), ("revoked", 1)])
+                logger.info("Created compound index on user_id + revoked")
+
+            # TTL index: Auto-delete revoked tokens after 30 days
+            # Only affects documents where revoked_at is set (active tokens have revoked_at=null)
+            if "revoked_at_1" not in index_names:
+                await self.collection.create_index(
+                    "revoked_at",
+                    expireAfterSeconds=30 * 24 * 60 * 60,  # 30 days = 2,592,000 seconds
+                )
+                logger.info("Created TTL index on revoked_at (30 days)")
+
+            logger.info("Refresh token indexes ensured")
+
+        except Exception as e:
+            # Log error but don't fail startup
+            logger.error("Failed to ensure refresh token indexes", error=str(e))
 
     async def create(self, token: RefreshToken) -> RefreshToken:
         """
