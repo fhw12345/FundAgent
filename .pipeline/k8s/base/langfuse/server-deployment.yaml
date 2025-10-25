@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-server
+  labels:
+    app: langfuse-server
+    component: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-server
+  template:
+    metadata:
+      labels:
+        app: langfuse-server
+        component: observability
+    spec:
+      serviceAccountName: klinematrix-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: langfuse
+        image: langfuse/langfuse:3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        # Database - Using complete DATABASE_URL with URL-encoded password
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: database-url
+
+        # ClickHouse - Define password first, then use in MIGRATION_URL
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: clickhouse-password
+        - name: CLICKHOUSE_URL
+          value: "http://langfuse-clickhouse:8123"
+        - name: CLICKHOUSE_USER
+          value: "langfuse"
+        - name: CLICKHOUSE_HOST
+          value: "langfuse-clickhouse"
+        - name: CLICKHOUSE_DATABASE
+          value: "langfuse"
+        - name: CLICKHOUSE_MIGRATION_URL
+          value: "clickhouse://langfuse:$(CLICKHOUSE_PASSWORD)@langfuse-clickhouse:9000/langfuse"
+        - name: CLICKHOUSE_CLUSTER_ENABLED
+          value: "false"
+
+        # Redis
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: REDIS_PORT
+          value: "6379"
+
+        # S3/OSS Event Uploads
+        # SECURITY NOTE: Using HTTP instead of HTTPS due to boto3 chunked encoding incompatibility with OSS
+        # Alibaba Cloud OSS does not support AWS SDK's aws-chunked encoding when using HTTPS
+        # Since AKS (Azure) cannot use OSS internal endpoint (different cloud), HTTP is required
+        # Traces are primarily stored in ClickHouse (encrypted at rest); OSS is backup storage
+        - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+          value: "langfuse-events-prod"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+          value: "cn-hangzhou"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: oss-access-key-id
+        - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: oss-access-key-secret
+        - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+          value: "http://oss-cn-hangzhou.aliyuncs.com"  # HTTP required (boto3 chunked encoding issue)
+        - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+          value: "false"
+
+        # Auth
+        - name: NEXTAUTH_URL
+          value: "https://monitor.klinematrix.com"
+        - name: NEXTAUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: nextauth-secret
+        - name: SALT
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: salt
+
+        # Config
+        - name: TELEMETRY_ENABLED
+          value: "false"
+        - name: LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES
+          value: "true"
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: nextjs-cache
+          mountPath: /app/.next/cache
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/public/health
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/public/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: nextjs-cache
+        emptyDir: {}
