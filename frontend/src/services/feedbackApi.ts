@@ -12,7 +12,7 @@ import type {
 } from "../types/feedback";
 import { authStorage } from "./authService";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // Create axios instance with auth header injection
 const api = axios.create({
