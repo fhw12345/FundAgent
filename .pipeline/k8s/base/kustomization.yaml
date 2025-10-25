@@ -35,4 +35,4 @@ images:
   newTag: "test-v0.5.5"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend
-  newTag: "test-v0.8.5"
+  newTag: "test-v0.8.6"
