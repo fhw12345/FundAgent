@@ -331,39 +331,44 @@ export function EnhancedChatInterface() {
 
             {/* Chat Panel - Primary on mobile, middle panel on desktop */}
             <div className="flex flex-col flex-1 w-full md:w-auto md:flex-1 lg:w-2/5 border-r border-gray-200 relative">
-              {/* Mobile toggle buttons */}
-              <div className="flex md:hidden absolute top-2 left-2 right-2 z-10 gap-2">
-                <button
-                  onClick={() => setIsMobileSidebarVisible(!isMobileSidebarVisible)}
-                  className="px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  {isMobileSidebarVisible ? "← Hide" : "← Chats"}
-                </button>
-                <button
-                  onClick={() => setIsMobileChartVisible(!isMobileChartVisible)}
-                  className="ml-auto px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  {isMobileChartVisible ? "Hide →" : "Chart →"}
-                </button>
+              {/* Mobile toggle buttons - only show when panels are closed */}
+              {!isMobileChartVisible && (
+                <div className="flex md:hidden absolute top-2 left-2 right-2 z-10 gap-2">
+                  <button
+                    onClick={() => setIsMobileSidebarVisible(!isMobileSidebarVisible)}
+                    className="px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    {isMobileSidebarVisible ? "← Hide" : "← Chats"}
+                  </button>
+                  <button
+                    onClick={() => setIsMobileChartVisible(true)}
+                    className="ml-auto px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Chart →
+                  </button>
+                </div>
+              )}
+
+              {/* Add padding-top to prevent toggle buttons from covering messages */}
+              <div className="pt-12 md:pt-0 flex-1 flex flex-col min-h-0">
+                <ChatMessages
+                  messages={messages}
+                  isAnalysisPending={
+                    chatMutation.isPending || buttonMutation.isPending
+                  }
+                />
+
+                <ChatInput
+                  message={message}
+                  setMessage={setMessage}
+                  onSendMessage={handleSendMessage}
+                  isPending={chatMutation.isPending || buttonMutation.isPending}
+                  currentSymbol={currentSymbol}
+                  messages={messages}
+                  modelSettings={modelSettings}
+                  onModelSettingsChange={setModelSettings}
+                />
               </div>
-
-              <ChatMessages
-                messages={messages}
-                isAnalysisPending={
-                  chatMutation.isPending || buttonMutation.isPending
-                }
-              />
-
-              <ChatInput
-                message={message}
-                setMessage={setMessage}
-                onSendMessage={handleSendMessage}
-                isPending={chatMutation.isPending || buttonMutation.isPending}
-                currentSymbol={currentSymbol}
-                messages={messages}
-                modelSettings={modelSettings}
-                onModelSettingsChange={setModelSettings}
-              />
             </div>
 
             {/* Chart Panel - Hidden on mobile, visible on desktop */}
@@ -374,6 +379,25 @@ export function EnhancedChatInterface() {
                   : "hidden"
               } lg:block lg:relative lg:z-0`}
             >
+              {/* Mobile close button for chart panel */}
+              {isMobileChartVisible && (
+                <div className="lg:hidden absolute top-2 left-2 right-2 z-30 flex justify-between items-center px-2">
+                  <button
+                    onClick={() => setIsMobileChartVisible(false)}
+                    className="px-4 py-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    ← Back to Chat
+                  </button>
+                  <button
+                    onClick={() => setIsMobileChartVisible(false)}
+                    className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md text-gray-700 hover:bg-gray-50 flex items-center justify-center"
+                    aria-label="Close chart"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <ChartPanel
                 currentSymbol={currentSymbol}
                 currentCompanyName={currentCompanyName}
