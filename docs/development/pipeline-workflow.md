@@ -1,12 +1,18 @@
 # AI Automation Workflow and Pipeline
 
-> **⚠️ STATUS: PLANNED/FUTURE**
+---
+
+> ## ⚠️ NOT IMPLEMENTED - FUTURE PLANNING DOCUMENT
 >
-> This document describes a planned CI/CD automation workflow that **has not been implemented yet**.
+> **STATUS**: This is a **planning document only**. None of the workflows described below are currently implemented.
 >
-> **Current deployment uses manual workflow** documented in [docs/deployment/workflow.md](../deployment/workflow.md).
+> **Current Process**: All deployment and CI/CD tasks are **manual**. See [Deployment Workflow](../deployment/workflow.md) for actual procedures.
 >
-> Keep this document as a reference for future automation, but it does not reflect current processes.
+> **Purpose**: This document serves as a reference for future automation initiatives. It describes the intended architecture for automated testing, patching, and deployment.
+>
+> **Last Updated**: 2025-10-24
+
+---
 
 ## Trigger Sources
 

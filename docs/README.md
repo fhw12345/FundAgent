@@ -6,15 +6,17 @@ Comprehensive documentation for the AI-Enhanced Financial Analysis Platform.
 
 ## Current Versions
 
-**Last Updated:** 2025-10-15
+**Last Updated:** 2025-10-24
 
 | Component | Version | Environment | Status |
 |-----------|---------|-------------|--------|
-| Backend   | v0.5.4  | Test (K8s)  | ✅ Stable |
+| Backend   | v0.5.5  | Test (K8s)  | ✅ Stable |
 | Frontend  | v0.8.4  | Test (K8s)  | ✅ Stable |
+| Langfuse  | v3.x    | Test (K8s)  | ✅ Production |
 | Production | -      | Not deployed | ⏳ Planned |
 
 **Test Environment:** https://klinematrix.com
+**Observability:** https://monitor.klinematrix.com (Langfuse v3)
 **Production:** Not yet deployed
 
 For detailed version history and release notes, see [Version Management](project/versions/README.md).

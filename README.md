@@ -159,35 +159,57 @@ financial_agent/
 
 ## 🚢 Deployment
 
-### Staging/Production
+### Test Environment (Azure AKS)
+
+**Current Process**: Manual deployment via Kustomize
+
 ```bash
-# Build production images
-make build-prod
+# 1. Bump version
+./scripts/bump-version.sh backend patch  # or minor/major
 
-# Deploy to Kubernetes (requires kubectl config)
-kubectl apply -f .pipeline/k8s/
+# 2. Build and push images to Azure Container Registry
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+az acr build --registry financialAgent \
+  --image klinematrix/backend:test-v${BACKEND_VERSION} \
+  --file backend/Dockerfile backend/
 
-# Or using Helm
-helm install financial-agent infra/helm/financials/
+# 3. Update image tag in kustomization
+# Edit .pipeline/k8s/overlays/test/kustomization.yaml
+
+# 4. Apply with Kustomize
+kubectl apply -k .pipeline/k8s/overlays/test/
+
+# 5. Verify deployment
+kubectl get pods -n klinematrix-test
+curl https://klinematrix.com/api/health
 ```
 
+**Documentation**: See [Deployment Workflow](docs/deployment/workflow.md) for complete procedures.
+
 ### CI/CD Pipeline
-- **GitHub Actions** for automated testing and building
-- **Docker image scanning** with Trivy
-- **Automated deployment** to Alibaba Cloud ACK
-- **Progressive rollouts** with health checks
+
+**Status**: ⚠️ Manual deployment (CI/CD automation planned for future)
+
+**Current Tools**:
+- **Pre-commit hooks** for code quality (Black, Ruff, mypy, ESLint, Prettier)
+- **Azure Container Registry** for image storage
+- **Azure Kubernetes Service (AKS)** for container orchestration
+- **External Secrets Operator** for secret management
+
+**Future**: See [Pipeline Workflow](docs/development/pipeline-workflow.md) for planned automation
 
 ## 🎯 Current Status: Production-Ready Platform ✅
 
-**Current Versions** (as of 2025-10-15):
-- ✅ **Backend v0.5.4**: LLM model selection, code quality improvements, datetime deprecation fixes
+**Current Versions** (as of 2025-10-24):
+- ✅ **Backend v0.5.5**: Cosmos DB MongoDB API compatibility fix, Langfuse observability integration
 - ✅ **Frontend v0.8.4**: CJK-aware token estimation, credit rollback, UI enhancements
 - ✅ **Test Environment**: https://klinematrix.com (Azure Kubernetes + Alibaba Cloud AI)
+- ✅ **Observability**: https://monitor.klinematrix.com (Langfuse v3 LLM trace visualization)
 
 **Recent Milestones**:
+- ✅ **v0.5.5**: Cosmos DB sorting compatibility + Langfuse v3 production deployment (2025-10-24)
 - ✅ **v0.5.4**: LLM model selection with per-model pricing + code quality improvements (2025-10-15)
 - ✅ **v0.5.3**: Token credit system with transaction tracking and reconciliation (2025-10-14)
-- ✅ **v0.5.2**: Type safety milestone - resolved 107 mypy type errors (2025-10-12)
 - ✅ **v0.4.5/v0.6.1**: Security hardening (non-root containers, read-only filesystems) (2025-10-08)
 
 **Core Features Delivered**:
