@@ -12,11 +12,11 @@ spec:
           value: "false"
         - name: REACT_APP_API_URL
           value: "https://klinematrix.com/api"
-        # Test environment resource limits
+        # Test environment resource limits (optimized for static NGINX)
         resources:
           requests:
-            memory: "128Mi"
-            cpu: "50m"
+            memory: "16Mi"
+            cpu: "10m"
           limits:
-            memory: "256Mi"
-            cpu: "200m"
+            memory: "64Mi"
+            cpu: "100m"

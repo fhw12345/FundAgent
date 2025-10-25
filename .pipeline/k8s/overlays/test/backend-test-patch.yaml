@@ -56,6 +56,19 @@ spec:
           value: "Klinematrix"
         - name: TENCENT_SES_TEMPLATE_ID
           value: "37066"
+        # Langfuse observability
+        - name: LANGFUSE_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: langfuse-public-key
+        - name: LANGFUSE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: langfuse-secret-key
+        - name: LANGFUSE_HOST
+          value: "https://monitor.klinematrix.com"
         # Test environment resource limits (10 beta users)
         resources:
           requests:
