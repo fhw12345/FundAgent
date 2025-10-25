@@ -67,15 +67,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         feedback_repo = FeedbackRepository(mongodb.get_collection("feedback_items"))
         await feedback_repo.ensure_indexes()
-        logger.info("Feedback item indexes created")
 
         comment_repo = CommentRepository(mongodb.get_collection("comments"))
         await comment_repo.ensure_indexes()
-        logger.info("Comment indexes created")
 
         transaction_repo = TransactionRepository(mongodb.get_collection("transactions"))
         await transaction_repo.ensure_indexes()
-        logger.info("Transaction indexes created")
 
         message_repo = MessageRepository(mongodb.get_collection("messages"))
         await message_repo.ensure_indexes()
