@@ -63,28 +63,46 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Fashionable glassmorphism header */}
+      {/* Mobile-responsive glassmorphism header */}
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-gray-200/50 shadow-sm">
-        <div className="mx-auto px-6 lg:px-8">
-          <div className="flex justify-between items-center py-2">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 ring-2 ring-white/50">
-                <span className="text-2xl">📊</span>
+        <div className="mx-auto px-3 sm:px-6 lg:px-8">
+          {/* Mobile-first responsive layout */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 gap-2">
+            {/* Logo and title */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-9 h-9 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 ring-2 ring-white/50">
+                  <span className="text-xl sm:text-2xl">📊</span>
+                </div>
+                <div>
+                  <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent tracking-tight">
+                    KlineMatrix
+                  </h1>
+                  <span className="text-xs font-medium text-gray-500 hidden sm:inline">
+                    AI-Powered Financial Intelligence
+                  </span>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent tracking-tight">
-                  KlineMatrix
-                </h1>
-                <span className="text-xs font-medium text-gray-500">
-                  AI-Powered Financial Intelligence
-                </span>
+              {/* Mobile user info */}
+              <div className="flex items-center gap-2 sm:hidden">
+                <CreditBalance className="w-32" />
+                <button
+                  onClick={() => {
+                    void handleLogout();
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100/80 rounded-lg transition-all"
+                >
+                  Logout
+                </button>
               </div>
             </div>
-            <nav className="flex items-center gap-2">
+
+            {/* Navigation - stacks vertically on mobile */}
+            <nav className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               {isAdmin && (
                 <button
                   onClick={() => setActiveTab("health")}
-                  className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                  className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
                     activeTab === "health"
                       ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
                       : "text-gray-700 hover:bg-gray-100/80"
@@ -95,7 +113,7 @@ function App() {
               )}
               <button
                 onClick={() => setActiveTab("chat")}
-                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
                   activeTab === "chat"
                     ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
                     : "text-gray-700 hover:bg-gray-100/80"
@@ -105,7 +123,7 @@ function App() {
               </button>
               <button
                 onClick={() => setActiveTab("feedback")}
-                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
                   activeTab === "feedback"
                     ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
                     : "text-gray-700 hover:bg-gray-100/80"
@@ -115,7 +133,7 @@ function App() {
               </button>
               <button
                 onClick={() => setActiveTab("transactions")}
-                className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
+                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
                   activeTab === "transactions"
                     ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
                     : "text-gray-700 hover:bg-gray-100/80"
@@ -123,7 +141,8 @@ function App() {
               >
                 Transactions
               </button>
-              <div className="ml-4 flex items-center gap-3 pl-4 border-l border-gray-200">
+              {/* Desktop user info */}
+              <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-gray-200">
                 <CreditBalance className="w-56" />
                 <span className="text-sm text-gray-700">👤 {username}</span>
                 <button

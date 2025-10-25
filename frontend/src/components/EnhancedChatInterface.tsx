@@ -22,6 +22,10 @@ export function EnhancedChatInterface() {
   const [dateRangeEnd, setDateRangeEnd] = useState("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Mobile panel visibility (overlays on mobile)
+  const [isMobileSidebarVisible, setIsMobileSidebarVisible] = useState(false);
+  const [isMobileChartVisible, setIsMobileChartVisible] = useState(false);
+
   // LLM Model settings
   const [modelSettings, setModelSettings] = useState<ModelSettings>({
     model: "qwen-plus",
@@ -287,21 +291,62 @@ export function EnhancedChatInterface() {
     <div className="bg-white">
       {/* Full-width trading interface with sidebar */}
       <div className="mx-auto">
-        <div className="overflow-hidden">
-          <div className="flex h-[calc(100vh-8rem)]">
-            {/* Chat History Sidebar */}
-            <ChatSidebar
-              activeChatId={chatId}
-              onChatSelect={(id) => void handleChatSelect(id)}
-              onNewChat={handleNewChat}
-              isCollapsed={isSidebarCollapsed}
-              onToggleCollapse={() =>
-                setIsSidebarCollapsed(!isSidebarCollapsed)
-              }
-            />
+        <div className="overflow-hidden relative">
+          {/* Mobile: vertical layout with overlays, Desktop: horizontal layout */}
+          <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)]">
+            {/* Chat History Sidebar - Hidden on mobile, visible on desktop */}
+            <div
+              className={`${
+                isMobileSidebarVisible
+                  ? "absolute top-0 left-0 z-20 h-full bg-white shadow-lg"
+                  : "hidden"
+              } md:block md:relative md:z-0`}
+            >
+              <ChatSidebar
+                activeChatId={chatId}
+                onChatSelect={(id) => void handleChatSelect(id)}
+                onNewChat={handleNewChat}
+                isCollapsed={isSidebarCollapsed}
+                onToggleCollapse={() =>
+                  setIsSidebarCollapsed(!isSidebarCollapsed)
+                }
+              />
+            </div>
 
-            {/* Chat Panel */}
-            <div className="flex flex-col flex-1 lg:w-2/5 border-r border-gray-200">
+            {/* Mobile overlay backdrop */}
+            {isMobileSidebarVisible && (
+              <div
+                role="button"
+                tabIndex={0}
+                className="absolute inset-0 bg-black/50 z-10 md:hidden"
+                onClick={() => setIsMobileSidebarVisible(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" || e.key === "Enter") {
+                    setIsMobileSidebarVisible(false);
+                  }
+                }}
+                aria-label="Close sidebar"
+              />
+            )}
+
+            {/* Chat Panel - Primary on mobile, middle panel on desktop */}
+            <div className="flex flex-col flex-1 w-full md:w-auto md:flex-1 lg:w-2/5 border-r border-gray-200 relative">
+              {/* Mobile toggle buttons */}
+              <div className="flex md:hidden absolute top-2 left-2 right-2 z-10 gap-2">
+                <button
+                  onClick={() => setIsMobileSidebarVisible(!isMobileSidebarVisible)}
+                  className="px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {isMobileSidebarVisible ? "← Hide" : "← Chats"}
+                </button>
+                <button
+                  onClick={() => setIsMobileChartVisible(!isMobileChartVisible)}
+                  className="ml-auto px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  {isMobileChartVisible ? "Hide →" : "Chart →"}
+                </button>
+              </div>
+
               <ChatMessages
                 messages={messages}
                 isAnalysisPending={
@@ -321,20 +366,44 @@ export function EnhancedChatInterface() {
               />
             </div>
 
-            {/* Chart Panel - Optimized width */}
-            <ChartPanel
-              currentSymbol={currentSymbol}
-              currentCompanyName={currentCompanyName}
-              priceDataQuery={priceDataQuery}
-              selectedInterval={selectedInterval}
-              selectedDateRange={selectedDateRange}
-              analysisMutation={buttonMutation}
-              fibonacciAnalysis={currentFibonacciAnalysis}
-              handleSymbolSelect={handleSymbolSelect}
-              handleIntervalChange={handleIntervalChange}
-              handleDateRangeSelect={handleDateRangeSelect}
-              handleQuickAnalysis={handleQuickAnalysis}
-            />
+            {/* Chart Panel - Hidden on mobile, visible on desktop */}
+            <div
+              className={`${
+                isMobileChartVisible
+                  ? "absolute top-0 right-0 z-20 h-full w-full bg-white shadow-lg"
+                  : "hidden"
+              } lg:block lg:relative lg:z-0`}
+            >
+              <ChartPanel
+                currentSymbol={currentSymbol}
+                currentCompanyName={currentCompanyName}
+                priceDataQuery={priceDataQuery}
+                selectedInterval={selectedInterval}
+                selectedDateRange={selectedDateRange}
+                analysisMutation={buttonMutation}
+                fibonacciAnalysis={currentFibonacciAnalysis}
+                handleSymbolSelect={handleSymbolSelect}
+                handleIntervalChange={handleIntervalChange}
+                handleDateRangeSelect={handleDateRangeSelect}
+                handleQuickAnalysis={handleQuickAnalysis}
+              />
+            </div>
+
+            {/* Mobile chart overlay backdrop */}
+            {isMobileChartVisible && (
+              <div
+                role="button"
+                tabIndex={0}
+                className="absolute inset-0 bg-black/50 z-10 lg:hidden"
+                onClick={() => setIsMobileChartVisible(false)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" || e.key === "Enter") {
+                    setIsMobileChartVisible(false);
+                  }
+                }}
+                aria-label="Close chart"
+              />
+            )}
           </div>
         </div>
       </div>
