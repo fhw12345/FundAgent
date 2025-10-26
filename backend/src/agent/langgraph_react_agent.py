@@ -136,7 +136,7 @@ class FinancialAnalysisReActAgent:
             self.llm,
             self.tools,
             checkpointer=self.checkpointer,
-            state_modifier=FINANCIAL_AGENT_SYSTEM_PROMPT,
+            prompt=FINANCIAL_AGENT_SYSTEM_PROMPT,
         )
 
         logger.info(
