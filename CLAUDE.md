@@ -116,16 +116,23 @@ docker compose exec frontend npm install --save-dev <package-name>
 ```bash
 # Build versioned images in Azure Container Registry
 BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+FRONTEND_VERSION=$(grep '"version":' frontend/package.json | head -1 | sed 's/.*"\(.*\)".*/\1/')
 
 az acr build --registry financialAgent \
   --image klinematrix/backend:test-v${BACKEND_VERSION} \
   --file backend/Dockerfile backend/
 
-# Restart pods to pull new image (imagePullPolicy: Always)
-kubectl delete pod -l app=backend -n klinematrix-test
+az acr build --registry financialAgent \
+  --image klinematrix/frontend:test-v${FRONTEND_VERSION} \
+  --target production --file frontend/Dockerfile frontend/
+
+# Update kustomization.yaml, then apply and force restart
+# Edit .pipeline/k8s/overlays/test/kustomization.yaml with new versions
+kubectl apply -k .pipeline/k8s/overlays/test
+kubectl rollout restart deployment/backend deployment/frontend -n klinematrix-test
 ```
 
-**Note**: This deploys to Test (K8s) environment at https://klinematrix.com
+**⚠️ CRITICAL**: Always use `kubectl rollout restart` after `apply -k` - image tag changes alone don't trigger rollouts
 
 ### 5. Verify Test Deployment
 ```bash
