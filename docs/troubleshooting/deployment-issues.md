@@ -1032,3 +1032,290 @@ kubectl delete pod \
 echo "Remaining pods:"
 kubectl get pods -n $NAMESPACE
 ```
+
+---
+
+## Issue: Pods Stuck in Pending During Rolling Update (Over-Allocated CPU Requests)
+
+**Pattern ID**: K8S-001
+
+### Symptoms
+```bash
+kubectl get pods -n klinematrix-test
+# NAME                            READY   STATUS    RESTARTS   AGE
+# backend-new-7b8d9f5c4d-abc123   0/1     Pending   0          5m
+# backend-old-6c7a8b3d2e-xyz789   1/1     Running   0          30m
+
+kubectl describe pod backend-new-7b8d9f5c4d-abc123 -n klinematrix-test
+# Events:
+#   Warning  FailedScheduling  0/3 nodes available: Insufficient cpu
+```
+
+### Root Cause
+CPU requests were set too high across multiple pods, causing node bin-packing to fail during rolling updates. When a new pod tries to schedule, the combined CPU requests of all pods (old + new) exceed available node capacity, even though actual CPU usage is low.
+
+**Real-World Example** (Oct 2025):
+- 3 nodes with ~2000m CPU each = 6000m total
+- 11 pods × 100m CPU request = 1100m (fits comfortably)
+- Reduced to 11 pods × 50m = 550m (50% reduction)
+- Result: Rolling updates can now create temporary duplicate pods without capacity issues
+
+### Diagnosis
+```bash
+# 1. Check pod CPU requests vs node capacity
+kubectl describe nodes | grep -A 5 "Allocated resources"
+
+# Look for cpu requests near or exceeding node capacity (2000m on Standard_D2ls_v5)
+
+# 2. Check pending pod events
+kubectl describe pod <pending-pod> -n klinematrix-test | grep "Insufficient cpu"
+
+# 3. Calculate total CPU requests
+kubectl get pods -n klinematrix-test -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].resources.requests.cpu}{"\n"}{end}'
+
+# 4. Compare actual usage vs requests
+kubectl top pods -n klinematrix-test
+```
+
+### Solution
+
+**Reduce CPU requests to match actual usage:**
+
+```yaml
+# Before (too high):
+resources:
+  requests:
+    cpu: "100m"  # Reserved but not fully used
+  limits:
+    cpu: "500m"
+
+# After (optimized):
+resources:
+  requests:
+    cpu: "50m"   # Matches actual usage
+  limits:
+    cpu: "500m"  # Keep burst capacity
+```
+
+**Apply to all deployments:**
+
+```bash
+# Example for backend
+# Edit .pipeline/k8s/base/backend/deployment.yaml
+# Change cpu request from 100m to 50m
+
+# Apply changes
+kubectl apply -k .pipeline/k8s/overlays/test/
+
+# Force rolling restart to create new pods
+kubectl rollout restart deployment/backend -n klinematrix-test
+```
+
+**Affected components** (based on Oct 2025 optimization):
+- Backend: 100m→50m
+- ClickHouse: 100m→50m
+- Langfuse Server: 100m→50m
+- Langfuse Worker: 50m→25m
+
+### Prevention
+
+**1. Right-size CPU requests based on actual usage:**
+```bash
+# Monitor actual CPU usage over time
+kubectl top pods -n klinematrix-test --containers
+
+# Set requests to ~10% above average usage
+# Set limits to handle burst traffic
+```
+
+**2. Test rolling updates after CPU request changes:**
+```bash
+# Force rolling update
+kubectl rollout restart deployment/<service> -n klinematrix-test
+
+# Watch for Pending pods
+kubectl get pods -n klinematrix-test -w
+```
+
+**3. Use pod disruption budgets:**
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+spec:
+  maxUnavailable: 1  # Allows rolling update to proceed
+  selector:
+    matchLabels:
+      app: backend
+```
+
+**4. Monitor node capacity utilization:**
+```bash
+# Should stay below 80% to allow for rolling updates
+kubectl describe nodes | grep -E "cpu.*requests"
+```
+
+### Impact
+- **Before**: Rolling updates would create Pending pods requiring manual intervention
+- **After**: Rolling updates complete automatically with 2x pod capacity during rollout
+- **Cost**: No change (requests don't affect pricing, only limits do)
+- **Performance**: No degradation (actual usage was already <50m)
+
+### Related Issues
+- See [Pods Pending Due to Resource Constraints](#issue-pods-pending-due-to-resource-constraints) for general resource troubleshooting
+- See [Cost Optimization Guide](../deployment/cost-optimization.md) for resource sizing methodology
+
+---
+
+## Issue: Rolling Update Creates Two ReplicaSets Simultaneously
+
+**Pattern ID**: K8S-002
+
+### Symptoms
+```bash
+kubectl get replicasets -n klinematrix-test
+# NAME                      DESIRED   CURRENT   READY   AGE
+# backend-7b8d9f5c4d (new)  1         1         0       5m    # New version stuck at 0/1 Ready
+# backend-6c7a8b3d2e (old)  1         1         1       30m   # Old version still running
+
+# Deployment shows progressing but never completes
+kubectl get deployment backend -n klinematrix-test
+# NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+# backend   1/1     1            1           30m
+# Conditions: Progressing (ReplicaSetUpdated)
+```
+
+### Root Cause
+During rolling updates, Kubernetes creates a new ReplicaSet while keeping the old one. If the new pod fails to become Ready (due to CPU constraints, health check failures, or dependency issues), both ReplicaSets remain active, consuming double the resources.
+
+**Common Triggers:**
+1. New pod Pending due to insufficient CPU/memory (see K8S-001)
+2. New pod fails readiness probe (database connection issues)
+3. New pod CrashLoopBackOff (code errors)
+
+### Diagnosis
+```bash
+# 1. Check ReplicaSet status
+kubectl get replicasets -n klinematrix-test -l app=backend
+
+# Look for two ReplicaSets with DESIRED=1
+
+# 2. Check why new pod isn't Ready
+kubectl get pods -n klinematrix-test -l app=backend
+kubectl describe pod <new-pod-name> -n klinematrix-test
+
+# 3. Check deployment rollout status
+kubectl rollout status deployment/backend -n klinematrix-test
+
+# 4. Check rollout history
+kubectl rollout history deployment/backend -n klinematrix-test
+```
+
+### Solution
+
+**Option 1: Fix the underlying issue** (preferred):
+
+```bash
+# Example: If pod is Pending due to CPU (K8S-001)
+# Delete old pod to free resources
+kubectl delete pod <old-pod-name> -n klinematrix-test
+
+# New pod should schedule and become Ready
+kubectl wait --for=condition=Ready pod -l app=backend,pod-template-hash=<new-hash> -n klinematrix-test --timeout=120s
+```
+
+**Option 2: Rollback to previous version:**
+
+```bash
+# Undo the rollout
+kubectl rollout undo deployment/backend -n klinematrix-test
+
+# Verify rollback completed
+kubectl rollout status deployment/backend -n klinematrix-test
+```
+
+**Option 3: Force cleanup old ReplicaSet:**
+
+```bash
+# Scale down old ReplicaSet manually
+kubectl scale replicaset backend-6c7a8b3d2e --replicas=0 -n klinematrix-test
+
+# Verify only new ReplicaSet remains
+kubectl get replicasets -n klinematrix-test -l app=backend
+```
+
+### Prevention
+
+**1. Ensure sufficient resources for rolling updates:**
+```yaml
+# Keep CPU requests low enough to allow 2x pods during rollout
+resources:
+  requests:
+    cpu: "50m"      # Allows room for old + new pod
+    memory: "384Mi"
+```
+
+**2. Configure deployment strategy:**
+```yaml
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0   # Keep old pod until new pod is Ready
+      maxSurge: 1         # Allow 1 extra pod during rollout
+```
+
+**3. Set appropriate readiness probe timing:**
+```yaml
+readinessProbe:
+  httpGet:
+    path: /api/health/ready
+    port: 8000
+  initialDelaySeconds: 10  # Give app time to start
+  periodSeconds: 5
+  failureThreshold: 3      # Allow 3 failures before marking unready
+```
+
+**4. Monitor rollout progress:**
+```bash
+# Watch rollout in real-time
+kubectl rollout status deployment/backend -n klinematrix-test -w
+
+# If stuck for >5 minutes, investigate immediately
+```
+
+**5. Use deployment deadline:**
+```yaml
+spec:
+  progressDeadlineSeconds: 300  # Fail rollout if not progressing after 5 min
+```
+
+### Understanding Rolling Update Flow
+
+**Normal flow:**
+1. New ReplicaSet created with 1 replica
+2. New pod scheduled and starts
+3. New pod passes readiness probe → Ready
+4. Old ReplicaSet scaled down to 0
+5. Old pod terminated
+6. Rollout complete
+
+**Stuck flow (this issue):**
+1. New ReplicaSet created with 1 replica
+2. New pod scheduled but **Pending/CrashLoopBackOff**
+3. New pod never becomes Ready ❌
+4. Old ReplicaSet stays at 1 (maxUnavailable: 0)
+5. **Both ReplicaSets active indefinitely**
+
+### Impact
+- **Resource consumption**: 2x resource reservations (old + new pod)
+- **Deployment time**: Stuck until manual intervention
+- **Risk**: Production traffic still served by old version with potential bugs
+- **Cost**: Autoscaler may add nodes to fit both pods (see COST-001)
+
+### Related Issues
+- See [K8S-001 (Over-Allocated CPU Requests)](#issue-pods-stuck-in-pending-during-rolling-update-over-allocated-cpu-requests) for CPU constraint fixes
+- See [K8S-003 (CrashLoopBackOff)](#issue-pod-stuck-in-crashloopbackoff) for dependency failure fixes
+- See [Cost Optimization Guide](../deployment/cost-optimization.md) for autoscaler impact

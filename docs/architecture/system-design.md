@@ -46,15 +46,20 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 ### Compute & Orchestration
 - **Platform**: Azure Kubernetes Service (AKS)
 - **Container Runtime**: Docker
+- **Node Configuration**: 3 nodes across 3 pools (agentpool, userpool, userpoolv2)
+  - agentpool: 1 × Standard_D2ls_v5 (System mode, 2 vCPU, 4GB)
+  - userpool: 1 × Standard_D2ls_v5 (User mode, 2 vCPU, 4GB)
+  - userpoolv2: 1 × Standard_E2_v3 (User mode, 2 vCPU, 16GB, memory-optimized)
 - **Deployment Pattern**: Separate pods for each service (frontend, backend, redis)
 - **Rationale**:
   - Independent scaling (frontend: 3-5 replicas, backend: 2-3 replicas, redis: 1 replica)
   - Independent updates (update backend without frontend downtime)
   - Failure isolation (backend crash doesn't affect frontend)
   - Fine-grained resource allocation per service
-- **Scaling**: Horizontal Pod Autoscaler (HPA) based on CPU load
+- **Scaling**: Horizontal Pod Autoscaler (HPA) based on CPU load, autoscaler capped at max-count=1 per pool
+- **Pod Distribution**: Kubernetes scheduler distributes pods across nodes based on resource requests
 - **Features**:
-  - Automated scaling per component
+  - Automated scaling per component (with cost guardrails)
   - Self-healing deployments
   - Zero-downtime rolling updates
   - Independent service lifecycle management

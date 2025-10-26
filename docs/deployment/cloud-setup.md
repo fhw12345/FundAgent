@@ -40,11 +40,16 @@
 - **Location**: Korea Central
 - **Kubernetes Version**: 1.32.6+
 - **Status**: Running
+- **Node Count**: 3 nodes (fixed) across 3 pools
+- **Node Pools**:
+  - agentpool: 1 × Standard_D2ls_v5 (2 vCPU, 4GB, System mode)
+  - userpool: 1 × Standard_D2ls_v5 (2 vCPU, 4GB, User mode)
+  - userpoolv2: 1 × Standard_E2_v3 (2 vCPU, 16GB, User mode, memory-optimized)
 - **Features Enabled**:
   - Workload Identity (for secretless auth)
   - OIDC Issuer
   - Azure CNI networking
-  - Auto-scaling (1-3 nodes)
+  - Autoscaler (capped at max-count=1 per pool)
 
 #### Azure Monitor Stack
 - **Workspace**: Azure Monitor Workspace
@@ -291,25 +296,17 @@ curl -X POST https://dashscope.cn-hangzhou.aliyuncs.com/api/v1/services/aigc/mul
 
 ## Cost Estimates
 
-### Azure (Monthly)
-```
-AKS Cluster: ~$150-300/month
-Cosmos DB: ~$200-500/month (depends on usage)
-Blob Storage: ~$10-50/month
-Azure Monitor: Included
-Total: ~$360-850/month
-```
+**Current Production Costs** (as of October 2025):
+- **AKS**: $237/month (3 nodes: agentpool + userpool + userpoolv2, autoscaler capped)
+- **Cosmos DB**: ~$200-500/month (depends on usage)
+- **Alibaba Cloud OSS/DashScope**: ~$60-250/month (pay-per-use)
+- **Total**: ~$500-1000/month
 
-### Alibaba Cloud (Monthly)
-```
-OSS Storage: ~$10-50/month
-DashScope API: Pay-per-use (~$50-200/month estimated)
-VPC (free): $0
-Total: ~$60-250/month
-```
+**Historical Context**:
+- Before October 2025 migration: $280/month (4 × Standard_B2s nodes, uncapped autoscaler)
+- After migration: $237/month (15% savings, cost-controlled autoscaling)
 
-### Combined Estimate
-**Total: ~$420-1100/month** (varies with usage)
+See [Cost Optimization Guide](cost-optimization.md) for detailed breakdown and monitoring procedures.
 
 ## Security Configuration
 

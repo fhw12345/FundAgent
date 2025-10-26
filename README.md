@@ -200,9 +200,9 @@ curl https://klinematrix.com/api/health
 
 ## 🎯 Current Status: Production-Ready Platform ✅
 
-**Current Versions** (as of 2025-10-24):
-- ✅ **Backend v0.5.5**: Cosmos DB MongoDB API compatibility fix, Langfuse observability integration
-- ✅ **Frontend v0.8.4**: CJK-aware token estimation, credit rollback, UI enhancements
+**Current Versions** (as of 2025-10-26):
+- ✅ **Backend v0.5.7**: Admin dashboard with enriched pod metrics (node pool, resource requests/limits)
+- ✅ **Frontend v0.8.10**: Enhanced health page with per-pod Kubernetes metadata display
 - ✅ **Test Environment**: https://klinematrix.com (Azure Kubernetes + Alibaba Cloud AI)
 - ✅ **Observability**: https://monitor.klinematrix.com (Langfuse v3 LLM trace visualization)
 

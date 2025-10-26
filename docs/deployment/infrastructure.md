@@ -83,12 +83,24 @@ External Dependencies:
 - **Cluster Name**: `FinancialAgent-AKS`
 - **Resource Group**: `FinancialAgent`
 - **Region**: Korea Central
-- **Node Count**: 1-3 nodes (auto-scaling)
+- **Node Count**: 3 nodes (fixed) across 3 pools
 - **Kubernetes Version**: 1.28+
 - **Features Enabled**:
   - Workload Identity (for secretless auth)
   - OIDC Issuer
   - Azure CNI networking
+
+**Node Pool Configuration** (as of October 2025 migration):
+
+| Pool Name     | VM SKU             | vCPU | Memory | Mode   | Count | Autoscaler   | Purpose                              |
+|---------------|--------------------|------|--------|--------|-------|--------------|--------------------------------------|
+| agentpool     | Standard_D2ls_v5   | 2    | 4GB    | System | 1     | max-count=1  | System pods (CoreDNS, metrics-server)|
+| userpool      | Standard_D2ls_v5   | 2    | 4GB    | User   | 1     | max-count=1  | General workloads                    |
+| userpoolv2    | Standard_E2_v3     | 2    | 16GB   | User   | 1     | max-count=1  | Memory-intensive workloads (ClickHouse, Langfuse) |
+
+**Cost**: $237/month (3 nodes total, autoscaler capped at max-count=1 per pool to prevent cost overruns)
+
+**Note**: Autoscaler configured with max-count=1 to prevent automatic scaling beyond 3 nodes total. See [Cost Optimization Guide](cost-optimization.md) for details.
 
 **Access**:
 ```bash
