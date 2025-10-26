@@ -52,7 +52,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     currentBalance >= estimatedCost;
 
   return (
-    <div className="border-t border-gray-200 px-6 py-4 bg-white">
+    <div className="flex-shrink-0 border-t border-gray-200 px-4 py-3 bg-white">
       {/* Warning Banner */}
       {hasInsufficientCredits && (
         <div className="mb-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">

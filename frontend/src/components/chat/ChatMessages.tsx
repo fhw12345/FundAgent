@@ -57,10 +57,10 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
       className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
     >
       <div
-        className={`px-6 py-4 rounded-xl ${
+        className={`px-4 py-3 rounded-lg ${
           msg.role === "user"
-            ? "max-w-full lg:max-w-4xl bg-white text-gray-900 border-2 border-blue-500/30 shadow-sm"
-            : "w-full bg-gray-50 text-gray-900 border border-gray-200"
+            ? "max-w-[85%] bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm"
+            : "w-full bg-white text-gray-900 border border-gray-200 shadow-sm"
         }`}
       >
         {/* Thinking Content (Collapsible) */}
@@ -81,9 +81,9 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
           </details>
         )}
 
-        <div className="markdown-content text-base max-w-none">
+        <div className="markdown-content text-sm max-w-none">
           {msg.role === "user" ? (
-            <p className="text-base">{msg.content}</p>
+            <p className="text-sm">{msg.content}</p>
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -226,17 +226,57 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   const lastUserMessageRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastScrolledUserMessageRef = useRef<string | null>(null);
+  const firstMessageIdRef = useRef<string | null>(null);
 
-  // Scroll ONCE when new user message appears, then let user control scroll
+  // Memoize last user message index to avoid recalculation on every render
+  const lastUserIdx = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        return i;
+      }
+    }
+    return -1;
+  }, [messages]);
+
+  // Scroll to last user message (or top if no user message) when chat loads
   useEffect(() => {
-    // Find the last user message
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find((msg) => msg.role === "user");
+    // If no messages, reset tracking
+    if (messages.length === 0) {
+      lastScrolledUserMessageRef.current = null;
+      firstMessageIdRef.current = null;
+      return;
+    }
+
+    // Detect chat change by checking if first message ID changed
+    const firstMessageId = String(messages[0]._id || messages[0].timestamp);
+    const isChatChange = firstMessageIdRef.current !== null && firstMessageIdRef.current !== firstMessageId;
+
+    if (isChatChange) {
+      lastScrolledUserMessageRef.current = null;
+    }
+    firstMessageIdRef.current = firstMessageId;
+
+    // Find the last user message - iterate backwards WITHOUT array copy
+    let lastUserMessage: ChatMessage | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        lastUserMessage = messages[i];
+        break;
+      }
+    }
 
     if (!lastUserMessage) {
-      // No user messages yet - scroll to bottom for initial load
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      // No user messages - this is a legacy chat (only assistant messages)
+      // Scroll to the top to show the beginning of the analysis
+      if (lastScrolledUserMessageRef.current === null) {
+        setTimeout(() => {
+          const messagesContainer = messagesEndRef.current?.closest('.overflow-y-auto');
+          if (messagesContainer) {
+            messagesContainer.scrollTop = 0;
+          }
+        }, 100);
+        lastScrolledUserMessageRef.current = 'no-user-messages';
+      }
       return;
     }
 
@@ -245,25 +285,22 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
       lastUserMessage._id || lastUserMessage.timestamp,
     );
 
-    // Only scroll if this is a NEW user message (haven't scrolled to it yet)
-    if (lastScrolledUserMessageRef.current !== userMessageId) {
-      lastUserMessageRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Check if this is a chat restoration (no previous scroll tracking)
+    const isRestoringChat = lastScrolledUserMessageRef.current === null && messages.length > 1;
+
+    if (isRestoringChat) {
+      // On chat restoration: scroll to last USER message to see what was asked
+      lastUserMessageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      lastScrolledUserMessageRef.current = userMessageId;
+    } else if (lastScrolledUserMessageRef.current !== userMessageId) {
+      // On new user message: scroll to show that message at the start
+      lastUserMessageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       lastScrolledUserMessageRef.current = userMessageId;
     }
-    // During streaming: don't scroll - user has control
   }, [messages]);
 
-  // Find last user message index once (used for ref attachment)
-  let lastUserIdx = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "user") {
-      lastUserIdx = i;
-      break;
-    }
-  }
-
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
       {messages.map((msg: ChatMessage, index: number) => {
         const isLastUserMessage = msg.role === "user" && index === lastUserIdx;
 

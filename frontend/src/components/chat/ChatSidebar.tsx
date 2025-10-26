@@ -66,13 +66,13 @@ export const ChatSidebar = memo(function ChatSidebar({
       <aside className="w-12 h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl border-r border-gray-200/50 items-center justify-center relative">
         <button
           onClick={onToggleCollapse}
-          className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-white/90 p-1 rounded group"
+          className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group hover:scale-110"
           title="Expand sidebar"
         >
           <ChevronRight
             size={20}
-            className="text-gray-500 hover:text-gray-700 transition-all duration-200 hover:scale-110"
-            strokeWidth={2.5}
+            strokeWidth={3.5}
+            className="text-white"
           />
         </button>
       </aside>
@@ -80,17 +80,17 @@ export const ChatSidebar = memo(function ChatSidebar({
   }
 
   return (
-    <aside className="w-80 h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl border-r border-gray-200/50 relative">
+    <aside className="w-full h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl relative">
       {/* Collapse Button - Centered vertically on right edge */}
       <button
         onClick={onToggleCollapse}
-        className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-white/90 p-1 rounded z-10 group"
+        className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 z-10 group hover:scale-110"
         title="Collapse sidebar"
       >
         <ChevronLeft
           size={20}
-          className="text-gray-500 hover:text-gray-700 transition-all duration-200 hover:scale-110"
-          strokeWidth={2.5}
+          strokeWidth={3.5}
+          className="text-white"
         />
       </button>
 

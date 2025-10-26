@@ -21,6 +21,7 @@ export function EnhancedChatInterface() {
   const [dateRangeStart, setDateRangeStart] = useState("");
   const [dateRangeEnd, setDateRangeEnd] = useState("");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isChartCollapsed, setIsChartCollapsed] = useState(false);
 
   // Mobile panel visibility (overlays on mobile)
   const [isMobileSidebarVisible, setIsMobileSidebarVisible] = useState(false);
@@ -292,19 +293,24 @@ export function EnhancedChatInterface() {
   }, [setMessages, setChatId]);
 
   return (
-    <div className="bg-white">
-      {/* Full-width trading interface with sidebar */}
+    <div className="bg-white overflow-hidden max-h-screen">
+      {/* Desktop: CSS Grid with fixed sidebar + flexible chat + narrow chart */}
+      {/* Mobile: Flex column with overlays */}
       <div className="mx-auto">
-        <div className="overflow-hidden relative">
-          {/* Mobile: vertical layout with overlays, Desktop: horizontal layout */}
-          <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)]">
-            {/* Chat History Sidebar - Hidden on mobile, visible on desktop */}
+        <div className="relative">
+          <div
+            className="flex flex-col lg:grid lg:gap-0 h-[calc(100vh-5rem)]"
+            style={{
+              gridTemplateColumns: `${isSidebarCollapsed ? '48px' : '240px'} minmax(600px, 1fr) ${isChartCollapsed ? '48px' : 'minmax(400px, 600px)'}`,
+            }}
+          >
+            {/* Chat History Sidebar - Mobile: overlay, Desktop: fixed 240px column */}
             <div
               className={`${
                 isMobileSidebarVisible
-                  ? "absolute top-0 left-0 z-20 h-full bg-white shadow-lg"
+                  ? "absolute top-0 left-0 z-20 h-full w-64 bg-white shadow-2xl"
                   : "hidden"
-              } md:block md:relative md:z-0`}
+              } lg:block lg:relative lg:z-0 lg:w-auto lg:border-r lg:border-gray-300 lg:h-full lg:overflow-hidden`}
             >
               <ChatSidebar
                 activeChatId={chatId}
@@ -317,12 +323,12 @@ export function EnhancedChatInterface() {
               />
             </div>
 
-            {/* Mobile overlay backdrop */}
+            {/* Mobile sidebar backdrop */}
             {isMobileSidebarVisible && (
               <div
                 role="button"
                 tabIndex={0}
-                className="absolute inset-0 bg-black/50 z-10 md:hidden"
+                className="absolute inset-0 bg-black/50 z-10 lg:hidden"
                 onClick={() => setIsMobileSidebarVisible(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" || e.key === "Enter") {
@@ -333,11 +339,11 @@ export function EnhancedChatInterface() {
               />
             )}
 
-            {/* Chat Panel - Primary on mobile, middle panel on desktop */}
-            <div className="flex flex-col flex-1 w-full md:w-auto md:flex-1 lg:w-2/5 border-r border-gray-200 relative">
+            {/* Chat Panel - Mobile: primary full-width, Desktop: flexible middle column */}
+            <div className="flex flex-col h-full w-full lg:w-auto lg:min-w-[600px] border-r border-gray-300 relative bg-gray-50 overflow-hidden">
               {/* Mobile toggle buttons - only show when panels are closed */}
               {!isMobileChartVisible && (
-                <div className="flex md:hidden absolute top-2 left-2 right-2 z-10 gap-2">
+                <div className="flex lg:hidden absolute top-2 left-2 right-2 z-10 gap-2">
                   <button
                     onClick={() => setIsMobileSidebarVisible(!isMobileSidebarVisible)}
                     className="px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
@@ -354,7 +360,7 @@ export function EnhancedChatInterface() {
               )}
 
               {/* Add padding-top to prevent toggle buttons from covering messages */}
-              <div className="pt-12 md:pt-0 flex-1 flex flex-col min-h-0">
+              <div className="pt-12 lg:pt-0 flex flex-col h-full">
                 <ChatMessages
                   messages={messages}
                   isAnalysisPending={
@@ -363,7 +369,7 @@ export function EnhancedChatInterface() {
                 />
 
                 {/* Agent Mode Toggle - Only enabled when starting new chat */}
-                <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/50">
+                <div className="flex-shrink-0 px-4 py-2 border-t border-gray-100 bg-gray-50/50">
                   <div className="flex items-center gap-3 text-sm">
                     <span className="text-gray-600 font-medium">Mode:</span>
                     <button
@@ -427,26 +433,26 @@ export function EnhancedChatInterface() {
               </div>
             </div>
 
-            {/* Chart Panel - Hidden on mobile, visible on desktop */}
+            {/* Chart Panel - Mobile: slide-in drawer (80% width), Desktop: fixed column */}
             <div
               className={`${
                 isMobileChartVisible
-                  ? "absolute top-0 right-0 z-20 h-full w-full bg-white shadow-lg"
-                  : "hidden"
-              } lg:block lg:relative lg:z-0`}
+                  ? "absolute top-0 right-0 z-30 h-full w-4/5 bg-white shadow-2xl transform transition-transform duration-300"
+                  : "hidden lg:block lg:relative lg:z-0 lg:w-auto lg:h-full lg:overflow-hidden"
+              }`}
             >
               {/* Mobile close button for chart panel */}
               {isMobileChartVisible && (
-                <div className="lg:hidden absolute top-2 left-2 right-2 z-30 flex justify-between items-center px-2">
+                <div className="lg:hidden absolute top-2 left-2 right-2 z-40 flex justify-between items-center px-2">
                   <button
                     onClick={() => setIsMobileChartVisible(false)}
-                    className="px-4 py-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="px-4 py-2 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-lg shadow-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                   >
                     ← Back to Chat
                   </button>
                   <button
                     onClick={() => setIsMobileChartVisible(false)}
-                    className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md text-gray-700 hover:bg-gray-50 flex items-center justify-center"
+                    className="w-9 h-9 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-lg shadow-lg text-gray-700 hover:bg-gray-50 flex items-center justify-center font-semibold"
                     aria-label="Close chart"
                   >
                     ✕
@@ -466,15 +472,17 @@ export function EnhancedChatInterface() {
                 handleIntervalChange={handleIntervalChange}
                 handleDateRangeSelect={handleDateRangeSelect}
                 handleQuickAnalysis={handleQuickAnalysis}
+                isCollapsed={isChartCollapsed}
+                onToggleCollapse={() => setIsChartCollapsed(!isChartCollapsed)}
               />
             </div>
 
-            {/* Mobile chart overlay backdrop */}
+            {/* Mobile chart backdrop - allows clicking to close */}
             {isMobileChartVisible && (
               <div
                 role="button"
                 tabIndex={0}
-                className="absolute inset-0 bg-black/50 z-10 lg:hidden"
+                className="absolute inset-0 bg-black/60 z-20 lg:hidden"
                 onClick={() => setIsMobileChartVisible(false)}
                 onKeyDown={(e) => {
                   if (e.key === "Escape" || e.key === "Enter") {
