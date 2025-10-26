@@ -10,7 +10,7 @@ import { ChatSidebar } from "./chat/ChatSidebar";
 import { useChatRestoration } from "../hooks/useChatRestoration";
 import { useUIStateSync } from "../hooks/useUIStateSync";
 import type { FibonacciMetadata } from "../utils/analysisMetadataExtractor";
-import { getPeriodForInterval } from "../utils/dateRangeCalculator";
+import { getPeriodForInterval, calculateDateRange } from "../utils/dateRangeCalculator";
 import type { ModelSettings } from "../types/models";
 
 export function EnhancedChatInterface() {
@@ -77,12 +77,6 @@ export function EnhancedChatInterface() {
   const currentFibonacciAnalysis = useMemo(() => {
     if (!currentSymbol) return null;
 
-    console.log("🔍 Searching for Fibonacci data:", {
-      currentSymbol,
-      selectedInterval,
-      totalMessages: messages.length,
-    });
-
     // Find the most recent Fibonacci analysis for current symbol AND timeframe
     // Iterate backwards without creating array copy for better performance
     let fibMessage = null;
@@ -99,11 +93,6 @@ export function EnhancedChatInterface() {
         break;
       }
     }
-
-    console.log("📊 Fibonacci analysis result:", {
-      found: !!fibMessage,
-      fibonacciData: fibMessage?.analysis_data,
-    });
 
     // Type guard to ensure proper typing
     if (!fibMessage?.analysis_data) return null;
@@ -163,52 +152,18 @@ export function EnhancedChatInterface() {
     setCurrentCompanyName(name);
 
     // Calculate date range for current interval
-    const today = new Date();
-    let daysBack: number;
-
-    switch (selectedInterval) {
-      case "1h":
-        daysBack = 30;
-        break;
-      case "1w":
-        daysBack = 365;
-        break;
-      case "1mo":
-        daysBack = 730;
-        break;
-      default:
-        daysBack = 180;
-    }
-
-    const startDate = new Date(today.getTime() - daysBack * 24 * 60 * 60 * 1000);
-    setDateRangeStart(startDate.toISOString().split("T")[0]);
-    setDateRangeEnd(today.toISOString().split("T")[0]);
+    const dateRange = calculateDateRange({ start: "", end: "" }, selectedInterval);
+    setDateRangeStart(dateRange.start);
+    setDateRangeEnd(dateRange.end);
   }, [selectedInterval]);
 
   const handleIntervalChange = useCallback((interval: TimeInterval) => {
     setSelectedInterval(interval);
 
     // Calculate appropriate date range for this interval
-    const today = new Date();
-    let daysBack: number;
-
-    switch (interval) {
-      case "1h":
-        daysBack = 30; // 1-hour interval: last 30 days
-        break;
-      case "1w":
-        daysBack = 365; // 1-week interval: last 1 year
-        break;
-      case "1mo":
-        daysBack = 730; // 1-month interval: last 2 years
-        break;
-      default:
-        daysBack = 180; // 1-day interval (default): last 6 months
-    }
-
-    const startDate = new Date(today.getTime() - daysBack * 24 * 60 * 60 * 1000);
-    setDateRangeStart(startDate.toISOString().split("T")[0]);
-    setDateRangeEnd(today.toISOString().split("T")[0]);
+    const dateRange = calculateDateRange({ start: "", end: "" }, interval);
+    setDateRangeStart(dateRange.start);
+    setDateRangeEnd(dateRange.end);
   }, []);
 
   const handleDateRangeSelect = useCallback(
@@ -301,7 +256,7 @@ export function EnhancedChatInterface() {
           <div
             className="flex flex-col lg:grid lg:gap-0 h-[calc(100vh-5rem)]"
             style={{
-              gridTemplateColumns: `${isSidebarCollapsed ? '48px' : '240px'} minmax(600px, 1fr) ${isChartCollapsed ? '48px' : 'minmax(400px, 600px)'}`,
+              gridTemplateColumns: `${isSidebarCollapsed ? '48px' : '240px'} minmax(500px, 1fr) ${isChartCollapsed ? '48px' : 'minmax(500px, 800px)'}`,
             }}
           >
             {/* Chat History Sidebar - Mobile: overlay, Desktop: fixed 240px column */}
@@ -340,7 +295,7 @@ export function EnhancedChatInterface() {
             )}
 
             {/* Chat Panel - Mobile: primary full-width, Desktop: flexible middle column */}
-            <div className="flex flex-col h-full w-full lg:w-auto lg:min-w-[600px] border-r border-gray-300 relative bg-gray-50 overflow-hidden">
+            <div className="flex flex-col h-full w-full lg:w-auto lg:min-w-[500px] border-r border-gray-300 relative bg-gray-50 overflow-hidden">
               {/* Mobile toggle buttons - only show when panels are closed */}
               {!isMobileChartVisible && (
                 <div className="flex lg:hidden absolute top-2 left-2 right-2 z-10 gap-2">

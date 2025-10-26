@@ -4,7 +4,7 @@
  * This component displays the trading chart and related controls,
  * such as symbol search and quick analysis buttons.
  */
-import React, { memo, useState } from "react";
+import React, { memo } from "react";
 import { UseQueryResult, UseMutationResult } from "@tanstack/react-query";
 import { SymbolSearch } from "../SymbolSearch";
 import { TradingChart } from "../TradingChart";
@@ -14,7 +14,6 @@ import {
   DollarSign,
   Loader2,
   LineChart,
-  Zap,
   Activity,
   ChevronRight,
   ChevronLeft,
@@ -80,104 +79,65 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
       </button>
 
       <div className={isCollapsed ? 'hidden' : 'flex flex-col h-full'}>
-      <div className="border-b p-4 bg-gray-50">
-        <div className="flex items-center justify-between mb-4">
+      <div className="border-b p-3 bg-gray-50">
+        {/* Title and Symbol in one line */}
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
+            <h3 className="text-lg font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
               Trading Charts
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Search symbols and view interactive charts
-            </p>
           </div>
-          {currentSymbol && (
-            <div className="text-right">
-              <div className="text-lg font-semibold text-gray-900">
-                {currentSymbol}
+          {currentSymbol && priceDataQuery.data?.data && priceDataQuery.data.data.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <div className="text-base font-semibold text-gray-900">{currentSymbol}</div>
+                <div className="text-xs text-gray-500">{currentCompanyName}</div>
               </div>
-              <div className="text-sm text-gray-600">{currentCompanyName}</div>
-              {priceDataQuery.data?.data.length > 0 && (
-                <div className="text-sm font-medium text-green-600">
-                  $
-                  {priceDataQuery.data.data[
-                    priceDataQuery.data.data.length - 1
-                  ].close.toFixed(2)}
-                </div>
-              )}
+              <div className="text-lg font-bold text-green-600">
+                ${priceDataQuery.data?.data[priceDataQuery.data.data.length - 1].close.toFixed(2)}
+              </div>
             </div>
           )}
         </div>
 
-        <SymbolSearch onSymbolSelect={handleSymbolSelect} className="mb-4" />
+        {/* Symbol Search */}
+        <SymbolSearch onSymbolSelect={handleSymbolSelect} className="mb-3" />
 
+        {/* Analysis Buttons - Only show when symbol selected */}
         {currentSymbol && (
           <div className="flex gap-2 flex-wrap">
-            <div className="relative group">
-              <button
-                onClick={() => handleQuickAnalysis("fibonacci")}
-                disabled={analysisMutation.isPending}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm transition-all"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Fibonacci
-              </button>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
-                Identify key support/resistance levels using Fibonacci
-                retracement
-                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
-              </div>
-            </div>
-            <div className="relative group">
-              <button
-                onClick={() => handleQuickAnalysis("fundamentals")}
-                disabled={analysisMutation.isPending}
-                className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 text-sm transition-all"
-              >
-                <DollarSign className="h-4 w-4" />
-                Fundamentals
-              </button>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
-                View company metrics: P/E ratio, market cap, dividend yield,
-                volume
-                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
-              </div>
-            </div>
-            <div className="relative group">
-              <button
-                onClick={() => handleQuickAnalysis("macro")}
-                disabled={analysisMutation.isPending}
-                className="flex items-center gap-2 px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-sm transition-all"
-              >
-                <TrendingUp className="h-4 w-4" />
-                Macro
-              </button>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
-                Analyze overall market sentiment, VIX level, and sector
-                performance
-                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
-              </div>
-            </div>
-            <div className="relative group">
-              <button
-                onClick={() => handleQuickAnalysis("stochastic")}
-                disabled={analysisMutation.isPending}
-                className="flex items-center gap-2 px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 text-sm transition-all"
-              >
-                <Activity className="h-4 w-4" />
-                Stochastic
-              </button>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900/50 backdrop-blur-sm text-white text-sm font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 shadow-lg border border-white/20">
-                Measure momentum to identify overbought/oversold conditions
-                (%K/%D)
-                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900/50"></div>
-              </div>
-            </div>
-            {selectedDateRange.start && selectedDateRange.end && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm">
-                <Zap className="h-4 w-4" />
-                {selectedDateRange.start} to {selectedDateRange.end}
-              </div>
-            )}
+            <button
+              onClick={() => handleQuickAnalysis("fibonacci")}
+              disabled={analysisMutation.isPending}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-xs transition-all"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Fibonacci
+            </button>
+            <button
+              onClick={() => handleQuickAnalysis("fundamentals")}
+              disabled={analysisMutation.isPending}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 text-xs transition-all"
+            >
+              <DollarSign className="h-3.5 w-3.5" />
+              Fundamentals
+            </button>
+            <button
+              onClick={() => handleQuickAnalysis("macro")}
+              disabled={analysisMutation.isPending}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-xs transition-all"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              Macro
+            </button>
+            <button
+              onClick={() => handleQuickAnalysis("stochastic")}
+              disabled={analysisMutation.isPending}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 text-xs transition-all"
+            >
+              <Activity className="h-3.5 w-3.5" />
+              Stochastic
+            </button>
           </div>
         )}
       </div>
@@ -205,11 +165,11 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
         )}
         {currentSymbol &&
           priceDataQuery.isError &&
-          priceDataQuery.error?.suggestions && (
+          (priceDataQuery.error as any)?.suggestions && (
             <div className="p-4 border rounded-lg bg-red-50 text-sm text-red-700">
               {priceDataQuery.error.message || "Price data unavailable."}
               <div className="mt-2 flex flex-wrap gap-2">
-                {priceDataQuery.error.suggestions.map((s: any) => (
+                {(priceDataQuery.error as any).suggestions.map((s: any) => (
                   <button
                     key={s.symbol}
                     onClick={() => handleSymbolSelect(s.symbol, s.name)}

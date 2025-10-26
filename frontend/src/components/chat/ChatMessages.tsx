@@ -269,13 +269,16 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
       // No user messages - this is a legacy chat (only assistant messages)
       // Scroll to the top to show the beginning of the analysis
       if (lastScrolledUserMessageRef.current === null) {
-        setTimeout(() => {
+        const SCROLL_DELAY_MS = 100;
+        const timeoutId = setTimeout(() => {
           const messagesContainer = messagesEndRef.current?.closest('.overflow-y-auto');
           if (messagesContainer) {
             messagesContainer.scrollTop = 0;
           }
-        }, 100);
+        }, SCROLL_DELAY_MS);
         lastScrolledUserMessageRef.current = 'no-user-messages';
+
+        return () => clearTimeout(timeoutId);
       }
       return;
     }
@@ -316,7 +319,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
 
       {isAnalysisPending && (
         <div className="flex justify-start">
-          <div className="bg-gray-50 text-gray-900 px-6 py-3 rounded-xl border border-gray-200">
+          <div className="w-full bg-white text-gray-900 px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
             <div className="flex items-center gap-3">
               <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
               <span className="text-sm font-medium">Analyzing...</span>
