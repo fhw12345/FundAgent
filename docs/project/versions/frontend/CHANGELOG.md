@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.11] - 2025-10-26
+
+### Added
+- feat: Agent mode toggle UI (v2 Copilot vs v3 Agent)
+
+
 ## [0.8.0] - 2025-10-10
 
 ### Added

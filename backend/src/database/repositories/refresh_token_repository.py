@@ -49,7 +49,7 @@ class RefreshTokenRepository:
                     logger.warning(
                         "Failed to create unique index on token_hash",
                         error=str(e),
-                        recommendation="Clear collection or create index before inserting documents"
+                        recommendation="Clear collection or create index before inserting documents",
                     )
 
             # Create other indexes (these can be created on non-empty collections)

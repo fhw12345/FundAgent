@@ -139,12 +139,22 @@ class KubernetesMetricsService:
 
                         # Format resource strings for display
                         if cpu_request_total > 0:
-                            cpu_request_str = f"{cpu_request_total}m" if cpu_request_total < 1000 else f"{cpu_request_total / 1000:.1f}"
+                            cpu_request_str = (
+                                f"{cpu_request_total}m"
+                                if cpu_request_total < 1000
+                                else f"{cpu_request_total / 1000:.1f}"
+                            )
                         if cpu_limit_total > 0:
-                            cpu_limit_str = f"{cpu_limit_total}m" if cpu_limit_total < 1000 else f"{cpu_limit_total / 1000:.1f}"
+                            cpu_limit_str = (
+                                f"{cpu_limit_total}m"
+                                if cpu_limit_total < 1000
+                                else f"{cpu_limit_total / 1000:.1f}"
+                            )
                             cpu_limit = cpu_limit_total
                         if memory_request_total > 0:
-                            memory_request_str = self._format_memory(memory_request_total)
+                            memory_request_str = self._format_memory(
+                                memory_request_total
+                            )
                         if memory_limit_total > 0:
                             memory_limit_str = self._format_memory(memory_limit_total)
                             memory_limit = memory_limit_total

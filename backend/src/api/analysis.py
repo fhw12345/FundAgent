@@ -243,9 +243,12 @@ async def macro_sentiment_analysis(
     try:
         # Check cache first (shorter cache time for macro data)
         # Include date to prevent serving stale data from previous day
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
+
         current_date = datetime.now(UTC).strftime("%Y-%m-%d")
-        cache_key = f"macro:{current_date}:{request.include_sectors}:{request.include_indices}"
+        cache_key = (
+            f"macro:{current_date}:{request.include_sectors}:{request.include_indices}"
+        )
         cached_result = await redis_cache.get(cache_key)
         if cached_result:
             return MacroSentimentResponse.model_validate(cached_result)
@@ -283,7 +286,8 @@ async def stock_fundamentals(
     try:
         # Check cache first
         # Include date to prevent serving stale price data from previous day
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
+
         current_date = datetime.now(UTC).strftime("%Y-%m-%d")
         cache_key = f"fundamentals:{request.symbol}:{current_date}"
         cached_result = await redis_cache.get(cache_key)

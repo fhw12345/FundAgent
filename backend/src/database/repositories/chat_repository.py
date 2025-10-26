@@ -111,10 +111,7 @@ class ChatRepository:
         # Note: Cosmos DB MongoDB API does NOT support sorting by _id with compound filters
         # Use updated_at instead (requires compound index: user_id, is_archived, updated_at)
         cursor = (
-            self.collection.find(query)
-            .sort("updated_at", -1)
-            .skip(skip)
-            .limit(limit)
+            self.collection.find(query).sort("updated_at", -1).skip(skip).limit(limit)
         )
 
         chats = []

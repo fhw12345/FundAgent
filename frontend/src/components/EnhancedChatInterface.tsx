@@ -34,6 +34,9 @@ export function EnhancedChatInterface() {
     debug_enabled: false,
   });
 
+  // Agent mode: v3 = Agent (auto tools), v2 = Copilot (manual tools)
+  const [agentMode, setAgentMode] = useState<"v2" | "v3">("v3");
+
   // Memoize selectedDateRange object to prevent recreation on every render
   const selectedDateRange = useMemo(
     () => ({ start: dateRangeStart, end: dateRangeEnd }),
@@ -116,6 +119,7 @@ export function EnhancedChatInterface() {
     chatId,
     setChatId,
     modelSettings,
+    agentMode, // Pass agent mode
   );
 
   // Button analysis mutation for quick analysis buttons
@@ -357,6 +361,58 @@ export function EnhancedChatInterface() {
                     chatMutation.isPending || buttonMutation.isPending
                   }
                 />
+
+                {/* Agent Mode Toggle - Only enabled when starting new chat */}
+                <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/50">
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-gray-600 font-medium">Mode:</span>
+                    <button
+                      onClick={() => setAgentMode("v3")}
+                      disabled={!!chatId}
+                      className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                        agentMode === "v3"
+                          ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md"
+                          : "bg-white text-gray-700 hover:bg-gray-100"
+                      } ${
+                        chatId
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer"
+                      }`}
+                      title={
+                        chatId
+                          ? "Mode locked for this chat"
+                          : "Agent mode (auto tool calling)"
+                      }
+                    >
+                      🤖 Agent
+                    </button>
+                    <button
+                      onClick={() => setAgentMode("v2")}
+                      disabled={!!chatId}
+                      className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                        agentMode === "v2"
+                          ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md"
+                          : "bg-white text-gray-700 hover:bg-gray-100"
+                      } ${
+                        chatId
+                          ? "opacity-50 cursor-not-allowed"
+                          : "cursor-pointer"
+                      }`}
+                      title={
+                        chatId
+                          ? "Mode locked for this chat"
+                          : "Copilot mode (manual tools)"
+                      }
+                    >
+                      👤 Copilot
+                    </button>
+                    {chatId && (
+                      <span className="ml-auto text-xs text-gray-500 italic">
+                        Mode locked for this chat
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 <ChatInput
                   message={message}

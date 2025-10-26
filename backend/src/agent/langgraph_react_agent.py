@@ -32,7 +32,7 @@ Design Philosophy:
 """
 
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from langchain_community.chat_models import ChatTongyi
@@ -367,12 +367,51 @@ Summary: {result.analysis_summary}"""
                 if msg.__class__.__name__ == "ToolMessage"
             ]
 
+            # Extract token usage from all AI messages
+            total_input_tokens = 0
+            total_output_tokens = 0
+
+            for msg in result["messages"]:
+                if msg.__class__.__name__ == "AIMessage":
+                    # Debug: Log message attributes
+                    logger.debug(
+                        "AIMessage attributes",
+                        has_usage_metadata=hasattr(msg, "usage_metadata"),
+                        usage_metadata=getattr(msg, "usage_metadata", None),
+                        has_response_metadata=hasattr(msg, "response_metadata"),
+                        response_metadata=getattr(msg, "response_metadata", None),
+                    )
+
+                    # Try usage_metadata first (newer LangChain)
+                    if hasattr(msg, "usage_metadata") and msg.usage_metadata:
+                        total_input_tokens += getattr(
+                            msg.usage_metadata, "input_tokens", 0
+                        )
+                        total_output_tokens += getattr(
+                            msg.usage_metadata, "output_tokens", 0
+                        )
+                    # Fallback to response_metadata
+                    elif hasattr(msg, "response_metadata") and msg.response_metadata:
+                        # Try Tongyi/DashScope format first (token_usage)
+                        usage = msg.response_metadata.get(
+                            "token_usage"
+                        ) or msg.response_metadata.get("usage", {})
+                        # Tongyi uses input_tokens/output_tokens
+                        total_input_tokens += usage.get("input_tokens", 0) or usage.get(
+                            "prompt_tokens", 0
+                        )
+                        total_output_tokens += usage.get(
+                            "output_tokens", 0
+                        ) or usage.get("completion_tokens", 0)
+
             logger.info(
                 "ReAct agent invocation completed",
                 trace_id=trace_id,
                 total_messages=len(result["messages"]),
                 tool_executions=len(tool_messages),
                 final_answer_length=len(final_answer),
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens,
             )
 
             return {
@@ -380,6 +419,9 @@ Summary: {result.analysis_summary}"""
                 "messages": result["messages"],
                 "final_answer": final_answer,
                 "tool_executions": len(tool_messages),
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens,
             }
 
         except Exception as e:

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2025-10-26
+
+### Added
+- fix: Credit system integration for v2 (Copilot) and v3 (Agent) modes with token extraction
+
+
 ## [0.5.5] - 2025-10-24
 
 ### Added

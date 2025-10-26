@@ -36,6 +36,7 @@ export const useAnalysis = (
   chatId?: string | null,
   setChatId?: (id: string) => void,
   modelSettings?: { model: string; thinking_enabled: boolean; max_tokens: number },
+  agentMode?: "v2" | "v3",
 ) => {
   const queryClient = useQueryClient();
   const optimisticDeduction = useOptimisticCreditDeduction();
@@ -128,6 +129,7 @@ export const useAnalysis = (
             thinking_enabled: modelSettings.thinking_enabled,
             max_tokens: modelSettings.max_tokens,
             debug_enabled: modelSettings.debug_enabled,
+            agent_version: agentMode, // Pass agent mode (v2/v3)
           } : undefined,
         );
       });
