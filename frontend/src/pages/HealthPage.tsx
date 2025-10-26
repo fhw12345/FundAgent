@@ -21,6 +21,12 @@ interface PodMetric {
   memory_usage: string;
   cpu_percentage: number;
   memory_percentage: number;
+  node_name?: string | null;
+  node_pool?: string | null;
+  cpu_request?: string | null;
+  cpu_limit?: string | null;
+  memory_request?: string | null;
+  memory_limit?: string | null;
 }
 
 interface NodeMetric {
@@ -41,6 +47,7 @@ interface SystemMetrics {
   health_status: string;
   kubernetes_available: boolean;
 }
+
 
 // Mock data for local development when K8s is not available
 const mockPods: PodMetric[] = [
@@ -228,7 +235,9 @@ export default function HealthPage() {
                   <h3 className="text-sm font-mono text-gray-700 mb-3 truncate">
                     {pod.name}
                   </h3>
-                  <div className="space-y-2">
+
+                  {/* Usage Metrics */}
+                  <div className="space-y-2 mb-3">
                     <div>
                       <div className="flex justify-between text-xs text-gray-600 mb-1">
                         <span>CPU: {pod.cpu_usage}</span>
@@ -266,6 +275,59 @@ export default function HealthPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Kubernetes Metadata */}
+                  {(pod.node_name || pod.node_pool || pod.cpu_request) && (
+                    <div className="border-t border-gray-200 pt-3 space-y-2">
+                      {/* Node Pool - Highlighted */}
+                      {pod.node_pool && (
+                        <div className="flex justify-between items-center px-2 py-1 bg-gradient-to-r from-blue-50 to-indigo-50 rounded border border-blue-200">
+                          <span className="text-xs font-medium text-gray-600">Node Pool:</span>
+                          <span className="text-xs font-bold text-blue-700">{pod.node_pool}</span>
+                        </div>
+                      )}
+
+                      {/* Node Name */}
+                      {pod.node_name && (
+                        <div className="flex justify-between items-center px-2 py-1 bg-gray-50 rounded">
+                          <span className="text-xs text-gray-600">Node:</span>
+                          <span className="text-xs font-mono text-gray-700 truncate max-w-[200px]" title={pod.node_name}>
+                            {pod.node_name}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Resource Requests/Limits */}
+                      {(pod.cpu_request || pod.memory_request) && (
+                        <div className="grid grid-cols-2 gap-1 text-xs">
+                          {pod.cpu_request && (
+                            <div className="px-2 py-1 bg-green-50 rounded">
+                              <div className="text-gray-600">CPU Req:</div>
+                              <div className="font-mono text-gray-700">{pod.cpu_request}</div>
+                            </div>
+                          )}
+                          {pod.cpu_limit && (
+                            <div className="px-2 py-1 bg-green-50 rounded">
+                              <div className="text-gray-600">CPU Lim:</div>
+                              <div className="font-mono text-gray-700">{pod.cpu_limit}</div>
+                            </div>
+                          )}
+                          {pod.memory_request && (
+                            <div className="px-2 py-1 bg-green-50 rounded">
+                              <div className="text-gray-600">Mem Req:</div>
+                              <div className="font-mono text-gray-700">{pod.memory_request}</div>
+                            </div>
+                          )}
+                          {pod.memory_limit && (
+                            <div className="px-2 py-1 bg-green-50 rounded">
+                              <div className="text-gray-600">Mem Lim:</div>
+                              <div className="font-mono text-gray-700">{pod.memory_limit}</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

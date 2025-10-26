@@ -88,23 +88,66 @@ class KubernetesMetricsService:
                     memory_bytes = self._parse_memory(memory_str)
                     total_memory += memory_bytes
 
-                # Get pod resource requests/limits for percentage calculation
+                # Get pod resource requests/limits and node info
                 pods = self.core_api.list_namespaced_pod(namespace=self.namespace)
                 cpu_limit = 1000  # Default 1 CPU core = 1000m
                 memory_limit = 512 * 1024 * 1024  # Default 512Mi
+                node_name = None
+                node_pool = None
+                cpu_request_str = None
+                cpu_limit_str = None
+                memory_request_str = None
+                memory_limit_str = None
 
                 for pod in pods.items:
                     if pod.metadata.name == pod_name:
+                        # Get node information
+                        node_name = pod.spec.node_name
+                        if node_name and node_name.startswith("aks-"):
+                            # Extract node pool from pattern: aks-<poolname>-<id>-vmss<instance>
+                            parts = node_name.split("-")
+                            if len(parts) >= 2:
+                                node_pool = parts[1]
+
+                        # Aggregate resource requests/limits across all containers
+                        cpu_request_total = 0
+                        cpu_limit_total = 0
+                        memory_request_total = 0
+                        memory_limit_total = 0
+
                         for container in pod.spec.containers:
-                            if container.resources and container.resources.limits:
-                                if "cpu" in container.resources.limits:
-                                    cpu_limit = self._parse_cpu(
-                                        container.resources.limits["cpu"]
-                                    )
-                                if "memory" in container.resources.limits:
-                                    memory_limit = self._parse_memory(
-                                        container.resources.limits["memory"]
-                                    )
+                            if container.resources:
+                                if container.resources.requests:
+                                    if "cpu" in container.resources.requests:
+                                        cpu_request_total += self._parse_cpu(
+                                            container.resources.requests["cpu"]
+                                        )
+                                    if "memory" in container.resources.requests:
+                                        memory_request_total += self._parse_memory(
+                                            container.resources.requests["memory"]
+                                        )
+
+                                if container.resources.limits:
+                                    if "cpu" in container.resources.limits:
+                                        cpu_limit_total += self._parse_cpu(
+                                            container.resources.limits["cpu"]
+                                        )
+                                    if "memory" in container.resources.limits:
+                                        memory_limit_total += self._parse_memory(
+                                            container.resources.limits["memory"]
+                                        )
+
+                        # Format resource strings for display
+                        if cpu_request_total > 0:
+                            cpu_request_str = f"{cpu_request_total}m" if cpu_request_total < 1000 else f"{cpu_request_total / 1000:.1f}"
+                        if cpu_limit_total > 0:
+                            cpu_limit_str = f"{cpu_limit_total}m" if cpu_limit_total < 1000 else f"{cpu_limit_total / 1000:.1f}"
+                            cpu_limit = cpu_limit_total
+                        if memory_request_total > 0:
+                            memory_request_str = self._format_memory(memory_request_total)
+                        if memory_limit_total > 0:
+                            memory_limit_str = self._format_memory(memory_limit_total)
+                            memory_limit = memory_limit_total
 
                 cpu_percentage = int((total_cpu / cpu_limit) * 100) if cpu_limit else 0
                 memory_percentage = (
@@ -118,6 +161,12 @@ class KubernetesMetricsService:
                         memory_usage=self._format_memory(total_memory),
                         cpu_percentage=cpu_percentage,
                         memory_percentage=memory_percentage,
+                        node_name=node_name,
+                        node_pool=node_pool,
+                        cpu_request=cpu_request_str,
+                        cpu_limit=cpu_limit_str,
+                        memory_request=memory_request_str,
+                        memory_limit=memory_limit_str,
                     )
                 )
 

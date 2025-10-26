@@ -27,6 +27,12 @@ class PodMetrics(BaseModel):
     memory_percentage: float = Field(
         ..., description="Memory usage as percentage of request"
     )
+    node_name: str | None = Field(None, description="Node where pod is running")
+    node_pool: str | None = Field(None, description="Node pool name")
+    cpu_request: str | None = Field(None, description="CPU request (e.g., '100m')")
+    cpu_limit: str | None = Field(None, description="CPU limit (e.g., '1')")
+    memory_request: str | None = Field(None, description="Memory request (e.g., '256Mi')")
+    memory_limit: str | None = Field(None, description="Memory limit (e.g., '512Mi')")
 
 
 class NodeMetrics(BaseModel):
