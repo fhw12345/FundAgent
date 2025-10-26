@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2025-10-26
+
+### Added
+- feat: Add consistent system prompt to v3 (Agent mode) for unified UX
+
+
 ## [0.5.8] - 2025-10-26
 
 ### Added

@@ -45,6 +45,7 @@ from ..core.analysis.fibonacci.analyzer import FibonacciAnalyzer
 from ..core.analysis.stochastic_analyzer import StochasticAnalyzer
 from ..core.config import Settings
 from ..core.data.ticker_data_service import TickerDataService
+from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 
 logger = structlog.get_logger()
 
@@ -129,12 +130,13 @@ class FinancialAnalysisReActAgent:
             self._create_stochastic_tool(),
         ]
 
-        # Create ReAct agent with memory
+        # Create ReAct agent with memory and custom system prompt
         self.checkpointer = MemorySaver()
         self.agent = create_react_agent(
             self.llm,
             self.tools,
             checkpointer=self.checkpointer,
+            state_modifier=FINANCIAL_AGENT_SYSTEM_PROMPT,
         )
 
         logger.info(
