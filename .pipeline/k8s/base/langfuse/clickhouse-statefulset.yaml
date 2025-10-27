@@ -60,10 +60,10 @@ spec:
           mountPath: /var/log/clickhouse-server
         resources:
           requests:
-            memory: "512Mi"
+            memory: "2Gi"  # Higher request to prefer userpool2 (high memory node)
             cpu: "100m"
           limits:
-            memory: "1Gi"
+            memory: "3Gi"  # Allow headroom for ClickHouse operations
             cpu: "500m"
         livenessProbe:
           httpGet:
