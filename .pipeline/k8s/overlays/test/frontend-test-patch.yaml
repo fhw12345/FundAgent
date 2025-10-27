@@ -7,6 +7,7 @@ spec:
     spec:
       containers:
       - name: frontend
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend:test-v0.8.12
         env:
         - name: REACT_APP_DEBUG
           value: "false"
