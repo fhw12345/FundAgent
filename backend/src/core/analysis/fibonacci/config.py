@@ -4,17 +4,6 @@ Contains timeframe-specific parameters and standard Fibonacci ratios used across
 """
 
 from dataclasses import dataclass
-from datetime import date
-
-
-@dataclass
-class SwingPoint:
-    """Represents a swing high or low point in price data."""
-
-    index: int
-    type: str  # 'high' or 'low'
-    price: float
-    date: date
 
 
 @dataclass
@@ -24,9 +13,7 @@ class TimeframeConfig:
     interval: str
     swing_lookback: int
     prominence: float
-    single_leg_min_magnitude: float
-    rolling_window_size: int
-    rolling_min_magnitude: float
+    min_magnitude_pct: float  # Percentage of median price (e.g., 0.05 = 5%)
 
 
 class FibonacciConstants:
@@ -49,14 +36,10 @@ class TimeframeConfigs:
 
     # Configurations adapted for different market scales and volatility
     CONFIGS: dict[str, TimeframeConfig] = {
-        "1h": TimeframeConfig(
-            "1h", 5, 0.3, 10, 15, 20
-        ),  # Hourly: more sensitive to micro moves
-        "1d": TimeframeConfig(
-            "1d", 3, 0.5, 15, 10, 25
-        ),  # Daily: sensitive to short-term moves
-        "1w": TimeframeConfig("1wk", 2, 1.0, 20, 10, 30),  # Weekly: very sensitive
-        "1M": TimeframeConfig("1mo", 1, 1.5, 15, 4, 25),  # Monthly: very sensitive
+        "1h": TimeframeConfig("1h", 5, 0.3, 0.03),  # Hourly: 3% minimum magnitude
+        "1d": TimeframeConfig("1d", 3, 0.5, 0.05),  # Daily: 5% minimum magnitude
+        "1w": TimeframeConfig("1wk", 2, 1.0, 0.08),  # Weekly: 8% minimum magnitude
+        "1M": TimeframeConfig("1mo", 1, 1.5, 0.10),  # Monthly: 10% minimum magnitude
     }
 
     @classmethod

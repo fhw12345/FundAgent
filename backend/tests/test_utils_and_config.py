@@ -11,13 +11,11 @@ Tests centralized utilities and configuration logic:
 These tests ensure robust utility functions and prevent configuration errors.
 """
 
-from datetime import date
 
 import pytest
 
 from src.core.analysis.fibonacci.config import (
     FibonacciConstants,
-    SwingPoint,
     TimeframeConfig,
     TimeframeConfigs,
 )
@@ -141,14 +139,8 @@ class TestTimeframeConfiguration:
                 config.prominence > 0
             ), f"Timeframe '{timeframe}' prominence must be positive"
             assert (
-                config.single_leg_min_magnitude > 0
-            ), f"Timeframe '{timeframe}' single_leg_min_magnitude must be positive"
-            assert (
-                config.rolling_window_size > 0
-            ), f"Timeframe '{timeframe}' rolling_window_size must be positive"
-            assert (
-                config.rolling_min_magnitude > 0
-            ), f"Timeframe '{timeframe}' rolling_min_magnitude must be positive"
+                config.min_magnitude_pct > 0
+            ), f"Timeframe '{timeframe}' min_magnitude_pct must be positive"
 
             # Test reasonable ranges
             assert (
@@ -235,48 +227,6 @@ class TestFibonacciConstants:
         assert (
             zone_start <= golden_ratio <= zone_end
         ), f"Golden ratio {golden_ratio} should be within zone [{zone_start}, {zone_end}]"
-
-
-class TestSwingPointDataStructure:
-    """Test SwingPoint data structure and validation."""
-
-    def test_swing_point_creation(self):
-        """Test SwingPoint creation and validation."""
-        # Test valid swing point
-        swing_point = SwingPoint(
-            index=10, type="high", price=150.50, date=date(2024, 6, 1)
-        )
-
-        assert swing_point.index == 10
-        assert swing_point.type == "high"
-        assert swing_point.price == 150.50
-        assert swing_point.date == date(2024, 6, 1)
-
-    def test_swing_point_type_validation(self):
-        """Test swing point type validation."""
-        valid_types = ["high", "low"]
-
-        for swing_type in valid_types:
-            point = SwingPoint(index=5, type=swing_type, price=100.0, date=date.today())
-            assert point.type == swing_type
-
-        # Note: SwingPoint doesn't currently validate type, but it should
-        # This test documents the expected behavior
-
-    def test_swing_point_logical_validation(self):
-        """Test logical validation of swing point data."""
-        # Test that index is non-negative
-        point = SwingPoint(index=0, type="high", price=100.0, date=date.today())
-        assert point.index >= 0, "Swing point index should be non-negative"
-
-        # Test that price is positive
-        point = SwingPoint(index=5, type="high", price=150.0, date=date.today())
-        assert point.price > 0, "Swing point price should be positive"
-
-        # Test date is reasonable (not in future)
-        today = date.today()
-        point = SwingPoint(index=5, type="high", price=150.0, date=today)
-        assert point.date <= today, "Swing point date should not be in future"
 
 
 class TestConfigurationIntegration:

@@ -1,6 +1,6 @@
 """
 Trend detection logic for Fibonacci analysis.
-Identifies swing-based trends, single-leg moves, and rolling window patterns in price data.
+Uses directional greedy accumulation to detect major trends with pullback tolerance.
 """
 
 from datetime import date
@@ -8,95 +8,46 @@ from typing import Any
 
 import pandas as pd
 import structlog
-from scipy.signal import find_peaks
 
-from .config import SwingPoint, TimeframeConfig
+from .config import TimeframeConfig
 
 logger = structlog.get_logger()
 
 
 class TrendDetector:
-    """Detects various types of trends in price data using multiple detection methods."""
+    """Detects trends using directional greedy accumulation with pullback tolerance."""
 
     def __init__(self, config: TimeframeConfig):
         """Initialize with timeframe-specific configuration."""
         self.config = config
 
-    def find_swing_points(self, data: pd.DataFrame) -> list[SwingPoint]:
-        """Find swing points using timeframe-adaptive parameters."""
-        if data is None or data.empty:
-            return []
+    def detect_top_trends(self, data: pd.DataFrame) -> list[dict[str, Any]]:
+        """
+        Detect top trending moves using directional greedy accumulation.
 
-        # Find peaks and troughs using scipy with adaptive parameters
-        high_peaks, _ = find_peaks(
-            data["High"],
-            distance=self.config.swing_lookback,
-            prominence=self.config.prominence,
+        Algorithm:
+        1. Start from every data point
+        2. Use first N days (lookback) to determine trend direction
+        3. Continue accumulating while price moves in trend direction or pulls back within tolerance
+        4. For uptrends: Allow high/low to go up, or pullback ≤ 3%
+        5. For downtrends: Allow high/low to go down, or pullback ≤ 3%
+        """
+        # Calculate dynamic tolerance (3% of median price)
+        tolerance_pct = 0.03
+
+        # Calculate minimum magnitude based on percentage of median price
+        median_price = data["Close"].median()
+        min_magnitude = median_price * self.config.min_magnitude_pct
+
+        # Detect all trend candidates
+        all_trends = self._detect_directional_trends(
+            data, tolerance_pct, min_magnitude, lookback=3
         )
-        low_peaks, _ = find_peaks(
-            -data["Low"],
-            distance=self.config.swing_lookback,
-            prominence=self.config.prominence,
-        )
-
-        swing_points = []
-
-        # Add high points
-        for i in high_peaks:
-            swing_points.append(
-                SwingPoint(
-                    index=i,
-                    type="high",
-                    price=data["High"].iloc[i],
-                    date=data.index[i].date(),
-                )
-            )
-
-        # Add low points
-        for i in low_peaks:
-            swing_points.append(
-                SwingPoint(
-                    index=i,
-                    type="low",
-                    price=data["Low"].iloc[i],
-                    date=data.index[i].date(),
-                )
-            )
-
-        # Sort by index
-        swing_points.sort(key=lambda x: x.index)
-
-        logger.info(
-            "Found swing points",
-            high_count=len(high_peaks),
-            low_count=len(low_peaks),
-            total=len(swing_points),
-        )
-
-        return swing_points
-
-    def detect_top_trends(
-        self, data: pd.DataFrame, swing_points: list[SwingPoint]
-    ) -> list[dict[str, Any]]:
-        """Detect and rank the top trending moves using multiple detection methods."""
-        all_trends = []
-
-        # 1. Traditional swing-based trends
-        swing_trends = self._detect_swing_based_trends(data, swing_points)
-        all_trends.extend(swing_trends)
-
-        # 2. Single-leg moves between swing points
-        single_leg_trends = self._detect_single_leg_moves(data, swing_points)
-        all_trends.extend(single_leg_trends)
-
-        # 3. Rolling window significant moves
-        rolling_trends = self._detect_rolling_window_moves(data)
-        all_trends.extend(rolling_trends)
 
         # Remove overlapping trends
         unique_trends = self._remove_overlapping_trends(all_trends)
 
-        # Sort by magnitude and return top trends
+        # Sort by magnitude and return
         unique_trends.sort(key=lambda x: x["Magnitude"], reverse=True)
 
         logger.info(
@@ -104,195 +55,108 @@ class TrendDetector:
             total_detected=len(all_trends),
             unique_trends=len(unique_trends),
             top_3_magnitudes=[t["Magnitude"] for t in unique_trends[:3]],
+            tolerance_pct=f"{tolerance_pct * 100:.0f}%",
         )
 
         return unique_trends
 
-    def _detect_swing_based_trends(
-        self, data: pd.DataFrame, swing_points: list[SwingPoint]
-    ) -> list[dict[str, Any]]:
-        """Detect trends based on higher highs/higher lows patterns."""
-        trends = []
-        i = 0
-
-        while i < len(swing_points) - 2:
-            p1, p2, p3 = swing_points[i], swing_points[i + 1], swing_points[i + 2]
-
-            # Uptrend: Low -> High -> Higher Low
-            if (
-                p1.type == "low"
-                and p2.type == "high"
-                and p3.type == "low"
-                and p3.price > p1.price
-            ):
-
-                trend_end, next_i = self._find_trend_continuation(
-                    swing_points, i, is_uptrend=True
-                )
-                data_slice = data.iloc[p1.index : trend_end.index + 1]
-
-                trends.append(
-                    self._create_trend_dict(
-                        data_slice, "Uptrend", p1.date, trend_end.date
-                    )
-                )
-                i = next_i
-                continue
-
-            # Downtrend: High -> Low -> Lower High
-            elif (
-                p1.type == "high"
-                and p2.type == "low"
-                and p3.type == "high"
-                and p3.price < p1.price
-            ):
-
-                trend_end, next_i = self._find_trend_continuation(
-                    swing_points, i, is_uptrend=False
-                )
-                data_slice = data.iloc[p1.index : trend_end.index + 1]
-
-                trends.append(
-                    self._create_trend_dict(
-                        data_slice, "Downtrend", p1.date, trend_end.date
-                    )
-                )
-                i = next_i
-                continue
-
-            i += 1
-
-        return trends
-
-    def _find_trend_continuation(
-        self, swing_points: list[SwingPoint], start_idx: int, is_uptrend: bool
-    ) -> tuple[SwingPoint, int]:
-        """Find where a trend pattern ends by looking for continuation patterns."""
-        current_high = (
-            swing_points[start_idx + 1] if is_uptrend else swing_points[start_idx]
-        )
-        current_low = (
-            swing_points[start_idx + 2] if is_uptrend else swing_points[start_idx + 1]
-        )
-
-        j = start_idx + 3
-        while j < len(swing_points) - 1:
-            next_point1 = swing_points[j]
-            next_point2 = swing_points[j + 1]
-
-            if is_uptrend:
-                # Look for higher highs and higher lows
-                if (
-                    next_point1.type == "high"
-                    and next_point2.type == "low"
-                    and next_point1.price > current_high.price
-                    and next_point2.price > current_low.price
-                ):
-                    current_high = next_point1
-                    current_low = next_point2
-                    j += 2
-                else:
-                    break
-            else:
-                # Look for lower lows and lower highs
-                if (
-                    next_point1.type == "low"
-                    and next_point2.type == "high"
-                    and next_point1.price < current_low.price
-                    and next_point2.price < current_high.price
-                ):
-                    current_low = next_point1
-                    current_high = next_point2
-                    j += 2
-                else:
-                    break
-
-        trend_end = current_high if is_uptrend else current_low
-        return trend_end, j - 1
-
-    def _detect_single_leg_moves(
-        self, data: pd.DataFrame, swing_points: list[SwingPoint]
-    ) -> list[dict[str, Any]]:
-        """Detect single-leg moves between consecutive swing points."""
-        trends = []
-
-        for i in range(len(swing_points) - 1):
-            current = swing_points[i]
-            next_swing = swing_points[i + 1]
-
-            magnitude = abs(current.price - next_swing.price)
-            if magnitude < self.config.single_leg_min_magnitude:
-                continue
-
-            data_slice = data.iloc[current.index : next_swing.index + 1]
-
-            if current.type == "high" and next_swing.type == "low":
-                trend_type = "Downtrend (Single-leg)"
-            elif current.type == "low" and next_swing.type == "high":
-                trend_type = "Uptrend (Single-leg)"
-            else:
-                continue
-
-            trends.append(
-                self._create_trend_dict(
-                    data_slice, trend_type, current.date, next_swing.date
-                )
-            )
-
-        return trends
-
-    def _detect_rolling_window_moves(self, data: pd.DataFrame) -> list[dict[str, Any]]:
-        """Detect significant moves using rolling windows."""
-        trends = []
-        window_size = self.config.rolling_window_size
-
-        for i in range(len(data) - window_size + 1):
-            window_data = data.iloc[i : i + window_size]
-
-            high_idx = window_data["High"].idxmax()
-            low_idx = window_data["Low"].idxmin()
-            magnitude = window_data["High"].max() - window_data["Low"].min()
-
-            if magnitude < self.config.rolling_min_magnitude:
-                continue
-
-            # Determine trend direction based on timing of high and low
-            high_pos = window_data.index.get_loc(high_idx)
-            low_pos = window_data.index.get_loc(low_idx)
-
-            if high_pos < low_pos:
-                trend_type = "Downtrend (Rolling)"
-                start_date, end_date = high_idx.date(), low_idx.date()
-            else:
-                trend_type = "Uptrend (Rolling)"
-                start_date, end_date = low_idx.date(), high_idx.date()
-
-            trends.append(
-                self._create_trend_dict(window_data, trend_type, start_date, end_date)
-            )
-
-        return trends
-
-    def _create_trend_dict(
+    def _detect_directional_trends(
         self,
-        data_slice: pd.DataFrame,
-        trend_type: str,
-        start_date: date,
-        end_date: date,
-    ) -> dict[str, Any]:
-        """Create standardized trend dictionary from data slice."""
-        abs_high = float(data_slice["High"].max())
-        abs_low = float(data_slice["Low"].min())
-        magnitude = abs_high - abs_low
+        data: pd.DataFrame,
+        tolerance_pct: float,
+        min_magnitude: float,
+        lookback: int,
+    ) -> list[dict[str, Any]]:
+        """
+        Detect trends by determining direction first, then accumulating.
 
-        return {
-            "Trend Type": trend_type,
-            "Start Date": start_date,
-            "End Date": end_date,
-            "Absolute High": abs_high,
-            "Absolute Low": abs_low,
-            "Magnitude": magnitude,
-        }
+        Key insight: In uptrends, both high AND low going up is EXPECTED.
+        In downtrends, both high AND low going down is EXPECTED.
+        Only break when pullbacks exceed tolerance.
+        """
+        trends = []
+
+        for i in range(len(data) - lookback - 1):
+            start_date = data.index[i].date()
+            start_close = data["Close"].iloc[i]
+
+            # Determine direction using lookback period
+            lookback_close = data["Close"].iloc[i + lookback]
+            close_change = lookback_close - start_close
+
+            if abs(close_change) < 0.01:  # Too flat, skip
+                continue
+
+            is_uptrend = close_change > 0
+
+            # Track extremes during lookback
+            lookback_high = data["High"].iloc[i : i + lookback + 1].max()
+            lookback_low = data["Low"].iloc[i : i + lookback + 1].min()
+
+            # Continue accumulating from lookback point
+            highest_high = lookback_high
+            lowest_low = lookback_low
+            current_high = data["High"].iloc[i + lookback]
+            current_low = data["Low"].iloc[i + lookback]
+            end_index = i + lookback
+
+            # Greedy accumulation with directional tolerance
+            for j in range(i + lookback + 1, len(data)):
+                next_high = data["High"].iloc[j]
+                next_low = data["Low"].iloc[j]
+
+                # Calculate thresholds based on current prices
+                high_threshold = current_high * tolerance_pct
+                low_threshold = current_low * tolerance_pct
+
+                if is_uptrend:
+                    # In uptrend: Allow high/low to go up (expected) or small pullback
+                    high_change = next_high - current_high
+                    low_change = next_low - current_low
+
+                    high_ok = (high_change >= 0) or (abs(high_change) <= high_threshold)
+                    low_ok = (low_change >= 0) or (abs(low_change) <= low_threshold)
+
+                    if not (high_ok and low_ok):
+                        break  # Pullback too large
+
+                else:  # Downtrend
+                    # In downtrend: Allow high/low to go down (expected) or small pullback
+                    high_change = next_high - current_high
+                    low_change = next_low - current_low
+
+                    low_ok = (low_change <= 0) or (abs(low_change) <= low_threshold)
+                    high_ok = (high_change <= 0) or (abs(high_change) <= high_threshold)
+
+                    if not (high_ok and low_ok):
+                        break  # Pullback too large
+
+                # Continue - update tracking
+                end_index = j
+                current_high = next_high
+                current_low = next_low
+
+                if next_high > highest_high:
+                    highest_high = next_high
+                if next_low < lowest_low:
+                    lowest_low = next_low
+
+            # Save if meets minimum requirements
+            total_magnitude = highest_high - lowest_low
+            if end_index - i >= 3 and total_magnitude >= min_magnitude:
+                trend_type = "Uptrend" if is_uptrend else "Downtrend"
+                trends.append(
+                    {
+                        "Trend Type": trend_type,
+                        "Start Date": start_date,
+                        "End Date": data.index[end_index].date(),
+                        "Absolute High": float(highest_high),
+                        "Absolute Low": float(lowest_low),
+                        "Magnitude": float(total_magnitude),
+                    }
+                )
+
+        return trends
 
     def _remove_overlapping_trends(
         self, trends: list[dict[str, Any]]

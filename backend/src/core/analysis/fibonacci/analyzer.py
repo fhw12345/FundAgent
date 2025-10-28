@@ -74,11 +74,8 @@ class FibonacciAnalyzer:
 
             self.data = stock_data
 
-            # Find swing points using trend detector
-            swing_points = self.trend_detector.find_swing_points(self.data)
-
-            # Detect top 3 most significant trends
-            top_trends = self.trend_detector.detect_top_trends(self.data, swing_points)
+            # Detect top trends using directional greedy accumulation
+            top_trends = self.trend_detector.detect_top_trends(self.data)
 
             # Use the most significant trend for main analysis
             primary_trend = top_trends[0] if top_trends else None
@@ -241,13 +238,15 @@ class FibonacciAnalyzer:
         """Build comprehensive raw data for debugging and agent use."""
         # Handle None config case
         if self.config is None:
-            swing_lookback = 20
-            prominence = 0.02
-            window_size = 5
+            swing_lookback = 3
+            min_magnitude_pct = 0.05
         else:
             swing_lookback = self.config.swing_lookback
-            prominence = self.config.prominence
-            window_size = self.config.rolling_window_size
+            min_magnitude_pct = self.config.min_magnitude_pct
+
+        # Calculate actual min_magnitude from percentage
+        median_price = stock_data["Close"].median()
+        min_magnitude = median_price * min_magnitude_pct
 
         return {
             "timeframe": timeframe,
@@ -259,11 +258,13 @@ class FibonacciAnalyzer:
             "price_range": {
                 "high": float(stock_data["High"].max()),
                 "low": float(stock_data["Low"].min()),
+                "median": float(median_price),
             },
-            "swing_detection_params": {
+            "trend_detection_params": {
                 "lookback": swing_lookback,
-                "prominence": prominence,
-                "window_size": window_size,
+                "tolerance_pct": 3.0,
+                "min_magnitude_pct": min_magnitude_pct * 100,  # Show as percentage
+                "min_magnitude_absolute": float(min_magnitude),
             },
             "top_trends": [
                 {
