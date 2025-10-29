@@ -1,5 +1,179 @@
 # Fixed Bugs
 
+## Kustomize Image Versions Not Persisting - Fixed 2025-10-27
+
+**Problem**: After `kubectl apply -k .pipeline/k8s/overlays/test`, deployments reverted to old versions:
+- Frontend: Reverted from v0.8.12 → v0.8.7
+- Backend: Reverted from v0.5.9 → v0.5.6
+
+**Root Cause**: Kustomize's `images` transformation wasn't applying when strategic merge patches were used. The patch files merged container specs without image transformations.
+
+**How It Happened**:
+```yaml
+# kustomization.yaml (overlay)
+images:
+- name: klinematrix/backend
+  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend
+  newTag: "test-v0.5.9"  # This transformation was ignored!
+
+# backend-test-patch.yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: backend
+        # Missing explicit image reference!
+        env: [...]
+```
+
+When Kustomize applied strategic merge, it merged the patch FIRST, then tried to apply image transformations. But since the patch didn't specify an image field, there was nothing to transform.
+
+**Solution**: Add explicit image references in patch files:
+
+```yaml
+# backend-test-patch.yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: backend
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v0.5.9  # Explicit!
+        env: [...]
+
+# frontend-test-patch.yaml
+spec:
+  template:
+    spec:
+      containers:
+      - name: frontend
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend:test-v0.8.12  # Explicit!
+        env: [...]
+```
+
+**Verification**:
+```bash
+# Render and check versions
+kubectl kustomize .pipeline/k8s/overlays/test | grep -E "(name: (frontend|backend)|image: financialagent)"
+
+# Expected output:
+# - name: backend
+#   image: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v0.5.9
+# - name: frontend
+#   image: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend:test-v0.8.12
+
+# Apply and verify running versions
+kubectl apply -k .pipeline/k8s/overlays/test
+kubectl get pods -n klinematrix-test -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[0].image}{"\n"}{end}' | grep -E "(backend|frontend)"
+```
+
+**Lesson**:
+- **Declarative means explicit** - Don't rely on implicit transformations when using patches
+- Strategic merge patches override base completely - include ALL critical fields (image, resources, env)
+- Always verify rendered manifests: `kubectl kustomize <overlay-path>` before applying
+- **User feedback was critical**: "do not force something, make it consistent in declaritive way, htorugh code and ymal files"
+
+**Files Modified**:
+- `.pipeline/k8s/overlays/test/backend-test-patch.yaml` - Added explicit image line 11
+- `.pipeline/k8s/overlays/test/frontend-test-patch.yaml` - Added explicit image line 10
+
+---
+
+## ClickHouse Pod Pending Due to Node Pod Limit - Fixed 2025-10-27
+
+**Problem**: ClickHouse pod stuck in Pending state despite userpoolv2 node having sufficient memory (5.1Gi / 15.6Gi used).
+
+**Symptom**:
+```bash
+kubectl describe pod langfuse-clickhouse-0 -n klinematrix-test
+# Events:
+# Warning  FailedScheduling  0/3 nodes are available: 1 Too many pods
+```
+
+**Root Cause**: Node hit maximum pod limit (30/30), not memory limit. AKS nodes have `max-pods` parameter that limits pod count regardless of available resources.
+
+**Why This Happened**:
+- userpoolv2 had `maxPods: 30` (set at node pool creation)
+- 3 application pods (langfuse-server, langfuse-worker, redis)
+- 27 system pods (kube-system, cert-manager, ingress, etc.)
+- Total: 30/30 pods = no space for ClickHouse
+
+**Initial Wrong Approach** ❌:
+```bash
+# Tried to update max-pods (doesn't work!)
+az aks nodepool update --max-pods 35  # ERROR: parameter cannot be updated
+```
+
+**Why max-pods Can't Be Updated**: AKS sets this at node creation and bakes it into VM configuration (affects IP allocation, network plugin config).
+
+**Solution**: Delete and recreate node pool with higher pod limit:
+
+```bash
+# 1. Delete old node pool
+az aks nodepool delete --resource-group FinancialAgent --cluster-name FinancialAgent-AKS --name userpoolv2 --no-wait
+
+# 2. Wait for deletion
+while az aks nodepool show --name userpoolv2 &>/dev/null; do sleep 10; done
+
+# 3. Create new node pool with max-pods 50
+az aks nodepool add \
+  --resource-group FinancialAgent \
+  --cluster-name FinancialAgent-AKS \
+  --name userpoolv2 \
+  --node-count 1 \
+  --min-count 1 \
+  --max-count 1 \
+  --max-pods 50 \
+  --node-vm-size Standard_E2_v3 \
+  --enable-cluster-autoscaler \
+  --mode User
+```
+
+**Resource Optimization (Concurrent Fix)**:
+While fixing pod limit, also rebalanced CPU allocation based on actual usage:
+
+```bash
+# Before:
+backend:          CPU 100m/500m (using 3m)   → Over-allocated
+langfuse-worker:  CPU 50m/200m  (using 17m)  → Under-allocated
+
+# After:
+backend:          CPU 50m/200m   → Right-sized
+langfuse-worker:  CPU 100m/500m  → Increased headroom
+```
+
+**Files Modified**:
+- `.pipeline/k8s/base/langfuse/worker-deployment.yaml` - Increased CPU to 100m/500m
+- `.pipeline/k8s/overlays/test/backend-test-patch.yaml` - Reduced CPU to 50m/200m
+
+**Verification**:
+```bash
+# Check node pod capacity
+kubectl get nodes -o custom-columns=NAME:.metadata.name,PODS:.status.allocatable.pods
+# Expected: aks-userpoolv2-34569655-vmss000000   50
+
+# Check pod scheduling
+kubectl get pods -n klinematrix-test -o wide | grep clickhouse
+# Expected: langfuse-clickhouse-0   1/1   Running   aks-userpoolv2-34569655-vmss000000
+
+# Verify resource requests
+kubectl top pods -n klinematrix-test --containers | grep -E "langfuse-worker|backend"
+```
+
+**Lessons**:
+- **Memory != Pod slots** - Node can have free memory but no pod slots
+- **max-pods is immutable** - Must delete/recreate node pool to change it
+- **User feedback guided solution**: "why don't you just delete userpoolv2 and create a new one with max pod allowed as 50?"
+- **Opportunity for optimization** - Use infrastructure changes to right-size resources
+- **Default pod limits vary by VM size** - Always check `kubectl describe node` for allocatable pods
+
+**Why 50 pods?**:
+- Current usage: ~30 pods (3 app + 27 system)
+- Growth headroom: 20 additional slots
+- Cost: $0 extra (same node count, max-count: 1)
+- Future-proof: Handles adding more services without hitting limits
+
+---
+
 ## Tencent Cloud SES Authentication Failure - Fixed 2025-10-07
 
 **Problem**: Email verification failing in test environment with `AuthFailure.SignatureFailure` but working locally
