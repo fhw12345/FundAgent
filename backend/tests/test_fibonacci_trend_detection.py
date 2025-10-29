@@ -19,6 +19,7 @@ def basic_config():
         swing_lookback=3,
         prominence=0.5,
         min_magnitude_pct=0.01,  # 1% for testing (very permissive)
+        tolerance_pct=0.01,  # 1% tolerance (production default for daily)
     )
 
 
@@ -70,7 +71,7 @@ class TestDirectionalTrendDetection:
         assert trends[0]["Magnitude"] > 15.0
 
     def test_uptrend_with_small_pullback(self, trend_detector):
-        """Test that uptrends allow small pullbacks within 3% tolerance."""
+        """Test that uptrends allow small pullbacks within 1% tolerance."""
         dates = pd.date_range("2024-01-01", periods=10, freq="D")
 
         # Uptrend with small pullback on day 5
@@ -92,7 +93,7 @@ class TestDirectionalTrendDetection:
         ) >= 5
 
     def test_downtrend_with_small_bounce(self, trend_detector):
-        """Test that downtrends allow small bounces within 3% tolerance."""
+        """Test that downtrends allow small bounces within 1% tolerance."""
         dates = pd.date_range("2024-01-01", periods=10, freq="D")
 
         # Downtrend with small bounce on day 5
@@ -113,10 +114,10 @@ class TestDirectionalTrendDetection:
         ) >= 5
 
     def test_large_pullback_breaks_trend(self, trend_detector):
-        """Test that pullbacks exceeding 3% break the trend."""
+        """Test that pullbacks exceeding 1% break the trend."""
         dates = pd.date_range("2024-01-01", periods=10, freq="D")
 
-        # Uptrend with LARGE pullback (>3%) on day 5
+        # Uptrend with LARGE pullback (>1%) on day 5
         highs = [100, 102, 104, 106, 102, 104, 106, 108, 110, 112]  # Large drop: 106→102
         lows = [98, 100, 102, 104, 100, 102, 104, 106, 108, 110]  # Large drop: 104→100
 
@@ -294,6 +295,7 @@ class TestConfigurationImpact:
             swing_lookback=3,
             prominence=0.5,
             min_magnitude_pct=0.20,  # 20% threshold (very strict)
+            tolerance_pct=0.01,  # 1% tolerance
         )
         detector = TrendDetector(config)
 

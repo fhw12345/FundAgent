@@ -141,6 +141,9 @@ class TestTimeframeConfiguration:
             assert (
                 config.min_magnitude_pct > 0
             ), f"Timeframe '{timeframe}' min_magnitude_pct must be positive"
+            assert (
+                config.tolerance_pct > 0
+            ), f"Timeframe '{timeframe}' tolerance_pct must be positive"
 
             # Test reasonable ranges
             assert (
@@ -149,6 +152,9 @@ class TestTimeframeConfiguration:
             assert (
                 0.1 <= config.prominence <= 10
             ), f"Timeframe '{timeframe}' prominence should be reasonable (0.1-10)"
+            assert (
+                0.001 <= config.tolerance_pct <= 0.05
+            ), f"Timeframe '{timeframe}' tolerance_pct should be reasonable (0.1%-5%)"
 
     def test_timeframe_config_scaling_logic(self):
         """Test that longer timeframes have appropriately scaled parameters."""

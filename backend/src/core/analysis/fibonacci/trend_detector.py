@@ -29,11 +29,11 @@ class TrendDetector:
         1. Start from every data point
         2. Use first N days (lookback) to determine trend direction
         3. Continue accumulating while price moves in trend direction or pulls back within tolerance
-        4. For uptrends: Allow high/low to go up, or pullback ≤ 3%
-        5. For downtrends: Allow high/low to go down, or pullback ≤ 3%
+        4. For uptrends: Allow high/low to go up, or pullback ≤ tolerance
+        5. For downtrends: Allow high/low to go down, or pullback ≤ tolerance
         """
-        # Calculate dynamic tolerance (3% of median price)
-        tolerance_pct = 0.03
+        # Use tolerance from config (timeframe-specific)
+        tolerance_pct = self.config.tolerance_pct
 
         # Calculate minimum magnitude based on percentage of median price
         median_price = data["Close"].median()
