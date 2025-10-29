@@ -9,9 +9,10 @@ Tests cover:
 - Multiple concurrent requests
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from fastapi import HTTPException, status
-from unittest.mock import AsyncMock, MagicMock
 
 from src.core.rate_limiter import RateLimiter
 

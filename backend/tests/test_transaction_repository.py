@@ -9,14 +9,14 @@ Tests database access layer for credit transactions including:
 """
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from motor.motor_asyncio import AsyncIOMotorCollection
 from pymongo import ReturnDocument
 
 from src.database.repositories.transaction_repository import TransactionRepository
-from src.models.transaction import CreditTransaction, TransactionCreate
+from src.models.transaction import TransactionCreate
 
 
 class AsyncIterator:

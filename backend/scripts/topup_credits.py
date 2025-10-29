@@ -39,7 +39,7 @@ async def topup_credits(username: str, target_amount: float):
         current_credits = user.get("credits", 0.0)
         user_id = user.get("user_id")
 
-        print(f"\n📊 Current Status:")
+        print("\n📊 Current Status:")
         print(f"   User: {username}")
         print(f"   User ID: {user_id}")
         print(f"   Current Credits: {current_credits}")

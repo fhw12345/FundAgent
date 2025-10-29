@@ -9,7 +9,6 @@ Tests credit management business logic including:
 - Error handling and edge cases
 """
 
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
