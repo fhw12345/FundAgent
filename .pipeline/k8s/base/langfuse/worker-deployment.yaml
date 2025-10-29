@@ -112,10 +112,10 @@ spec:
         resources:
           requests:
             memory: "2Gi"  # Higher request to prefer userpool2 (high memory node)
-            cpu: "50m"
+            cpu: "100m"    # Increased from 50m due to high CPU usage
           limits:
             memory: "3Gi"  # Allow headroom for worker operations
-            cpu: "200m"
+            cpu: "500m"    # Increased from 200m for processing headroom
       volumes:
       - name: tmp
         emptyDir: {}

@@ -74,7 +74,7 @@ spec:
         resources:
           requests:
             memory: "256Mi"
-            cpu: "100m"
+            cpu: "50m"     # Reduced from 100m (actual usage ~3m)
           limits:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "200m"    # Reduced from 500m to free up CPU for worker

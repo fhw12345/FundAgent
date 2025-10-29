@@ -247,6 +247,37 @@ kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 
 **Example**: Database name parsing bug existed in TWO places (config.py + mongodb.py). Fix once, extract to shared utility if needed.
 
+## 🎯 Kubernetes Operations Best Practices
+
+### Declarative Configuration
+- **Always use explicit values** - Don't rely on implicit transformations
+- **Include image references** - Strategic merge patches need explicit `image:` field
+- **Verify before apply**: `kubectl kustomize <path>` to check rendered manifests
+- **Never force with kubectl** - All changes must be in YAML files
+
+### Resource Management
+- **Use resource requests for scheduling** - High memory requests → high-memory nodes
+- **Right-size based on metrics**: `kubectl top pods --containers`
+- **Memory ≠ Pod slots** - Node can have free memory but hit pod limit
+- **Node pool limits are immutable**:
+  - `max-pods` cannot be changed after creation
+  - Must delete/recreate node pool to modify
+
+### Node Pool Strategy
+```yaml
+# High-memory workloads (2Gi request) → userpoolv2 (Standard_E2_v3, 16GB)
+langfuse-worker, langfuse-clickhouse, backend
+
+# Lightweight workloads (< 256Mi) → userpool (Standard_D2ls_v5, 4GB)
+redis, frontend
+```
+
+### Troubleshooting Checklist
+1. **Deployment version reverts** → Check explicit image in patch files
+2. **Pod pending with free memory** → Check `kubectl describe node` for pod limit
+3. **CPU throttling** → Review `kubectl top pods` and adjust limits
+4. **Pods on wrong node** → Verify resource requests match node capacity
+
 ---
 
 **Before any actions, always get context by reading the [docs main page](docs/README.md).**
