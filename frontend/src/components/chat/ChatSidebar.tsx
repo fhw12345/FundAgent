@@ -66,14 +66,15 @@ export const ChatSidebar = memo(function ChatSidebar({
       <aside className="w-12 h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl border-r border-gray-200/50 items-center justify-center relative">
         <button
           onClick={onToggleCollapse}
-          className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 group hover:scale-110"
+          className="group relative"
           title="Expand sidebar"
         >
-          <ChevronRight
-            size={20}
-            strokeWidth={3.5}
-            className="text-white"
-          />
+          {/* Vertical bar with hover effect */}
+          <div className="w-1 h-16 bg-gradient-to-b from-blue-400 via-indigo-500 to-blue-600 rounded-full transition-all duration-300 group-hover:h-20 group-hover:w-1.5 group-hover:shadow-lg group-hover:shadow-blue-500/50" />
+          {/* Chevron icon overlay */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <ChevronRight size={16} strokeWidth={2.5} className="text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+          </div>
         </button>
       </aside>
     );
@@ -81,17 +82,22 @@ export const ChatSidebar = memo(function ChatSidebar({
 
   return (
     <aside className="w-full h-full flex flex-col bg-gradient-to-b from-white/80 to-gray-50/80 backdrop-blur-xl relative">
-      {/* Collapse Button - Centered vertically on right edge */}
+      {/* Artistic Collapse Toggle - Vertical Bar Design */}
       <button
         onClick={onToggleCollapse}
-        className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white p-2.5 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 z-10 group hover:scale-110"
+        className="group absolute right-0 top-1/2 -translate-y-1/2 z-10"
         title="Collapse sidebar"
       >
-        <ChevronLeft
-          size={20}
-          strokeWidth={3.5}
-          className="text-white"
-        />
+        {/* Elegant vertical bar that peeks from edge */}
+        <div className="relative flex items-center">
+          <div className="w-1 h-16 bg-gradient-to-b from-blue-400 via-indigo-500 to-blue-600 rounded-l-full transition-all duration-300 group-hover:h-20 group-hover:w-1.5 group-hover:shadow-lg group-hover:shadow-blue-500/50" />
+          {/* Chevron appears on hover */}
+          <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:-translate-x-1">
+            <div className="bg-white/90 backdrop-blur-sm rounded-full p-1.5 shadow-md">
+              <ChevronLeft size={14} strokeWidth={2.5} className="text-indigo-600" />
+            </div>
+          </div>
+        </div>
       </button>
 
       {/* Header */}

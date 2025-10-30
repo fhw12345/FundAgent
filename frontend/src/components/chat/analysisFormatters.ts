@@ -112,7 +112,7 @@ ${result.market_outlook}
 ${allSectors.map(([sector, perf]) => `| ${sector} | ${perf > 0 ? "+" : ""}${perf.toFixed(2)}% |`).join("\n")}
 
 ### 🔑 Key Factors
-${result.key_factors.map((factor) => `• ${factor}`).join("\n")}
+${result.key_factors.map((factor) => `• ${factor}`).join("\n\n")}
 `;
 }
 
@@ -140,14 +140,9 @@ ${result.pb_ratio ? `| P/B Ratio | ${result.pb_ratio.toFixed(2)} |` : ""}
 
 ### 📊 Valuation & Trading
 
-| Metric | Value |
-|--------|-------|
-${result.dividend_yield ? `| Dividend Yield | ${result.dividend_yield.toFixed(2)}% |` : ""}
-${result.beta ? `| Beta | ${result.beta.toFixed(2)} |` : ""}
-| Volume | ${result.volume.toLocaleString()} |
-| Avg Volume | ${result.avg_volume.toLocaleString()} |
-| 52-Week High | $${result.fifty_two_week_high.toFixed(2)} |
-| 52-Week Low | $${result.fifty_two_week_low.toFixed(2)} |
+${result.beta ? `**Beta** ${result.beta.toFixed(2)} • ` : ""}${result.dividend_yield ? `**Dividend Yield** ${result.dividend_yield.toFixed(2)}% • ` : ""}**Volume** ${result.volume.toLocaleString()} • **Avg Volume** ${result.avg_volume.toLocaleString()}
+
+**52-Week High** $${result.fifty_two_week_high.toFixed(2)} • **52-Week Low** $${result.fifty_two_week_low.toFixed(2)}
 `;
 }
 
