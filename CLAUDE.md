@@ -213,6 +213,7 @@ kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 
 **Checklist:**
 - [ ] **Test locally first** - Verify changes work in browser/terminal
+- [ ] **Docker running** (required for frontend tests): `open -a Docker` if needed
 - [ ] **Feature spec created** (for new features): Document in `docs/features/`
 - [ ] Run `make fmt && make test && make lint`
 - [ ] **Bump version** (required): `./scripts/bump-version.sh [component] [patch|minor|major]`
