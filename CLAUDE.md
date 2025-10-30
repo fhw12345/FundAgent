@@ -4,15 +4,11 @@
 
 ## 🔐 Security Rules
 
-**CRITICAL**: Never write secrets in code, docs, or comments:
-- ❌ API keys, access tokens, secret IDs, passwords
-- ❌ Connection strings with credentials
-- ❌ Private keys, certificates
-- ✅ Use placeholders: `YOUR_SECRET_HERE`, `AKID*****`, `<REDACTED>`
-- ✅ Store secrets in Azure Key Vault + External Secrets Operator
-- ✅ Reference secrets by name in documentation
-
-**GitHub Push Protection will block commits containing secrets.**
+**🚨 NEVER COMMIT SECRETS 🚨** - API keys, passwords, tokens, credentials, connection strings, certificates
+- ✅ Use placeholders: `<REDACTED>`, `YOUR_SECRET_HERE`, `AKID*****`
+- ✅ Store in Azure Key Vault, reference by name only
+- ✅ Before commit: Run `git diff --staged`, scan for secrets/passwords/keys
+- ❌ **GitHub Push Protection blocks secret commits → painful git history rewrite!**
 
 ## Tech Stack
 
