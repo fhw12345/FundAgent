@@ -31,8 +31,8 @@ env:
 ### Credentials (Azure Key Vault)
 
 Stored in `klinematrix-test-kv`:
-- `langfuse-oss-access-key-id`: <REDACTED>
-- `langfuse-oss-access-key-secret`: <REDACTED>
+- `langfuse-oss-access-key-id`: `<REDACTED>` (stored in Key Vault)
+- `langfuse-oss-access-key-secret`: `<REDACTED>` (stored in Key Vault)
 
 Referenced via External Secrets in:
 - `.pipeline/k8s/base/langfuse/server-deployment.yaml`
