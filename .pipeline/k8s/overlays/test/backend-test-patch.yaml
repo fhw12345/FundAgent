@@ -8,7 +8,7 @@ spec:
       serviceAccountName: backend-sa
       containers:
       - name: backend
-        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v0.5.10
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v0.5.11-1761890785
         env:
         - name: ENVIRONMENT
           value: "test"
