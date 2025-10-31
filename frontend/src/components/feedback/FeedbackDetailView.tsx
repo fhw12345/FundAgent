@@ -269,6 +269,31 @@ export function FeedbackDetailView({
                   {item.description}
                 </ReactMarkdown>
               </div>
+
+              {/* Inline Images */}
+              {item.image_urls && item.image_urls.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  {item.image_urls.map((imageUrl, index) => (
+                    <div
+                      key={imageUrl}
+                      className="rounded-lg overflow-hidden border border-gray-200 bg-gray-50"
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`Attachment ${index + 1}`}
+                        className="w-full h-auto cursor-pointer hover:opacity-95 transition-opacity"
+                        onClick={() => window.open(imageUrl, "_blank")}
+                        loading="lazy"
+                      />
+                      <div className="px-3 py-2 bg-white border-t border-gray-200">
+                        <p className="text-xs text-gray-500">
+                          Attachment {index + 1} • Click to view full size
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Comments Section */}

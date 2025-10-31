@@ -37,6 +37,35 @@ class FeedbackItemCreate(BaseModel):
         ...,
         description="Type of feedback: 'feature' for feature requests, 'bug' for bug reports",
     )
+    image_urls: list[str] = Field(
+        default_factory=list,
+        max_length=5,
+        description="Optional list of image URLs (max 5 images)",
+    )
+
+
+class FeedbackImageUploadRequest(BaseModel):
+    """Request model for generating presigned upload URL for images."""
+
+    filename: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Original filename with extension",
+    )
+    content_type: str = Field(
+        ...,
+        description="MIME type (e.g., 'image/png', 'image/jpeg')",
+    )
+
+
+class FeedbackImageUploadResponse(BaseModel):
+    """Response model for presigned upload URL."""
+
+    upload_url: str = Field(..., description="Presigned URL for uploading the image")
+    object_key: str = Field(..., description="OSS object key (path)")
+    public_url: str = Field(..., description="Public URL for accessing the uploaded image")
+    expires_in: int = Field(..., description="URL expiration time in seconds")
 
 
 class CommentCreate(BaseModel):
@@ -78,6 +107,10 @@ class FeedbackItem(BaseModel):
     commentCount: int = Field(..., description="Total number of comments")
     createdAt: datetime = Field(..., description="Creation timestamp")
     updatedAt: datetime = Field(..., description="Last update timestamp")
+    image_urls: list[str] = Field(
+        default_factory=list,
+        description="List of attached image URLs",
+    )
 
     # Computed field set by service layer based on user context
     hasVoted: bool = Field(
@@ -154,6 +187,7 @@ class FeedbackItemInDB(BaseModel):
     commentCount: int
     createdAt: datetime
     updatedAt: datetime
+    image_urls: list[str] = []
 
 
 class CommentInDB(BaseModel):

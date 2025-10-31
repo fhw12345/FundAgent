@@ -4,6 +4,7 @@ Dependency injection for feedback platform endpoints.
 
 from fastapi import Depends, Header, HTTPException, status
 
+from ...core.config import get_settings
 from ...database.mongodb import MongoDB
 from ...database.repositories.comment_repository import CommentRepository
 from ...database.repositories.feedback_repository import FeedbackRepository
@@ -11,6 +12,7 @@ from ...database.repositories.user_repository import UserRepository
 from ...services.auth_service import AuthService
 from ...services.feedback_export_service import FeedbackExportService
 from ...services.feedback_service import FeedbackService
+from ...services.oss_service import OSSService, get_oss_service
 
 
 def get_mongodb() -> MongoDB:
@@ -60,6 +62,17 @@ def get_feedback_export_service(
 ) -> FeedbackExportService:
     """Get feedback export service instance."""
     return FeedbackExportService(feedback_repo, comment_repo, user_repo)
+
+
+def get_oss_service_dep() -> OSSService:
+    """Get OSS service instance for feedback image uploads."""
+    settings = get_settings()
+    return get_oss_service(
+        access_key_id=settings.oss_access_key,
+        access_key_secret=settings.oss_secret_key,
+        endpoint=settings.oss_endpoint,
+        bucket_name="financial-agent-feedback",  # Dedicated bucket for feedback images
+    )
 
 
 def get_auth_service(

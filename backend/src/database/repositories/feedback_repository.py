@@ -85,6 +85,7 @@ class FeedbackRepository:
             "commentCount": 0,  # Initial comment count
             "createdAt": now,
             "updatedAt": now,
+            "image_urls": item_create.image_urls,  # Image attachments
         }
 
         # Insert into database
@@ -109,6 +110,7 @@ class FeedbackRepository:
             commentCount=0,
             createdAt=now,
             updatedAt=now,
+            image_urls=item_create.image_urls,
             hasVoted=False,
             authorUsername=None,  # Will be populated by service layer
         )

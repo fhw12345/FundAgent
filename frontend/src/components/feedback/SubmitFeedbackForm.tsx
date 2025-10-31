@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { FeedbackType } from "../../types/feedback";
 import { feedbackApi } from "../../services/feedbackApi";
+import { ImageUploadWidget } from "./ImageUploadWidget";
 
 interface SubmitFeedbackFormProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
   const [type, setType] = useState<FeedbackType>("feature");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [errors, setErrors] = useState<{
     title?: string;
     description?: string;
@@ -63,6 +65,7 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
       title,
       description,
       type,
+      image_urls: imageUrls,
     });
   };
 
@@ -213,6 +216,14 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
             <p className="mt-1 text-sm text-gray-500">
               {description.length}/10,000 characters · Markdown supported
             </p>
+          </div>
+
+          {/* Image Attachments */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Attachments (Optional)
+            </label>
+            <ImageUploadWidget onImagesUploaded={setImageUrls} />
           </div>
 
           {/* Error Message */}

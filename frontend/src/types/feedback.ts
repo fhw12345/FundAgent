@@ -21,6 +21,7 @@ export interface FeedbackItem {
   commentCount: number;
   createdAt: string;
   updatedAt: string;
+  image_urls: string[];
   hasVoted: boolean;
   authorUsername?: string;
 }
@@ -29,6 +30,19 @@ export interface FeedbackItemCreate {
   title: string;
   description: string;
   type: FeedbackType;
+  image_urls?: string[];
+}
+
+export interface FeedbackImageUploadRequest {
+  filename: string;
+  content_type: string;
+}
+
+export interface FeedbackImageUploadResponse {
+  upload_url: string;
+  object_key: string;
+  public_url: string;
+  expires_in: number;
 }
 
 export interface Comment {

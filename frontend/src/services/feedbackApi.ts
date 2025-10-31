@@ -6,6 +6,8 @@ import axios from "axios";
 import type {
   Comment,
   CommentCreate,
+  FeedbackImageUploadRequest,
+  FeedbackImageUploadResponse,
   FeedbackItem,
   FeedbackItemCreate,
   FeedbackType,
@@ -114,5 +116,32 @@ export const feedbackApi = {
       { status },
     );
     return response.data;
+  },
+
+  /**
+   * Generate presigned URL for uploading an image.
+   */
+  async generateUploadUrl(
+    request: FeedbackImageUploadRequest,
+  ): Promise<FeedbackImageUploadResponse> {
+    const response = await api.post<FeedbackImageUploadResponse>(
+      "/api/feedback/upload-image",
+      request,
+    );
+    return response.data;
+  },
+
+  /**
+   * Upload image file to OSS using presigned URL.
+   */
+  async uploadImageToOSS(
+    presignedUrl: string,
+    file: File,
+  ): Promise<void> {
+    await axios.put(presignedUrl, file, {
+      headers: {
+        "Content-Type": file.type,
+      },
+    });
   },
 };
