@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.12] - 2025-10-31
+
+### Added
+- fix(oss): Use HTTPS for presigned URLs to fix mixed content error
+
+
 ## [0.5.11] - 2025-10-31
 
 ### Added
