@@ -1319,3 +1319,345 @@ spec:
 - See [K8S-001 (Over-Allocated CPU Requests)](#issue-pods-stuck-in-pending-during-rolling-update-over-allocated-cpu-requests) for CPU constraint fixes
 - See [K8S-003 (CrashLoopBackOff)](#issue-pod-stuck-in-crashloopbackoff) for dependency failure fixes
 - See [Cost Optimization Guide](../deployment/cost-optimization.md) for autoscaler impact
+
+---
+
+## Issue: Mixed Content Error - HTTP Resources on HTTPS Page
+
+**Pattern ID**: WEB-001
+
+### Symptoms
+```javascript
+// Browser console error:
+Mixed Content: The page at 'https://klinematrix.com/' was loaded over HTTPS,
+but requested an insecure XMLHttpRequest endpoint
+'http://financial-agent-feedback.oss-cn-hangzhou.aliyuncs.com/feedback/...'
+This request has been blocked; the content must be served over HTTPS.
+```
+
+**User-facing symptoms:**
+- Image uploads appear to work (shows progress bar)
+- Upload completes but image doesn't display
+- Network tab shows request blocked/canceled
+- No error shown to user (silent failure)
+
+### Root Cause
+OSS presigned URLs were generated using `http://` instead of `https://`, causing browsers to block requests due to mixed content security policy. Modern browsers prevent HTTPS pages from loading HTTP resources to protect against man-in-the-middle attacks.
+
+**Code issue:**
+```python
+# backend/src/services/oss_service.py (BEFORE FIX)
+auth = oss2.Auth(access_key_id, access_key_secret)
+self.bucket = oss2.Bucket(auth, endpoint, bucket_name)
+# endpoint = "oss-cn-hangzhou.aliyuncs.com" (no protocol)
+# Result: presigned URLs use HTTP by default
+```
+
+### Diagnosis
+```bash
+# 1. Check browser console for mixed content errors
+# F12 → Console → Look for "Mixed Content" warnings
+
+# 2. Test backend presigned URL generation
+kubectl exec -n klinematrix-test deployment/backend -- python -c "
+from src.services.oss_service import OSSService
+import os
+svc = OSSService(
+    os.getenv('OSS_ACCESS_KEY'),
+    os.getenv('OSS_SECRET_KEY'),
+    os.getenv('OSS_ENDPOINT'),
+    os.getenv('OSS_BUCKET')
+)
+url = svc.generate_presigned_upload_url('test/file.png', 'image/png', 300)
+print('URL:', url['url'][:60])
+print('Uses HTTPS:', url['url'].startswith('https://'))
+"
+
+# 3. Check backend logs for upload requests
+kubectl logs -l app=backend -n klinematrix-test --tail=50 | grep "upload"
+
+# 4. Inspect Network tab in browser DevTools
+# F12 → Network → Filter: XHR → Look for blocked requests
+```
+
+### Solution
+
+**Fix OSS service to use HTTPS endpoint:**
+
+```python
+# backend/src/services/oss_service.py
+def __init__(
+    self,
+    access_key_id: str,
+    access_key_secret: str,
+    endpoint: str,
+    bucket_name: str,
+):
+    self.endpoint = endpoint
+    self.bucket_name = bucket_name
+
+    # Initialize OSS auth and bucket (use HTTPS endpoint)
+    auth = oss2.Auth(access_key_id, access_key_secret)
+    # Ensure endpoint uses HTTPS for presigned URLs
+    https_endpoint = f"https://{endpoint}" if not endpoint.startswith("http") else endpoint
+    self.bucket = oss2.Bucket(auth, https_endpoint, bucket_name)
+```
+
+**Deploy fix:**
+```bash
+# 1. Rebuild backend image with fix
+az acr build --registry financialAgent \
+  --image klinematrix/backend:test-v0.5.12 \
+  --file backend/Dockerfile backend/
+
+# 2. Update deployment
+kubectl apply -k .pipeline/k8s/overlays/test
+
+# 3. Restart backend pods
+kubectl rollout restart deployment/backend -n klinematrix-test
+
+# 4. Verify HTTPS URLs are generated
+kubectl exec -n klinematrix-test deployment/backend -- python -c "
+from src.services.oss_service import OSSService
+import os
+svc = OSSService(
+    os.getenv('OSS_ACCESS_KEY'),
+    os.getenv('OSS_SECRET_KEY'),
+    os.getenv('OSS_ENDPOINT'),
+    os.getenv('OSS_BUCKET')
+)
+url = svc.generate_presigned_upload_url('test/file.png', 'image/png', 300)
+assert url['url'].startswith('https://'), 'URL should use HTTPS'
+print('✅ Fix verified: URLs use HTTPS')
+"
+```
+
+### Prevention
+
+**1. Always use HTTPS for external resources:**
+```python
+# When initializing any S3-compatible client
+endpoint = f"https://{raw_endpoint}" if not raw_endpoint.startswith("http") else raw_endpoint
+```
+
+**2. Test with browser security policies:**
+```javascript
+// Frontend integration test
+const uploadUrl = await generateUploadUrl({filename: 'test.png', content_type: 'image/png'});
+if (!uploadUrl.startsWith('https://')) {
+  throw new Error('Upload URL must use HTTPS');
+}
+```
+
+**3. Add CSP headers to enforce HTTPS:**
+```nginx
+# nginx.conf
+add_header Content-Security-Policy "upgrade-insecure-requests" always;
+```
+
+**4. Monitor browser console in production:**
+```javascript
+// Log mixed content errors
+window.addEventListener('securitypolicyviolation', (e) => {
+  console.error('CSP Violation:', {
+    blockedURI: e.blockedURI,
+    violatedDirective: e.violatedDirective
+  });
+});
+```
+
+### Impact
+- **Severity**: High (feature completely broken for users)
+- **Detection**: Silent failure (no error shown to user)
+- **Browser scope**: All modern browsers (Chrome, Firefox, Safari, Edge)
+- **Workaround**: None (browsers enforce policy strictly)
+
+### Related Issues
+- See [OSS Configuration](../deployment/cloud-setup.md#alibaba-cloud-oss) for OSS setup guide
+- See [Feedback Image Attachments](../features/feedback-image-attachments.md) for feature documentation
+- See [Security Hardening](../deployment/security-hardening.md) for HTTPS best practices
+
+### Real-World Occurrence
+**Date**: October 31, 2025
+**Versions Affected**: Backend v0.5.11 and earlier
+**Fixed In**: Backend v0.5.12
+**Discovery**: User reported "Network Error" during image upload testing
+**Resolution Time**: ~2 hours (diagnosis + fix + deployment)
+
+---
+
+## Issue: Backend Image Build Missing Upload Endpoint Code
+
+**Pattern ID**: DEPLOY-001
+
+### Symptoms
+```bash
+# API endpoint returns 404
+curl https://klinematrix.com/api/feedback/upload-image
+# HTTP/1.1 404 Not Found
+
+# Backend logs show endpoint not registered
+kubectl exec -n klinematrix-test deployment/backend -- \
+  python -c "from src.api.feedback import router; print([r.path for r in router.routes])"
+# Output: ['/api/feedback/items', '/api/feedback/items/{item_id}']
+# Missing: '/api/feedback/upload-image'
+```
+
+**User-facing symptoms:**
+- "Request failed with status code 404" error on image upload
+- Upload widget appears but upload fails immediately
+- No server-side error logged (request never reaches backend)
+
+### Root Cause
+Docker image was built from ACR build context **before** the upload endpoint code was committed to git. ACR builds upload the local directory content, so if code hasn't been pushed/committed when build runs, the image will be missing those changes.
+
+**Timeline that causes this:**
+1. Developer writes upload endpoint code locally
+2. Developer runs `az acr build` (uploads local `backend/` directory)
+3. **BUG**: Local code includes uncommitted changes
+4. Developer commits code **after** build completes
+5. Image is deployed but missing the new endpoint
+
+### Diagnosis
+```bash
+# 1. Verify endpoint exists in local code
+grep -n "upload-image" backend/src/api/feedback.py
+
+# 2. Check if endpoint is registered in deployed pod
+kubectl exec -n klinematrix-test deployment/backend -- \
+  grep -n "@router.post.*upload" /app/src/api/feedback.py
+
+# 3. Compare file sizes (local vs deployed)
+wc -c backend/src/api/feedback.py
+kubectl exec -n klinematrix-test deployment/backend -- \
+  wc -c /app/src/api/feedback.py
+
+# 4. Check file modification date in image
+kubectl exec -n klinematrix-test deployment/backend -- \
+  ls -la /app/src/api/feedback.py
+# If date is older than expected, image was built from old code
+
+# 5. Verify image tag matches expected version
+kubectl get deployment backend -n klinematrix-test \
+  -o jsonpath='{.spec.template.spec.containers[0].image}'
+```
+
+### Solution
+
+**Option 1: Rebuild with correct source (recommended):**
+```bash
+# 1. Ensure all code is committed
+git status
+git add backend/src/api/feedback.py
+git commit -m "feat: add upload endpoint"
+git push origin main
+
+# 2. Build image from committed code
+az acr build --registry financialAgent \
+  --image klinematrix/backend:test-v0.5.11 \
+  --file backend/Dockerfile backend/
+
+# 3. Force pull new image (use unique tag)
+# Option A: Use timestamp tag to force unique build
+TIMESTAMP=$(date +%s)
+az acr build --registry financialAgent \
+  --image klinematrix/backend:test-v0.5.11-${TIMESTAMP} \
+  --file backend/Dockerfile backend/
+
+# Update deployment to use timestamped image
+kubectl set image deployment/backend \
+  backend=financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v0.5.11-${TIMESTAMP} \
+  -n klinematrix-test
+
+# 4. Restart pods
+kubectl rollout restart deployment/backend -n klinematrix-test
+
+# 5. Verify endpoint is now available
+kubectl exec -n klinematrix-test deployment/backend -- \
+  python -c "from src.api.feedback import router; \
+  routes = [r.path for r in router.routes]; \
+  print('Upload endpoint exists:', '/api/feedback/upload-image' in routes)"
+```
+
+**Option 2: Patch file directly (NOT RECOMMENDED - testing only):**
+```bash
+# Copy file into running pod (temporary fix for testing)
+kubectl cp backend/src/api/feedback.py \
+  klinematrix-test/backend-xxx:/app/src/api/feedback.py
+
+# Restart pod to reload code
+kubectl delete pod backend-xxx -n klinematrix-test
+
+# Note: This change will be lost on next deployment!
+```
+
+### Prevention
+
+**1. Always commit before building images:**
+```bash
+# Add to deployment workflow
+git status | grep "nothing to commit" || {
+  echo "❌ Uncommitted changes found. Commit first!"; exit 1;
+}
+
+az acr build ...
+```
+
+**2. Use git commit SHA as image tag:**
+```bash
+# Ensures image matches exact code state
+COMMIT_SHA=$(git rev-parse --short HEAD)
+az acr build --registry financialAgent \
+  --image klinematrix/backend:${COMMIT_SHA} \
+  --file backend/Dockerfile backend/
+```
+
+**3. Add verification step after build:**
+```bash
+# Verify image contains expected files/code
+docker run --rm klinematrix/backend:test-v0.5.11 \
+  grep -q "upload-image" /app/src/api/feedback.py && \
+  echo "✅ Upload endpoint code present" || \
+  echo "❌ Upload endpoint code missing!"
+```
+
+**4. Use CI/CD pipeline with git integration:**
+```yaml
+# GitHub Actions example
+- name: Build Docker image
+  run: |
+    # CI builds from checked-out commit (never local changes)
+    az acr build --registry financialAgent \
+      --image klinematrix/backend:${{ github.sha }} \
+      --file backend/Dockerfile backend/
+```
+
+**5. Document build-commit workflow:**
+```markdown
+# Deployment Workflow
+1. ✅ Write code
+2. ✅ Test locally
+3. ✅ Commit changes
+4. ✅ Push to git
+5. ✅ Build Docker image (from committed code)
+6. ✅ Deploy image
+```
+
+### Impact
+- **Severity**: Critical (feature completely broken)
+- **Detection**: API 404 errors, missing routes
+- **Scope**: Affects any endpoint added but not in deployed image
+- **Resolution**: Rebuild image with correct source
+
+### Related Issues
+- See [Old Image Cached](#issue-old-image-cached-changes-not-reflected) for caching issues
+- See [ImagePullBackOff](#issue-pod-stuck-in-imagepullbackoff) for image availability issues
+- See [Deployment Workflow](../deployment/workflow.md) for CI/CD best practices
+
+### Real-World Occurrence
+**Date**: October 31, 2025
+**Versions Affected**: Backend v0.5.11 (initial build)
+**Fixed In**: Backend v0.5.11-1761890785 (rebuild with code)
+**Discovery**: Image upload returned 404, endpoint not in routes list
+**Root Cause**: ACR build ran before commit with upload endpoint code
+**Resolution**: Rebuilt image with timestamped tag from committed code
