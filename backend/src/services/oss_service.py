@@ -57,9 +57,11 @@ class OSSService:
         self.endpoint = endpoint
         self.bucket_name = bucket_name
 
-        # Initialize OSS auth and bucket
+        # Initialize OSS auth and bucket (use HTTPS endpoint)
         auth = oss2.Auth(access_key_id, access_key_secret)
-        self.bucket = oss2.Bucket(auth, endpoint, bucket_name)
+        # Ensure endpoint uses HTTPS for presigned URLs
+        https_endpoint = f"https://{endpoint}" if not endpoint.startswith("http") else endpoint
+        self.bucket = oss2.Bucket(auth, https_endpoint, bucket_name)
 
         logger.info(
             "OSS service initialized",

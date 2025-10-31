@@ -25,9 +25,10 @@ resources:
 - ingress/clusterissuer.yaml
 - ingress/ingress.yaml
 
-commonLabels:
-  app.kubernetes.io/name: klinematrix
-  app.kubernetes.io/version: "0.6.1"
+labels:
+- pairs:
+    app.kubernetes.io/name: klinematrix
+    app.kubernetes.io/version: "0.6.1"
 
 images:
 - name: klinematrix/backend
