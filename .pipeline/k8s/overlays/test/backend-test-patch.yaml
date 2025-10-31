@@ -70,6 +70,21 @@ spec:
               key: langfuse-secret-key
         - name: LANGFUSE_HOST
           value: "https://monitor.klinematrix.com"
+        # OSS credentials (for feedback image uploads)
+        - name: OSS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: oss-access-key-id
+        - name: OSS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-secrets
+              key: oss-access-key-secret
+        - name: OSS_ENDPOINT
+          value: "oss-cn-hangzhou.aliyuncs.com"
+        - name: OSS_BUCKET
+          value: "financial-agent-feedback"
         # Test environment resource limits (10 beta users)
         resources:
           requests:
