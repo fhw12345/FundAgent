@@ -27,10 +27,10 @@ commonLabels:
 images:
 - name: klinematrix/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend
-  newTag: "test-v0.5.10"
+  newTag: "test-v0.5.11"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend
-  newTag: "test-v0.8.13"
+  newTag: "test-v0.8.14"
 
 # Resource limits for test (10 beta users)
 replicas:
