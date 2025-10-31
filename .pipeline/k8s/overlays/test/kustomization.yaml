@@ -15,14 +15,13 @@ resources:
 - rbac.yaml
 
 # Test environment overrides
-patches:
-- path: backend-test-patch.yaml
-- path: frontend-test-patch.yaml
+patchesStrategicMerge:
+- backend-test-patch.yaml
+- frontend-test-patch.yaml
 
 # Environment-specific labels
-labels:
-- pairs:
-    environment: test
+commonLabels:
+  environment: test
 
 # Test-specific image tags (versioned for stability)
 images:
