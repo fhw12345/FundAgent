@@ -81,27 +81,46 @@ def get_react_agent(
     ticker_service: TickerDataService = Depends(get_ticker_data_service),
 ) -> FinancialAnalysisReActAgent:
     """
-    Get SDK ReAct agent with flexible auto-planning (singleton per worker).
+    Get SDK ReAct agent with MCP tools (120 total: 2 local + 118 MCP).
 
     This agent uses LangGraph's create_react_agent SDK for:
     - Autonomous tool chaining (LLM decides sequence)
     - Compressed tool results (2-3 lines vs 20KB dicts)
     - Built-in message history via MemorySaver
-    - 60% less code than custom state machine
+    - MCP protocol for Alpha Vantage tools (118 tools)
 
     Key difference from get_financial_analysis_agent:
     - LLM-driven routing (vs hardcoded conditional_router)
     - Can chain multiple tools per invocation
     - Auto-loop handles ReAct pattern
+    - Access to 118 Alpha Vantage tools via MCP
 
-    Performance: Using singleton pattern to avoid agent compilation overhead.
+    Performance: Agent is initialized during startup with MCP tools loaded.
+    Falls back to local tools only if MCP initialization fails.
     """
     global _react_agent_singleton
+    from ...main import app
 
+    # Try to get pre-initialized agent from app state (includes MCP tools)
+    if hasattr(app.state, "react_agent"):
+        return app.state.react_agent
+
+    # Fallback: Create agent without MCP tools (local only)
+    # NOTE: This fallback path should rarely execute since main.py initializes
+    # the agent with tool tracking. If you see this log frequently, investigate
+    # why app.state.react_agent is None.
     if _react_agent_singleton is None:
+        import structlog
+        logger = structlog.get_logger()
+        logger.warning(
+            "Creating fallback agent without tool execution tracking",
+            reason="app.state.react_agent not found"
+        )
+
         _react_agent_singleton = FinancialAnalysisReActAgent(
             settings=settings,
             ticker_data_service=ticker_service,
+            # NOTE: tool_cache_wrapper not passed - no execution tracking in fallback mode
         )
 
     return _react_agent_singleton

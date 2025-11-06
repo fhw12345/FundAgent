@@ -35,16 +35,24 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import structlog
+
+# Patch DashScope error handling BEFORE importing ChatTongyi
+from ..core.utils.dashscope_fix import patch_tongyi_check_response
+patch_tongyi_check_response()
+
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
+from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
 from ..core.analysis.fibonacci.analyzer import FibonacciAnalyzer
+from ..core.utils import extract_token_usage_from_messages
 from ..core.analysis.stochastic_analyzer import StochasticAnalyzer
 from ..core.config import Settings
 from ..core.data.ticker_data_service import TickerDataService
+from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 
 logger = structlog.get_logger()
@@ -75,16 +83,23 @@ class FinancialAnalysisReActAgent:
     without explicit routing logic.
     """
 
-    def __init__(self, settings: Settings, ticker_data_service: TickerDataService):
+    def __init__(
+        self,
+        settings: Settings,
+        ticker_data_service: TickerDataService,
+        tool_cache_wrapper: ToolCacheWrapper | None = None,
+    ):
         """
-        Initialize ReAct agent with SDK.
+        Initialize ReAct agent with SDK and MCP tools.
 
         Args:
             settings: Application settings with API keys
             ticker_data_service: Service for fetching ticker data
+            tool_cache_wrapper: Optional wrapper for tool caching + tracking
         """
         self.settings = settings
         self.ticker_data_service = ticker_data_service
+        self.tool_cache_wrapper = tool_cache_wrapper
 
         # Initialize Langfuse client globally (SDK v3 pattern)
         # Only enable if credentials are configured and library is available
@@ -115,20 +130,35 @@ class FinancialAnalysisReActAgent:
         self.fibonacci_analyzer = FibonacciAnalyzer()
         self.stochastic_analyzer = StochasticAnalyzer(ticker_data_service)
 
-        # Initialize LLM
+        # Initialize LLM with centralized configuration
         self.llm = ChatTongyi(
-            model_name="qwen-plus",
+            model_name=settings.default_llm_model,
             dashscope_api_key=settings.dashscope_api_key,
-            temperature=0.7,
+            temperature=settings.default_llm_temperature,
             model_kwargs={"result_format": "message"},
             request_timeout=30,
         )
 
-        # Create compressed tools
+        # Create compressed local tools
         self.tools = [
             self._create_fibonacci_tool(),
             self._create_stochastic_tool(),
         ]
+
+        # Initialize MCP client for Alpha Vantage tools (118 tools)
+        self.mcp_client = None
+        if settings.alpha_vantage_api_key:
+            try:
+                self.mcp_client = self._initialize_mcp_client()
+                logger.info("MCP client initialized", server="alphavantage")
+            except Exception as e:
+                logger.warning(
+                    "Failed to initialize MCP client - continuing with local tools only",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+        else:
+            logger.info("Alpha Vantage API key not configured - MCP tools disabled")
 
         # Create ReAct agent with memory and custom system prompt
         self.checkpointer = MemorySaver()
@@ -142,8 +172,82 @@ class FinancialAnalysisReActAgent:
         logger.info(
             "FinancialAnalysisReActAgent initialized",
             agent_type="langgraph_sdk",
-            tools=len(self.tools),
+            local_tools=2,
+            mcp_enabled=self.mcp_client is not None,
+            total_tools=len(self.tools),
         )
+
+    def _initialize_mcp_client(self) -> MultiServerMCPClient:
+        """
+        Initialize MCP client for Alpha Vantage tools.
+
+        Returns:
+            Configured MultiServerMCPClient with Alpha Vantage server
+        """
+        # Alpha Vantage MCP server URL
+        mcp_url = f"https://mcp.alphavantage.co/mcp?apikey={self.settings.alpha_vantage_api_key}"
+
+        # Initialize MCP client with Alpha Vantage server
+        # Note: Parameter is 'connections' not 'servers' in langchain-mcp-adapters
+        client = MultiServerMCPClient(
+            connections={
+                "alphavantage": {
+                    "transport": "streamable_http",
+                    "url": mcp_url,
+                }
+            }
+        )
+
+        logger.info(
+            "MCP client created",
+            server="alphavantage",
+            transport="streamable_http",
+        )
+
+        return client
+
+    async def initialize_mcp_tools(self) -> None:
+        """
+        Load MCP tools asynchronously and add to agent.
+
+        This method should be called during application startup (after __init__).
+        It loads 118 tools from Alpha Vantage MCP server and recreates the
+        agent with the full tool set (2 local + 118 MCP = 120 total).
+        """
+        if not self.mcp_client:
+            logger.info("MCP client not configured - skipping MCP tool initialization")
+            return
+
+        try:
+            # Get tools from MCP client
+            mcp_tools = await self.mcp_client.get_tools()
+
+            # Add MCP tools to existing tools
+            self.tools.extend(mcp_tools)
+
+            # Recreate agent with full tool set
+            self.agent = create_react_agent(
+                self.llm,
+                self.tools,
+                checkpointer=self.checkpointer,
+                prompt=FINANCIAL_AGENT_SYSTEM_PROMPT,
+            )
+
+            logger.info(
+                "MCP tools initialized successfully",
+                local_tools=2,
+                mcp_tools=len(mcp_tools),
+                total_tools=len(self.tools),
+                mcp_server="alphavantage",
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to initialize MCP tools - continuing with local tools only",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
 
     def _create_fibonacci_tool(self) -> Any:
         """
@@ -330,6 +434,7 @@ Summary: {result.analysis_summary}"""
         # Invoke agent with config
         config = {
             "configurable": {"thread_id": thread_id},
+            "recursion_limit": 50,  # Allow up to 50 tool calls for complex analyses (default: 25)
         }
 
         # Add callbacks if Langfuse is configured
@@ -370,41 +475,9 @@ Summary: {result.analysis_summary}"""
             ]
 
             # Extract token usage from all AI messages
-            total_input_tokens = 0
-            total_output_tokens = 0
-
-            for msg in result["messages"]:
-                if msg.__class__.__name__ == "AIMessage":
-                    # Debug: Log message attributes
-                    logger.debug(
-                        "AIMessage attributes",
-                        has_usage_metadata=hasattr(msg, "usage_metadata"),
-                        usage_metadata=getattr(msg, "usage_metadata", None),
-                        has_response_metadata=hasattr(msg, "response_metadata"),
-                        response_metadata=getattr(msg, "response_metadata", None),
-                    )
-
-                    # Try usage_metadata first (newer LangChain)
-                    if hasattr(msg, "usage_metadata") and msg.usage_metadata:
-                        total_input_tokens += getattr(
-                            msg.usage_metadata, "input_tokens", 0
-                        )
-                        total_output_tokens += getattr(
-                            msg.usage_metadata, "output_tokens", 0
-                        )
-                    # Fallback to response_metadata
-                    elif hasattr(msg, "response_metadata") and msg.response_metadata:
-                        # Try Tongyi/DashScope format first (token_usage)
-                        usage = msg.response_metadata.get(
-                            "token_usage"
-                        ) or msg.response_metadata.get("usage", {})
-                        # Tongyi uses input_tokens/output_tokens
-                        total_input_tokens += usage.get("input_tokens", 0) or usage.get(
-                            "prompt_tokens", 0
-                        )
-                        total_output_tokens += usage.get(
-                            "output_tokens", 0
-                        ) or usage.get("completion_tokens", 0)
+            total_input_tokens, total_output_tokens, _ = extract_token_usage_from_messages(
+                result["messages"]
+            )
 
             logger.info(
                 "ReAct agent invocation completed",
@@ -427,15 +500,24 @@ Summary: {result.analysis_summary}"""
             }
 
         except Exception as e:
+            # Get full traceback for debugging
+            import traceback
+            tb_str = traceback.format_exc()
+
             logger.error(
                 "ReAct agent invocation failed",
                 trace_id=trace_id,
                 error=str(e),
                 error_type=type(e).__name__,
+                traceback=tb_str,
             )
             return {
                 "trace_id": trace_id,
                 "messages": messages,
                 "final_answer": f"Agent execution failed: {str(e)}",
                 "error": str(e),
+                "tool_executions": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
             }

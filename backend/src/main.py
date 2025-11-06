@@ -22,6 +22,8 @@ from .api.feedback import router as feedback_router
 from .api.health import router as health_router
 from .api.llm_models import router as llm_models_router
 from .api.market_data import router as market_data_router
+from .api.portfolio import router as portfolio_router
+from .api.watchlist import router as watchlist_router
 from .core.config import get_settings
 from .core.exceptions import AppError
 from .database.mongodb import MongoDB
@@ -49,11 +51,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await redis_cache.connect(settings.redis_url)
 
         # Create database indexes for optimal query performance
+        from .database.repositories.chat_repository import ChatRepository
         from .database.repositories.comment_repository import CommentRepository
         from .database.repositories.feedback_repository import FeedbackRepository
         from .database.repositories.message_repository import MessageRepository
         from .database.repositories.refresh_token_repository import (
             RefreshTokenRepository,
+        )
+        from .database.repositories.tool_execution_repository import (
+            ToolExecutionRepository,
         )
         from .database.repositories.transaction_repository import (
             TransactionRepository,
@@ -77,6 +83,111 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         message_repo = MessageRepository(mongodb.get_collection("messages"))
         await message_repo.ensure_indexes()
         logger.info("Message indexes created")
+
+        # Phase 2 indexes: Chat and Tool Execution
+        chat_repo = ChatRepository(mongodb.get_collection("chats"))
+        await chat_repo.ensure_indexes()
+        logger.info("Chat indexes created (symbol-per-chat pattern)")
+
+        tool_execution_repo = ToolExecutionRepository(
+            mongodb.get_collection("tool_executions")
+        )
+        await tool_execution_repo.ensure_indexes()
+        logger.info("Tool execution indexes created (audit trail + cost tracking)")
+
+        # Portfolio indexes: Holdings
+        from .database.repositories.holding_repository import HoldingRepository
+
+        holding_repo = HoldingRepository(mongodb.get_collection("holdings"))
+        await holding_repo.ensure_indexes()
+        logger.info("Holding indexes created (portfolio management)")
+
+        # Watchlist indexes
+        from .database.repositories.watchlist_repository import WatchlistRepository
+
+        watchlist_repo = WatchlistRepository(mongodb.get_collection("watchlist"))
+        await watchlist_repo.ensure_indexes()
+        logger.info("Watchlist indexes created (symbol tracking)")
+
+        # Portfolio order indexes (order audit trail)
+        from .database.repositories.portfolio_order_repository import (
+            PortfolioOrderRepository,
+        )
+
+        order_repo = PortfolioOrderRepository(mongodb.get_collection("portfolio_orders"))
+        await order_repo.ensure_indexes()
+        logger.info("Portfolio order indexes created (order audit trail)")
+
+        # Initialize MCP tools for ReAct agent (if configured)
+        # This loads 118 Alpha Vantage tools via MCP protocol
+        from .agent.langgraph_react_agent import FinancialAnalysisReActAgent
+        from .core.data.ticker_data_service import TickerDataService
+        from .services.alpaca_data_service import AlpacaDataService
+        from .services.alpaca_trading_service import AlpacaTradingService
+        from .database.repositories.tool_execution_repository import ToolExecutionRepository
+        from .services.tool_cache_wrapper import ToolCacheWrapper
+
+        react_agent = None
+        alpaca_trading_service = None
+        try:
+            # Create agent instance (will be cached as singleton in dependency injection)
+            alpaca_data_service = AlpacaDataService(settings=settings)
+            alpaca_trading_service = AlpacaTradingService(settings=settings)
+            ticker_service = TickerDataService(
+                redis_cache=redis_cache,
+                alpaca_data_service=alpaca_data_service,
+            )
+
+            # Initialize tool execution tracking
+            tool_exec_collection = mongodb.get_collection("tool_executions")
+            tool_exec_repo = ToolExecutionRepository(tool_exec_collection)
+            await tool_exec_repo.ensure_indexes()
+
+            # Initialize tool cache wrapper for execution tracking
+            tool_cache_wrapper = ToolCacheWrapper(
+                redis_cache=redis_cache,
+                tool_execution_repo=tool_exec_repo,
+            )
+
+            logger.info("Tool execution tracking initialized")
+
+            # Create agent with tool cache wrapper
+            react_agent = FinancialAnalysisReActAgent(
+                settings=settings,
+                ticker_data_service=ticker_service,
+                tool_cache_wrapper=tool_cache_wrapper,
+            )
+
+            # Load MCP tools asynchronously (118 tools from Alpha Vantage)
+            await react_agent.initialize_mcp_tools()
+
+            # Store in app state for use in dependencies
+            app.state.react_agent = react_agent
+            logger.info("ReAct agent initialized with MCP tools")
+
+        except Exception as e:
+            logger.warning(
+                "Failed to initialize ReAct agent with MCP tools - will use local tools only",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+
+        # Initialize watchlist analyzer (manual trigger only, no auto-run)
+        from .services.watchlist_analyzer import WatchlistAnalyzer
+
+        watchlist_analyzer = WatchlistAnalyzer(
+            watchlist_collection=mongodb.get_collection("watchlist"),
+            messages_collection=mongodb.get_collection("messages"),
+            chats_collection=mongodb.get_collection("chats"),
+            redis_cache=redis_cache,
+            agent=react_agent,  # Pass agent for LLM-based analysis
+            trading_service=alpaca_trading_service,  # Pass trading service for order placement
+            order_repository=order_repo,  # Pass order repository for MongoDB persistence
+        )
+
+        # Store in app state for manual triggering via API
+        app.state.watchlist_analyzer = watchlist_analyzer
+        logger.info("Watchlist analyzer initialized (manual trigger mode)" + (" with agent" if react_agent else " without agent"))
 
         # Store in app state for dependency injection
         app.state.mongodb = mongodb
@@ -153,6 +264,8 @@ def create_app() -> FastAPI:
     app.include_router(analysis_router)
     app.include_router(market_data_router)
     app.include_router(chat_router)  # Persistent MongoDB-based chat
+    app.include_router(portfolio_router)  # Portfolio holdings management
+    app.include_router(watchlist_router)  # Watchlist symbol tracking
     app.include_router(credits_router)  # Token-based credit economy
     app.include_router(llm_models_router)  # LLM model selection and pricing
     app.include_router(feedback_router)  # Feedback & Community Roadmap platform
