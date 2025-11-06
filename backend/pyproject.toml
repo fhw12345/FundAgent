@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "financial-agent-backend"
-version = "0.5.12"
+version = "0.5.13"
 description = "AI-Enhanced Financial Analysis Platform Backend"
 authors = [
     {name = "Financial Agent Team", email = "team@financialagent.com"},
@@ -22,11 +22,13 @@ dependencies = [
     "langchain>=0.3.0",
     "langchain-core>=0.3.0",
     "langchain-community>=0.3.0",
+    "langchain-mcp-adapters>=0.1.0",
     "langgraph>=0.2.0",
     "langsmith>=0.2.0",
     "langfuse>=3.0.0,<4.0.0",  # LLM observability (v3.x with OTLP, requires ClickHouse + Redis server)
     "dashscope>=1.20.0",      # Alibaba Cloud Qwen API
     "yfinance>=0.2.0",
+    "alpaca-py>=0.30.0",
     "pandas>=2.1.0",
     "matplotlib>=3.8.0",
     "numpy>=1.26.0",
