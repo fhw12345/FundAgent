@@ -67,6 +67,25 @@ class MessageMetadata(BaseModel):
         default=None, description="Whether agent executed a tool in this response"
     )
 
+    # Portfolio tracking (NEW - for order placement and analysis workflow)
+    analysis_id: str | None = Field(
+        default=None, description="Analysis workflow ID this message belongs to"
+    )
+    order_placed: bool | None = Field(
+        default=None, description="Whether this message placed an order"
+    )
+    order_id: str | None = Field(
+        default=None, description="FK to portfolio_orders.order_id"
+    )
+    tool_execution_ids: list[str] | None = Field(
+        default=None,
+        description="List of tool_executions.execution_id for this message",
+    )
+    tool_summary: dict[str, Any] | None = Field(
+        default=None,
+        description="Summary: {tool_name: {cache_hit, duration_ms, cost}}",
+    )
+
     # Extensible - any additional data
     raw_data: dict[str, Any] | None = Field(
         default=None, description="Raw analysis data"

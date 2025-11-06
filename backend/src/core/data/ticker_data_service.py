@@ -3,15 +3,16 @@ Centralized ticker data service with intelligent caching.
 
 This service eliminates redundant API calls by providing shared ticker data
 to all analyzers through a unified caching layer.
+
+MIGRATION: Replaced yfinance with Alpaca for FREE paper trading data.
 """
 
 import pandas as pd
 import structlog
-import yfinance as yf
 
 from ...database.redis import RedisCache
+from ...services.alpaca_data_service import AlpacaDataService
 from ..utils.date_utils import DateUtils
-from ..utils.yfinance_utils import map_timeframe_to_yfinance_interval
 
 logger = structlog.get_logger()
 
@@ -21,17 +22,25 @@ class TickerDataService:
     Centralized service for fetching and caching raw ticker data.
 
     Provides unified interface to ticker data with intelligent caching
-    to prevent redundant yfinance API calls across analyzers.
+    to prevent redundant API calls across analyzers.
+
+    MIGRATION: Now uses Alpaca instead of yfinance for FREE real-time data.
     """
 
-    def __init__(self, redis_cache: RedisCache):
+    def __init__(
+        self,
+        redis_cache: RedisCache,
+        alpaca_data_service: AlpacaDataService | None = None,
+    ):
         """
         Initialize ticker data service.
 
         Args:
             redis_cache: Redis cache instance for data storage
+            alpaca_data_service: Alpaca data service for market data (optional, falls back to yfinance)
         """
         self.redis_cache = redis_cache
+        self.alpaca_data_service = alpaca_data_service
         self.default_ttl = 1800  # 30 minutes default TTL
 
     async def get_ticker_history(
@@ -101,8 +110,8 @@ class TickerDataService:
 
         logger.info("Cache miss", cache_key=cache_key)
 
-        # Fetch from yfinance
-        df = await self._fetch_from_yfinance(
+        # Fetch from Alpaca
+        df = await self._fetch_from_alpaca(
             symbol, interval, normalized_start, normalized_end
         )
 
@@ -119,6 +128,87 @@ class TickerDataService:
             )
 
         return df
+
+    async def get_current_price(self, symbol: str) -> float | None:
+        """
+        Get current/latest price for a symbol.
+
+        Uses Alpaca if available, falls back to yfinance otherwise.
+        Caches prices for 30 seconds to reduce API calls for real-time data.
+
+        Args:
+            symbol: Stock symbol (e.g., "AAPL")
+
+        Returns:
+            Current price as float, or None if unavailable
+        """
+        # Check cache first (30 second TTL for real-time prices)
+        cache_key = f"current_price:{symbol}"
+        cached_price = await self.redis_cache.get(cache_key)
+        if cached_price is not None:
+            logger.debug("Cache hit for current price", symbol=symbol, price=cached_price)
+            return float(cached_price)
+
+        try:
+            price = None
+
+            # If Alpaca is available, use it for real-time price
+            if self.alpaca_data_service:
+                logger.info("Fetching current price from Alpaca", symbol=symbol)
+                price = await self.alpaca_data_service.get_latest_price(symbol)
+                if price and price > 0:
+                    logger.info(
+                        "Got price from Alpaca", symbol=symbol, price=price
+                    )
+                else:
+                    logger.warning(
+                        "Invalid price from Alpaca",
+                        symbol=symbol,
+                        price=price,
+                    )
+                    price = None
+
+            # Fall back to yfinance
+            if not price:
+                logger.info("Falling back to yfinance", symbol=symbol)
+                import yfinance as yf
+
+                ticker = yf.Ticker(symbol)
+                info = ticker.info
+
+                # Try different price fields in order of preference
+                price = (
+                    info.get("currentPrice")
+                    or info.get("regularMarketPrice")
+                    or info.get("previousClose")
+                )
+
+                if price and price > 0:
+                    logger.info("Got price from yfinance", symbol=symbol, price=price)
+                    price = float(price)
+                else:
+                    logger.warning(
+                        "No valid price from yfinance",
+                        symbol=symbol,
+                        price=price,
+                    )
+                    price = None
+
+            # Cache the price if we got a valid one (30 second TTL)
+            if price and price > 0:
+                await self.redis_cache.set(cache_key, price, ttl_seconds=30)
+                return price
+            else:
+                return None
+
+        except Exception as e:
+            logger.error(
+                "Error fetching current price",
+                symbol=symbol,
+                error=str(e),
+                exc_info=True,
+            )
+            return None
 
     def _validate_parameters(
         self, period: str | None, start_date: str | None, end_date: str | None
@@ -213,11 +303,16 @@ class TickerDataService:
 
         return base_ttl
 
-    async def _fetch_from_yfinance(
+    async def _fetch_from_alpaca(
         self, symbol: str, interval: str, start_date: str, end_date: str
     ) -> pd.DataFrame:
         """
-        Fetch ticker data from yfinance API.
+        Fetch ticker data from Alpaca Data API (with yfinance fallback).
+
+        MIGRATION: Replaced yfinance with Alpaca for:
+        - FREE real-time data (no 15-minute delay)
+        - Extended hours support (pre/post-market)
+        - Consistent with trading service
 
         Args:
             symbol: Stock symbol
@@ -229,44 +324,58 @@ class TickerDataService:
             DataFrame with OHLCV data, or empty DataFrame on error
         """
         try:
-            # Map interval to yfinance format
-            yf_interval = map_timeframe_to_yfinance_interval(interval)
-
-            logger.info(
-                "Fetching from yfinance",
-                symbol=symbol,
-                interval=interval,
-                yf_interval=yf_interval,
-                start=start_date,
-                end=end_date,
-            )
-
-            # Fetch data using yfinance
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(start=start_date, end=end_date, interval=yf_interval)
-
-            if df.empty:
-                logger.warning(
-                    "No data returned from yfinance",
+            # Try Alpaca first if available
+            if self.alpaca_data_service:
+                logger.info(
+                    "Fetching from Alpaca",
                     symbol=symbol,
                     interval=interval,
                     start=start_date,
                     end=end_date,
                 )
-                return pd.DataFrame()
 
-            logger.info(
-                "Successfully fetched from yfinance",
+                # Fetch data using Alpaca
+                df = await self.alpaca_data_service.get_bars(
                 symbol=symbol,
-                rows=len(df),
-                columns=list(df.columns),
+                interval=interval,
+                start_date=start_date,
+                end_date=end_date,
             )
 
-            return df
+                if df.empty:
+                    logger.warning(
+                        "No data returned from Alpaca",
+                        symbol=symbol,
+                        interval=interval,
+                        start=start_date,
+                        end=end_date,
+                    )
+                else:
+                    logger.info(
+                        "Successfully fetched from Alpaca",
+                        symbol=symbol,
+                        rows=len(df),
+                        columns=list(df.columns),
+                    )
+                    return df
+
+            # Fall back to yfinance if Alpaca unavailable or returned empty
+            logger.info("Falling back to yfinance for historical data", symbol=symbol)
+            import yfinance as yf
+
+            ticker = yf.Ticker(symbol)
+            df = ticker.history(start=start_date, end=end_date, interval=interval)
+
+            if not df.empty:
+                logger.info("Successfully fetched from yfinance", symbol=symbol, rows=len(df))
+                return df
+            else:
+                logger.warning("No data from yfinance either", symbol=symbol)
+                return pd.DataFrame()
 
         except Exception as e:
             logger.error(
-                "Error fetching from yfinance",
+                "Error fetching ticker data",
                 symbol=symbol,
                 interval=interval,
                 error=str(e),

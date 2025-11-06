@@ -328,6 +328,83 @@ class ChatService:
 
         return chat.title == "New Chat" and message_count > 0
 
+    async def find_chat_by_symbol(self, user_id: str, symbol: str) -> Chat | None:
+        """
+        Find active chat for specific symbol.
+
+        Used for symbol-per-chat pattern to prevent duplicate chats.
+
+        Args:
+            user_id: User identifier
+            symbol: Stock symbol (e.g., "AAPL")
+
+        Returns:
+            Chat if found, None otherwise
+
+        Example:
+            >>> chat = await service.find_chat_by_symbol("user_123", "AAPL")
+            >>> if chat:
+            ...     print(f"Found existing AAPL chat: {chat.chat_id}")
+        """
+        return await self.chat_repo.find_by_symbol(user_id, symbol)
+
+    async def get_or_create_symbol_chat(self, user_id: str, symbol: str) -> Chat:
+        """
+        Get existing chat for symbol or create new one.
+
+        Implements symbol-per-chat pattern:
+        1. Check if chat exists for symbol
+        2. If yes, return existing chat (reuse)
+        3. If no, create new chat with symbol in UI state
+
+        Args:
+            user_id: User identifier
+            symbol: Stock symbol (e.g., "AAPL")
+
+        Returns:
+            Existing or newly created chat
+
+        Example:
+            >>> chat = await service.get_or_create_symbol_chat("user_123", "AAPL")
+            >>> # Always returns a chat (existing or new)
+            >>> print(f"Chat ID: {chat.chat_id}, Symbol: {chat.ui_state.current_symbol}")
+        """
+        # Try to find existing chat
+        existing_chat = await self.find_chat_by_symbol(user_id, symbol)
+
+        if existing_chat:
+            logger.info(
+                "Reusing existing chat for symbol",
+                user_id=user_id,
+                symbol=symbol,
+                chat_id=existing_chat.chat_id,
+            )
+            return existing_chat
+
+        # Create new chat with symbol
+        new_chat = await self.create_chat(user_id, title=f"{symbol} Analysis")
+
+        # Set symbol in UI state
+        ui_state = UIState(current_symbol=symbol)
+        updated_chat = await self.update_ui_state(new_chat.chat_id, user_id, ui_state)
+
+        if not updated_chat:
+            # Fallback to new_chat if update failed
+            logger.warning(
+                "Failed to update UI state after chat creation",
+                chat_id=new_chat.chat_id,
+            )
+            return new_chat
+
+        logger.info(
+            "Created new chat for symbol",
+            user_id=user_id,
+            symbol=symbol,
+            chat_id=updated_chat.chat_id,
+        )
+
+        return updated_chat
+
     async def delete_chat(self, chat_id: str, user_id: str) -> bool:
         """
         Delete chat and all associated messages.

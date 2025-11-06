@@ -4,12 +4,13 @@ import { LoginPage } from "./components/LoginPage";
 import HealthPage from "./pages/HealthPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import { TransactionHistory } from "./pages/TransactionHistory";
+import PortfolioDashboard from "./pages/PortfolioDashboard";
 import { CreditBalance } from "./components/credits/CreditBalance";
 import { authStorage, logout } from "./services/authService";
 
 function App() {
   const [activeTab, setActiveTab] = useState<
-    "health" | "chat" | "feedback" | "transactions"
+    "health" | "chat" | "portfolio" | "feedback" | "transactions"
   >("chat");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
@@ -122,6 +123,16 @@ function App() {
                 Platform
               </button>
               <button
+                onClick={() => setActiveTab("portfolio")}
+                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
+                  activeTab === "portfolio"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
+                    : "text-gray-700 hover:bg-gray-100/80"
+                }`}
+              >
+                Portfolio
+              </button>
+              <button
                 onClick={() => setActiveTab("feedback")}
                 className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
                   activeTab === "feedback"
@@ -163,6 +174,8 @@ function App() {
         {activeTab === "health" && isAdmin && <HealthPage />}
 
         {activeTab === "chat" && <EnhancedChatInterface />}
+
+        {activeTab === "portfolio" && <PortfolioDashboard />}
 
         {activeTab === "feedback" && <FeedbackPage />}
 

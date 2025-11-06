@@ -57,6 +57,53 @@
 
 **Golden Rule**: Develop locally with docker-compose, deploy to Test (K8s) for verification.
 
+## 🧪 Testing & Iteration Rules
+
+**When using webapp-testing skill for E2E testing:**
+
+1. **Test First** - Run comprehensive E2E test to identify all issues
+2. **Document Findings** - Write findings to `/tmp/webtesting/{scenario}/FINDINGS.md`
+3. **Auto-Fix Loop** - Once testing complete, AUTOMATICALLY start fixing issues WITHOUT waiting for user prompt:
+   ```
+   WHILE issues exist:
+     - Fix the issue in code
+     - Restart affected services (docker compose restart)
+     - Use Playwright/Chromium to trigger actions in UI
+     - Re-run verification checks (logs + database + frontend)
+     - IF new issues found: Add to list and continue
+     - IF all checks pass: DONE
+   ```
+4. **No Manual Intervention** - Keep iterating until ALL checks pass (backend logs + database + frontend + APIs)
+5. **Use Browser Automation** - Install playwright and use Chromium to:
+   - Login with credentials (allenpan/admin123)
+   - Navigate to features
+   - Click buttons, trigger actions
+   - Verify UI updates
+6. **Verification Required** - After each fix, verify:
+   - ✅ Backend logs show expected behavior
+   - ✅ Database contains correct data
+   - ✅ Frontend displays correctly
+   - ✅ 3rd party APIs reflect changes
+
+**Example:**
+```
+Test finds: Agent not being invoked
+→ Fix: Inject agent into WatchlistAnalyzer
+→ Restart: docker compose restart backend
+→ Use Playwright: Login, click "Analyze Now"
+→ Check logs for "Agent invoked"
+→ IF fails: Fix and repeat
+→ IF passes: Move to next issue
+```
+
+**Browser Automation Setup:**
+```bash
+pip install playwright
+python -m playwright install chromium
+```
+
+**CRITICAL:** Don't stop at first fix - keep going until EVERYTHING works!
+
 ## Development Workflow
 
 ### 1. Feature Specification (Required for New Features)
@@ -98,6 +145,22 @@ docker compose exec frontend npm install --save-dev <package-name>
 ```
 
 **⚠️ Frontend Commands**: Always run `npm` commands through `docker compose exec frontend` to ensure correct dependencies and environment. The `/app/node_modules` volume mount keeps node_modules isolated inside the container.
+
+**⚠️ Package Management**: ALWAYS check if packages are already installed before installing:
+- Check Docker containers: `docker compose exec <service> pip list` or `docker compose exec <service> npm list`
+- Check existing venv: Look for `/tmp/webtesting/*/venv` or project venvs
+- Check conda environments: `conda env list`
+- **REUSE existing environments** - don't install duplicate packages globally
+
+**Example:**
+```bash
+# ❌ DON'T: Install globally without checking
+pip install playwright
+
+# ✅ DO: Check and reuse existing venv
+ls /tmp/webtesting/*/venv  # Check for existing venvs
+source /tmp/webtesting/portfolio-analysis/venv/bin/activate  # Reuse it
+```
 
 ### 3. Bump Version (Required)
 ```bash

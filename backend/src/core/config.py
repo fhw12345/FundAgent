@@ -51,10 +51,20 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = "http://langfuse-server:3000"
 
-    # External APIs
+    # External APIs - LLM
     openai_api_key: str = ""
     qwen_api_key: str = ""  # Legacy - use dashscope_api_key instead
     dashscope_api_key: str = ""  # Alibaba Cloud DashScope API key
+
+    # LLM Configuration
+    default_llm_model: str = "qwen-plus-latest"  # Default model for agents
+    default_llm_temperature: float = 0.7  # Default temperature for LLM calls
+
+    # External APIs - Market Data & Trading
+    alpha_vantage_api_key: str = ""  # Alpha Vantage API key (free tier: 25 calls/day)
+    alpaca_api_key: str = ""  # Alpaca Paper Trading API key
+    alpaca_secret_key: str = ""  # Alpaca Paper Trading secret key
+    alpaca_base_url: str = "https://paper-api.alpaca.markets"  # Paper trading endpoint
 
     # Email configuration (Tencent Cloud SES)
     tencent_secret_id: str = ""  # Tencent Cloud API SecretID

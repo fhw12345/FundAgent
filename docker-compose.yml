@@ -31,6 +31,27 @@ services:
       - /app/node_modules
     restart: unless-stopped
 
+  # Portfolio Analysis Agent (Standalone)
+  # Run manually: docker compose run --rm portfolio-agent
+  # Or with args: docker compose run --rm portfolio-agent python scripts/run_portfolio_analysis.py --dry-run
+  portfolio-agent:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: python scripts/run_portfolio_analysis.py
+    env_file:
+      - ./backend/.env.development
+    environment:
+      - ENVIRONMENT=development
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./backend:/app
+      - backend_deps:/home/app/.local
+    profiles:
+      - tools  # Only run when explicitly requested
+
   mongodb:
     image: mongo:7.0
     ports:

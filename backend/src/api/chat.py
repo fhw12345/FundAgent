@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 from ..agent.chat_agent import ChatAgent
 from ..agent.langgraph_react_agent import FinancialAnalysisReActAgent
 from ..core.exceptions import NotFoundError
+from ..core.utils import extract_token_usage_from_agent_result
 from ..models.chat import ChatUpdate
 from ..services.chat_service import ChatService
 from ..services.credit_service import CreditService
@@ -38,6 +39,36 @@ from .schemas.chat_models import (
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+
+# ===== Helper Functions =====
+
+
+async def get_or_create_chat(
+    request: ChatRequest,
+    user_id: str,
+    chat_service: ChatService,
+) -> tuple[str, dict[str, Any] | None]:
+    """
+    Get existing chat or create new one for streaming endpoints.
+
+    Args:
+        request: Chat request with optional chat_id
+        user_id: Current user ID
+        chat_service: Chat service instance
+
+    Returns:
+        Tuple of (chat_id, chat_created_event_dict)
+        chat_created_event_dict is None if using existing chat,
+        or a dict with chat_id and type='chat_created' if new chat was created
+    """
+    if request.chat_id:
+        chat = await chat_service.get_chat(request.chat_id, user_id)
+        return chat.chat_id, None
+    else:
+        chat_title = request.title if request.title else "New Chat"
+        chat = await chat_service.create_chat(user_id, title=chat_title)
+        return chat.chat_id, {"chat_id": chat.chat_id, "type": "chat_created"}
 
 
 # ===== Persistent Chat Management Endpoints =====
@@ -372,14 +403,9 @@ async def _stream_with_simple_agent(
 
         try:
             # Create or get chat
-            if request.chat_id:
-                chat = await chat_service.get_chat(request.chat_id, user_id)
-                chat_id = chat.chat_id
-            else:
-                chat_title = request.title if request.title else "New Chat"
-                chat = await chat_service.create_chat(user_id, title=chat_title)
-                chat_id = chat.chat_id
-                yield f"data: {json.dumps({'chat_id': chat_id, 'type': 'chat_created'})}\n\n"
+            chat_id, chat_created_event = await get_or_create_chat(request, user_id, chat_service)
+            if chat_created_event:
+                yield f"data: {json.dumps(chat_created_event)}\n\n"
 
             # Save user message
             await chat_service.add_message(
@@ -562,14 +588,9 @@ async def _stream_with_react_agent(
 
         try:
             # Create or get chat
-            if request.chat_id:
-                chat = await chat_service.get_chat(request.chat_id, user_id)
-                chat_id = chat.chat_id
-            else:
-                chat_title = request.title if request.title else "New Chat"
-                chat = await chat_service.create_chat(user_id, title=chat_title)
-                chat_id = chat.chat_id
-                yield f"data: {json.dumps({'chat_id': chat_id, 'type': 'chat_created'})}\n\n"
+            chat_id, chat_created_event = await get_or_create_chat(request, user_id, chat_service)
+            if chat_created_event:
+                yield f"data: {json.dumps(chat_created_event)}\n\n"
 
             # Save message
             await chat_service.add_message(
@@ -656,10 +677,30 @@ async def _stream_with_react_agent(
             tool_executions = result.get("tool_executions", 0)
             trace_id = result.get("trace_id", "unknown")
 
-            # Extract token usage from LangGraph result
-            input_tokens = result.get("input_tokens", 0)
-            output_tokens = result.get("output_tokens", 0)
-            total_tokens = result.get("total_tokens", 0)
+            # Extract token usage from agent result
+            token_usage = extract_token_usage_from_agent_result(result)
+            input_tokens = token_usage["input_tokens"]
+            output_tokens = token_usage["output_tokens"]
+            total_tokens = token_usage["total_tokens"]
+
+            # Check if agent execution failed
+            if "error" in result:
+                logger.error(
+                    "Agent execution failed with error",
+                    chat_id=chat_id,
+                    trace_id=trace_id,
+                    error=result["error"],
+                )
+                # Fail transaction and return clear error
+                if transaction:
+                    await credit_service.fail_transaction(transaction.transaction_id)
+                error_data = {
+                    "error": result["error"],
+                    "error_code": "AGENT_EXECUTION_FAILED",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
 
             logger.info(
                 "ReAct agent execution completed",
@@ -672,7 +713,7 @@ async def _stream_with_react_agent(
                 total_tokens=total_tokens,
             )
 
-            # Validate token usage before proceeding
+            # Validate token usage before proceeding (only if no error)
             if input_tokens == 0 and output_tokens == 0:
                 logger.warning(
                     "No token usage extracted from v3 agent result",

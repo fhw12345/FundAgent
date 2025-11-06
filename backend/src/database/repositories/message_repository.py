@@ -8,7 +8,7 @@ from datetime import datetime
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
-from ...models.message import Message, MessageCreate
+from ...models.message import Message, MessageCreate, MessageMetadata
 
 logger = structlog.get_logger()
 
@@ -237,3 +237,83 @@ class MessageRepository:
         message_dict.pop("_id", None)
 
         return Message(**message_dict)
+
+    async def get_analysis_messages(
+        self,
+        user_id: str | None = None,
+        symbol: str | None = None,
+        analysis_id: str | None = None,
+        limit: int = 100,
+    ) -> list[Message]:
+        """
+        Get analysis messages with optional filters.
+
+        Useful for:
+        - Getting all analyses for a symbol (for portfolio chart markers)
+        - Getting specific analysis session (by analysis_id)
+        - Getting user's analysis history
+
+        Args:
+            user_id: Optional user filter (requires chat lookup)
+            symbol: Optional symbol to filter by
+            analysis_id: Optional specific analysis workflow ID
+            limit: Maximum number of messages to return
+
+        Returns:
+            List of analysis messages sorted by timestamp descending
+        """
+        # Build query
+        query: dict = {
+            "source": {"$in": ["tool", "llm"]},  # Analysis messages from tools or LLM (watchlist)
+        }
+
+        if symbol:
+            query["metadata.symbol"] = symbol
+
+        if analysis_id:
+            query["metadata.analysis_id"] = analysis_id
+
+        # TODO: Add user_id filter (requires JOIN with chats collection)
+        # For now, filter by symbol which is most common use case
+
+        cursor = self.collection.find(query).sort("timestamp", -1).limit(limit)
+
+        messages = []
+        async for message_dict in cursor:
+            # Remove MongoDB _id field
+            message_dict.pop("_id", None)
+            messages.append(Message(**message_dict))
+
+        logger.info(
+            "Analysis messages queried",
+            symbol=symbol,
+            analysis_id=analysis_id,
+            count=len(messages),
+        )
+
+        return messages
+
+    async def update_metadata(self, message_id: str, metadata: MessageMetadata) -> Message | None:
+        """
+        Update message metadata.
+
+        Args:
+            message_id: Message ID to update
+            metadata: New metadata to set
+
+        Returns:
+            Updated message or None if not found
+        """
+        result = await self.collection.find_one_and_update(
+            {"message_id": message_id},
+            {"$set": {"metadata": metadata.model_dump(exclude_none=True)}},
+            return_document=True,
+        )
+
+        if result:
+            result.pop("_id", None)
+            logger.info("Message metadata updated", message_id=message_id)
+            return Message(**result)
+
+        logger.warning("Message not found for metadata update", message_id=message_id)
+        return None

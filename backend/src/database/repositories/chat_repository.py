@@ -26,6 +26,29 @@ class ChatRepository:
         """
         self.collection = collection
 
+    async def ensure_indexes(self) -> None:
+        """
+        Create indexes for optimal query performance.
+        Called during application startup.
+
+        Indexes:
+        1. user_id + is_archived + updated_at: For listing user chats
+        2. user_id + ui_state.current_symbol + is_archived: For symbol-per-chat lookup
+        """
+        # Index for listing user chats (sorted by updated_at)
+        await self.collection.create_index(
+            [("user_id", 1), ("is_archived", 1), ("updated_at", -1)],
+            name="idx_user_chats",
+        )
+
+        # Index for symbol-per-chat pattern (Phase 2)
+        await self.collection.create_index(
+            [("user_id", 1), ("ui_state.current_symbol", 1), ("is_archived", 1)],
+            name="idx_symbol_lookup",
+        )
+
+        logger.info("Chat indexes ensured")
+
     async def create(self, chat_create: ChatCreate) -> Chat:
         """
         Create a new chat.
@@ -227,6 +250,43 @@ class ChatRepository:
         result.pop("_id", None)
 
         return Chat(**result)
+
+    async def find_by_symbol(self, user_id: str, symbol: str) -> Chat | None:
+        """
+        Find active chat for user with specific symbol.
+
+        Used for symbol-per-chat pattern to prevent duplicate chats
+        for same symbol.
+
+        Args:
+            user_id: User identifier
+            symbol: Stock symbol (e.g., "AAPL")
+
+        Returns:
+            Chat if found, None otherwise
+        """
+        chat_dict = await self.collection.find_one(
+            {
+                "user_id": user_id,
+                "ui_state.current_symbol": symbol,
+                "is_archived": False,
+            }
+        )
+
+        if not chat_dict:
+            return None
+
+        # Remove MongoDB _id field
+        chat_dict.pop("_id", None)
+
+        logger.info(
+            "Chat found by symbol",
+            user_id=user_id,
+            symbol=symbol,
+            chat_id=chat_dict["chat_id"],
+        )
+
+        return Chat(**chat_dict)
 
     async def delete(self, chat_id: str) -> bool:
         """
