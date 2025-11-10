@@ -12,7 +12,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
@@ -242,7 +241,31 @@ def create_app() -> FastAPI:
     # Only add middleware in non-test environments (middleware breaks FastAPI TestClient)
     if settings.environment != "test":
         app.add_middleware(SlowAPIMiddleware)  # This middleware enforces rate limits
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Custom rate limit exception handler that handles both RateLimitExceeded and connection errors
+    @app.exception_handler(RateLimitExceeded)
+    async def custom_rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Handle rate limit exceeded errors gracefully, including Redis connection failures."""
+        # Check if this is a RateLimitExceeded exception
+        if isinstance(exc, RateLimitExceeded):
+            return JSONResponse(
+                status_code=429,
+                content={"error": f"Rate limit exceeded: {exc.detail}"},
+                headers={"Retry-After": str(60)},
+            )
+        # Handle other exceptions (like ConnectionError from Redis)
+        else:
+            logger.warning(
+                "Rate limiting error occurred",
+                error=str(exc),
+                error_type=type(exc).__name__,
+                path=request.url.path,
+            )
+            # Allow request to proceed if Redis is unavailable (graceful degradation)
+            return JSONResponse(
+                status_code=503,
+                content={"error": "Rate limiting temporarily unavailable"},
+            )
 
     # Global exception handler for custom app errors
     @app.exception_handler(AppError)
