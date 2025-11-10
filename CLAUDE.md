@@ -104,6 +104,10 @@ python -m playwright install chromium
 
 **CRITICAL:** Don't stop at first fix - keep going until EVERYTHING works!
 
+> 📖 **See [E2E Automation Guide](docs/testing/e2e-automation-guide.md) for complete E2E testing procedures**
+> 📖 **See [E2E Reference](docs/testing/e2e-reference.md) for API endpoints, selectors, and workflows**
+> 📖 **See [Testing Strategy](docs/development/testing-strategy.md) for unit test coverage plans**
+
 ## Development Workflow
 
 ### 1. Feature Specification (Required for New Features)
