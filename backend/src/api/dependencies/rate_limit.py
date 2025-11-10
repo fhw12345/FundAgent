@@ -1,0 +1,77 @@
+"""
+Rate limiting dependencies for API endpoints.
+
+Uses slowapi with Redis backend for distributed rate limiting.
+"""
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Initialize rate limiter
+# Uses Redis for distributed rate limiting (shared across multiple backend instances)
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200/minute"],  # Global default: 200 requests per minute
+    storage_uri="redis://redis:6379",  # Redis backend for distributed limiting
+)
+
+
+# Rate limit decorators for different endpoint types
+def rate_limit_standard(func):
+    """
+    Standard rate limit for read operations.
+
+    Allows 60 requests per minute (1 per second).
+
+    Usage:
+        @router.get("/endpoint")
+        @rate_limit_standard
+        async def endpoint():
+            pass
+    """
+    return limiter.limit("60/minute")(func)
+
+
+def rate_limit_expensive(func):
+    """
+    Restrictive rate limit for expensive operations (external API calls).
+
+    Allows 10 requests per minute.
+
+    Usage:
+        @router.get("/portfolio/history")
+        @rate_limit_expensive
+        async def get_portfolio_history():
+            pass
+    """
+    return limiter.limit("10/minute")(func)
+
+
+def rate_limit_critical(func):
+    """
+    Very restrictive rate limit for critical operations (LLM, trading).
+
+    Allows 2 requests per minute.
+
+    Usage:
+        @router.post("/watchlist/analyze")
+        @rate_limit_critical
+        async def trigger_analysis():
+            pass
+    """
+    return limiter.limit("2/minute")(func)
+
+
+def rate_limit_write(func):
+    """
+    Moderate rate limit for write operations.
+
+    Allows 30 requests per minute.
+
+    Usage:
+        @router.post("/watchlist")
+        @rate_limit_write
+        async def add_to_watchlist():
+            pass
+    """
+    return limiter.limit("30/minute")(func)

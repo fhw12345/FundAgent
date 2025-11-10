@@ -8,16 +8,22 @@ No manual holdings management - Alpaca handles all positions.
 from datetime import datetime, timedelta
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..models.holding import Holding
 from ..services.alpaca_trading_service import AlpacaTradingService
 from ..services.chat_service import ChatService
 from ..database.mongodb import MongoDB
 from ..database.repositories.message_repository import MessageRepository
-from .dependencies.auth import get_mongodb
+from .dependencies.auth import get_current_user_id, get_mongodb, require_admin
 from .dependencies.chat_deps import get_chat_service
 from .dependencies.portfolio_deps import get_alpaca_trading_service
+from .dependencies.rate_limit import (
+    limiter,
+    rate_limit_expensive,
+    rate_limit_standard,
+    rate_limit_write,
+)
 from .schemas.portfolio_models import (
     AnalysisMarker,
     HoldingResponse,
@@ -33,8 +39,10 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 
 @router.get("/holdings", response_model=list[HoldingResponse])
+@limiter.limit("10/minute")  # Alpaca API call - restrictive limit
 async def get_holdings(
-    user_id: str = Depends(lambda: "default_user"),  # TODO: Replace with actual auth
+    request: Request,
+    user_id: str = Depends(get_current_user_id),  # JWT authentication required
     alpaca_trading: AlpacaTradingService | None = Depends(get_alpaca_trading_service),
 ) -> list[HoldingResponse]:
     """
@@ -92,13 +100,15 @@ async def get_holdings(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch positions: {str(e)}"
+            detail="Unable to retrieve portfolio positions. Please try again later."
         )
 
 
 @router.get("/summary", response_model=PortfolioSummaryResponse)
+@limiter.limit("10/minute")  # Alpaca API call - restrictive limit
 async def get_portfolio_summary(
-    user_id: str = Depends(lambda: "default_user"),  # TODO: Replace with actual auth
+    request: Request,
+    user_id: str = Depends(get_current_user_id),  # JWT authentication required
     alpaca_trading: AlpacaTradingService | None = Depends(get_alpaca_trading_service),
 ) -> PortfolioSummaryResponse:
     """
@@ -150,15 +160,17 @@ async def get_portfolio_summary(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch account summary: {str(e)}"
+            detail="Unable to retrieve portfolio summary. Please try again later."
         )
 
 
 @router.get("/history", response_model=PortfolioHistoryResponse)
+@limiter.limit("10/minute")  # Alpaca API call - restrictive limit
 async def get_portfolio_history(
+    request: Request,
     period: str = "1D",
     symbol: str | None = None,  # Optional: filter analysis markers by symbol
-    user_id: str = Depends(lambda: "default_user"),  # TODO: Replace with actual auth
+    user_id: str = Depends(get_current_user_id),  # JWT authentication required
     alpaca_trading: AlpacaTradingService | None = Depends(get_alpaca_trading_service),
     mongodb: MongoDB = Depends(get_mongodb),
 ) -> PortfolioHistoryResponse:
@@ -296,12 +308,14 @@ async def get_portfolio_history(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch portfolio history: {str(e)}"
+            detail="Unable to retrieve portfolio history. Please try again later."
         )
 
 
 @router.get("/chat-history")
+@limiter.limit("60/minute")  # Standard read operation
 async def get_portfolio_chat_history(
+    request: Request,
     mongodb: MongoDB = Depends(get_mongodb),
 ) -> dict:
     """
@@ -381,12 +395,14 @@ async def get_portfolio_chat_history(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch portfolio chat history: {str(e)}"
+            detail="Unable to retrieve portfolio chat history. Please try again later."
         )
 
 
 @router.get("/chats/{chat_id}")
+@limiter.limit("60/minute")  # Standard read operation
 async def get_portfolio_chat_detail(
+    request: Request,
     chat_id: str,
     limit: int | None = None,
     chat_service: ChatService = Depends(get_chat_service),
@@ -434,26 +450,31 @@ async def get_portfolio_chat_detail(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve portfolio chat: {str(e)}"
+            detail="Unable to retrieve portfolio chat. Please try again later."
         )
 
 
 @router.delete("/chats/{chat_id}", status_code=204)
+@limiter.limit("30/minute")  # Write operation - admin only
 async def delete_portfolio_chat(
+    request: Request,
     chat_id: str,
+    _: None = Depends(require_admin),  # Admin only
     chat_service: ChatService = Depends(get_chat_service),
 ) -> None:
     """
     Delete a portfolio agent chat and all its messages.
 
-    Portfolio agent chats are owned by 'portfolio_agent' system user,
-    so no ownership check is needed - any authenticated user can delete them.
+    **Admin only** - Requires admin privileges to delete portfolio analysis chats.
 
     Args:
         chat_id: Chat identifier
 
     Returns:
         204 No Content on success
+
+    Raises:
+        HTTPException: 403 if not admin, 404 if chat not found
     """
     try:
         # Delete chat with portfolio_agent as owner
@@ -484,12 +505,14 @@ async def delete_portfolio_chat(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to delete portfolio chat: {str(e)}"
+            detail="Unable to delete portfolio chat. Please try again later."
         )
 
 
 @router.get("/orders")
+@limiter.limit("10/minute")  # Alpaca API call - restrictive limit
 async def get_portfolio_orders(
+    request: Request,
     limit: int = 50,
     status: str | None = None,  # "open", "closed", "all"
     trading_service: AlpacaTradingService = Depends(get_alpaca_trading_service),
@@ -567,5 +590,5 @@ async def get_portfolio_orders(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve orders: {str(e)}"
+            detail="Unable to retrieve order history. Please try again later."
         )

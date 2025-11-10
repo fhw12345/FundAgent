@@ -12,6 +12,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from .api.admin import router as admin_router
 from .api.analysis import router as analysis_router
@@ -24,6 +27,7 @@ from .api.llm_models import router as llm_models_router
 from .api.market_data import router as market_data_router
 from .api.portfolio import router as portfolio_router
 from .api.watchlist import router as watchlist_router
+from .api.dependencies.rate_limit import limiter
 from .core.config import get_settings
 from .core.exceptions import AppError
 from .database.mongodb import MongoDB
@@ -232,6 +236,13 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
+
+    # Rate limiting - SlowAPI integration
+    app.state.limiter = limiter
+    # Only add middleware in non-test environments (middleware breaks FastAPI TestClient)
+    if settings.environment != "test":
+        app.add_middleware(SlowAPIMiddleware)  # This middleware enforces rate limits
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Global exception handler for custom app errors
     @app.exception_handler(AppError)

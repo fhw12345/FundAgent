@@ -9,7 +9,8 @@ from pymongo.errors import DuplicateKeyError
 from ..database.mongodb import MongoDB
 from ..database.repositories.watchlist_repository import WatchlistRepository
 from ..models.watchlist import WatchlistItem, WatchlistItemCreate
-from .dependencies.auth import get_mongodb
+from .dependencies.auth import get_current_user_id, get_mongodb, require_admin
+from .dependencies.rate_limit import limiter
 
 logger = structlog.get_logger()
 
@@ -17,24 +18,29 @@ router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
 
 @router.post("", response_model=WatchlistItem, status_code=201)
+@limiter.limit("30/minute")  # Write operation - admin only
 async def add_to_watchlist(
+    request: Request,
     item: WatchlistItemCreate,
-    user_id: str = Depends(lambda: "default_user"),  # TODO: Replace with actual auth
+    _: None = Depends(require_admin),  # Admin only
+    user_id: str = Depends(get_current_user_id),  # JWT authentication required
     mongodb: MongoDB = Depends(get_mongodb),
 ) -> WatchlistItem:
     """
-    Add a symbol to user's watchlist.
+    Add a symbol to watchlist for automated analysis.
+
+    **Admin only** - Requires admin privileges to manage watchlist.
 
     Args:
         item: Watchlist item creation data
-        user_id: Authenticated user ID
+        user_id: Authenticated user ID (from JWT)
         mongodb: MongoDB instance
 
     Returns:
         Created watchlist item
 
     Raises:
-        HTTPException: If symbol already in watchlist or validation fails
+        HTTPException: 403 if not admin, 409 if symbol already in watchlist
     """
     try:
         watchlist_collection = mongodb.get_collection("watchlist")
@@ -66,13 +72,15 @@ async def add_to_watchlist(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to add watchlist item: {str(e)}"
+            detail="Unable to add symbol to watchlist. Please try again later."
         )
 
 
 @router.get("", response_model=list[WatchlistItem])
+@limiter.limit("60/minute")  # Standard read operation
 async def get_watchlist(
-    user_id: str = Depends(lambda: "default_user"),  # TODO: Replace with actual auth
+    request: Request,
+    user_id: str = Depends(get_current_user_id),  # JWT authentication required
     mongodb: MongoDB = Depends(get_mongodb),
 ) -> list[WatchlistItem]:
     """
@@ -108,26 +116,31 @@ async def get_watchlist(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to get watchlist: {str(e)}"
+            detail="Unable to retrieve watchlist. Please try again later."
         )
 
 
 @router.delete("/{watchlist_id}", status_code=204)
+@limiter.limit("30/minute")  # Write operation - admin only
 async def remove_from_watchlist(
+    request: Request,
     watchlist_id: str,
-    user_id: str = Depends(lambda: "default_user"),  # TODO: Replace with actual auth
+    _: None = Depends(require_admin),  # Admin only
+    user_id: str = Depends(get_current_user_id),  # JWT authentication required
     mongodb: MongoDB = Depends(get_mongodb),
 ) -> None:
     """
-    Remove a symbol from user's watchlist.
+    Remove a symbol from watchlist.
+
+    **Admin only** - Requires admin privileges to manage watchlist.
 
     Args:
         watchlist_id: Watchlist item identifier
-        user_id: Authenticated user ID
+        user_id: Authenticated user ID (from JWT)
         mongodb: MongoDB instance
 
     Raises:
-        HTTPException: If item not found or deletion fails
+        HTTPException: 403 if not admin, 404 if item not found
     """
     try:
         watchlist_collection = mongodb.get_collection("watchlist")
@@ -159,29 +172,33 @@ async def remove_from_watchlist(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to remove watchlist item: {str(e)}"
+            detail="Unable to remove symbol from watchlist. Please try again later."
         )
 
 
 @router.post("/analyze", status_code=202)
+@limiter.limit("2/minute")  # CRITICAL: Expensive LLM analysis - very restrictive
 async def trigger_watchlist_analysis(
     request: Request,
-    user_id: str = Depends(lambda: "default_user"),  # TODO: Replace with actual auth
+    _: None = Depends(require_admin),  # Admin only
+    user_id: str = Depends(get_current_user_id),  # JWT authentication required
 ) -> dict:
     """
     Manually trigger analysis for all watchlist symbols.
+
+    **Admin only** - Requires admin privileges to trigger expensive LLM analysis.
 
     This runs the watchlist analyzer once (not continuously).
 
     Args:
         request: FastAPI request (to access app.state)
-        user_id: Authenticated user ID
+        user_id: Authenticated user ID (from JWT)
 
     Returns:
-        Status message with count of analyzed symbols
+        Status message indicating analysis has started
 
     Raises:
-        HTTPException: If analysis fails
+        HTTPException: 403 if not admin, 500 if analysis fails
     """
     try:
         # Get analyzer from app state
@@ -211,5 +228,5 @@ async def trigger_watchlist_analysis(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to trigger analysis: {str(e)}"
+            detail="Unable to trigger watchlist analysis. Please try again later."
         )
