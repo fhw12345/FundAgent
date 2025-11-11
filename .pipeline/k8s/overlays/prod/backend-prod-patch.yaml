@@ -46,6 +46,20 @@ spec:
               name: backend-secrets
               key: jwt-secret
 
+        # Alpaca Trading API
+        - name: ALPACA_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: alpaca-api-key
+        - name: ALPACA_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: alpaca-secret-key
+        - name: ALPACA_BASE_URL
+          value: "https://paper-api.alpaca.markets"
+
         # Environment
         - name: ENVIRONMENT
           value: "production"

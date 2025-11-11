@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.15] - 2025-11-12
+
+### Fixed
+- fix(frontend): standardize API URL env var to VITE_API_URL for ACK deployment
+  - Replaced VITE_API_BASE_URL with VITE_API_URL in 5 files
+  - Fixes CORS errors for portfolio chat, orders, and watchlist features in ACK
+  - Ensures consistent environment variable usage across frontend
+
 ## [0.8.14] - 2025-10-31
 
 ### Added

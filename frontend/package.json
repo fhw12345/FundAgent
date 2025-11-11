@@ -1,6 +1,6 @@
 {
   "name": "financial-agent-frontend",
-  "version": "0.8.14",
+  "version": "0.8.15",
   "type": "module",
   "description": "AI-Enhanced Financial Analysis Platform Frontend",
   "scripts": {
