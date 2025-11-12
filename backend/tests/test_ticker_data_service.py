@@ -413,6 +413,7 @@ class TestTickerDataServiceCaching:
             assert any("Cache hit" in str(call) for call in log_calls)
 
 
+@pytest.mark.skip(reason="yfinance deprecated - migrated to Alpha Vantage")
 class TestTickerDataServiceYfinance:
     """Test suite for TickerDataService yfinance integration."""
 

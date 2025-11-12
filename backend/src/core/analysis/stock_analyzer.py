@@ -39,7 +39,8 @@ class StockAnalyzer:
             logger.info("Starting fundamentals analysis", symbol=symbol)
 
             self.symbol = symbol.upper()
-            self.ticker_data = yf.Ticker(self.symbol)
+            # DISABLED: yfinance removed - requires Alpha Vantage fundamentals implementation
+            raise NotImplementedError("Fundamentals analysis requires Alpha Vantage integration")
 
             # Get basic info and price data
             info = self.ticker_data.info
