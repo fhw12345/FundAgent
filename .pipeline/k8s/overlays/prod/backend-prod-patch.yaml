@@ -64,6 +64,10 @@ spec:
         - name: ENVIRONMENT
           value: "production"
 
+        # CORS Configuration
+        - name: CORS_ORIGINS
+          value: '["https://klinecubic.cn"]'
+
         # Production resource limits
         resources:
           requests:

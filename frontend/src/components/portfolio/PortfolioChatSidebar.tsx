@@ -35,7 +35,7 @@ interface ChatHistoryResponse {
   chats: SymbolChat[];
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 /**
  * Fetch portfolio agent chat history grouped by analysis_id.

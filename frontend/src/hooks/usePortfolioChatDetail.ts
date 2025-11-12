@@ -6,7 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ChatMessage, Chat } from "../types/api";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 interface PortfolioChatDetailResponse {
   chat: Chat;

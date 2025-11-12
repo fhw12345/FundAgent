@@ -49,7 +49,7 @@ images:
   newTag: "test-v0.5.14"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend
-  newTag: "test-v0.8.15"
+  newTag: "prod-v0.8.16"
 
 # Resource allocation for production (Phase 1: No Langfuse)
 replicas:

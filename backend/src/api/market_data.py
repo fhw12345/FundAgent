@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 import pandas as pd
+import structlog
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -22,6 +23,7 @@ from ..services.market import (
 from .dependencies.auth import get_current_user_id
 
 router = APIRouter(prefix="/api/market", tags=["Market Data"])
+logger = structlog.get_logger()
 
 
 class SymbolSearchResult(BaseModel):
@@ -91,6 +93,8 @@ async def search_symbols(
         if len(query) < 1:
             raise ValueError("Search query must be at least 1 character")
 
+        logger.info("Symbol search started", query=query, user_id=user_id)
+
         results = []
 
         # Common company name to symbol mappings
@@ -151,8 +155,14 @@ async def search_symbols(
                     # Add to dedup dict
                     if company_name:
                         seen_companies[company_name.lower().strip()] = result
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(
+                    "Direct symbol mapping failed",
+                    query=query,
+                    symbol=COMMON_MAPPINGS.get(query_lower),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
 
         # Use yfinance Search for company name to symbol mapping with ranking
         try:
@@ -211,11 +221,23 @@ async def search_symbols(
             # Limit final list
             results = results[:10]
 
-        except Exception:
+            logger.info(
+                "Symbol search completed via yf.Search",
+                query=query,
+                result_count=len(results),
+            )
+
+        except Exception as e:
+            logger.error(
+                "yfinance Search failed, falling back to Lookup",
+                query=query,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             # Fallback: try Lookup if Search fails
             try:
-                lookup = yf.Lookup()
-                lookup_results = lookup.lookup(query)
+                lookup = yf.Lookup(query)
+                lookup_results = lookup.all()
 
                 # Reset deduplication for fallback path
                 seen_companies = {}
@@ -270,7 +292,19 @@ async def search_symbols(
                 results.sort(key=lambda r: (-r.confidence, r.symbol))
                 results = results[:10]
 
-            except Exception:
+                logger.info(
+                    "Symbol search completed via yf.Lookup fallback",
+                    query=query,
+                    result_count=len(results),
+                )
+
+            except Exception as e:
+                logger.error(
+                    "yfinance Lookup fallback also failed, trying direct ticker",
+                    query=query,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 # If both fail, try simple ticker validation with price data check
                 if len(query) <= 5 and query.isalpha():
                     try:
@@ -306,9 +340,19 @@ async def search_symbols(
                             except Exception:
                                 # Skip symbols that don't have price data
                                 pass
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(
+                            "Direct ticker validation failed",
+                            query=query,
+                            error=str(e),
+                            error_type=type(e).__name__,
+                        )
 
+        logger.info(
+            "Symbol search returning results",
+            query=query,
+            result_count=len(results),
+        )
         return SymbolSearchResponse(query=query, results=results)
 
     except ValueError as e:
