@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.18] - 2025-11-12
+
+### Added
+- Replace yfinance with hybrid Alpaca + Polygon.io for market data to fix ACK rate limiting
+
+
 ## [0.5.15] - 2025-11-11
 
 ### Added

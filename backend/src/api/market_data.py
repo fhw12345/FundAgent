@@ -1,29 +1,36 @@
 """
-Market Data API endpoints for symbol search and price data.
-Provides symbol autocomplete and real-time price data with granularity controls.
+Market Data API endpoints using hybrid Alpaca + Polygon.io provider.
+Replaces yfinance to avoid rate limiting in cloud environments.
 """
 
 from datetime import datetime
-from typing import Any
+from functools import lru_cache
 
 import pandas as pd
 import structlog
-import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ..core.config import Settings
 from ..core.utils import (
     get_valid_frontend_intervals,
-    map_timeframe_to_yfinance_interval,
 )
-from ..services.market import (
-    calculate_match_confidence,
-    should_replace_duplicate,
-)
+from ..services.alphavantage_market_data import AlphaVantageMarketDataService
 from .dependencies.auth import get_current_user_id
 
 router = APIRouter(prefix="/api/market", tags=["Market Data"])
 logger = structlog.get_logger()
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """Get cached settings instance."""
+    return Settings()
+
+
+def get_market_service() -> AlphaVantageMarketDataService:
+    """Dependency to get market data service."""
+    return AlphaVantageMarketDataService(get_settings())
 
 
 class SymbolSearchResult(BaseModel):
@@ -80,284 +87,50 @@ async def search_symbols(
         description="Search query (company name or partial symbol)",
     ),
     user_id: str = Depends(get_current_user_id),
+    service: AlphaVantageMarketDataService = Depends(get_market_service),
 ) -> SymbolSearchResponse:
     """
-    Search for stock symbols using company names or partial symbols.
+    Search for stock symbols using Alpaca assets with fuzzy matching.
 
-    Uses yfinance's built-in search functionality to find matching stocks.
     Supports queries like 'apple', 'microsoft', 'AAPL', etc.
+    Uses client-side fuzzy matching on Alpaca's asset list.
     """
     try:
-        # Clean and validate query
+        # Clean query
         query = q.strip()
         if len(query) < 1:
             raise ValueError("Search query must be at least 1 character")
 
         logger.info("Symbol search started", query=query, user_id=user_id)
 
-        results = []
+        # Use hybrid service
+        raw_results = await service.search_symbols(query, limit=10)
 
-        # Common company name to symbol mappings
-        COMMON_MAPPINGS = {
-            "apple": "AAPL",
-            "microsoft": "MSFT",
-            "google": "GOOGL",
-            "alphabet": "GOOGL",
-            "amazon": "AMZN",
-            "tesla": "TSLA",
-            "meta": "META",
-            "facebook": "META",
-            "netflix": "NFLX",
-            "nvidia": "NVDA",
-            "amd": "AMD",
-            "intel": "INTC",
-            "boeing": "BA",
-            "disney": "DIS",
-            "walmart": "WMT",
-            "coca cola": "KO",
-            "pepsi": "PEP",
-            "mcdonalds": "MCD",
-            "starbucks": "SBUX",
-            "visa": "V",
-            "mastercard": "MA",
-            "jp morgan": "JPM",
-            "goldman sachs": "GS",
-            "bank of america": "BAC",
-            "wells fargo": "WFC",
-            "exxon": "XOM",
-            "chevron": "CVX",
-            "pfizer": "PFE",
-            "johnson": "JNJ",
-            "berkshire": "BRK-B",
-        }
-
-        # Deduplicate results across all sources
-        seen_companies = {}  # company_name_lower -> best_result
-
-        # Check for direct mapping first
-        query_lower = query.lower().strip()
-        if query_lower in COMMON_MAPPINGS:
-            symbol = COMMON_MAPPINGS[query_lower]
-            # Verify symbol exists
-            try:
-                ticker = yf.Ticker(symbol)
-                info = ticker.info
-                if info and "symbol" in info:
-                    company_name = info.get("shortName", info.get("longName", ""))
-                    result = SymbolSearchResult(
-                        symbol=symbol,
-                        name=company_name,
-                        exchange=info.get("exchange", ""),
-                        type=info.get("quoteType", "EQUITY"),
-                        match_type="name_prefix",
-                        confidence=1.0,
-                    )
-                    # Add to dedup dict
-                    if company_name:
-                        seen_companies[company_name.lower().strip()] = result
-            except Exception as e:
-                logger.error(
-                    "Direct symbol mapping failed",
-                    query=query,
-                    symbol=COMMON_MAPPINGS.get(query_lower),
-                    error=str(e),
-                    error_type=type(e).__name__,
-                )
-
-        # Use yfinance Search for company name to symbol mapping with ranking
-        try:
-            search = yf.Search(query)
-            raw_quotes = search.quotes or []
-
-            for result in raw_quotes[:50]:
-                # Handle both dict (yfinance) and object responses
-                if isinstance(result, dict):
-                    symbol = result.get("symbol", "") or ""
-                    name = result.get("shortname", result.get("longname", "")) or ""
-                    exchange = result.get("exchange", "") or ""
-                    quote_type = result.get("quoteType", "") or ""
-                else:
-                    # SymbolSearchResult object
-                    symbol = result.symbol if hasattr(result, "symbol") else ""
-                    name = result.name if hasattr(result, "name") else ""
-                    exchange = result.exchange if hasattr(result, "exchange") else ""
-                    quote_type = result.type if hasattr(result, "type") else ""
-
-                # Skip if no name (can't deduplicate)
-                if not name:
-                    continue
-
-                # Calculate match type and confidence using helper
-                match_result = calculate_match_confidence(query, symbol, name)
-                if not match_result:
-                    continue
-
-                match_type, confidence = match_result
-
-                symbol_result = SymbolSearchResult(
-                    symbol=symbol,
-                    name=name,
-                    exchange=exchange,
-                    type=quote_type,
-                    match_type=match_type,
-                    confidence=confidence,
-                )
-
-                # Deduplicate: keep result with higher confidence or better exchange
-                company_key = name.lower().strip()
-                if company_key in seen_companies:
-                    if should_replace_duplicate(
-                        seen_companies[company_key], confidence, exchange
-                    ):
-                        seen_companies[company_key] = symbol_result
-                else:
-                    seen_companies[company_key] = symbol_result
-
-            # Convert deduped results to list
-            results = list(seen_companies.values())
-
-            # Sort results by confidence then symbol
-            results.sort(key=lambda r: (-r.confidence, r.symbol))
-            # Limit final list
-            results = results[:10]
-
-            logger.info(
-                "Symbol search completed via yf.Search",
-                query=query,
-                result_count=len(results),
+        # Convert to response model
+        results = [
+            SymbolSearchResult(
+                symbol=r["symbol"],
+                name=r["name"],
+                exchange=r["exchange"],
+                type=r["type"],
+                match_type=r["match_type"],
+                confidence=r["confidence"],
             )
-
-        except Exception as e:
-            logger.error(
-                "yfinance Search failed, falling back to Lookup",
-                query=query,
-                error=str(e),
-                error_type=type(e).__name__,
-            )
-            # Fallback: try Lookup if Search fails
-            try:
-                lookup = yf.Lookup(query)
-                lookup_results = lookup.all()
-
-                # Reset deduplication for fallback path
-                seen_companies = {}
-
-                for result in lookup_results[:50]:
-                    # Handle both dict (yfinance) and object responses
-                    if isinstance(result, dict):
-                        symbol = result.get("symbol", "") or ""
-                        name = result.get("name", "") or ""
-                        exchange = result.get("exchange", "") or ""
-                        quote_type = result.get("type", "") or ""
-                    else:
-                        # SymbolSearchResult object
-                        symbol = result.symbol if hasattr(result, "symbol") else ""
-                        name = result.name if hasattr(result, "name") else ""
-                        exchange = (
-                            result.exchange if hasattr(result, "exchange") else ""
-                        )
-                        quote_type = result.type if hasattr(result, "type") else ""
-
-                    if not name:
-                        continue
-
-                    # Calculate match type and confidence using helper
-                    match_result = calculate_match_confidence(query, symbol, name)
-                    if not match_result:
-                        continue
-
-                    match_type, confidence = match_result
-
-                    symbol_result = SymbolSearchResult(
-                        symbol=symbol,
-                        name=name,
-                        exchange=exchange,
-                        type=quote_type,
-                        match_type=match_type,
-                        confidence=confidence,
-                    )
-
-                    # Deduplicate using helper
-                    company_key = name.lower().strip()
-                    if company_key in seen_companies:
-                        if should_replace_duplicate(
-                            seen_companies[company_key], confidence, exchange
-                        ):
-                            seen_companies[company_key] = symbol_result
-                    else:
-                        seen_companies[company_key] = symbol_result
-
-                # Convert deduped results (Lookup fallback)
-                results = list(seen_companies.values())
-                results.sort(key=lambda r: (-r.confidence, r.symbol))
-                results = results[:10]
-
-                logger.info(
-                    "Symbol search completed via yf.Lookup fallback",
-                    query=query,
-                    result_count=len(results),
-                )
-
-            except Exception as e:
-                logger.error(
-                    "yfinance Lookup fallback also failed, trying direct ticker",
-                    query=query,
-                    error=str(e),
-                    error_type=type(e).__name__,
-                )
-                # If both fail, try simple ticker validation with price data check
-                if len(query) <= 5 and query.isalpha():
-                    try:
-                        ticker = yf.Ticker(query.upper())
-                        info = ticker.info
-                        if info and "symbol" in info:
-                            # Validate that the symbol has actual price data
-                            # Try to get recent data (last 5 days) to verify it's tradeable
-                            try:
-                                test_data = ticker.history(period="5d", interval="1d")
-                                if not test_data.empty:
-                                    symbol_result = SymbolSearchResult(
-                                        symbol=info.get("symbol", query.upper()),
-                                        name=info.get(
-                                            "shortName", info.get("longName", "")
-                                        ),
-                                        exchange=info.get("exchange", ""),
-                                        type=info.get("quoteType", "EQUITY"),
-                                        match_type=(
-                                            "exact_symbol"
-                                            if info.get("symbol", "").lower()
-                                            == query.lower()
-                                            else "fuzzy"
-                                        ),
-                                        confidence=(
-                                            1.0
-                                            if info.get("symbol", "").lower()
-                                            == query.lower()
-                                            else 0.6
-                                        ),
-                                    )
-                                    results.append(symbol_result)
-                            except Exception:
-                                # Skip symbols that don't have price data
-                                pass
-                    except Exception as e:
-                        logger.warning(
-                            "Direct ticker validation failed",
-                            query=query,
-                            error=str(e),
-                            error_type=type(e).__name__,
-                        )
+            for r in raw_results
+        ]
 
         logger.info(
-            "Symbol search returning results",
+            "Symbol search completed",
             query=query,
             result_count=len(results),
         )
+
         return SymbolSearchResponse(query=query, results=results)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
+        logger.error("Symbol search failed", query=q, error=str(e), error_type=type(e).__name__)
         raise HTTPException(
             status_code=500, detail=f"Symbol search failed: {str(e)}"
         ) from e
@@ -367,6 +140,7 @@ async def search_symbols(
 async def get_price_data(
     symbol: str,
     user_id: str = Depends(get_current_user_id),
+    service: AlphaVantageMarketDataService = Depends(get_market_service),
     interval: str = Query(
         default="1d",
         description="Data interval: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo",
@@ -379,13 +153,13 @@ async def get_price_data(
     end_date: str | None = Query(default=None, description="End date (YYYY-MM-DD)"),
 ) -> PriceDataResponse:
     """
-    Get price data for a symbol with configurable granularity.
+    Get price data using Alpha Vantage with extended hours support.
 
-    Supports multiple time intervals for different chart views:
-    - Intraday: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h
-    - Daily+: 1d, 5d, 1wk, 1mo, 3mo
+    Supports multiple time intervals:
+    - Intraday: 1m, 5m, 15m, 30m, 60m
+    - Daily+: 1d, 1wk, 1mo
 
-    Can use either period (relative) or start_date/end_date (absolute) ranges.
+    Uses Alpha Vantage TIME_SERIES_INTRADAY with extended_hours=true for pre/post market data.
     """
     try:
         # Validate symbol
@@ -393,76 +167,35 @@ async def get_price_data(
         if not symbol:
             raise ValueError("Symbol is required")
 
-        # Validate interval using centralized utility
+        # Validate interval
         valid_intervals = get_valid_frontend_intervals()
         if interval not in valid_intervals:
             raise ValueError(f"Invalid interval. Must be one of: {valid_intervals}")
 
-        # Convert to yfinance format using centralized utility
-        yfinance_interval = map_timeframe_to_yfinance_interval(interval)
+        logger.info(
+            "Price data request",
+            symbol=symbol,
+            interval=interval,
+            period=period,
+            user_id=user_id,
+        )
 
-        # Get ticker
-        ticker = yf.Ticker(symbol)
-
-        # Fetch data based on date range or period
-        if start_date and end_date:
-            # Use absolute date range
-            try:
-                datetime.strptime(start_date, "%Y-%m-%d")
-                datetime.strptime(end_date, "%Y-%m-%d")
-            except ValueError:
-                raise ValueError("Dates must be in YYYY-MM-DD format") from None
-
-            data = ticker.history(
-                start=start_date, end=end_date, interval=yfinance_interval
-            )
-        else:
-            # Use relative period
-            valid_periods = [
-                "1d",
-                "5d",
-                "1mo",
-                "3mo",
-                "6mo",
-                "1y",
-                "2y",
-                "5y",
-                "10y",
-                "ytd",
-                "max",
-            ]
-            if period not in valid_periods:
-                raise ValueError(f"Invalid period. Must be one of: {valid_periods}")
-
-            data = ticker.history(period=period, interval=yfinance_interval)
+        # Fetch data using Alpha Vantage
+        data = await service.get_price_bars(
+            symbol=symbol,
+            interval=interval,
+            period=period,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
         if data.empty:
-            suggestions = []
-            try:
-                search = yf.Search(symbol)
-                raw_quotes = search.quotes or []
-                for r in raw_quotes[:20]:
-                    s = r.get("symbol") or ""
-                    n = r.get("shortname", r.get("longname", "")) or ""
-                    if s and s != symbol and s.isalpha() and len(s) <= 5:
-                        suggestions.append({"symbol": s, "name": n})
-                # Heuristic: if missing common vowel in AAPL case
-                if symbol == "APPL" and not any(
-                    sug["symbol"] == "AAPL" for sug in suggestions
-                ):
-                    suggestions.insert(0, {"symbol": "AAPL", "name": "Apple Inc."})
-            except Exception:
-                pass
-
-            # Ensure fallback for common typos always works
-            if symbol == "APPL" and not suggestions:
-                suggestions.append({"symbol": "AAPL", "name": "Apple Inc."})
-
+            logger.warning("No price data available", symbol=symbol, period=period)
             raise HTTPException(
                 status_code=400,
                 detail={
                     "message": f"No data available for symbol {symbol}",
-                    "suggestions": suggestions,
+                    "suggestions": [],
                 },
             )
 
@@ -487,6 +220,13 @@ async def get_price_data(
             )
             price_points.append(price_point)
 
+        logger.info(
+            "Price data fetched successfully",
+            symbol=symbol,
+            bars_count=len(price_points),
+            interval=interval,
+        )
+
         return PriceDataResponse(
             symbol=symbol,
             interval=interval,
@@ -495,11 +235,16 @@ async def get_price_data(
         )
 
     except HTTPException:
-        # Re-raise HTTPExceptions (like our suggestions response)
         raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
+        logger.error(
+            "Price data fetch failed",
+            symbol=symbol,
+            error=str(e),
+            error_type=type(e).__name__,
+        )
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch price data: {str(e)}"
         ) from e
@@ -507,36 +252,37 @@ async def get_price_data(
 
 @router.get("/info/{symbol}")
 async def get_symbol_info(
-    symbol: str, user_id: str = Depends(get_current_user_id)
-) -> dict[str, Any]:
+    symbol: str,
+    user_id: str = Depends(get_current_user_id),
+    service: AlphaVantageMarketDataService = Depends(get_market_service),
+) -> dict[str, str]:
     """
-    Get basic information about a symbol for autocomplete enhancement.
+    Get basic symbol information from Alpaca.
 
-    Returns company name, sector, industry, and other basic info.
+    Returns symbol, name, exchange for autocomplete enhancement.
+    Note: Alpaca provides limited fundamental data compared to yfinance.
     """
     try:
         symbol = symbol.upper().strip()
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
 
-        if not info or "symbol" not in info:
+        # Get assets and find matching symbol
+        assets = await service._get_alpaca_assets()
+        matching_asset = next((a for a in assets if a.symbol == symbol), None)
+
+        if not matching_asset:
             raise ValueError(f"Symbol {symbol} not found")
 
-        # Extract relevant info for autocomplete
         return {
-            "symbol": info.get("symbol", symbol),
-            "name": info.get("shortName", info.get("longName", "")),
-            "sector": info.get("sector", ""),
-            "industry": info.get("industry", ""),
-            "exchange": info.get("exchange", ""),
-            "currency": info.get("currency", "USD"),
-            "market_cap": info.get("marketCap"),
-            "current_price": info.get("currentPrice", info.get("regularMarketPrice")),
+            "symbol": matching_asset.symbol,
+            "name": matching_asset.name,
+            "exchange": matching_asset.exchange.value if hasattr(matching_asset.exchange, "value") else str(matching_asset.exchange),
+            "type": matching_asset.asset_class.value if hasattr(matching_asset.asset_class, "value") else "EQUITY",
         }
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
+        logger.error("Symbol info fetch failed", symbol=symbol, error=str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch symbol info: {str(e)}"
         ) from e

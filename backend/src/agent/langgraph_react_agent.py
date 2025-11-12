@@ -87,6 +87,7 @@ class FinancialAnalysisReActAgent:
         self,
         settings: Settings,
         ticker_data_service: TickerDataService,
+        market_service,  # AlphaVantageMarketDataService for market data
         tool_cache_wrapper: ToolCacheWrapper | None = None,
     ):
         """
@@ -95,9 +96,11 @@ class FinancialAnalysisReActAgent:
         Args:
             settings: Application settings with API keys
             ticker_data_service: Service for fetching ticker data
+            market_service: Hybrid market data service for stock data
             tool_cache_wrapper: Optional wrapper for tool caching + tracking
         """
         self.settings = settings
+        self.market_service = market_service
         self.ticker_data_service = ticker_data_service
         self.tool_cache_wrapper = tool_cache_wrapper
 
@@ -127,7 +130,7 @@ class FinancialAnalysisReActAgent:
                 )
 
         # Initialize analysis tools
-        self.fibonacci_analyzer = FibonacciAnalyzer()
+        self.fibonacci_analyzer = FibonacciAnalyzer(market_service)
         self.stochastic_analyzer = StochasticAnalyzer(ticker_data_service)
 
         # Initialize LLM with centralized configuration

@@ -1,12 +1,14 @@
 """
 Stock fundamentals and analysis engine.
 Provides comprehensive fundamental analysis including valuation metrics and company information.
+
+NOTE: Temporarily disabled - requires migration from yfinance to alternative data source.
 """
 
 from datetime import datetime
 
 import structlog
-import yfinance as yf
+# import yfinance as yf  # DISABLED: Removed yfinance dependency
 
 from ...api.models import StockFundamentalsResponse
 
@@ -14,10 +16,13 @@ logger = structlog.get_logger()
 
 
 class StockAnalyzer:
-    """Stock fundamentals and analysis engine."""
+    """Stock fundamentals and analysis engine.
+
+    NOTE: Currently disabled - requires alternative data source for fundamentals.
+    """
 
     def __init__(self) -> None:
-        self.ticker_data: yf.Ticker | None = None
+        self.ticker_data: None = None  # was: yf.Ticker | None
         self.symbol: str = ""
 
     async def get_fundamentals(self, symbol: str) -> StockFundamentalsResponse:

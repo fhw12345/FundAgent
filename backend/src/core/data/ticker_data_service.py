@@ -37,7 +37,7 @@ class TickerDataService:
 
         Args:
             redis_cache: Redis cache instance for data storage
-            alpaca_data_service: Alpaca data service for market data (optional, falls back to yfinance)
+            alpaca_data_service: Alpaca data service for market data (optional)
         """
         self.redis_cache = redis_cache
         self.alpaca_data_service = alpaca_data_service
@@ -131,9 +131,8 @@ class TickerDataService:
 
     async def get_current_price(self, symbol: str) -> float | None:
         """
-        Get current/latest price for a symbol.
+        Get current/latest price for a symbol using Alpaca.
 
-        Uses Alpaca if available, falls back to yfinance otherwise.
         Caches prices for 30 seconds to reduce API calls for real-time data.
 
         Args:
@@ -163,32 +162,6 @@ class TickerDataService:
                 else:
                     logger.warning(
                         "Invalid price from Alpaca",
-                        symbol=symbol,
-                        price=price,
-                    )
-                    price = None
-
-            # Fall back to yfinance
-            if not price:
-                logger.info("Falling back to yfinance", symbol=symbol)
-                import yfinance as yf
-
-                ticker = yf.Ticker(symbol)
-                info = ticker.info
-
-                # Try different price fields in order of preference
-                price = (
-                    info.get("currentPrice")
-                    or info.get("regularMarketPrice")
-                    or info.get("previousClose")
-                )
-
-                if price and price > 0:
-                    logger.info("Got price from yfinance", symbol=symbol, price=price)
-                    price = float(price)
-                else:
-                    logger.warning(
-                        "No valid price from yfinance",
                         symbol=symbol,
                         price=price,
                     )
@@ -359,19 +332,9 @@ class TickerDataService:
                     )
                     return df
 
-            # Fall back to yfinance if Alpaca unavailable or returned empty
-            logger.info("Falling back to yfinance for historical data", symbol=symbol)
-            import yfinance as yf
-
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(start=start_date, end=end_date, interval=interval)
-
-            if not df.empty:
-                logger.info("Successfully fetched from yfinance", symbol=symbol, rows=len(df))
-                return df
-            else:
-                logger.warning("No data from yfinance either", symbol=symbol)
-                return pd.DataFrame()
+            # No data available from Alpaca
+            logger.warning("No data from Alpaca", symbol=symbol)
+            return pd.DataFrame()
 
         except Exception as e:
             logger.error(

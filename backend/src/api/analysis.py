@@ -10,6 +10,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..core.config import get_settings
 from ..core.financial_analysis import (
     FibonacciAnalyzer,
     MacroAnalyzer,
@@ -17,6 +18,7 @@ from ..core.financial_analysis import (
     StockAnalyzer,
 )
 from ..database.redis import RedisCache
+from ..services.alphavantage_market_data import AlphaVantageMarketDataService
 from .dependencies.auth import get_current_user_id
 from .health import get_redis
 from .models import (
@@ -31,6 +33,11 @@ from .models import (
     StockFundamentalsRequest,
     StockFundamentalsResponse,
 )
+
+
+def get_market_service() -> AlphaVantageMarketDataService:
+    """Dependency to get market data service."""
+    return AlphaVantageMarketDataService(get_settings())
 
 
 def validate_date_range(start_date: str | None, end_date: str | None) -> None:
@@ -92,6 +99,7 @@ async def fibonacci_analysis(
     request: FibonacciAnalysisRequest,
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
+    market_service: AlphaVantageMarketDataService = Depends(get_market_service),
 ) -> FibonacciAnalysisResponse:
     """
     Perform Fibonacci retracement analysis on a stock symbol.
@@ -170,7 +178,7 @@ async def fibonacci_analysis(
             ).days,
         )
 
-        analyzer = FibonacciAnalyzer()
+        analyzer = FibonacciAnalyzer(market_service)
         result = await analyzer.analyze(
             symbol=request.symbol,
             start_date=request.start_date,

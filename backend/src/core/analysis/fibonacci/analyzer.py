@@ -4,17 +4,18 @@ Orchestrates trend detection, level calculation, and pressure zone analysis usin
 """
 
 from datetime import datetime
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import pandas as pd
 import structlog
-import yfinance as yf
 
 from ....api.models import FibonacciAnalysisResponse
-from ...utils import map_timeframe_to_yfinance_interval
 from .config import TimeframeConfig, TimeframeConfigs
 from .level_calculator import LevelCalculator
 from .trend_detector import TrendDetector
+
+if TYPE_CHECKING:
+    from ....services.alphavantage_market_data import AlphaVantageMarketDataService
 
 logger = structlog.get_logger()
 
@@ -22,8 +23,9 @@ logger = structlog.get_logger()
 class FibonacciAnalyzer:
     """Advanced Fibonacci pressure level analyzer with modular architecture."""
 
-    def __init__(self) -> None:
+    def __init__(self, market_service: "AlphaVantageMarketDataService") -> None:
         """Initialize analyzer with modular components."""
+        self.market_service = market_service
         self.data: pd.DataFrame | None = None
         self.symbol: str = ""
         self.timeframe: str = "1d"
@@ -149,34 +151,45 @@ class FibonacciAnalyzer:
     async def _fetch_stock_data(
         self, start_date: str | None = None, end_date: str | None = None
     ) -> pd.DataFrame:
-        """Fetch stock data with timeframe-appropriate interval."""
+        """Fetch stock data with timeframe-appropriate interval using AlphaVantageMarketDataService."""
         try:
-            ticker = yf.Ticker(self.symbol)
+            # Map timeframe to Polygon interval
+            interval_map = {
+                "1h": "hour",
+                "1d": "day",
+                "1w": "week",
+                "1M": "month",
+            }
+            interval = interval_map.get(self.timeframe, "day")
 
-            # Convert our timeframe to yfinance-compatible interval
-            interval = map_timeframe_to_yfinance_interval(self.timeframe)
+            # Default periods for different timeframes
+            period_map = {
+                "1h": "60d",
+                "1d": "6mo",
+                "1w": "2y",
+                "1M": "5y",
+            }
+            period = period_map.get(self.timeframe, "6mo")
 
-            if start_date and end_date:
-                data = ticker.history(start=start_date, end=end_date, interval=interval)
-            else:
-                # Default periods for different timeframes
-                period_map = {
-                    "1h": "60d",  # 60 days max for hourly data
-                    "1d": "6mo",
-                    "1w": "2y",
-                    "1M": "5y",
-                }
-                period = period_map.get(self.timeframe, "6mo")
-                data = ticker.history(period=period, interval=interval)
+            # Fetch bars from Alpha Vantage via market service
+            bars = await self.market_service.get_price_bars(
+                symbol=self.symbol,
+                interval=interval,
+                period=period,
+            )
 
-            if data.empty:
+            if bars.empty:
                 logger.error("No data returned for symbol", symbol=self.symbol)
                 return pd.DataFrame()
 
+            # bars is already a properly formatted DataFrame from Polygon
+            data = bars
+
             logger.info(
-                "Fetched stock data",
+                "Fetched stock data via AlphaVantageMarketDataService",
                 symbol=self.symbol,
                 timeframe=self.timeframe,
+                interval=interval,
                 data_points=len(data),
                 start=data.index[0],
                 end=data.index[-1],

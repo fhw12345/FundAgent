@@ -31,6 +31,7 @@ class WatchlistAnalyzer:
         messages_collection: AsyncIOMotorCollection,
         chats_collection: AsyncIOMotorCollection,
         redis_cache: RedisCache,
+        market_service,  # AlphaVantageMarketDataService for market data
         agent=None,  # LLM agent for analysis
         trading_service=None,  # Alpaca trading service for order placement
         order_repository=None,  # Repository for persisting orders to MongoDB
@@ -40,6 +41,7 @@ class WatchlistAnalyzer:
         self.message_repo = MessageRepository(messages_collection)
         self.chat_repo = ChatRepository(chats_collection)
         self.redis_cache = redis_cache
+        self.market_service = market_service
         self.agent = agent
         self.trading_service = trading_service
         self.order_repository = order_repository
@@ -258,7 +260,7 @@ REASONING: [your analysis]
         try:
             from datetime import datetime, timedelta
 
-            analyzer = FibonacciAnalyzer()
+            analyzer = FibonacciAnalyzer(self.market_service)
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=180)
 

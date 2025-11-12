@@ -1,17 +1,19 @@
 """
 Stock data fetching utilities.
-Handles yfinance data retrieval with proper error handling and validation.
+DISABLED: Replaced by AlphaVantageMarketDataService.
 """
 
 import pandas as pd
 import structlog
-import yfinance as yf
 
 logger = structlog.get_logger()
 
 
 class StockDataFetcher:
-    """Fetches and validates stock data from yfinance."""
+    """Fetches and validates stock data.
+
+    DEPRECATED: Use AlphaVantageMarketDataService instead.
+    """
 
     @staticmethod
     async def fetch_stock_data(

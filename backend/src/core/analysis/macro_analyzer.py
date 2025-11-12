@@ -1,6 +1,8 @@
 """
 Macro market sentiment analysis engine.
 Analyzes VIX, major indices, and sector performance for market sentiment assessment.
+
+NOTE: Temporarily disabled - requires migration from yfinance to alternative data source.
 """
 
 from datetime import datetime
@@ -8,7 +10,7 @@ from typing import Literal
 
 import pandas as pd
 import structlog
-import yfinance as yf
+# import yfinance as yf  # DISABLED: Removed yfinance dependency
 
 from ...api.models import MacroSentimentResponse
 
@@ -16,7 +18,10 @@ logger = structlog.get_logger()
 
 
 class MacroAnalyzer:
-    """Macro market sentiment analyzer."""
+    """Macro market sentiment analyzer.
+
+    NOTE: Currently disabled - requires alternative data source for VIX, indices, sectors.
+    """
 
     def __init__(self) -> None:
         self.vix_data: pd.DataFrame | None = None
@@ -36,156 +41,89 @@ class MacroAnalyzer:
         Returns:
             MacroSentimentResponse with complete sentiment analysis
         """
-        try:
-            logger.info("Starting macro sentiment analysis")
+        # DISABLED: Requires migration from yfinance to alternative data source
+        raise NotImplementedError(
+            "Macro sentiment analysis temporarily disabled. "
+            "Requires migration from yfinance to alternative market data provider."
+        )
 
-            # Get VIX data for fear/greed analysis
-            vix_level, vix_interpretation, fear_greed_score = await self._analyze_vix()
-
-            # Get major indices performance
-            major_indices = {}
-            if include_indices:
-                major_indices = await self._analyze_major_indices()
-
-            # Get sector performance
-            sector_performance = {}
-            if include_sectors:
-                sector_performance = await self._analyze_sector_performance()
-
-            # Overall sentiment assessment
-            market_sentiment = self._assess_overall_sentiment(
-                fear_greed_score, major_indices
-            )
-            confidence_level = self._calculate_confidence(
-                vix_level, major_indices, sector_performance
-            )
-
-            # Generate insights
-            sentiment_summary, market_outlook, key_factors = (
-                self._generate_macro_insights(
-                    vix_level, vix_interpretation, major_indices, sector_performance
-                )
-            )
-
-            response = MacroSentimentResponse(
-                analysis_date=datetime.now().isoformat(),
-                vix_level=vix_level,
-                vix_interpretation=vix_interpretation,
-                fear_greed_score=fear_greed_score,
-                major_indices=major_indices,
-                sector_performance=sector_performance,
-                market_sentiment=market_sentiment,
-                confidence_level=confidence_level,
-                sentiment_summary=sentiment_summary,
-                market_outlook=market_outlook,
-                key_factors=key_factors,
-            )
-
-            logger.info(
-                "Macro sentiment analysis completed", sentiment=market_sentiment
-            )
-            return response
-
-        except Exception as e:
-            logger.error("Macro sentiment analysis failed", error=str(e))
-            raise
+        # try:
+        #     logger.info("Starting macro sentiment analysis")
+        #
+        #     # Get VIX data for fear/greed analysis
+        #     vix_level, vix_interpretation, fear_greed_score = await self._analyze_vix()
+        #
+        #     # Get major indices performance
+        #     major_indices = {}
+        #     if include_indices:
+        #         major_indices = await self._analyze_major_indices()
+        #
+        #     # Get sector performance
+        #     sector_performance = {}
+        #     if include_sectors:
+        #         sector_performance = await self._analyze_sector_performance()
+        #
+        #     # Overall sentiment assessment
+        #     market_sentiment = self._assess_overall_sentiment(
+        #         fear_greed_score, major_indices
+        #     )
+        #     confidence_level = self._calculate_confidence(
+        #         vix_level, major_indices, sector_performance
+        #     )
+        #
+        #     # Generate insights
+        #     sentiment_summary, market_outlook, key_factors = (
+        #         self._generate_macro_insights(
+        #             vix_level, vix_interpretation, major_indices, sector_performance
+        #         )
+        #     )
+        #
+        #     response = MacroSentimentResponse(
+        #         analysis_date=datetime.now().isoformat(),
+        #         vix_level=vix_level,
+        #         vix_interpretation=vix_interpretation,
+        #         fear_greed_score=fear_greed_score,
+        #         major_indices=major_indices,
+        #         sector_performance=sector_performance,
+        #         market_sentiment=market_sentiment,
+        #         confidence_level=confidence_level,
+        #         sentiment_summary=sentiment_summary,
+        #         market_outlook=market_outlook,
+        #         key_factors=key_factors,
+        #     )
+        #
+        #     logger.info(
+        #         "Macro sentiment analysis completed", sentiment=market_sentiment
+        #     )
+        #     return response
+        #
+        # except Exception as e:
+        #     logger.error("Macro sentiment analysis failed", error=str(e))
+        #     raise
 
     async def _analyze_vix(self) -> tuple[float, str, int]:
-        """Analyze VIX for fear/greed sentiment."""
-        try:
-            vix_ticker = yf.Ticker("^VIX")
-            vix_data = vix_ticker.history(
-                period="2d"
-            )  # Reduce to 2 days for faster fetch
+        """Analyze VIX for fear/greed sentiment.
 
-            if vix_data.empty:
-                # Fallback values if VIX data unavailable
-                return 20.0, "neutral", 50
-
-            current_vix = float(vix_data["Close"].iloc[-1])
-
-            # VIX interpretation
-            if current_vix > 30:
-                interpretation = "fearful"
-                fear_greed_score = max(0, 50 - int((current_vix - 30) * 2))
-            elif current_vix < 15:
-                interpretation = "greedy"
-                fear_greed_score = min(100, 50 + int((15 - current_vix) * 3))
-            else:
-                interpretation = "neutral"
-                fear_greed_score = 50
-
-            return current_vix, interpretation, fear_greed_score
-
-        except Exception as e:
-            logger.warning("Failed to fetch VIX data", error=str(e))
-            return 20.0, "neutral", 50
+        DISABLED: Requires yfinance migration.
+        """
+        # DISABLED: This method uses yfinance
+        return 20.0, "neutral", 50
 
     async def _analyze_major_indices(self) -> dict[str, float]:
-        """Analyze major market indices performance."""
-        indices = {
-            "S&P 500": "^GSPC",
-            "NASDAQ": "^IXIC",
-            "DOW": "^DJI",
-            "Russell 2000": "^RUT",
-        }
+        """Analyze major market indices performance.
 
-        performance = {}
-        for name, symbol in indices.items():
-            try:
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="2d")  # Reduce to 2 days for faster fetch
-
-                if not data.empty and len(data) >= 2:
-                    change = (
-                        (data["Close"].iloc[-1] - data["Close"].iloc[-2])
-                        / data["Close"].iloc[-2]
-                    ) * 100
-                    performance[name] = float(change)
-                else:
-                    performance[name] = 0.0
-
-            except Exception as e:
-                logger.warning(f"Failed to fetch {name} data", error=str(e))
-                performance[name] = 0.0
-
-        return performance
+        DISABLED: Requires yfinance migration.
+        """
+        # DISABLED: This method uses yfinance
+        return {}
 
     async def _analyze_sector_performance(self) -> dict[str, float]:
-        """Analyze sector ETF performance."""
-        sectors = {
-            "Technology": "XLK",
-            "Healthcare": "XLV",
-            "Financial": "XLF",
-            "Energy": "XLE",
-            "Consumer Discretionary": "FDIS",
-            "Industrials": "XLI",
-            "Communication": "XLC",
-            "Consumer Staples": "XLP",
-            "Utilities": "XLU",
-            "Real Estate": "XLRE",
-        }
+        """Analyze sector ETF performance.
 
-        performance = {}
-        for name, symbol in sectors.items():
-            try:
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(period="2d")  # Reduce to 2 days for faster fetch
-
-                if not data.empty and len(data) >= 2:
-                    change = (
-                        (data["Close"].iloc[-1] - data["Close"].iloc[-2])
-                        / data["Close"].iloc[-2]
-                    ) * 100
-                    performance[name] = float(change)
-                else:
-                    performance[name] = 0.0
-
-            except Exception as e:
-                logger.warning(f"Failed to fetch {name} sector data", error=str(e))
-                performance[name] = 0.0
-
-        return performance
+        DISABLED: Requires yfinance migration.
+        """
+        # DISABLED: This method uses yfinance
+        return {}
 
     def _assess_overall_sentiment(
         self, fear_greed_score: int, major_indices: dict[str, float]

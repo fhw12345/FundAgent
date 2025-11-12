@@ -127,15 +127,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from .core.data.ticker_data_service import TickerDataService
         from .services.alpaca_data_service import AlpacaDataService
         from .services.alpaca_trading_service import AlpacaTradingService
+        from .services.alphavantage_market_data import AlphaVantageMarketDataService
         from .database.repositories.tool_execution_repository import ToolExecutionRepository
         from .services.tool_cache_wrapper import ToolCacheWrapper
 
         react_agent = None
         alpaca_trading_service = None
+        market_service = None
         try:
             # Create agent instance (will be cached as singleton in dependency injection)
             alpaca_data_service = AlpacaDataService(settings=settings)
             alpaca_trading_service = AlpacaTradingService(settings=settings)
+            market_service = AlphaVantageMarketDataService(settings=settings)
             ticker_service = TickerDataService(
                 redis_cache=redis_cache,
                 alpaca_data_service=alpaca_data_service,
@@ -158,6 +161,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             react_agent = FinancialAnalysisReActAgent(
                 settings=settings,
                 ticker_data_service=ticker_service,
+                market_service=market_service,
                 tool_cache_wrapper=tool_cache_wrapper,
             )
 
@@ -183,6 +187,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             messages_collection=mongodb.get_collection("messages"),
             chats_collection=mongodb.get_collection("chats"),
             redis_cache=redis_cache,
+            market_service=market_service,  # Pass Alpha Vantage service for price data
             agent=react_agent,  # Pass agent for LLM-based analysis
             trading_service=alpaca_trading_service,  # Pass trading service for order placement
             order_repository=order_repo,  # Pass order repository for MongoDB persistence
@@ -195,6 +200,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Store in app state for dependency injection
         app.state.mongodb = mongodb
         app.state.redis = redis_cache
+        app.state.market_service = market_service
 
         logger.info("Database connections started")
 
@@ -205,6 +211,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await mongodb.disconnect()
         await redis_cache.disconnect()
         logger.info("Database connections stopped")
+
+        # Cleanup Alpha Vantage HTTP client
+        if market_service:
+            await market_service.close()
+            logger.info("Alpha Vantage service closed")
 
 
 def create_app() -> FastAPI:
