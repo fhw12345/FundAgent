@@ -11,10 +11,15 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Loader2 } from "lucide-react";
 import type { ChatMessage } from "../../types/api";
+import { ToolMessageWrapper } from "./ToolMessageWrapper";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
   isAnalysisPending: boolean;
+  chatId: string | null;
+  onLoadMore?: () => Promise<void>;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 const formatTimestamp = (timestamp: string) => {
@@ -222,6 +227,10 @@ MessageBubble.displayName = "MessageBubble";
 export const ChatMessages: React.FC<ChatMessagesProps> = ({
   messages,
   isAnalysisPending,
+  chatId,
+  onLoadMore,
+  hasMore = false,
+  isLoadingMore = false,
 }) => {
   const lastUserMessageRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -302,17 +311,55 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
     }
   }, [messages]);
 
+  // Memoize filtered messages to avoid re-computing on every render
+  const visibleMessages = useMemo(() => {
+    return messages.filter(msg =>
+      // Skip empty assistant messages (streaming placeholders)
+      msg.role !== "assistant" || msg.content.trim()
+    );
+  }, [messages]);
+
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
-      {messages.map((msg: ChatMessage, index: number) => {
+      {/* Load More Button - Shows at top when chat has older messages */}
+      {chatId && hasMore && onLoadMore && (
+        <div className="flex justify-center mb-4">
+          <button
+            onClick={() => void onLoadMore()}
+            disabled={isLoadingMore}
+            className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-blue-200 transition-colors flex items-center gap-2"
+          >
+            {isLoadingMore ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              "Load older messages"
+            )}
+          </button>
+        </div>
+      )}
+
+      {visibleMessages.map((msg: ChatMessage, index: number) => {
         const isLastUserMessage = msg.role === "user" && index === lastUserIdx;
+
+        // Check if this is a tool message with tool_call metadata
+        const isToolMessage = msg.role === "assistant" && msg.tool_call;
 
         return (
           <div
             key={msg._id || msg.timestamp}
             ref={isLastUserMessage ? lastUserMessageRef : null}
           >
-            <MessageBubble msg={msg} />
+            {isToolMessage && msg.tool_call ? (
+              <ToolMessageWrapper
+                toolCall={msg.tool_call}
+                content={<MessageBubble msg={msg} />}
+              />
+            ) : (
+              <MessageBubble msg={msg} />
+            )}
           </div>
         );
       })}

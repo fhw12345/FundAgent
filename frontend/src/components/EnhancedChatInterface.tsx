@@ -38,6 +38,10 @@ export function EnhancedChatInterface() {
   // Agent mode: v3 = Agent (auto tools), v2 = Copilot (manual tools)
   const [agentMode, setAgentMode] = useState<"v2" | "v3">("v3");
 
+  // Pagination state for loading older messages
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   // Memoize selectedDateRange object to prevent recreation on every render
   const selectedDateRange = useMemo(
     () => ({ start: dateRangeStart, end: dateRangeEnd }),
@@ -175,40 +179,22 @@ export function EnhancedChatInterface() {
   );
 
   const handleQuickAnalysis = useCallback(
-    (type: "fibonacci" | "fundamentals" | "macro" | "stochastic") => {
-      // Generate user message describing the analysis request
-      let userMessage = "";
-
-      if (type === "fibonacci") {
-        userMessage = `Start Fibonacci analysis for ${currentSymbol || "symbol"} on ${selectedInterval} period${selectedDateRange.start && selectedDateRange.end ? ` from ${selectedDateRange.start} to ${selectedDateRange.end}` : ""}`;
-      } else if (type === "fundamentals") {
-        userMessage = `Get fundamentals for ${currentSymbol || "symbol"}`;
-      } else if (type === "macro") {
-        userMessage = "Analyze macro market sentiment";
-      } else if (type === "stochastic") {
-        userMessage = `Start Stochastic oscillator analysis for ${currentSymbol || "symbol"} on ${selectedInterval} period${selectedDateRange.start && selectedDateRange.end ? ` from ${selectedDateRange.start} to ${selectedDateRange.end}` : ""}`;
-      }
-
-      // Add user message to chat (triggers auto-scroll to user message position)
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "user",
-          content: userMessage,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-
-      // Trigger analysis (assistant response will appear below)
+    (
+      type:
+        | "fibonacci"
+        | "company_overview"
+        | "macro"
+        | "stochastic"
+        | "news_sentiment"
+        | "cash_flow"
+        | "balance_sheet"
+        | "market_movers",
+    ) => {
+      // Route all analysis types to direct API (< 1 second response, no LLM cost)
+      // User message is now handled by useButtonAnalysis.onSuccess
       buttonMutation.mutate(type);
     },
-    [
-      buttonMutation,
-      setMessages,
-      currentSymbol,
-      selectedInterval,
-      selectedDateRange,
-    ],
+    [buttonMutation],
   );
 
   // Old complex pattern matching logic removed
@@ -231,6 +217,8 @@ export function EnhancedChatInterface() {
       isRestoringRef.current = true;
       try {
         await restoreChat(chatId);
+        // After restoration, assume there might be more messages (will hide button if none)
+        setHasMoreMessages(true);
       } finally {
         isRestoringRef.current = false;
       }
@@ -245,7 +233,57 @@ export function EnhancedChatInterface() {
     setCurrentCompanyName("");
     setDateRangeStart("");
     setDateRangeEnd("");
+    setHasMoreMessages(false); // Reset pagination
   }, [setMessages, setChatId]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!chatId || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      // Import chatService dynamically
+      const { chatService } = await import("../services/api");
+
+      // Calculate offset (current message count)
+      const currentOffset = messages.length;
+
+      // Fetch next 50 messages
+      const chatDetail = await chatService.getChatDetail(chatId, 50, currentOffset);
+
+      if (chatDetail.messages.length === 0) {
+        // No more messages to load
+        setHasMoreMessages(false);
+        return;
+      }
+
+      // Convert backend messages to frontend format
+      const olderMessages = chatDetail.messages.map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        timestamp: msg.timestamp,
+        analysis_data: msg.metadata?.raw_data as Record<string, unknown> | undefined,
+        tool_call: msg.tool_call,
+      }));
+
+      // Prepend older messages to current messages
+      setMessages((prev) => [...olderMessages, ...prev]);
+
+      // Check if there might be even more messages
+      setHasMoreMessages(chatDetail.messages.length === 50);
+    } catch (error) {
+      console.error("❌ Failed to load more messages:", error);
+      setMessages((prev) => [
+        {
+          role: "assistant",
+          content: "⚠️ Failed to load older messages. Please try again.",
+          timestamp: new Date().toISOString(),
+        },
+        ...prev,
+      ]);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [chatId, messages.length, isLoadingMore, setMessages]);
 
   return (
     <div className="bg-white overflow-hidden max-h-screen">
@@ -321,6 +359,10 @@ export function EnhancedChatInterface() {
                   isAnalysisPending={
                     chatMutation.isPending || buttonMutation.isPending
                   }
+                  chatId={chatId}
+                  onLoadMore={handleLoadMore}
+                  hasMore={hasMoreMessages}
+                  isLoadingMore={isLoadingMore}
                 />
 
                 {/* Agent Mode Toggle - Only enabled when starting new chat */}

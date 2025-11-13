@@ -147,6 +147,7 @@ async def list_user_chats(
 async def get_chat_detail(
     chat_id: str,
     limit: int | None = None,
+    offset: int = 0,
     user_id: str = Depends(get_current_user_id),
     chat_service: ChatService = Depends(get_chat_service),
 ) -> ChatDetailResponse:
@@ -160,6 +161,7 @@ async def get_chat_detail(
 
     **Query Parameters:**
     - limit: Optional limit on number of messages (default: 100)
+    - offset: Number of messages to skip for pagination (default: 0)
 
     **Response:**
     ```json
@@ -192,8 +194,10 @@ async def get_chat_detail(
         # Get chat with ownership verification
         chat = await chat_service.get_chat(chat_id, user_id)
 
-        # Get messages
-        messages = await chat_service.get_chat_messages(chat_id, user_id, limit=limit)
+        # Get messages with pagination
+        messages = await chat_service.get_chat_messages(
+            chat_id, user_id, limit=limit, offset=offset
+        )
 
         logger.info(
             "Chat detail retrieved",
@@ -415,11 +419,18 @@ async def _stream_with_simple_agent(
                 content=request.message,
                 source=request.source,
                 metadata=request.metadata,
+                tool_call=request.tool_call,
             )
 
-            # Only invoke LLM for user messages (not tool/assistant messages)
-            if request.role != "user":
+            # Only invoke LLM for user messages from actual chat (not tool results or assistant messages)
+            if request.role != "user" or request.source == "tool":
                 yield f"data: {json.dumps({'type': 'done', 'chat_id': chat_id})}\n\n"
+                logger.info(
+                    "Skipping agent invocation (v2)",
+                    role=request.role,
+                    source=request.source,
+                    reason="non-user role or tool source",
+                )
                 return
 
             # ===== CREDIT SYSTEM INTEGRATION =====
@@ -473,16 +484,61 @@ async def _stream_with_simple_agent(
                 chat_id=chat_id,
             )
 
-            # Stream LLM response
+            # Stream LLM response with timeout protection
             full_response = ""
-            async for chunk in agent.stream_chat(
-                messages=conversation_history,
-                model=request.model,
-                thinking_enabled=request.thinking_enabled,
-                max_tokens=request.max_tokens,
-            ):
-                full_response += chunk
-                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+            try:
+                async def stream_with_timeout():
+                    nonlocal full_response
+                    async for chunk in agent.stream_chat(
+                        messages=conversation_history,
+                        model=request.model,
+                        thinking_enabled=request.thinking_enabled,
+                        max_tokens=request.max_tokens,
+                    ):
+                        full_response += chunk
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+                async for chunk_data in asyncio.wait_for(
+                    stream_with_timeout(),
+                    timeout=120.0  # 2 minutes max
+                ):
+                    yield chunk_data
+
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Agent streaming timeout (v2)",
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    timeout_seconds=120,
+                )
+                # Fail transaction to release credits
+                if transaction:
+                    await credit_service.fail_transaction(transaction.transaction_id)
+                error_data = {
+                    "error": "Request timeout. The response is taking too long. Please try again.",
+                    "error_code": "STREAM_TIMEOUT",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
+            except Exception as e:
+                logger.error(
+                    "Agent streaming error (v2)",
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    error=str(e),
+                    exc_info=True,
+                )
+                # Fail transaction to release credits
+                if transaction:
+                    await credit_service.fail_transaction(transaction.transaction_id)
+                error_data = {
+                    "error": f"Streaming failed: {str(e)}",
+                    "error_code": "STREAM_ERROR",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
 
             # Get token usage from agent
             token_usage = agent.get_last_token_usage(model=request.model)
@@ -593,6 +649,10 @@ async def _stream_with_react_agent(
                 yield f"data: {json.dumps(chat_created_event)}\n\n"
 
             # Save message
+            logger.debug(
+                "Saving message with tool_call",
+                has_tool_call=request.tool_call is not None,
+            )
             await chat_service.add_message(
                 chat_id=chat_id,
                 user_id=user_id,
@@ -600,11 +660,18 @@ async def _stream_with_react_agent(
                 content=request.message,
                 source=request.source or "chat",
                 metadata=request.metadata,
+                tool_call=request.tool_call,
             )
 
-            # Only invoke LLM for user messages (not tool/assistant messages)
-            if request.role != "user":
+            # Only invoke LLM for user messages from actual chat (not tool results or assistant messages)
+            if request.role != "user" or request.source == "tool":
                 yield f"data: {json.dumps({'type': 'done', 'chat_id': chat_id})}\n\n"
+                logger.info(
+                    "Skipping agent invocation (v3)",
+                    role=request.role,
+                    source=request.source,
+                    reason="non-user role or tool source",
+                )
                 return
 
             # ===== CREDIT SYSTEM INTEGRATION (v3 - Agent Mode) =====
@@ -666,12 +733,51 @@ async def _stream_with_react_agent(
                 ],
             )
 
-            # Invoke ReAct agent (auto-loop handles tool chaining)
-            result = await agent.ainvoke(
-                user_message=request.message,
-                conversation_history=conversation_history,
-                debug=debug,
-            )
+            # Invoke ReAct agent (auto-loop handles tool chaining) with timeout protection
+            try:
+                result = await asyncio.wait_for(
+                    agent.ainvoke(
+                        user_message=request.message,
+                        conversation_history=conversation_history,
+                        debug=debug,
+                    ),
+                    timeout=120.0  # 2 minutes max for agent response
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Agent execution timeout",
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    timeout_seconds=120,
+                )
+                # Fail transaction to release credits
+                if transaction:
+                    await credit_service.fail_transaction(transaction.transaction_id)
+                error_data = {
+                    "error": "Request timeout. The analysis is taking too long. Please try again with a simpler question.",
+                    "error_code": "AGENT_TIMEOUT",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
+            except Exception as e:
+                logger.error(
+                    "Agent execution error",
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    error=str(e),
+                    exc_info=True,
+                )
+                # Fail transaction to release credits
+                if transaction:
+                    await credit_service.fail_transaction(transaction.transaction_id)
+                error_data = {
+                    "error": f"Agent execution failed: {str(e)}",
+                    "error_code": "AGENT_ERROR",
+                    "type": "error",
+                }
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
 
             final_answer = result["final_answer"]
             tool_executions = result.get("tool_executions", 0)
@@ -818,324 +924,3 @@ async def _stream_with_react_agent(
 
     return StreamingResponse(generate_stream(), media_type="text/event-stream")
 
-
-# ===== Legacy Endpoints (Deprecated) =====
-
-
-@router.post("/stream-v2", deprecated=True)
-async def chat_stream_persistent(
-    request: ChatRequest,
-    user_id: str = Depends(get_current_user_id),
-    chat_service: ChatService = Depends(get_chat_service),
-    agent: ChatAgent = Depends(get_chat_agent),
-    credit_service: CreditService = Depends(get_credit_service),
-) -> StreamingResponse:
-    """
-    Send a message and receive streaming response with MongoDB persistence.
-
-    **Authentication**: Requires Bearer token in Authorization header.
-
-    **Request:**
-    ```json
-    {
-      "message": "What are the Fibonacci levels for AAPL?",
-      "chat_id": "chat_abc123"  // Optional - omit to create new chat
-    }
-    ```
-
-    **Response:** Stream of Server-Sent Events with incremental content
-    """
-
-    async def generate_stream_with_persistence() -> AsyncGenerator[str, None]:
-        """Generate SSE stream and persist to MongoDB."""
-        chat_id = None
-
-        try:
-            # Get or create chat
-            if request.chat_id:
-                # Verify ownership and get chat
-                chat = await chat_service.get_chat(request.chat_id, user_id)
-                chat_id = chat.chat_id
-            else:
-                # Create new chat with provided title or default
-                chat_title = request.title if request.title else "New Chat"
-                chat = await chat_service.create_chat(user_id, title=chat_title)
-                chat_id = chat.chat_id
-                logger.info(
-                    "New persistent chat created",
-                    chat_id=chat_id,
-                    user_id=user_id,
-                    title=chat_title,
-                )
-
-                # Send chat_id to client immediately
-                chat_info = {"chat_id": chat_id, "type": "chat_created"}
-                yield f"data: {json.dumps(chat_info)}\n\n"
-
-            # Save message to MongoDB
-            await chat_service.add_message(
-                chat_id=chat_id,
-                user_id=user_id,
-                role=request.role,
-                content=request.message,
-                source=request.source,
-                metadata=request.metadata,  # Pass metadata for overlays
-            )
-
-            # Auto-update UI state from analysis metadata
-            if request.metadata and hasattr(request.metadata, "raw_data"):
-                raw_data = request.metadata.raw_data or {}
-                symbol = raw_data.get("symbol")
-                timeframe = raw_data.get("timeframe")
-                start_date = raw_data.get("start_date")
-                end_date = raw_data.get("end_date")
-
-                if symbol or timeframe:
-                    from ..models.chat import UIState
-
-                    # Build active_overlays based on selected tool in metadata
-                    active_overlays = {}
-                    selected_tool = (
-                        request.metadata.selected_tool
-                        if request.metadata
-                        and hasattr(request.metadata, "selected_tool")
-                        else None
-                    )
-                    if selected_tool:
-                        active_overlays[selected_tool] = {"enabled": True}
-
-                    ui_state = UIState(
-                        current_symbol=symbol,
-                        current_interval=timeframe or "1d",
-                        current_date_range=(
-                            {
-                                "start": start_date,
-                                "end": end_date,
-                            }
-                            if start_date and end_date
-                            else {"start": None, "end": None}
-                        ),
-                        active_overlays=active_overlays,
-                    )
-                    await chat_service.update_ui_state(chat_id, user_id, ui_state)
-                    logger.info(
-                        "UI state auto-updated from metadata",
-                        chat_id=chat_id,
-                        symbol=symbol,
-                        timeframe=timeframe,
-                        overlays=list(active_overlays.keys()),
-                    )
-
-            # If source is tool output (not "user"), skip LLM (results already provided)
-            if request.source == "tool":
-                logger.info(
-                    "Tool results - skipping LLM",
-                    chat_id=chat_id,
-                    role=request.role,
-                    source=request.source,
-                    selected_tool=(
-                        request.metadata.selected_tool if request.metadata else None  # type: ignore[union-attr]
-                    ),
-                )
-
-                # Send completion event
-                messages = await chat_service.get_chat_messages(chat_id, user_id)
-                completion_data = {
-                    "type": "done",
-                    "chat_id": chat_id,
-                    "message_count": len(messages),
-                }
-                yield f"data: {json.dumps(completion_data)}\n\n"
-
-                logger.info(
-                    "Tool results saved without LLM call",
-                    chat_id=chat_id,
-                    message_count=len(messages),
-                    selected_tool=(
-                        request.metadata.selected_tool if request.metadata else None  # type: ignore[union-attr]
-                    ),
-                )
-                return
-
-            # ===== CREDIT SYSTEM INTEGRATION =====
-            # Check balance before expensive LLM call
-            has_credits = await credit_service.check_balance(
-                user_id=user_id,
-                estimated_cost=10.0,  # Conservative estimate
-            )
-
-            if not has_credits:
-                error_data = {
-                    "error": "Insufficient credits. Minimum 10 credits required.",
-                    "error_code": "INSUFFICIENT_CREDITS",
-                    "type": "error",
-                }
-                yield f"data: {json.dumps(error_data)}\n\n"
-                logger.warning(
-                    "Request blocked - insufficient credits", user_id=user_id
-                )
-                return
-
-            # Create PENDING transaction (safety net)
-            transaction = await credit_service.create_pending_transaction(
-                user_id=user_id,
-                chat_id=chat_id,
-                estimated_cost=10.0,
-                model=request.model,
-            )
-
-            logger.info(
-                "Credits checked and transaction created",
-                user_id=user_id,
-                model=request.model,
-                thinking_enabled=request.thinking_enabled,
-                transaction_id=transaction.transaction_id,
-            )
-
-            # Get conversation history from MongoDB
-            messages = await chat_service.get_chat_messages(chat_id, user_id)
-
-            # Convert MongoDB messages to LLM format
-            # Include only user and assistant messages (skip system messages)
-            conversation_history = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-                if msg.role in ("user", "assistant")
-            ]
-
-            logger.info(
-                "Prepared conversation for LLM",
-                chat_id=chat_id,
-                total_messages=len(messages),
-                llm_messages=len(conversation_history),
-            )
-
-            # Stream LLM response directly (no session management)
-            full_response = ""
-            import asyncio
-
-            async for chunk in agent.stream_chat(
-                messages=conversation_history,
-                model=request.model,
-                thinking_enabled=request.thinking_enabled,
-                max_tokens=request.max_tokens,
-            ):
-                full_response += chunk
-                chunk_data = {"content": chunk, "type": "content"}
-                yield f"data: {json.dumps(chunk_data)}\n\n"
-                await asyncio.sleep(0)  # Flush buffer
-
-            # Get token usage from LLM client
-            token_usage = agent.get_last_token_usage(model=request.model)
-
-            if not token_usage:
-                logger.error(
-                    "No token usage available after streaming",
-                    transaction_id=transaction.transaction_id,
-                )
-                # Fail the transaction - no charge
-                await credit_service.fail_transaction(transaction.transaction_id)
-                error_data = {
-                    "error": "Failed to track token usage. No charge applied.",
-                    "type": "error",
-                }
-                yield f"data: {json.dumps(error_data)}\n\n"
-                return
-
-            # Save assistant response to MongoDB with transaction linkage
-            from ..models.message import MessageMetadata
-
-            assistant_message = await chat_service.add_message(
-                chat_id=chat_id,
-                user_id=user_id,
-                role="assistant",
-                content=full_response,
-                source="llm",
-                metadata=MessageMetadata(
-                    model=request.model,
-                    tokens=token_usage.total_tokens,
-                    input_tokens=token_usage.input_tokens,
-                    output_tokens=token_usage.output_tokens,
-                    transaction_id=transaction.transaction_id,
-                ),
-            )
-
-            # Complete transaction and deduct credits atomically
-            updated_transaction, updated_user = (
-                await credit_service.complete_transaction_with_deduction(
-                    transaction_id=transaction.transaction_id,
-                    message_id=assistant_message.message_id,
-                    input_tokens=token_usage.input_tokens,
-                    output_tokens=token_usage.output_tokens,
-                    model=request.model,
-                    thinking_enabled=request.thinking_enabled,
-                )
-            )
-
-            if not updated_transaction or not updated_user:
-                logger.error(
-                    "Failed to complete transaction",
-                    transaction_id=transaction.transaction_id,
-                )
-                error_data = {
-                    "error": "Failed to process payment. Please contact support.",
-                    "type": "error",
-                }
-                yield f"data: {json.dumps(error_data)}\n\n"
-                return
-
-            logger.info(
-                "Transaction completed successfully",
-                transaction_id=transaction.transaction_id,
-                tokens=token_usage.total_tokens,
-                cost=updated_transaction.actual_cost,
-                new_balance=updated_user.credits,
-            )
-
-            # Generate title on first message (only if not provided)
-            if await chat_service.should_generate_title(chat_id):
-                title = await chat_service.generate_title_from_llm(
-                    request.message, full_response
-                )
-                await chat_service.chat_repo.update(chat_id, ChatUpdate(title=title))
-                logger.info("Chat title generated", chat_id=chat_id, title=title)
-
-                # Send title to client
-                title_data = {"title": title, "type": "title_generated"}
-                yield f"data: {json.dumps(title_data)}\n\n"
-
-            # Send completion event
-            messages = await chat_service.get_chat_messages(chat_id, user_id)
-            completion_data = {
-                "type": "done",
-                "chat_id": chat_id,
-                "message_count": len(messages),
-            }
-            yield f"data: {json.dumps(completion_data)}\n\n"
-
-            logger.info(
-                "Streaming chat with persistence completed",
-                chat_id=chat_id,
-                message_count=len(messages),
-            )
-
-        except HTTPException as e:
-            error_data = {"error": e.detail, "type": "error"}
-            yield f"data: {json.dumps(error_data)}\n\n"
-        except Exception as e:
-            logger.error("Streaming chat with persistence failed", error=str(e))
-            error_data = {
-                "error": "Failed to process streaming chat. Please try again.",
-                "type": "error",
-            }
-            yield f"data: {json.dumps(error_data)}\n\n"
-
-    return StreamingResponse(
-        generate_stream_with_persistence(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-        },
-    )

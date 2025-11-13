@@ -11,6 +11,7 @@ import { usePortfolioChatDetail } from "../hooks/usePortfolioChatDetail";
 import { usePortfolioOrders } from "../hooks/usePortfolioOrders";
 import { PortfolioChart } from "../components/portfolio/PortfolioChart";
 import { WatchlistPanel } from "../components/portfolio/WatchlistPanel";
+import { MarketMovers } from "../components/MarketMovers";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
 import { ChatMessages } from "../components/chat/ChatMessages";
 import { formatPL, getPLColor } from "../services/portfolioApi";
@@ -106,6 +107,15 @@ export default function PortfolioDashboard() {
                 </p>
               </div>
             )}
+
+            {/* Market Movers */}
+            <div className="mb-8">
+              <MarketMovers
+                onTickerClick={(ticker) => {
+                  console.log("Clicked ticker:", ticker);
+                }}
+              />
+            </div>
 
         {/* Portfolio Value Header */}
         <div className="mb-6">
@@ -463,7 +473,7 @@ function ChatMessagesModal({ chatId, onClose }: { chatId: string; onClose: () =>
               <div className="text-gray-500">Loading messages...</div>
             </div>
           ) : chatDetail?.messages ? (
-            <ChatMessages messages={chatDetail.messages} isAnalysisPending={false} />
+            <ChatMessages messages={chatDetail.messages} isAnalysisPending={false} chatId={chatId} />
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-gray-500">No messages found</div>

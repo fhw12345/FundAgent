@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from ...models.chat import Chat, UIState
 from ...models.message import Message, MessageMetadata
+from ...api.models import ToolCall  # Import ToolCall for tool wrapper UI
 
 # ===== Request Models =====
 
@@ -44,6 +45,10 @@ class ChatRequest(BaseModel):
     metadata: MessageMetadata | dict[str, Any] | None = Field(
         None,
         description="Analysis metadata for overlays (Fibonacci levels, Stochastic signals, etc.)",
+    )
+    tool_call: ToolCall | None = Field(
+        None,
+        description="Tool invocation metadata for collapsible UI wrapper (when source='tool')",
     )
     # Agent Configuration
     agent_version: Literal["v2", "v3"] = Field(

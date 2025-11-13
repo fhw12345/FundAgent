@@ -31,6 +31,7 @@ class TickerDataService:
         self,
         redis_cache: RedisCache,
         alpaca_data_service: AlpacaDataService | None = None,
+        alpha_vantage_service: "AlphaVantageMarketDataService | None" = None,
     ):
         """
         Initialize ticker data service.
@@ -38,9 +39,11 @@ class TickerDataService:
         Args:
             redis_cache: Redis cache instance for data storage
             alpaca_data_service: Alpaca data service for market data (optional)
+            alpha_vantage_service: Alpha Vantage service for fallback (optional)
         """
         self.redis_cache = redis_cache
         self.alpaca_data_service = alpaca_data_service
+        self.alpha_vantage_service = alpha_vantage_service
         self.default_ttl = 1800  # 30 minutes default TTL
 
     async def get_ticker_history(

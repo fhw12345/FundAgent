@@ -35,8 +35,8 @@ export function useChatRestoration(callbacks: ChatRestoreCallbacks) {
         // Import chatService dynamically to avoid circular deps
         const { chatService } = await import("../services/api");
 
-        // Fetch chat detail with messages
-        const chatDetail = await chatService.getChatDetail(chatId);
+        // Fetch chat detail with recent 50 messages (pagination for performance)
+        const chatDetail = await chatService.getChatDetail(chatId, 50);
 
         // Convert backend Message[] to frontend ChatMessage[]
         const restoredMessages: ChatMessage[] = chatDetail.messages.map(

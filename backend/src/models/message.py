@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ..api.models import ToolCall
+
 
 class MessageMetadata(BaseModel):
     """
@@ -116,6 +118,7 @@ class MessageCreate(BaseModel):
     content: str
     source: Literal["user", "llm", "tool"]
     metadata: MessageMetadata = MessageMetadata()
+    tool_call: ToolCall | None = None
 
 
 class Message(BaseModel):
@@ -140,6 +143,12 @@ class Message(BaseModel):
     metadata: MessageMetadata = Field(
         default=MessageMetadata(),
         description="Flexible metadata for analysis data",
+    )
+
+    # Tool invocation metadata for UI rendering
+    tool_call: ToolCall | None = Field(
+        default=None,
+        description="Tool invocation metadata for collapsible UI wrapper (when source='tool')",
     )
 
     class Config:

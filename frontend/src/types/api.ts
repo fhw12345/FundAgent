@@ -47,6 +47,7 @@ export interface ChatMessage {
   chart_url?: string;
   analysis_data?: Record<string, unknown>;
   _id?: string | number; // Optional ID for frontend tracking
+  tool_call?: ToolCall;
 }
 
 export interface ChatRequest {
@@ -128,6 +129,16 @@ export interface ChatListResponse {
   page_size: number;
 }
 
+// Tool invocation metadata for UI rendering
+export interface ToolCall {
+  tool_name: string;
+  title: string;
+  icon: string;
+  symbol?: string;
+  invoked_at: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface Message {
   message_id: string;
   chat_id: string;
@@ -139,9 +150,11 @@ export interface Message {
     | "fibonacci"
     | "stochastic"
     | "macro"
-    | "fundamentals";
+    | "fundamentals"
+    | "tool"; // Added 'tool' as a valid source
   timestamp: string;
   metadata?: Record<string, unknown>;
+  tool_call?: ToolCall; // NEW: Tool invocation metadata for collapsible UI
 }
 
 export interface ChatDetailResponse {

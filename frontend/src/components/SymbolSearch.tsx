@@ -2,15 +2,16 @@
  * Symbol Search Autocomplete Component
  *
  * Features:
- * - Real-time symbol search as you type
- * - Debounced API calls for performance
+ * - Search triggered on Enter key press (not every keystroke)
+ * - Top N results displayed in dropdown
  * - Company name to symbol mapping (e.g., "Apple" → "AAPL")
- * - Keyboard navigation support
+ * - Keyboard navigation support (Arrow keys, Enter, Escape)
+ * - Loading state and error handling
  * - Clean, accessible UI
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Building2, TrendingUp } from "lucide-react";
+import { Search, Building2, TrendingUp, CornerDownLeft } from "lucide-react";
 import { marketService, SymbolSearchResult } from "../services/market";
 
 interface SymbolSearchProps {
@@ -22,7 +23,7 @@ interface SymbolSearchProps {
 
 export const SymbolSearch: React.FC<SymbolSearchProps> = ({
   onSymbolSelect,
-  placeholder = "Search stocks (e.g., Apple, AAPL, Microsoft...)",
+  placeholder = "Type stock name or symbol, press Enter to search...",
   className = "",
   autoFocus = false,
 }) => {
@@ -70,11 +71,11 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
     [debouncedSearch],
   );
 
-  // Handle input change
+  // Handle input change (just update query, don't search)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     setQuery(newQuery);
-    performSearch(newQuery);
+    // Don't trigger search on every keystroke - only on Enter key
   };
 
   // Handle result selection
@@ -87,25 +88,34 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isOpen || results.length === 0) return;
-
     switch (e.key) {
       case "ArrowDown":
+        if (!isOpen || results.length === 0) return;
         e.preventDefault();
         setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : 0));
         break;
       case "ArrowUp":
+        if (!isOpen || results.length === 0) return;
         e.preventDefault();
         setSelectedIndex((prev) => (prev > 0 ? prev - 1 : results.length - 1));
         break;
       case "Enter":
         e.preventDefault();
-        if (selectedIndex >= 0 && selectedIndex < results.length) {
-          handleResultSelect(results[selectedIndex]);
-        } else if (results.length > 0) {
-          const top = results[0];
-          if (top.confidence && top.confidence >= 0.85) {
-            handleResultSelect(top);
+        // If dropdown is open with results, select the highlighted item
+        if (isOpen && results.length > 0) {
+          if (selectedIndex >= 0 && selectedIndex < results.length) {
+            handleResultSelect(results[selectedIndex]);
+          } else {
+            // Auto-select top result if high confidence
+            const top = results[0];
+            if (top.confidence && top.confidence >= 0.85) {
+              handleResultSelect(top);
+            }
+          }
+        } else {
+          // No results yet - trigger search
+          if (query.trim().length >= 1) {
+            performSearch(query);
           }
         }
         break;
@@ -170,9 +180,32 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
             }
           }}
           placeholder={placeholder}
-          className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          className="block w-full pl-10 pr-24 py-3 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           autoComplete="off"
         />
+        {/* Enter Button - Always visible */}
+        {!isLoading && (
+          <button
+            onClick={() => {
+              if (query.trim().length >= 1) {
+                performSearch(query);
+              }
+            }}
+            disabled={query.trim().length < 1}
+            className="absolute inset-y-0 right-0 pr-2 flex items-center group"
+            title="Press Enter to search"
+          >
+            <div className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+              query.trim().length >= 1
+                ? "bg-blue-500 text-white hover:bg-blue-600 cursor-pointer"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
+            }`}>
+              <CornerDownLeft className="h-3 w-3" />
+              <span className="text-xs font-medium">Enter</span>
+            </div>
+          </button>
+        )}
+        {/* Loading Spinner */}
         {isLoading && (
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
@@ -248,8 +281,10 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
       {query.length === 0 && (
         <div className="mt-2 text-xs text-gray-500">
           <p>
-            💡 Try searching: &ldquo;Apple&rdquo;, &ldquo;AAPL&rdquo;,
-            &ldquo;Microsoft&rdquo;, &ldquo;Tesla&rdquo;, etc.
+            💡 Type a company name or symbol, then press <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono">Enter</kbd> to search
+          </p>
+          <p className="mt-1 text-gray-400">
+            Examples: &ldquo;Apple&rdquo;, &ldquo;AAPL&rdquo;, &ldquo;Microsoft&rdquo;, &ldquo;Tesla&rdquo;
           </p>
         </div>
       )}

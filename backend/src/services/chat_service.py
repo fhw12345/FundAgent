@@ -134,6 +134,7 @@ class ChatService:
         content: str,
         source: Literal["user", "llm", "tool"],
         metadata: MessageMetadata | dict[str, Any] | None = None,
+        tool_call: Any | None = None,
     ) -> Message:
         """
         Add message to chat and update chat timestamps.
@@ -142,9 +143,10 @@ class ChatService:
             chat_id: Chat identifier
             user_id: User identifier (for ownership check)
             role: Message role (user/assistant/system)
-            content: Message content
+            content: str
             source: Message source (user/llm/tool)
             metadata: Optional message metadata (MessageMetadata or dict)
+            tool_call: Optional tool invocation metadata for UI wrapper
 
         Returns:
             Created message
@@ -179,6 +181,7 @@ class ChatService:
                 content=content,
                 source=source,
                 metadata=metadata_obj,
+                tool_call=tool_call,
             )
         )
 
@@ -200,7 +203,7 @@ class ChatService:
         return message
 
     async def get_chat_messages(
-        self, chat_id: str, user_id: str, limit: int | None = None
+        self, chat_id: str, user_id: str, limit: int | None = None, offset: int = 0
     ) -> list[Message]:
         """
         Get messages for chat with ownership verification.
@@ -208,7 +211,8 @@ class ChatService:
         Args:
             chat_id: Chat identifier
             user_id: User identifier (for ownership check)
-            limit: Optional limit on number of messages
+            limit: Optional limit on number of messages (default: 100)
+            offset: Number of messages to skip (default: 0)
 
         Returns:
             List of messages in chronological order
@@ -219,9 +223,9 @@ class ChatService:
         # Verify chat ownership
         await self.get_chat(chat_id, user_id)
 
-        # Get messages
+        # Get messages with pagination
         messages = await self.message_repo.get_by_chat(
-            chat_id, limit=limit or 100, offset=0
+            chat_id, limit=limit or 100, offset=offset
         )
 
         return messages

@@ -128,11 +128,15 @@ export const chatService = {
   async getChatDetail(
     chatId: string,
     limit?: number,
+    offset?: number,
   ): Promise<ChatDetailResponse> {
     const response = await api.get<ChatDetailResponse>(
       `/api/chat/chats/${chatId}`,
       {
-        params: limit ? { limit } : {},
+        params: {
+          ...(limit !== undefined ? { limit } : {}),
+          ...(offset !== undefined ? { offset } : {}),
+        },
       },
     );
     return response.data;

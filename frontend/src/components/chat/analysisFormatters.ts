@@ -4,8 +4,13 @@
  */
 
 import type {
+  BalanceSheetResponse,
+  CashFlowResponse,
+  CompanyOverviewResponse,
   FibonacciAnalysisResponse,
   MacroSentimentResponse,
+  MarketMoversResponse,
+  NewsSentimentResponse,
   StockFundamentalsResponse,
   StochasticAnalysisResponse,
 } from "../../services/analysis";
@@ -237,5 +242,157 @@ ${recentSignals
   .join("\n\n")}`
     : ""
 }
+`;
+}
+
+export function formatCompanyOverviewResponse(
+  result: CompanyOverviewResponse,
+): string {
+  return `## 🏢 Company Overview - ${result.symbol}
+*${result.company_name}*
+
+### 📋 Company Info
+
+**Industry**: ${result.industry} | **Sector**: ${result.sector}
+**Exchange**: ${result.exchange} | **Country**: ${result.country}
+
+**Description**: ${result.description}
+
+### 📊 Key Metrics
+
+| Metric | Value | Metric | Value |
+|--------|-------|--------|-------|
+${result.market_cap ? `| Market Cap | $${(result.market_cap / 1e9).toFixed(2)}B |` : ""}${result.pe_ratio ? ` P/E Ratio | ${result.pe_ratio.toFixed(2)} |` : " - | - |"}
+${result.eps ? `| EPS | $${result.eps.toFixed(2)} |` : ""}${result.profit_margin ? ` Profit Margin | ${result.profit_margin.toFixed(2)}% |` : " - | - |"}
+${result.revenue_ttm ? `| Revenue (TTM) | $${(result.revenue_ttm / 1e9).toFixed(2)}B |` : ""}${result.dividend_yield ? ` Dividend Yield | ${result.dividend_yield.toFixed(2)}% |` : " - | - |"}
+${result.beta ? `| Beta | ${result.beta.toFixed(2)} |` : ""}${result.percent_insiders ? ` % Insiders | ${result.percent_insiders.toFixed(2)}% |` : " - | - |"}
+${result.percent_institutions ? `| % Institutions | ${result.percent_institutions.toFixed(2)}% |` : ""}${result.week_52_high ? ` 52W High | $${result.week_52_high.toFixed(2)} |` : " - | - |"}
+${result.week_52_low ? `| 52W Low | $${result.week_52_low.toFixed(2)} |` : ""}
+`;
+}
+
+export function formatCashFlowResponse(
+  result: CashFlowResponse,
+): string {
+  return `## 💵 Cash Flow - ${result.symbol}
+*${result.company_name} • ${result.fiscal_date_ending}*
+
+### 📋 Key Metrics
+
+| Metric | Value |
+|--------|-------|
+${result.operating_cashflow ? `| Operating Cash Flow | $${(result.operating_cashflow / 1e6).toFixed(2)}M |` : ""}
+${result.capital_expenditures ? `| Capital Expenditures | $${(Math.abs(result.capital_expenditures) / 1e6).toFixed(2)}M |` : ""}
+${result.free_cashflow ? `| Free Cash Flow | $${(result.free_cashflow / 1e6).toFixed(2)}M |` : ""}
+${result.dividend_payout ? `| Dividend Payout | $${(result.dividend_payout / 1e6).toFixed(2)}M |` : ""}
+
+### 📝 Summary
+
+${result.cashflow_summary}
+`;
+}
+
+export function formatBalanceSheetResponse(
+  result: BalanceSheetResponse,
+): string {
+  return `## 📊 Balance Sheet - ${result.symbol}
+*${result.company_name} • ${result.fiscal_date_ending}*
+
+### 📋 Key Metrics
+
+| Metric | Value |
+|--------|-------|
+${result.total_assets ? `| Total Assets | $${(result.total_assets / 1e6).toFixed(2)}M |` : ""}
+${result.total_liabilities ? `| Total Liabilities | $${(result.total_liabilities / 1e6).toFixed(2)}M |` : ""}
+${result.total_shareholder_equity ? `| Shareholder Equity | $${(result.total_shareholder_equity / 1e6).toFixed(2)}M |` : ""}
+${result.current_assets ? `| Current Assets | $${(result.current_assets / 1e6).toFixed(2)}M |` : ""}
+${result.current_liabilities ? `| Current Liabilities | $${(result.current_liabilities / 1e6).toFixed(2)}M |` : ""}
+${result.cash_and_equivalents ? `| Cash & Equivalents | $${(result.cash_and_equivalents / 1e6).toFixed(2)}M |` : ""}
+
+### 📝 Summary
+
+${result.balance_sheet_summary}
+`;
+}
+
+export function formatNewsSentimentResponse(
+  result: NewsSentimentResponse,
+): string {
+  return `## 📰 News Sentiment - ${result.symbol}
+
+### 📝 Overall Sentiment
+
+${result.overall_sentiment}
+
+${
+  result.positive_news.length > 0
+    ? `### ✅ Positive News (${result.positive_news.length})
+
+${result.positive_news
+  .map(
+    (article) =>
+      `**${article.title}**
+*${article.source} • Sentiment: ${article.sentiment_label} (${article.sentiment_score.toFixed(2)})*
+[Read more](${article.url})`,
+  )
+  .join("\n\n")}`
+    : ""
+}
+
+${
+  result.negative_news.length > 0
+    ? `### ❌ Negative News (${result.negative_news.length})
+
+${result.negative_news
+  .map(
+    (article) =>
+      `**${article.title}**
+*${article.source} • Sentiment: ${article.sentiment_label} (${article.sentiment_score.toFixed(2)})*
+[Read more](${article.url})`,
+  )
+  .join("\n\n")}`
+    : ""
+}
+`;
+}
+
+export function formatMarketMoversResponse(
+  result: MarketMoversResponse,
+): string {
+  return `## 📊 Market Movers
+*Last Updated: ${new Date(result.last_updated).toLocaleString()}*
+
+### 📈 Top Gainers
+
+| Ticker | Price | Change | Volume |
+|--------|-------|--------|--------|
+${result.top_gainers
+  .map(
+    (mover) =>
+      `| ${mover.ticker} | $${mover.price.toFixed(2)} | ${mover.change_percentage} | ${(mover.volume / 1e6).toFixed(2)}M |`,
+  )
+  .join("\n")}
+
+### 📉 Top Losers
+
+| Ticker | Price | Change | Volume |
+|--------|-------|--------|--------|
+${result.top_losers
+  .map(
+    (mover) =>
+      `| ${mover.ticker} | $${mover.price.toFixed(2)} | ${mover.change_percentage} | ${(mover.volume / 1e6).toFixed(2)}M |`,
+  )
+  .join("\n")}
+
+### 🔥 Most Active
+
+| Ticker | Price | Change | Volume |
+|--------|-------|--------|--------|
+${result.most_active
+  .map(
+    (mover) =>
+      `| ${mover.ticker} | $${mover.price.toFixed(2)} | ${mover.change_percentage} | ${(mover.volume / 1e6).toFixed(2)}M |`,
+  )
+  .join("\n")}
 `;
 }

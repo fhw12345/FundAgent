@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     default_llm_temperature: float = 0.7  # Default temperature for LLM calls
 
     # External APIs - Market Data & Trading
-    alpha_vantage_api_key: str = ""  # Alpha Vantage API key (free tier: 25 calls/day)
+    alpha_vantage_api_key: str = ""  # Alpha Vantage API key (premium: 75 calls/min)
     alpaca_api_key: str = ""  # Alpaca Paper Trading API key
     alpaca_secret_key: str = ""  # Alpaca Paper Trading secret key
     alpaca_base_url: str = "https://paper-api.alpaca.markets"  # Paper trading endpoint

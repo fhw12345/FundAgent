@@ -13,8 +13,13 @@ import { chatService } from "../../services/api";
 import { chatKeys } from "../../hooks/useChats";
 import { useOptimisticCreditDeduction, creditKeys } from "../../hooks/useCredits";
 import {
+  formatBalanceSheetResponse,
+  formatCashFlowResponse,
+  formatCompanyOverviewResponse,
   formatFibonacciResponse,
   formatMacroResponse,
+  formatMarketMoversResponse,
+  formatNewsSentimentResponse,
   formatFundamentalsResponse,
   formatStochasticResponse,
 } from "./analysisFormatters";
@@ -23,6 +28,7 @@ import {
   extractFibonacciMetadata,
   extractStochasticMetadata,
 } from "../../utils/analysisMetadataExtractor";
+import { createToolCall, TOOL_REGISTRY, type ToolName } from "../../constants/toolRegistry";
 
 // Formatting functions moved to analysisFormatters.ts
 
@@ -44,6 +50,22 @@ export const useAnalysis = (
   return useMutation({
     mutationKey: ["chat", chatId],
     mutationFn: async (userMessage: string) => {
+      // Input validation
+      const trimmed = userMessage.trim();
+
+      if (!trimmed) {
+        throw new Error("Message cannot be empty");
+      }
+
+      if (trimmed.length > 5000) {
+        throw new Error("Message too long. Maximum 5000 characters allowed.");
+      }
+
+      // Check for potential XSS patterns (additional safety layer)
+      if (/<script|javascript:|onerror=/i.test(trimmed)) {
+        throw new Error("Invalid characters detected in message");
+      }
+
       // Add user message immediately
       const userMessageObj = {
         role: "user" as const,
@@ -150,15 +172,25 @@ export const useButtonAnalysis = (
   const queryClient = useQueryClient();
 
   return useMutation({
+    // Note: Single mutation instance handles all analysis types
+    // Deduplication happens automatically via isPending state
     mutationKey: [
-      "analysis",
+      "button-analysis",
       currentSymbol,
       selectedInterval,
       selectedDateRange.start,
       selectedDateRange.end,
     ],
     mutationFn: async (
-      analysisType: "fibonacci" | "macro" | "fundamentals" | "stochastic",
+      analysisType:
+        | "fibonacci"
+        | "macro"
+        | "company_overview"
+        | "stochastic"
+        | "cash_flow"
+        | "balance_sheet"
+        | "news_sentiment"
+        | "market_movers",
     ) => {
       let response;
 
@@ -166,8 +198,12 @@ export const useButtonAnalysis = (
       const titleMap = {
         fibonacci: "Fibonacci Analysis",
         macro: "Macro Sentiment",
-        fundamentals: "Stock Fundamentals",
+        company_overview: "Company Overview",
         stochastic: "Stochastic Analysis",
+        cash_flow: "Cash Flow",
+        balance_sheet: "Balance Sheet",
+        news_sentiment: "News Sentiment",
+        market_movers: "Market Movers",
       };
 
       const analysisTitle = titleMap[analysisType];
@@ -210,15 +246,15 @@ export const useButtonAnalysis = (
           break;
         }
 
-        case "fundamentals": {
+        case "company_overview": {
           if (!currentSymbol)
             throw new Error("Please select a stock symbol first.");
-          const result = await analysisService.stockFundamentals({
+          const result = await analysisService.companyOverview({
             symbol: currentSymbol,
           });
           response = {
-            type: "fundamentals",
-            content: formatFundamentalsResponse(result),
+            type: "company_overview",
+            content: formatCompanyOverviewResponse(result),
           };
           break;
         }
@@ -249,48 +285,162 @@ export const useButtonAnalysis = (
           };
           break;
         }
+
+        case "cash_flow": {
+          if (!currentSymbol)
+            throw new Error("Please select a stock symbol first.");
+          const result = await analysisService.cashFlow({
+            symbol: currentSymbol,
+          });
+          response = {
+            type: "cash_flow",
+            content: formatCashFlowResponse(result),
+          };
+          break;
+        }
+
+        case "balance_sheet": {
+          if (!currentSymbol)
+            throw new Error("Please select a stock symbol first.");
+          const result = await analysisService.balanceSheet({
+            symbol: currentSymbol,
+          });
+          response = {
+            type: "balance_sheet",
+            content: formatBalanceSheetResponse(result),
+          };
+          break;
+        }
+
+        case "news_sentiment": {
+          if (!currentSymbol)
+            throw new Error("Please select a stock symbol first.");
+          const result = await analysisService.newsSentiment({
+            symbol: currentSymbol,
+          });
+          response = {
+            type: "news_sentiment",
+            content: formatNewsSentimentResponse(result),
+          };
+          break;
+        }
+
+        case "market_movers": {
+          const result = await analysisService.marketMovers();
+          response = {
+            type: "market_movers",
+            content: formatMarketMoversResponse(result),
+          };
+          break;
+        }
       }
 
       // Save to MongoDB using streaming endpoint (analysis sources skip LLM)
       if (response) {
         return new Promise((resolve, reject) => {
+          // Get tool metadata for user message
+          const toolInfo = TOOL_REGISTRY[analysisType as ToolName];
+          const toolTitle = toolInfo?.title || analysisType;
+          const toolIcon = toolInfo?.icon || "🔧";
+
+          // Create user message describing the action
+          const userMessage = currentSymbol
+            ? `${toolIcon} Get ${toolTitle} for ${currentSymbol}`
+            : `${toolIcon} Get ${toolTitle}`;
+
+          // Track chatId across nested calls to avoid creating duplicate chats
+          let activeChatId = chatId;
+          let userMessageSaved = false;
+
+          // First, save user message (the trigger)
           chatService.sendMessageStreamPersistent(
-            response.content,
-            chatId || null,
-            () => {
-              // No chunks expected with analysis sources
-            },
+            userMessage,
+            activeChatId || null,
+            () => {},
             (newChatId: string) => {
-              // Chat created callback
+              // Capture new chat ID for use in second call
+              activeChatId = newChatId;
               if (setChatId) {
                 setChatId(newChatId);
               }
-              // Don't invalidate here - wait for completion to avoid duplicate requests
             },
+            () => {},
             () => {
-              // No title generation with custom title
-            },
-            () => {
-              // Done callback - invalidate chat list ONCE after completion
-              resolve(response);
-              void queryClient.invalidateQueries({
-                queryKey: chatKeys.lists(),
-              });
-              // Refresh credits to show actual cost deducted by backend
-              void queryClient.invalidateQueries({
-                queryKey: creditKeys.profile(),
-              });
+              // User message saved successfully
+              userMessageSaved = true;
+
+              // Now save assistant response
+              chatService.sendMessageStreamPersistent(
+                response.content,
+                activeChatId || null,
+                () => {},
+                (newChatId: string) => {
+                  if (setChatId) {
+                    setChatId(newChatId);
+                  }
+                },
+                () => {},
+                () => {
+                  // Both messages saved - invalidate queries
+                  resolve(response);
+                  void queryClient.invalidateQueries({
+                    queryKey: chatKeys.lists(),
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: creditKeys.profile(),
+                  });
+                },
+                (error: string) => {
+                  // Assistant message save failed - show error to user
+                  console.error("❌ Failed to save assistant message:", error);
+
+                  // Show user-visible error
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      role: "assistant",
+                      content: `⚠️ **Warning**: Analysis completed but failed to save to chat history. Error: ${error}`,
+                      timestamp: new Date().toISOString(),
+                    },
+                  ]);
+
+                  // Still resolve with response data (analysis succeeded even if save failed)
+                  resolve(response);
+                },
+                {
+                  title: chatTitle,
+                  role: "assistant",
+                  source: sourceType,
+                  metadata: { raw_data: response.analysis_data },
+                  tool_call: createToolCall(
+                    analysisType as ToolName,
+                    currentSymbol || undefined,
+                    response.analysis_data,
+                  ),
+                },
+              );
             },
             (error: string) => {
-              console.error("❌ Failed to save to MongoDB:", error);
-              reject(new Error(error));
+              // User message save failed - this is more critical
+              console.error("❌ Failed to save user message:", error);
+
+              // Show user-visible error
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: `❌ **Error**: Failed to save analysis to chat. Please try again. Error: ${error}`,
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+
+              // Reject because user can't continue without saving the request
+              reject(new Error(`Failed to save analysis: ${error}`));
             },
             {
               title: chatTitle,
-              role: "assistant",
-              source: sourceType,
-              // Wrap in raw_data to avoid schema mismatch
-              metadata: { raw_data: response.analysis_data },
+              role: "user",
+              source: "tool",  // Prevent agent invocation for button clicks
             },
           );
         });
@@ -305,19 +455,41 @@ export const useButtonAnalysis = (
         analysisData: response?.analysis_data,
       });
 
-      // Add to frontend messages
+      // Add both user message and assistant response to frontend messages
       if (response) {
+        // Get tool metadata
+        const toolInfo = TOOL_REGISTRY[response.type as ToolName];
+        const toolTitle = toolInfo?.title || response.type;
+        const toolIcon = toolInfo?.icon || "🔧";
+
+        // Create user message
+        const userMessage = currentSymbol
+          ? `${toolIcon} Get ${toolTitle} for ${currentSymbol}`
+          : `${toolIcon} Get ${toolTitle}`;
+
         setMessages((prev) => [
           ...prev,
+          // User message (trigger)
+          {
+            role: "user",
+            content: userMessage,
+            timestamp: new Date().toISOString(),
+          },
+          // Assistant message (tool response)
           {
             role: "assistant",
             content: response.content,
             timestamp: new Date().toISOString(),
             analysis_data: response.analysis_data,
+            tool_call: createToolCall(
+              response.type as ToolName,
+              currentSymbol || undefined,
+              response.analysis_data,
+            ),
           },
         ]);
 
-        console.log("📝 Message added to state with analysis_data");
+        console.log("📝 User message and assistant response added to state");
       }
     },
     onError: (error: any) => {

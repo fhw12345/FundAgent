@@ -171,6 +171,105 @@ class StockFundamentalsResponse(BaseModel):
     )
 
 
+class CompanyOverviewResponse(BaseModel):
+    """Company overview with key metrics and ownership data."""
+
+    symbol: str = Field(..., description="Stock symbol")
+    company_name: str = Field(..., description="Company name")
+    description: str = Field(..., description="Company business description")
+    industry: str = Field(..., description="Industry")
+    sector: str = Field(..., description="Sector")
+    exchange: str = Field(..., description="Exchange where stock is listed")
+    country: str = Field(..., description="Country of incorporation")
+
+    # Key metrics
+    market_cap: float | None = Field(None, description="Market capitalization")
+    pe_ratio: float | None = Field(None, description="Price-to-earnings ratio")
+    eps: float | None = Field(None, description="Earnings per share")
+    profit_margin: float | None = Field(None, description="Profit margin percentage")
+    revenue_ttm: float | None = Field(None, description="Revenue trailing twelve months")
+    dividend_yield: float | None = Field(None, description="Dividend yield percentage")
+    beta: float | None = Field(None, description="Stock beta")
+
+    # Ownership
+    percent_insiders: float | None = Field(None, description="Percent held by insiders")
+    percent_institutions: float | None = Field(None, description="Percent held by institutions")
+
+    # Price metrics
+    week_52_high: float | None = Field(None, description="52-week high")
+    week_52_low: float | None = Field(None, description="52-week low")
+
+    # Formatted summary
+    overview_summary: str = Field(..., description="Formatted company overview summary")
+    key_metrics: list[str] = Field(..., description="Key metrics highlighted")
+
+
+class CashFlowResponse(BaseModel):
+    """Cash flow statement response."""
+
+    symbol: str = Field(..., description="Stock symbol")
+    company_name: str = Field(..., description="Company name")
+    fiscal_date_ending: str = Field(..., description="Fiscal date ending")
+    operating_cashflow: float | None = Field(None, description="Operating cash flow")
+    capital_expenditures: float | None = Field(None, description="Capital expenditures")
+    free_cashflow: float | None = Field(None, description="Free cash flow")
+    dividend_payout: float | None = Field(None, description="Dividend payout")
+    cashflow_summary: str = Field(..., description="Cash flow summary")
+
+
+class BalanceSheetResponse(BaseModel):
+    """Balance sheet response."""
+
+    symbol: str = Field(..., description="Stock symbol")
+    company_name: str = Field(..., description="Company name")
+    fiscal_date_ending: str = Field(..., description="Fiscal date ending")
+    total_assets: float | None = Field(None, description="Total assets")
+    total_liabilities: float | None = Field(None, description="Total liabilities")
+    total_shareholder_equity: float | None = Field(None, description="Total shareholder equity")
+    current_assets: float | None = Field(None, description="Current assets")
+    current_liabilities: float | None = Field(None, description="Current liabilities")
+    cash_and_equivalents: float | None = Field(None, description="Cash and cash equivalents")
+    balance_sheet_summary: str = Field(..., description="Balance sheet summary")
+
+
+class NewsArticle(BaseModel):
+    """Single news article with sentiment."""
+
+    title: str = Field(..., description="Article title")
+    url: str = Field(..., description="Article URL")
+    source: str = Field(..., description="News source")
+    sentiment_score: float = Field(..., description="Sentiment score (-1 to 1)")
+    sentiment_label: str = Field(..., description="Sentiment label (Bullish/Bearish/Neutral)")
+
+
+class NewsSentimentResponse(BaseModel):
+    """News sentiment response."""
+
+    symbol: str = Field(..., description="Stock symbol")
+    positive_news: list[NewsArticle] = Field(..., description="Positive sentiment news")
+    negative_news: list[NewsArticle] = Field(..., description="Negative sentiment news")
+    overall_sentiment: str = Field(..., description="Overall sentiment summary")
+
+
+class MarketMover(BaseModel):
+    """Single market mover entry."""
+
+    ticker: str = Field(..., description="Stock ticker")
+    price: float = Field(..., description="Current price")
+    change_amount: float = Field(..., description="Change amount")
+    change_percentage: str = Field(..., description="Change percentage")
+    volume: int = Field(..., description="Trading volume")
+
+
+class MarketMoversResponse(BaseModel):
+    """Market movers response."""
+
+    top_gainers: list[MarketMover] = Field(..., description="Top gaining stocks")
+    top_losers: list[MarketMover] = Field(..., description="Top losing stocks")
+    most_active: list[MarketMover] = Field(..., description="Most actively traded stocks")
+    last_updated: str = Field(..., description="Last updated timestamp")
+
+
 class ChartGenerationResponse(BaseModel):
     """Chart generation response."""
 
@@ -316,4 +415,33 @@ class StochasticAnalysisRequest(BaseModel):
         ge=2,
         le=20,
         description="D% period for signal line smoothing",
+    )
+
+
+# Tool invocation metadata for UI rendering
+class ToolCall(BaseModel):
+    """
+    Tool invocation metadata for collapsible UI wrapper.
+
+    Used by both button-triggered analysis and agent-invoked tools
+    to provide consistent UI rendering with title, icon, and metadata.
+    """
+
+    tool_name: str = Field(
+        ...,
+        description="Tool identifier (e.g., 'company_overview', 'fibonacci')",
+    )
+    title: str = Field(
+        ..., description="Display title for UI (e.g., 'Company Overview')"
+    )
+    icon: str = Field(..., description="Emoji icon for tool (e.g., '🏢')")
+    symbol: str | None = Field(
+        None, description="Stock symbol if applicable (e.g., 'TSLA')"
+    )
+    invoked_at: str = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat(),
+        description="ISO timestamp of tool invocation",
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Additional tool-specific data"
     )

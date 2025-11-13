@@ -54,6 +54,7 @@ from ..core.config import Settings
 from ..core.data.ticker_data_service import TickerDataService
 from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
+from .tools.alpha_vantage_tools import create_alpha_vantage_tools
 
 logger = structlog.get_logger()
 
@@ -142,11 +143,20 @@ class FinancialAnalysisReActAgent:
             request_timeout=30,
         )
 
-        # Create compressed local tools
-        self.tools = [
+        # Create compressed local tools (Fibonacci + Stochastic)
+        base_tools = [
             self._create_fibonacci_tool(),
             self._create_stochastic_tool(),
         ]
+        self.tools = base_tools.copy()
+
+        # Add Alpha Vantage tools (search, overview, news, financials, movers)
+        alpha_vantage_tools = create_alpha_vantage_tools(market_service)
+        self.tools.extend(alpha_vantage_tools)
+
+        # Track tool counts for logging
+        base_tool_count = len(base_tools)
+        alpha_vantage_tool_count = len(alpha_vantage_tools)
 
         # Initialize MCP client for Alpha Vantage tools (118 tools)
         self.mcp_client = None
@@ -175,9 +185,10 @@ class FinancialAnalysisReActAgent:
         logger.info(
             "FinancialAnalysisReActAgent initialized",
             agent_type="langgraph_sdk",
-            local_tools=2,
+            base_tools=base_tool_count,
+            alpha_vantage_tools=alpha_vantage_tool_count,
+            total_local_tools=len(self.tools),
             mcp_enabled=self.mcp_client is not None,
-            total_tools=len(self.tools),
         )
 
     def _initialize_mcp_client(self) -> MultiServerMCPClient:
@@ -216,7 +227,13 @@ class FinancialAnalysisReActAgent:
         This method should be called during application startup (after __init__).
         It loads 118 tools from Alpha Vantage MCP server and recreates the
         agent with the full tool set (2 local + 118 MCP = 120 total).
+
+        DISABLED: MCP tools not needed - we use direct Alpha Vantage API calls.
         """
+        logger.info("MCP tools loading disabled - using direct API calls only")
+        return
+
+        # DISABLED CODE BELOW - kept for reference
         if not self.mcp_client:
             logger.info("MCP client not configured - skipping MCP tool initialization")
             return
@@ -236,10 +253,13 @@ class FinancialAnalysisReActAgent:
                 prompt=FINANCIAL_AGENT_SYSTEM_PROMPT,
             )
 
+            # Calculate local tools before MCP addition (base + alpha vantage)
+            local_tools_before_mcp = len(self.tools) - len(mcp_tools)
+
             logger.info(
                 "MCP tools initialized successfully",
-                local_tools=2,
-                mcp_tools=len(mcp_tools),
+                local_tools_before_mcp=local_tools_before_mcp,
+                mcp_tools_added=len(mcp_tools),
                 total_tools=len(self.tools),
                 mcp_server="alphavantage",
             )

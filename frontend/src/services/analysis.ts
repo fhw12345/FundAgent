@@ -137,6 +137,83 @@ export interface StockFundamentalsResponse {
   key_metrics: string[];
 }
 
+export interface CompanyOverviewResponse {
+  symbol: string;
+  company_name: string;
+  description: string;
+  industry: string;
+  sector: string;
+  exchange: string;
+  country: string;
+  market_cap?: number;
+  pe_ratio?: number;
+  eps?: number;
+  profit_margin?: number;
+  revenue_ttm?: number;
+  dividend_yield?: number;
+  beta?: number;
+  percent_insiders?: number;
+  percent_institutions?: number;
+  week_52_high?: number;
+  week_52_low?: number;
+  overview_summary: string;
+  key_metrics: string[];
+}
+
+export interface CashFlowResponse {
+  symbol: string;
+  company_name: string;
+  fiscal_date_ending: string;
+  operating_cashflow?: number;
+  capital_expenditures?: number;
+  free_cashflow?: number;
+  dividend_payout?: number;
+  cashflow_summary: string;
+}
+
+export interface BalanceSheetResponse {
+  symbol: string;
+  company_name: string;
+  fiscal_date_ending: string;
+  total_assets?: number;
+  total_liabilities?: number;
+  total_shareholder_equity?: number;
+  current_assets?: number;
+  current_liabilities?: number;
+  cash_and_equivalents?: number;
+  balance_sheet_summary: string;
+}
+
+export interface NewsArticle {
+  title: string;
+  url: string;
+  source: string;
+  sentiment_score: number;
+  sentiment_label: string;
+}
+
+export interface NewsSentimentResponse {
+  symbol: string;
+  positive_news: NewsArticle[];
+  negative_news: NewsArticle[];
+  overall_sentiment: string;
+}
+
+export interface MarketMover {
+  ticker: string;
+  price: number;
+  change_amount: number;
+  change_percentage: string;
+  volume: number;
+}
+
+export interface MarketMoversResponse {
+  top_gainers: MarketMover[];
+  top_losers: MarketMover[];
+  most_active: MarketMover[];
+  last_updated: string;
+}
+
 export interface ChartGenerationResponse {
   symbol: string;
   chart_type: string;
@@ -196,6 +273,19 @@ export const analysisService = {
   },
 
   /**
+   * Get company overview with key metrics and ownership data
+   */
+  async companyOverview(
+    request: { symbol: string },
+  ): Promise<CompanyOverviewResponse> {
+    const response = await apiClient.post<CompanyOverviewResponse>(
+      "/api/analysis/company-overview",
+      request,
+    );
+    return response.data;
+  },
+
+  /**
    * Perform Stochastic Oscillator analysis
    */
   async stochasticAnalysis(
@@ -234,6 +324,55 @@ export const analysisService = {
 
     const response = await apiClient.get<AnalysisHistoryResponse>(
       `/api/analysis/history/${analysisType}?${params}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Get cash flow statement
+   */
+  async cashFlow(
+    request: { symbol: string },
+  ): Promise<CashFlowResponse> {
+    const response = await apiClient.post<CashFlowResponse>(
+      "/api/analysis/cash-flow",
+      request,
+    );
+    return response.data;
+  },
+
+  /**
+   * Get balance sheet
+   */
+  async balanceSheet(
+    request: { symbol: string },
+  ): Promise<BalanceSheetResponse> {
+    const response = await apiClient.post<BalanceSheetResponse>(
+      "/api/analysis/balance-sheet",
+      request,
+    );
+    return response.data;
+  },
+
+  /**
+   * Get news sentiment
+   */
+  async newsSentiment(
+    request: { symbol: string },
+  ): Promise<NewsSentimentResponse> {
+    const response = await apiClient.post<NewsSentimentResponse>(
+      "/api/analysis/news-sentiment",
+      request,
+    );
+    return response.data;
+  },
+
+  /**
+   * Get market movers
+   */
+  async marketMovers(): Promise<MarketMoversResponse> {
+    const response = await apiClient.get<MarketMoversResponse>(
+      "/api/analysis/market-movers",
     );
     return response.data;
   },

@@ -60,6 +60,13 @@ spec:
         - name: ALPACA_BASE_URL
           value: "https://paper-api.alpaca.markets"
 
+        # Alpha Vantage Market Data API
+        - name: ALPHA_VANTAGE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: alpha-vantage-api-key
+
         # Environment
         - name: ENVIRONMENT
           value: "production"

@@ -65,6 +65,7 @@ class MessageRepository:
             source=message_create.source,
             timestamp=datetime.utcnow(),
             metadata=message_create.metadata,
+            tool_call=message_create.tool_call,
         )
 
         # Convert to dict for MongoDB
