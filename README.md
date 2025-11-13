@@ -21,10 +21,17 @@ This project transforms a sophisticated CLI financial analysis tool into a produ
 > 📖 **See [Getting Started Guide](docs/development/getting-started.md) for detailed setup instructions**
 
 **Access deployed application:**
-- Test: https://klinematrix.com
-- Production: Not yet deployed
-- API Docs: https://klinematrix.com/api/docs
-- Health Check: https://klinematrix.com/api/health
+
+| Environment | Platform | URL | Status |
+|------------|----------|-----|--------|
+| **Dev/Local** | Docker Compose | http://localhost:3000 | ✅ Active |
+| **Test** | Azure AKS | https://klinematrix.com | ⚠️ Planned (not deployed) |
+| **Production** | Alibaba Cloud ACK | https://klinecubic.cn | ✅ Active |
+
+**Production URLs:**
+- Application: https://klinecubic.cn
+- API Docs: https://klinecubic.cn/api/docs
+- Health Check: https://klinecubic.cn/api/health
 
 **Local development:**
 ```bash
@@ -77,7 +84,7 @@ make clean        # Clean up Docker resources
 - **Real-Time Streaming**: Token-by-token LLM responses with SSE
 - **Wall Street Analyst Persona**: Expert insights with "Compact Logic Book" structure
 - **Session Management**: Context-aware chat conversations
-- **Symbol Search**: Smart search with yfinance validation
+- **Symbol Search**: Smart search with Alpha Vantage market data validation
 
 ### Platform Features
 - **Modern UI**: Glassmorphism design with gradient accents
@@ -159,9 +166,9 @@ financial_agent/
 
 ## 🚢 Deployment
 
-### Test Environment (Azure AKS)
+### Production Environment (Alibaba Cloud ACK)
 
-**Current Process**: Manual deployment via Kustomize
+**Current Process**: Manual deployment via Kustomize to ACK (Alibaba Cloud)
 
 ```bash
 # 1. Bump version
@@ -170,21 +177,27 @@ financial_agent/
 # 2. Build and push images to Azure Container Registry
 BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
 az acr build --registry financialAgent \
-  --image klinematrix/backend:test-v${BACKEND_VERSION} \
+  --image klinecubic/backend:prod-v${BACKEND_VERSION} \
   --file backend/Dockerfile backend/
 
 # 3. Update image tag in kustomization
-# Edit .pipeline/k8s/overlays/test/kustomization.yaml
+# Edit .pipeline/k8s/overlays/prod/kustomization.yaml
 
-# 4. Apply with Kustomize
-kubectl apply -k .pipeline/k8s/overlays/test/
+# 4. Apply with Kustomize (uses ACK kubeconfig)
+export KUBECONFIG=/Users/allenpan/.kube/config-ack-prod
+kubectl apply -k .pipeline/k8s/overlays/prod/
 
-# 5. Verify deployment
-kubectl get pods -n klinematrix-test
-curl https://klinematrix.com/api/health
+# 5. Force rollout restart (ACK requires explicit restart for new images)
+kubectl rollout restart deployment/backend deployment/frontend -n klinematrix-prod
+
+# 6. Verify deployment
+kubectl get pods -n klinematrix-prod
+curl https://klinecubic.cn/api/health
 ```
 
-**Documentation**: See [Deployment Workflow](docs/deployment/workflow.md) for complete procedures.
+**Documentation**: See [Deployment Workflow](docs/deployment/workflow.md) and [ACK Architecture](docs/deployment/ack-architecture.md) for complete procedures.
+
+> **Note**: Test environment (klinematrix.com on Azure AKS) is planned but not yet deployed. Production is the active cloud environment.
 
 ### CI/CD Pipeline
 
@@ -200,11 +213,11 @@ curl https://klinematrix.com/api/health
 
 ## 🎯 Current Status: Production-Ready Platform ✅
 
-**Current Versions** (as of 2025-10-26):
-- ✅ **Backend v0.5.7**: Admin dashboard with enriched pod metrics (node pool, resource requests/limits)
-- ✅ **Frontend v0.8.10**: Enhanced health page with per-pod Kubernetes metadata display
-- ✅ **Test Environment**: https://klinematrix.com (Azure Kubernetes + Alibaba Cloud AI)
-- ✅ **Observability**: https://monitor.klinematrix.com (Langfuse v3 LLM trace visualization)
+**Current Versions** (as of 2025-11-13):
+- ✅ **Backend v0.6.0**: Alpha Vantage integration, production-ready market data
+- ✅ **Frontend v0.9.0**: Enhanced portfolio management and analysis features
+- ✅ **Production Environment**: https://klinecubic.cn (Alibaba Cloud ACK - Shanghai region)
+- ⚠️ **Test Environment**: Planned for Azure AKS (not yet deployed)
 
 **Recent Milestones**:
 - ✅ **v0.5.5**: Cosmos DB sorting compatibility + Langfuse v3 production deployment (2025-10-24)
