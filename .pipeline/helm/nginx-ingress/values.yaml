@@ -1,0 +1,27 @@
+# Base nginx-ingress configuration
+# Shared across all environments
+# Chart: ingress-nginx/ingress-nginx v4.14.0
+
+controller:
+  # Use Alibaba Cloud registry for faster pulls in China
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    image: google_containers/nginx-ingress-controller
+    tag: v1.9.4
+    # IMPORTANT: Don't use SHA digests - they're not mirrored in Alibaba Cloud registry
+    digest: ""
+
+  # Disable admission webhooks
+  # Reason: Image pull failures due to SHA digest not available in registry
+  # Impact: Minimal - admission webhook validates Ingress resources but is optional
+  admissionWebhooks:
+    enabled: false
+
+  # LoadBalancer service configuration
+  service:
+    type: LoadBalancer
+    # IMPORTANT: No loadbalancer-spec annotation
+    # Reason: Annotation caused "付费模式与实际实例不一致" error in ACK console
+    # ACK Cloud Controller Manager will auto-detect existing CLB configuration
+    # External IP will be preserved (139.224.28.199)
+    annotations: {}

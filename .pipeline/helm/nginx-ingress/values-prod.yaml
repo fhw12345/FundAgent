@@ -1,0 +1,39 @@
+# Production-specific overrides for ACK (Alibaba Cloud)
+# Cluster: klinecubic-financialagent (cn-shanghai)
+
+controller:
+  # High availability setup
+  replicaCount: 2
+
+  # Resource limits for production workload
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # Pod anti-affinity for high availability
+  # Ensures pods are spread across different nodes
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - ingress-nginx
+          topologyKey: kubernetes.io/hostname
+
+  # Production-grade metrics and monitoring
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Enable when Prometheus operator is installed
+
+  # Production logging
+  logLevel: info  # Use 'debug' for troubleshooting
