@@ -22,7 +22,7 @@ spec:
         fsGroup: 999
       containers:
       - name: redis
-        image: redis:7.2-alpine
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/redis:7.2-alpine-final
         ports:
         - containerPort: 6379
           name: redis
