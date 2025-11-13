@@ -16,7 +16,7 @@
 |-------|-----------|
 | **Backend** | Python 3.12 + FastAPI + MongoDB + Redis |
 | **Frontend** | React 18 + TypeScript 5 + Vite + TailwindCSS |
-| **Deployment** | Kubernetes (AKS) + Azure + Alibaba Cloud |
+| **Deployment** | Kubernetes (ACK/AKS) + Azure AKV/ACR + Alibaba Cloud |
 | **AI/LLM** | LangChain + LangGraph + Alibaba DashScope |
 
 > 📖 **See [System Design](docs/architecture/system-design.md) for architecture details**
@@ -28,8 +28,8 @@
 | Environment | Deployment Method | Access | Purpose |
 |-------------|------------------|--------|---------|
 | **Dev/Local** | Docker Compose | `localhost:3000` | Local development on your machine |
-| **Test** | Kubernetes (AKS) | `https://klinematrix.com` | Cloud testing environment |
-| **Prod** | *(Not yet deployed)* | *(Planned)* | Production environment |
+| **Test** | Kubernetes (AKS - Planned) | `https://klinematrix.com` | Cloud testing (Azure suite) |
+| **Prod** | Kubernetes (ACK - Alibaba Cloud) | `https://klinecubic.cn` | Production (ACK suite) |
 
 ### Dev/Local Environment
 - **How to run**: `make dev` (starts docker-compose)
@@ -44,18 +44,38 @@
 - **Hot reload**: ✅ Works for 90% of changes
 - **When to use**: Daily development, testing features locally
 
-### Test Environment (Kubernetes)
-- **How to deploy**: Build images → Push to ACR → Restart pods
+### Test Environment (AKS - Planned)
+- **Platform**: Azure Kubernetes Service (AKS)
 - **Access**: https://klinematrix.com
-- **Commands**: `kubectl get pods -n klinematrix-test`
-- **When to use**: Testing before merging, verifying cloud integration
-- **Note**: This is the ONLY cloud environment right now
+- **Namespace**: `klinematrix-test`
+- **Images**: `financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/*`
+- **Status**: Planned - Not yet deployed
 
-### Prod Environment
-- **Status**: Not yet deployed
-- **Planned**: Will be separate K8s namespace with production data
+### Prod Environment (ACK - Active)
+- **Platform**: Alibaba Cloud Container Service for Kubernetes (ACK)
+- **Access**: https://klinecubic.cn
+- **Namespace**: `klinematrix-prod`
+- **Cluster**: `klinecubic-financialagent` (Shanghai/华东2)
+- **Images**: `financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/*`
+- **Status**: Active - Production deployment
 
-**Golden Rule**: Develop locally with docker-compose, deploy to Test (K8s) for verification.
+### 🏗️ Hybrid Cloud Architecture
+
+**Shared Services (Azure - Both Environments)**:
+- **Container Registry**: Azure ACR (`financialagent-gxftdbbre4gtegea.azurecr.io`)
+- **Key Vault**: Azure Key Vault (`klinematrix-test-kv`)
+
+**Compute Platforms**:
+- **Test**: Azure AKS (Korea Central) - Planned
+- **Prod**: Alibaba Cloud ACK (Shanghai) - Active
+
+**Image Naming Convention**:
+```
+Test:  financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v*
+Prod:  financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend:prod-v*
+```
+
+**Golden Rule**: Develop locally with docker-compose, deploy to Prod (ACK) for production verification.
 
 ## 🧪 Testing & Iteration Rules
 

@@ -2,56 +2,57 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 metadata:
-  name: klinematrix-prod
+  name: klinecubic-prod
 
 # Production namespace
 namespace: klinematrix-prod
 
-# Base configuration (Phase 1: No Langfuse)
+# Base configuration
 resources:
-# Backend & Frontend
+# Base resources (excluding Langfuse, namespace, and Azure workload identity)
 - ../../base/backend/deployment.yaml
 - ../../base/backend/service.yaml
 - ../../base/frontend/deployment.yaml
 - ../../base/frontend/service.yaml
-
-# Redis (self-hosted cache)
 - ../../base/redis/deployment.yaml
 - ../../base/redis/service.yaml
 - ../../base/redis/configmap.yaml
 - ../../base/redis/secret.yaml
-
-# Ingress & TLS
 - ../../base/ingress/clusterissuer.yaml
 - ../../base/ingress/ingress.yaml
-
-# Production-specific resources
+# Production-specific resources (Alibaba Cloud ACK)
 - namespace.yaml
 - mongodb-statefulset.yaml
 - mongodb-service.yaml
-- secrets.yaml
+# Note: secrets.yaml references External Secrets Operator (not installed in ACK)
+# Secrets are managed manually via kubectl in production
 - rbac.yaml
 
 # Production environment overrides
-patchesStrategicMerge:
-- backend-prod-patch.yaml
-- frontend-prod-patch.yaml
-- ingress-prod-patch.yaml
-
-# Environment-specific labels
-commonLabels:
-  environment: prod
+patches:
+- path: backend-prod-patch.yaml
+  target:
+    kind: Deployment
+    name: backend
+- path: frontend-prod-patch.yaml
+  target:
+    kind: Deployment
+    name: frontend
+- path: ingress-prod-patch.yaml
+  target:
+    kind: Ingress
+    name: klinematrix-ingress
 
 # Production image tags (current versions)
 images:
 - name: klinematrix/backend
-  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend
-  newTag: "prod-v0.5.18"
+  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend
+  newTag: "prod-v0.6.0"
 - name: klinematrix/frontend
-  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/frontend
-  newTag: "prod-v0.8.16"
+  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend
+  newTag: "prod-v0.9.0"
 
-# Resource allocation for production (Phase 1: No Langfuse)
+# Resource allocation for production
 replicas:
 - name: backend
   count: 1
