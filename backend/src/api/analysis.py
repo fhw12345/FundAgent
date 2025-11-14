@@ -288,11 +288,12 @@ async def macro_sentiment_analysis(
     request: MacroAnalysisRequest,
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
+    market_service: AlphaVantageMarketDataService = Depends(get_market_service),
 ) -> MacroSentimentResponse:
     """
-    Analyze macro market sentiment using VIX, major indices, and sector performance.
+    Analyze macro market sentiment using economic indicators from AlphaVantage.
 
-    Provides fear/greed analysis and overall market outlook based on current conditions.
+    Provides fear/greed analysis and overall market outlook based on economic data.
     """
     try:
         # Check cache first (shorter cache time for macro data)
@@ -307,8 +308,8 @@ async def macro_sentiment_analysis(
         if cached_result:
             return MacroSentimentResponse.model_validate(cached_result)
 
-        # Perform analysis
-        analyzer = MacroAnalyzer()
+        # Perform analysis with market_service dependency
+        analyzer = MacroAnalyzer(market_service)
         result = await analyzer.analyze(
             include_sectors=request.include_sectors,
             include_indices=request.include_indices,

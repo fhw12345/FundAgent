@@ -41,9 +41,7 @@ class PortfolioOrder(BaseModel):
 
     # Order details
     symbol: str = Field(..., description="Stock symbol (e.g., AAPL)")
-    order_type: str = Field(
-        ..., description="market | limit | stop | stop_limit"
-    )
+    order_type: str = Field(..., description="market | limit | stop | stop_limit")
     side: str = Field(..., description="buy | sell")
     quantity: float = Field(..., description="Number of shares")
 

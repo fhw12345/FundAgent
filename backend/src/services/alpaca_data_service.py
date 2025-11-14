@@ -16,7 +16,7 @@ import pandas as pd
 import structlog
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest
-from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+from alpaca.data.timeframe import TimeFrame
 
 from ..core.config import Settings
 from ..core.utils import map_frontend_to_alpaca

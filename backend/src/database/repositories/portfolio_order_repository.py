@@ -134,7 +134,9 @@ class PortfolioOrderRepository:
         Returns:
             PortfolioOrder if found, None otherwise
         """
-        order_dict = await self.collection.find_one({"alpaca_order_id": alpaca_order_id})
+        order_dict = await self.collection.find_one(
+            {"alpaca_order_id": alpaca_order_id}
+        )
 
         if not order_dict:
             return None

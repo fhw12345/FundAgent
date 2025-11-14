@@ -11,8 +11,8 @@ from datetime import datetime
 
 import structlog
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
-from alpaca.trading.requests import MarketOrderRequest, GetPortfolioHistoryRequest
+from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.requests import GetPortfolioHistoryRequest, MarketOrderRequest
 
 from ..core.config import Settings
 from ..models.portfolio import (
@@ -137,9 +137,11 @@ class AlpacaTradingService:
                 quantity=quantity,
                 status=str(alpaca_order.status),
                 filled_qty=float(alpaca_order.filled_qty or 0),
-                filled_avg_price=float(alpaca_order.filled_avg_price)
-                if alpaca_order.filled_avg_price
-                else None,
+                filled_avg_price=(
+                    float(alpaca_order.filled_avg_price)
+                    if alpaca_order.filled_avg_price
+                    else None
+                ),
                 created_at=alpaca_order.submitted_at,
                 filled_at=alpaca_order.filled_at,
                 metadata={
@@ -206,9 +208,11 @@ class AlpacaTradingService:
                 quantity=float(alpaca_order.qty),
                 status=str(alpaca_order.status),
                 filled_qty=float(alpaca_order.filled_qty or 0),
-                filled_avg_price=float(alpaca_order.filled_avg_price)
-                if alpaca_order.filled_avg_price
-                else None,
+                filled_avg_price=(
+                    float(alpaca_order.filled_avg_price)
+                    if alpaca_order.filled_avg_price
+                    else None
+                ),
                 created_at=alpaca_order.submitted_at,
                 filled_at=alpaca_order.filled_at,
             )
@@ -383,8 +387,8 @@ class AlpacaTradingService:
         """
         try:
             # Get closed orders from Alpaca
-            from alpaca.trading.requests import GetOrdersRequest
             from alpaca.trading.enums import QueryOrderStatus
+            from alpaca.trading.requests import GetOrdersRequest
 
             request = GetOrdersRequest(
                 status=QueryOrderStatus.CLOSED,
@@ -408,9 +412,11 @@ class AlpacaTradingService:
                     quantity=float(alpaca_order.qty),
                     status=str(alpaca_order.status),
                     filled_qty=float(alpaca_order.filled_qty or 0),
-                    filled_avg_price=float(alpaca_order.filled_avg_price)
-                    if alpaca_order.filled_avg_price
-                    else None,
+                    filled_avg_price=(
+                        float(alpaca_order.filled_avg_price)
+                        if alpaca_order.filled_avg_price
+                        else None
+                    ),
                     created_at=alpaca_order.submitted_at,
                     filled_at=alpaca_order.filled_at,
                 )
@@ -468,7 +474,10 @@ class AlpacaTradingService:
 
             # Run blocking Alpaca API call in thread executor to avoid blocking event loop
             import asyncio
-            history = await asyncio.to_thread(self.client.get_portfolio_history, request)
+
+            history = await asyncio.to_thread(
+                self.client.get_portfolio_history, request
+            )
 
             logger.info(
                 "Portfolio history retrieved",
@@ -480,10 +489,16 @@ class AlpacaTradingService:
 
             return {
                 "base_value": history.base_value,
-                "timestamps": [datetime.fromtimestamp(ts).isoformat() for ts in history.timestamp],
+                "timestamps": [
+                    datetime.fromtimestamp(ts).isoformat() for ts in history.timestamp
+                ],
                 "equity": list(history.equity) if history.equity else [],
                 "profit_loss": list(history.profit_loss) if history.profit_loss else [],
-                "profit_loss_pct": [pct * 100 for pct in history.profit_loss_pct] if history.profit_loss_pct else [],
+                "profit_loss_pct": (
+                    [pct * 100 for pct in history.profit_loss_pct]
+                    if history.profit_loss_pct
+                    else []
+                ),
             }
 
         except Exception as e:

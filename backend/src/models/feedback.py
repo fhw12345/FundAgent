@@ -64,7 +64,9 @@ class FeedbackImageUploadResponse(BaseModel):
 
     upload_url: str = Field(..., description="Presigned URL for uploading the image")
     object_key: str = Field(..., description="OSS object key (path)")
-    public_url: str = Field(..., description="Public URL for accessing the uploaded image")
+    public_url: str = Field(
+        ..., description="Public URL for accessing the uploaded image"
+    )
     expires_in: int = Field(..., description="URL expiration time in seconds")
 
 

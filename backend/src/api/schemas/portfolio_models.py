@@ -17,9 +17,7 @@ class HoldingCreateRequest(BaseModel):
     symbol: str = Field(..., description="Stock symbol", min_length=1, max_length=10)
     quantity: int = Field(..., description="Number of shares", gt=0)
     avg_price: float | None = Field(
-        None,
-        description="Average purchase price (auto-fetched if not provided)",
-        gt=0
+        None, description="Average purchase price (auto-fetched if not provided)", gt=0
     )
 
     class Config:

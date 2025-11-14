@@ -19,7 +19,6 @@ from ..agent.chat_agent import ChatAgent
 from ..agent.langgraph_react_agent import FinancialAnalysisReActAgent
 from ..core.exceptions import NotFoundError
 from ..core.utils import extract_token_usage_from_agent_result
-from ..models.chat import ChatUpdate
 from ..services.chat_service import ChatService
 from ..services.credit_service import CreditService
 from .dependencies.chat_deps import (
@@ -407,7 +406,9 @@ async def _stream_with_simple_agent(
 
         try:
             # Create or get chat
-            chat_id, chat_created_event = await get_or_create_chat(request, user_id, chat_service)
+            chat_id, chat_created_event = await get_or_create_chat(
+                request, user_id, chat_service
+            )
             if chat_created_event:
                 yield f"data: {json.dumps(chat_created_event)}\n\n"
 
@@ -487,6 +488,7 @@ async def _stream_with_simple_agent(
             # Stream LLM response with timeout protection
             full_response = ""
             try:
+
                 async def stream_with_timeout():
                     nonlocal full_response
                     async for chunk in agent.stream_chat(
@@ -499,12 +501,11 @@ async def _stream_with_simple_agent(
                         yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
                 async for chunk_data in asyncio.wait_for(
-                    stream_with_timeout(),
-                    timeout=120.0  # 2 minutes max
+                    stream_with_timeout(), timeout=120.0  # 2 minutes max
                 ):
                     yield chunk_data
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(
                     "Agent streaming timeout (v2)",
                     chat_id=chat_id,
@@ -644,7 +645,9 @@ async def _stream_with_react_agent(
 
         try:
             # Create or get chat
-            chat_id, chat_created_event = await get_or_create_chat(request, user_id, chat_service)
+            chat_id, chat_created_event = await get_or_create_chat(
+                request, user_id, chat_service
+            )
             if chat_created_event:
                 yield f"data: {json.dumps(chat_created_event)}\n\n"
 
@@ -741,9 +744,9 @@ async def _stream_with_react_agent(
                         conversation_history=conversation_history,
                         debug=debug,
                     ),
-                    timeout=120.0  # 2 minutes max for agent response
+                    timeout=120.0,  # 2 minutes max for agent response
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(
                     "Agent execution timeout",
                     chat_id=chat_id,
@@ -923,4 +926,3 @@ async def _stream_with_react_agent(
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
 
     return StreamingResponse(generate_stream(), media_type="text/event-stream")
-

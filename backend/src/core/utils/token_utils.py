@@ -45,19 +45,27 @@ def extract_token_usage_from_messages(messages: list[Any]) -> tuple[int, int, in
         elif hasattr(msg, "response_metadata") and msg.response_metadata:
             # Try DashScope/Tongyi format first (token_usage)
             # Then OpenAI format (usage)
-            usage = msg.response_metadata.get("token_usage") or msg.response_metadata.get("usage", {})
+            usage = msg.response_metadata.get(
+                "token_usage"
+            ) or msg.response_metadata.get("usage", {})
 
             # DashScope uses input_tokens/output_tokens
             # OpenAI uses prompt_tokens/completion_tokens
-            total_input_tokens += usage.get("input_tokens", 0) or usage.get("prompt_tokens", 0)
-            total_output_tokens += usage.get("output_tokens", 0) or usage.get("completion_tokens", 0)
+            total_input_tokens += usage.get("input_tokens", 0) or usage.get(
+                "prompt_tokens", 0
+            )
+            total_output_tokens += usage.get("output_tokens", 0) or usage.get(
+                "completion_tokens", 0
+            )
 
     total_tokens = total_input_tokens + total_output_tokens
 
     return total_input_tokens, total_output_tokens, total_tokens
 
 
-def extract_token_usage_from_agent_result(agent_result: dict[str, Any]) -> dict[str, int]:
+def extract_token_usage_from_agent_result(
+    agent_result: dict[str, Any]
+) -> dict[str, int]:
     """
     Extract token usage from agent invocation result.
 

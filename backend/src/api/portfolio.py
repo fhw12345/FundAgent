@@ -10,19 +10,15 @@ from datetime import datetime, timedelta
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from ..database.mongodb import MongoDB
 from ..models.holding import Holding
 from ..services.alpaca_trading_service import AlpacaTradingService
 from ..services.chat_service import ChatService
-from ..database.mongodb import MongoDB
-from ..database.repositories.message_repository import MessageRepository
 from .dependencies.auth import get_current_user_id, get_mongodb, require_admin
 from .dependencies.chat_deps import get_chat_service
 from .dependencies.portfolio_deps import get_alpaca_trading_service
 from .dependencies.rate_limit import (
     limiter,
-    rate_limit_expensive,
-    rate_limit_standard,
-    rate_limit_write,
 )
 from .schemas.portfolio_models import (
     AnalysisMarker,
@@ -60,7 +56,7 @@ async def get_holdings(
     if not alpaca_trading:
         raise HTTPException(
             status_code=503,
-            detail="Alpaca credentials not configured. Cannot fetch positions."
+            detail="Alpaca credentials not configured. Cannot fetch positions.",
         )
 
     try:
@@ -88,7 +84,9 @@ async def get_holdings(
             )
             holdings.append(HoldingResponse.from_holding(holding))
 
-        logger.info("Positions retrieved from Alpaca", user_id=user_id, count=len(holdings))
+        logger.info(
+            "Positions retrieved from Alpaca", user_id=user_id, count=len(holdings)
+        )
 
         return holdings
 
@@ -100,7 +98,7 @@ async def get_holdings(
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve portfolio positions. Please try again later."
+            detail="Unable to retrieve portfolio positions. Please try again later.",
         )
 
 
@@ -126,7 +124,7 @@ async def get_portfolio_summary(
     if not alpaca_trading:
         raise HTTPException(
             status_code=503,
-            detail="Alpaca credentials not configured. Cannot fetch account summary."
+            detail="Alpaca credentials not configured. Cannot fetch account summary.",
         )
 
     try:
@@ -136,7 +134,8 @@ async def get_portfolio_summary(
         # Convert PortfolioSummary model to dict for PortfolioSummaryResponse
         summary_dict = {
             "holdings_count": account_summary.position_count,
-            "total_cost_basis": account_summary.equity - account_summary.total_pl,  # Equity - P/L = initial
+            "total_cost_basis": account_summary.equity
+            - account_summary.total_pl,  # Equity - P/L = initial
             "total_market_value": account_summary.equity,
             "total_unrealized_pl": account_summary.total_pl,
             "total_unrealized_pl_pct": account_summary.total_pl_pct,
@@ -160,7 +159,7 @@ async def get_portfolio_summary(
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve portfolio summary. Please try again later."
+            detail="Unable to retrieve portfolio summary. Please try again later.",
         )
 
 
@@ -190,7 +189,7 @@ async def get_portfolio_history(
     if not alpaca_trading:
         raise HTTPException(
             status_code=503,
-            detail="Alpaca credentials not configured. Cannot fetch portfolio history."
+            detail="Alpaca credentials not configured. Cannot fetch portfolio history.",
         )
 
     try:
@@ -218,10 +217,11 @@ async def get_portfolio_history(
         # Convert to response format
         data_points = [
             PortfolioHistoryDataPoint(
-                timestamp=datetime.fromisoformat(ts),
-                value=equity
+                timestamp=datetime.fromisoformat(ts), value=equity
             )
-            for ts, equity in zip(history_data["timestamps"], history_data["equity"])
+            for ts, equity in zip(
+                history_data["timestamps"], history_data["equity"], strict=False
+            )
         ]
 
         # Get current equity (last value)
@@ -258,13 +258,15 @@ async def get_portfolio_history(
         # Build order query (filter by symbol and time range)
         order_query = {
             "user_id": user_id,
-            "created_at": {"$gte": start_time, "$lte": end_time}
+            "created_at": {"$gte": start_time, "$lte": end_time},
         }
         if symbol:
             order_query["symbol"] = symbol
 
         # Query orders sorted by creation time descending
-        orders_cursor = orders_collection.find(order_query).sort("created_at", -1).limit(100)
+        orders_cursor = (
+            orders_collection.find(order_query).sort("created_at", -1).limit(100)
+        )
 
         # Convert to OrderMarker format
         order_markers: list[OrderMarker] = []
@@ -308,7 +310,7 @@ async def get_portfolio_history(
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve portfolio history. Please try again later."
+            detail="Unable to retrieve portfolio history. Please try again later.",
         )
 
 
@@ -334,7 +336,9 @@ async def get_portfolio_chat_history(
         messages_collection = mongodb.get_collection("messages")
 
         # Get all chats for portfolio_agent user
-        portfolio_chats = await chats_collection.find({"user_id": "portfolio_agent"}).to_list(length=None)
+        portfolio_chats = await chats_collection.find(
+            {"user_id": "portfolio_agent"}
+        ).to_list(length=None)
 
         if not portfolio_chats:
             logger.info("No portfolio agent chats found")
@@ -353,31 +357,40 @@ async def get_portfolio_chat_history(
             symbol = title.split(" ")[0] if " " in title else title
 
             # Get all messages for this chat
-            messages = await messages_collection.find(
-                {"chat_id": chat_id}
-            ).sort("timestamp", 1).to_list(length=None)  # Sort oldest first
+            messages = (
+                await messages_collection.find({"chat_id": chat_id})
+                .sort("timestamp", 1)
+                .to_list(length=None)
+            )  # Sort oldest first
 
             # Clean messages
             for msg in messages:
                 msg.pop("_id", None)
 
             # Get most recent message timestamp for sorting
-            latest_timestamp = messages[-1].get("timestamp", datetime.min) if messages else datetime.min
+            latest_timestamp = (
+                messages[-1].get("timestamp", datetime.min)
+                if messages
+                else datetime.min
+            )
 
-            result_chats.append({
-                "chat_id": chat_id,
-                "symbol": symbol,
-                "title": title,
-                "message_count": len(messages),
-                "messages": messages,
-                "latest_timestamp": latest_timestamp.isoformat() if isinstance(latest_timestamp, datetime) else str(latest_timestamp),
-            })
+            result_chats.append(
+                {
+                    "chat_id": chat_id,
+                    "symbol": symbol,
+                    "title": title,
+                    "message_count": len(messages),
+                    "messages": messages,
+                    "latest_timestamp": (
+                        latest_timestamp.isoformat()
+                        if isinstance(latest_timestamp, datetime)
+                        else str(latest_timestamp)
+                    ),
+                }
+            )
 
         # Sort chats by most recent message (newest first)
-        result_chats.sort(
-            key=lambda c: c.get("latest_timestamp", ""),
-            reverse=True
-        )
+        result_chats.sort(key=lambda c: c.get("latest_timestamp", ""), reverse=True)
 
         logger.info(
             "Portfolio chat history retrieved",
@@ -395,7 +408,7 @@ async def get_portfolio_chat_history(
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve portfolio chat history. Please try again later."
+            detail="Unable to retrieve portfolio chat history. Please try again later.",
         )
 
 
@@ -426,9 +439,7 @@ async def get_portfolio_chat_detail(
 
         # Get messages
         messages = await chat_service.get_chat_messages(
-            chat_id,
-            user_id="portfolio_agent",
-            limit=limit
+            chat_id, user_id="portfolio_agent", limit=limit
         )
 
         logger.info(
@@ -450,7 +461,7 @@ async def get_portfolio_chat_detail(
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve portfolio chat. Please try again later."
+            detail="Unable to retrieve portfolio chat. Please try again later.",
         )
 
 
@@ -505,7 +516,7 @@ async def delete_portfolio_chat(
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to delete portfolio chat. Please try again later."
+            detail="Unable to delete portfolio chat. Please try again later.",
         )
 
 
@@ -558,19 +569,33 @@ async def get_portfolio_orders(
             order_type = str(alpaca_order.type).lower().replace("ordertype.", "")
             status = str(alpaca_order.status).lower().replace("orderstatus.", "")
 
-            orders.append({
-                "order_id": str(alpaca_order.id),
-                "symbol": alpaca_order.symbol,
-                "side": side,
-                "quantity": float(alpaca_order.qty),
-                "order_type": order_type,
-                "status": status,
-                "filled_qty": float(alpaca_order.filled_qty or 0),
-                "filled_avg_price": float(alpaca_order.filled_avg_price) if alpaca_order.filled_avg_price else None,
-                "submitted_at": alpaca_order.submitted_at.isoformat() if alpaca_order.submitted_at else None,
-                "filled_at": alpaca_order.filled_at.isoformat() if alpaca_order.filled_at else None,
-                "analysis_id": alpaca_order.client_order_id,  # Our analysis ID
-            })
+            orders.append(
+                {
+                    "order_id": str(alpaca_order.id),
+                    "symbol": alpaca_order.symbol,
+                    "side": side,
+                    "quantity": float(alpaca_order.qty),
+                    "order_type": order_type,
+                    "status": status,
+                    "filled_qty": float(alpaca_order.filled_qty or 0),
+                    "filled_avg_price": (
+                        float(alpaca_order.filled_avg_price)
+                        if alpaca_order.filled_avg_price
+                        else None
+                    ),
+                    "submitted_at": (
+                        alpaca_order.submitted_at.isoformat()
+                        if alpaca_order.submitted_at
+                        else None
+                    ),
+                    "filled_at": (
+                        alpaca_order.filled_at.isoformat()
+                        if alpaca_order.filled_at
+                        else None
+                    ),
+                    "analysis_id": alpaca_order.client_order_id,  # Our analysis ID
+                }
+            )
 
         logger.info(
             "Portfolio orders retrieved",
@@ -590,5 +615,5 @@ async def get_portfolio_orders(
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve order history. Please try again later."
+            detail="Unable to retrieve order history. Please try again later.",
         )

@@ -24,18 +24,25 @@ class Holding(BaseModel):
     current_price: float | None = Field(None, description="Current market price")
 
     # Calculated fields
-    cost_basis: float = Field(..., description="Total amount invested (qty * avg_price)")
-    market_value: float | None = Field(None, description="Current value (qty * current_price)")
+    cost_basis: float = Field(
+        ..., description="Total amount invested (qty * avg_price)"
+    )
+    market_value: float | None = Field(
+        None, description="Current value (qty * current_price)"
+    )
     unrealized_pl: float | None = Field(None, description="Unrealized profit/loss ($)")
     unrealized_pl_pct: float | None = Field(None, description="Unrealized P/L (%)")
 
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    last_price_update: datetime | None = Field(None, description="Last time price was updated")
+    last_price_update: datetime | None = Field(
+        None, description="Last time price was updated"
+    )
 
     class Config:
         """Pydantic config."""
+
         json_schema_extra = {
             "example": {
                 "holding_id": "holding_abc123",
@@ -61,13 +68,12 @@ class HoldingCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol", min_length=1, max_length=10)
     quantity: int = Field(..., description="Number of shares", gt=0)
     avg_price: float | None = Field(
-        None,
-        description="Average purchase price (auto-fetched if not provided)",
-        gt=0
+        None, description="Average purchase price (auto-fetched if not provided)", gt=0
     )
 
     class Config:
         """Pydantic config."""
+
         json_schema_extra = {
             "example": {
                 "symbol": "AAPL",
@@ -85,6 +91,7 @@ class HoldingUpdate(BaseModel):
 
     class Config:
         """Pydantic config."""
+
         json_schema_extra = {
             "example": {
                 "quantity": 150,
@@ -105,6 +112,7 @@ class HoldingWithAnalysis(Holding):
 
     class Config:
         """Pydantic config."""
+
         json_schema_extra = {
             "example": {
                 "holding_id": "holding_abc123",

@@ -32,9 +32,7 @@ class ToolExecution(BaseModel):
     analysis_id: str = Field(
         ..., description="Analysis workflow this execution belongs to"
     )
-    message_id: str | None = Field(
-        None, description="Message that triggered tool call"
-    )
+    message_id: str | None = Field(None, description="Message that triggered tool call")
 
     # Tool identification (CRITICAL - differentiates 1st vs 3rd party)
     tool_name: str = Field(
@@ -105,7 +103,9 @@ class ToolExecutionInDB(ToolExecution):
 class ToolExecutionSummary(BaseModel):
     """Summary of tool executions for cost tracking."""
 
-    tool_source: str = Field(..., description="Tool source (1st_party, mcp_alphavantage)")
+    tool_source: str = Field(
+        ..., description="Tool source (1st_party, mcp_alphavantage)"
+    )
     tool_name: str = Field(..., description="Tool name")
 
     # Call statistics

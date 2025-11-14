@@ -20,13 +20,13 @@ from .api.analysis import router as analysis_router
 from .api.auth import router as auth_router
 from .api.chat import router as chat_router
 from .api.credits import router as credits_router
+from .api.dependencies.rate_limit import limiter
 from .api.feedback import router as feedback_router
 from .api.health import router as health_router
 from .api.llm_models import router as llm_models_router
 from .api.market_data import router as market_data_router
 from .api.portfolio import router as portfolio_router
 from .api.watchlist import router as watchlist_router
-from .api.dependencies.rate_limit import limiter
 from .core.config import get_settings
 from .core.exceptions import AppError
 from .database.mongodb import MongoDB
@@ -117,7 +117,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             PortfolioOrderRepository,
         )
 
-        order_repo = PortfolioOrderRepository(mongodb.get_collection("portfolio_orders"))
+        order_repo = PortfolioOrderRepository(
+            mongodb.get_collection("portfolio_orders")
+        )
         await order_repo.ensure_indexes()
         logger.info("Portfolio order indexes created (order audit trail)")
 
@@ -125,10 +127,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # This loads 118 Alpha Vantage tools via MCP protocol
         from .agent.langgraph_react_agent import FinancialAnalysisReActAgent
         from .core.data.ticker_data_service import TickerDataService
-        from .services.alpaca_data_service import AlpacaDataService
+        from .database.repositories.tool_execution_repository import (
+            ToolExecutionRepository,
+        )
         from .services.alpaca_trading_service import AlpacaTradingService
         from .services.alphavantage_market_data import AlphaVantageMarketDataService
-        from .database.repositories.tool_execution_repository import ToolExecutionRepository
         from .services.tool_cache_wrapper import ToolCacheWrapper
 
         react_agent = None
@@ -136,12 +139,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         market_service = None
         try:
             # Create agent instance (will be cached as singleton in dependency injection)
-            alpaca_data_service = AlpacaDataService(settings=settings)
             alpaca_trading_service = AlpacaTradingService(settings=settings)
             market_service = AlphaVantageMarketDataService(settings=settings)
             ticker_service = TickerDataService(
                 redis_cache=redis_cache,
-                alpaca_data_service=alpaca_data_service,
+                alpha_vantage_service=market_service,
             )
 
             # Initialize tool execution tracking
@@ -195,7 +197,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         # Store in app state for manual triggering via API
         app.state.watchlist_analyzer = watchlist_analyzer
-        logger.info("Watchlist analyzer initialized (manual trigger mode)" + (" with agent" if react_agent else " without agent"))
+        logger.info(
+            "Watchlist analyzer initialized (manual trigger mode)"
+            + (" with agent" if react_agent else " without agent")
+        )
 
         # Store in app state for dependency injection
         app.state.mongodb = mongodb
@@ -255,7 +260,9 @@ def create_app() -> FastAPI:
 
     # Custom rate limit exception handler that handles both RateLimitExceeded and connection errors
     @app.exception_handler(RateLimitExceeded)
-    async def custom_rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    async def custom_rate_limit_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
         """Handle rate limit exceeded errors gracefully, including Redis connection failures."""
         # Check if this is a RateLimitExceeded exception
         if isinstance(exc, RateLimitExceeded):

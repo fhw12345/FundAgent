@@ -265,7 +265,9 @@ class MessageRepository:
         """
         # Build query
         query: dict = {
-            "source": {"$in": ["tool", "llm"]},  # Analysis messages from tools or LLM (watchlist)
+            "source": {
+                "$in": ["tool", "llm"]
+            },  # Analysis messages from tools or LLM (watchlist)
         }
 
         if symbol:
@@ -294,7 +296,9 @@ class MessageRepository:
 
         return messages
 
-    async def update_metadata(self, message_id: str, metadata: MessageMetadata) -> Message | None:
+    async def update_metadata(
+        self, message_id: str, metadata: MessageMetadata
+    ) -> Message | None:
         """
         Update message metadata.
 

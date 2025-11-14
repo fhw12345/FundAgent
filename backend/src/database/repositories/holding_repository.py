@@ -239,11 +239,15 @@ class HoldingRepository:
         # Remove MongoDB _id field
         result.pop("_id", None)
 
-        logger.info("Holding updated", holding_id=holding_id, fields=list(update_dict.keys()))
+        logger.info(
+            "Holding updated", holding_id=holding_id, fields=list(update_dict.keys())
+        )
 
         return Holding(**result)
 
-    async def update_price(self, holding_id: str, current_price: float) -> Holding | None:
+    async def update_price(
+        self, holding_id: str, current_price: float
+    ) -> Holding | None:
         """
         Update current price and recalculate P/L.
 

@@ -37,9 +37,7 @@ class PortfolioService:
         self.ticker_service = ticker_service
         self.settings = settings
 
-    async def add_holding(
-        self, user_id: str, holding_create: HoldingCreate
-    ) -> Holding:
+    async def add_holding(self, user_id: str, holding_create: HoldingCreate) -> Holding:
         """
         Add new holding to portfolio.
 
@@ -201,7 +199,9 @@ class PortfolioService:
         # Calculate overall P&L
         total_unrealized_pl = total_market_value - total_cost_basis
         total_unrealized_pl_pct = (
-            (total_unrealized_pl / total_cost_basis) * 100 if total_cost_basis > 0 else 0
+            (total_unrealized_pl / total_cost_basis) * 100
+            if total_cost_basis > 0
+            else 0
         )
 
         return {

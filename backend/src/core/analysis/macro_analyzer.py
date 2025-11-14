@@ -1,129 +1,206 @@
 """
 Macro market sentiment analysis engine.
-Analyzes VIX, major indices, and sector performance for market sentiment assessment.
-
-NOTE: Temporarily disabled - requires migration from yfinance to alternative data source.
+Analyzes economic indicators from AlphaVantage for market sentiment assessment.
 """
 
 from datetime import datetime
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import pandas as pd
 import structlog
-# import yfinance as yf  # DISABLED: Removed yfinance dependency
 
 from ...api.models import MacroSentimentResponse
+
+if TYPE_CHECKING:
+    from ...services.alphavantage_market_data import AlphaVantageMarketDataService
 
 logger = structlog.get_logger()
 
 
 class MacroAnalyzer:
-    """Macro market sentiment analyzer.
+    """Macro market sentiment analyzer using AlphaVantage economic indicators."""
 
-    NOTE: Currently disabled - requires alternative data source for VIX, indices, sectors.
-    """
-
-    def __init__(self) -> None:
-        self.vix_data: pd.DataFrame | None = None
-        self.indices_data: dict[str, pd.DataFrame] = {}
-        self.sectors_data: dict[str, pd.DataFrame] = {}
+    def __init__(self, market_service: "AlphaVantageMarketDataService") -> None:
+        self.market_service = market_service
+        self.commodity_data: pd.DataFrame | None = None
+        self.economic_indicators: dict[str, pd.DataFrame] = {}
 
     async def analyze(
         self, include_sectors: bool = True, include_indices: bool = True
     ) -> MacroSentimentResponse:
         """
-        Analyze macro market sentiment.
+        Analyze macro market sentiment using AlphaVantage economic indicators.
 
         Args:
-            include_sectors: Include sector rotation analysis
-            include_indices: Include major indices analysis
+            include_sectors: Include sector rotation analysis (deprecated, kept for API compatibility)
+            include_indices: Include economic indicators analysis
 
         Returns:
             MacroSentimentResponse with complete sentiment analysis
         """
-        # DISABLED: Requires migration from yfinance to alternative data source
-        raise NotImplementedError(
-            "Macro sentiment analysis temporarily disabled. "
-            "Requires migration from yfinance to alternative market data provider."
-        )
+        try:
+            logger.info("Starting macro sentiment analysis with AlphaVantage")
 
-        # try:
-        #     logger.info("Starting macro sentiment analysis")
-        #
-        #     # Get VIX data for fear/greed analysis
-        #     vix_level, vix_interpretation, fear_greed_score = await self._analyze_vix()
-        #
-        #     # Get major indices performance
-        #     major_indices = {}
-        #     if include_indices:
-        #         major_indices = await self._analyze_major_indices()
-        #
-        #     # Get sector performance
-        #     sector_performance = {}
-        #     if include_sectors:
-        #         sector_performance = await self._analyze_sector_performance()
-        #
-        #     # Overall sentiment assessment
-        #     market_sentiment = self._assess_overall_sentiment(
-        #         fear_greed_score, major_indices
-        #     )
-        #     confidence_level = self._calculate_confidence(
-        #         vix_level, major_indices, sector_performance
-        #     )
-        #
-        #     # Generate insights
-        #     sentiment_summary, market_outlook, key_factors = (
-        #         self._generate_macro_insights(
-        #             vix_level, vix_interpretation, major_indices, sector_performance
-        #         )
-        #     )
-        #
-        #     response = MacroSentimentResponse(
-        #         analysis_date=datetime.now().isoformat(),
-        #         vix_level=vix_level,
-        #         vix_interpretation=vix_interpretation,
-        #         fear_greed_score=fear_greed_score,
-        #         major_indices=major_indices,
-        #         sector_performance=sector_performance,
-        #         market_sentiment=market_sentiment,
-        #         confidence_level=confidence_level,
-        #         sentiment_summary=sentiment_summary,
-        #         market_outlook=market_outlook,
-        #         key_factors=key_factors,
-        #     )
-        #
-        #     logger.info(
-        #         "Macro sentiment analysis completed", sentiment=market_sentiment
-        #     )
-        #     return response
-        #
-        # except Exception as e:
-        #     logger.error("Macro sentiment analysis failed", error=str(e))
-        #     raise
+            # Fetch economic indicators
+            commodity_level, commodity_interpretation, fear_greed_score = (
+                await self._analyze_commodity_prices()
+            )
 
-    async def _analyze_vix(self) -> tuple[float, str, int]:
-        """Analyze VIX for fear/greed sentiment.
+            # Get economic indicators performance
+            economic_indicators = {}
+            if include_indices:
+                economic_indicators = await self._analyze_economic_indicators()
 
-        DISABLED: Requires yfinance migration.
-        """
-        # DISABLED: This method uses yfinance
-        return 20.0, "neutral", 50
+            # Overall sentiment assessment
+            market_sentiment = self._assess_overall_sentiment(
+                fear_greed_score, economic_indicators
+            )
+            confidence_level = self._calculate_confidence(
+                commodity_level, economic_indicators, {}
+            )
 
-    async def _analyze_major_indices(self) -> dict[str, float]:
-        """Analyze major market indices performance.
+            # Generate insights
+            sentiment_summary, market_outlook, key_factors = (
+                self._generate_macro_insights(
+                    commodity_level,
+                    commodity_interpretation,
+                    economic_indicators,
+                    {},
+                )
+            )
 
-        DISABLED: Requires yfinance migration.
-        """
-        # DISABLED: This method uses yfinance
-        return {}
+            response = MacroSentimentResponse(
+                analysis_date=datetime.now().isoformat(),
+                vix_level=commodity_level,
+                vix_interpretation=commodity_interpretation,
+                fear_greed_score=fear_greed_score,
+                major_indices=economic_indicators,
+                sector_performance={},  # Not available with economic indicators
+                market_sentiment=market_sentiment,
+                confidence_level=confidence_level,
+                sentiment_summary=sentiment_summary,
+                market_outlook=market_outlook,
+                key_factors=key_factors,
+            )
 
-    async def _analyze_sector_performance(self) -> dict[str, float]:
-        """Analyze sector ETF performance.
+            logger.info(
+                "Macro sentiment analysis completed", sentiment=market_sentiment
+            )
+            return response
 
-        DISABLED: Requires yfinance migration.
-        """
-        # DISABLED: This method uses yfinance
-        return {}
+        except Exception as e:
+            logger.error("Macro sentiment analysis failed", error=str(e))
+            raise
+
+    async def _analyze_commodity_prices(self) -> tuple[float, str, int]:
+        """Analyze commodity prices (WTI) as a market sentiment proxy."""
+        try:
+            # Fetch WTI commodity prices
+            commodity_df = await self.market_service.get_commodity_prices(
+                interval="monthly"
+            )
+            self.commodity_data = commodity_df
+
+            if commodity_df.empty:
+                logger.warning("No commodity data available, using default values")
+                return 70.0, "neutral", 50
+
+            # Get recent price changes (last 3 months vs previous 3 months)
+            latest_values = commodity_df["value"].iloc[-3:].mean()
+            previous_values = commodity_df["value"].iloc[-6:-3].mean()
+
+            # Calculate percentage change
+            pct_change = ((latest_values - previous_values) / previous_values) * 100
+
+            # Map to sentiment score (inverted: rising commodities = fear, falling = greed)
+            if pct_change > 10:
+                interpretation = "rising_fast"
+                fear_greed_score = 30  # More fear
+            elif pct_change > 5:
+                interpretation = "rising"
+                fear_greed_score = 40
+            elif pct_change > -5:
+                interpretation = "neutral"
+                fear_greed_score = 50
+            elif pct_change > -10:
+                interpretation = "falling"
+                fear_greed_score = 60
+            else:
+                interpretation = "falling_fast"
+                fear_greed_score = 70  # More greed
+
+            logger.info(
+                "Commodity price analysis completed",
+                level=latest_values,
+                interpretation=interpretation,
+                pct_change=pct_change,
+            )
+
+            return float(latest_values), interpretation, fear_greed_score
+
+        except Exception as e:
+            logger.error("Commodity price analysis failed", error=str(e))
+            # Return neutral default values
+            return 70.0, "neutral", 50
+
+    async def _analyze_economic_indicators(self) -> dict[str, float]:
+        """Analyze economic indicators (GDP, CPI, Inflation, Unemployment)."""
+        try:
+            indicators = {}
+
+            # Fetch all economic indicators
+            try:
+                gdp_df = await self.market_service.get_real_gdp(interval="quarterly")
+                if not gdp_df.empty:
+                    # Calculate YoY growth
+                    latest_gdp = gdp_df["value"].iloc[-1]
+                    year_ago_gdp = gdp_df["value"].iloc[-4] if len(gdp_df) >= 4 else latest_gdp
+                    gdp_growth = ((latest_gdp - year_ago_gdp) / year_ago_gdp) * 100
+                    indicators["Real GDP Growth (YoY)"] = round(gdp_growth, 2)
+                    self.economic_indicators["GDP"] = gdp_df
+            except Exception as e:
+                logger.warning("Failed to fetch GDP data", error=str(e))
+
+            try:
+                cpi_df = await self.market_service.get_cpi(interval="monthly")
+                if not cpi_df.empty:
+                    # Calculate MoM change
+                    latest_cpi = cpi_df["value"].iloc[-1]
+                    prev_cpi = cpi_df["value"].iloc[-2] if len(cpi_df) >= 2 else latest_cpi
+                    cpi_change = ((latest_cpi - prev_cpi) / prev_cpi) * 100
+                    indicators["CPI (MoM)"] = round(cpi_change, 2)
+                    self.economic_indicators["CPI"] = cpi_df
+            except Exception as e:
+                logger.warning("Failed to fetch CPI data", error=str(e))
+
+            try:
+                inflation_df = await self.market_service.get_inflation()
+                if not inflation_df.empty:
+                    latest_inflation = inflation_df["value"].iloc[-1]
+                    indicators["Inflation Rate"] = round(latest_inflation, 2)
+                    self.economic_indicators["Inflation"] = inflation_df
+            except Exception as e:
+                logger.warning("Failed to fetch inflation data", error=str(e))
+
+            try:
+                unemployment_df = await self.market_service.get_unemployment()
+                if not unemployment_df.empty:
+                    latest_unemployment = unemployment_df["value"].iloc[-1]
+                    indicators["Unemployment Rate"] = round(latest_unemployment, 2)
+                    self.economic_indicators["Unemployment"] = unemployment_df
+            except Exception as e:
+                logger.warning("Failed to fetch unemployment data", error=str(e))
+
+            logger.info(
+                "Economic indicators analysis completed",
+                indicators_count=len(indicators),
+            )
+
+            return indicators
+
+        except Exception as e:
+            logger.error("Economic indicators analysis failed", error=str(e))
+            return {}
 
     def _assess_overall_sentiment(
         self, fear_greed_score: int, major_indices: dict[str, float]

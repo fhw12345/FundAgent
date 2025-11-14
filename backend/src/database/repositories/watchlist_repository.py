@@ -32,21 +32,19 @@ class WatchlistRepository:
         """
         # Compound index for user + symbol (ensure uniqueness)
         await self.collection.create_index(
-            [("user_id", 1), ("symbol", 1)],
-            unique=True,
-            name="idx_user_symbol"
+            [("user_id", 1), ("symbol", 1)], unique=True, name="idx_user_symbol"
         )
         # Index for user queries
         await self.collection.create_index("user_id", name="user_id_1")
         # Index for analysis scheduling
-        await self.collection.create_index("last_analyzed_at", name="last_analyzed_at_1")
+        await self.collection.create_index(
+            "last_analyzed_at", name="last_analyzed_at_1"
+        )
 
         logger.info("Watchlist indexes ensured")
 
     async def create(
-        self,
-        user_id: str,
-        watchlist_create: WatchlistItemCreate
+        self, user_id: str, watchlist_create: WatchlistItemCreate
     ) -> WatchlistItem:
         """
         Create a new watchlist item.
@@ -99,10 +97,9 @@ class WatchlistRepository:
         Returns:
             List of watchlist items sorted by added_at descending
         """
-        cursor = (
-            self.collection.find({"user_id": user_id})
-            .sort("added_at", -1)  # Newest first
-        )
+        cursor = self.collection.find({"user_id": user_id}).sort(
+            "added_at", -1
+        )  # Newest first
 
         items = []
         async for item_dict in cursor:
@@ -112,11 +109,7 @@ class WatchlistRepository:
 
         return items
 
-    async def get_by_id(
-        self,
-        watchlist_id: str,
-        user_id: str
-    ) -> WatchlistItem | None:
+    async def get_by_id(self, watchlist_id: str, user_id: str) -> WatchlistItem | None:
         """
         Get a specific watchlist item.
 
@@ -127,10 +120,9 @@ class WatchlistRepository:
         Returns:
             Watchlist item if found, None otherwise
         """
-        item_dict = await self.collection.find_one({
-            "watchlist_id": watchlist_id,
-            "user_id": user_id
-        })
+        item_dict = await self.collection.find_one(
+            {"watchlist_id": watchlist_id, "user_id": user_id}
+        )
 
         if not item_dict:
             return None
@@ -151,27 +143,21 @@ class WatchlistRepository:
         Returns:
             True if deleted, False if not found
         """
-        result = await self.collection.delete_one({
-            "watchlist_id": watchlist_id,
-            "user_id": user_id
-        })
+        result = await self.collection.delete_one(
+            {"watchlist_id": watchlist_id, "user_id": user_id}
+        )
 
         deleted = result.deleted_count > 0
 
         if deleted:
             logger.info(
-                "Watchlist item deleted",
-                watchlist_id=watchlist_id,
-                user_id=user_id
+                "Watchlist item deleted", watchlist_id=watchlist_id, user_id=user_id
             )
 
         return deleted
 
     async def update_last_analyzed(
-        self,
-        watchlist_id: str,
-        user_id: str,
-        timestamp: datetime | None = None
+        self, watchlist_id: str, user_id: str, timestamp: datetime | None = None
     ) -> bool:
         """
         Update last_analyzed_at timestamp.
@@ -189,7 +175,7 @@ class WatchlistRepository:
 
         result = await self.collection.update_one(
             {"watchlist_id": watchlist_id, "user_id": user_id},
-            {"$set": {"last_analyzed_at": timestamp}}
+            {"$set": {"last_analyzed_at": timestamp}},
         )
 
         updated = result.modified_count > 0
@@ -199,15 +185,12 @@ class WatchlistRepository:
                 "Watchlist item analyzed timestamp updated",
                 watchlist_id=watchlist_id,
                 user_id=user_id,
-                timestamp=timestamp.isoformat()
+                timestamp=timestamp.isoformat(),
             )
 
         return updated
 
-    async def get_stale_items(
-        self,
-        minutes: int = 5
-    ) -> list[WatchlistItem]:
+    async def get_stale_items(self, minutes: int = 5) -> list[WatchlistItem]:
         """
         Get watchlist items that haven't been analyzed recently.
 
@@ -224,12 +207,16 @@ class WatchlistRepository:
         cutoff_time = datetime.utcnow() - timedelta(minutes=minutes)
 
         # Find items either never analyzed OR analyzed before cutoff
-        cursor = self.collection.find({
-            "$or": [
-                {"last_analyzed_at": None},
-                {"last_analyzed_at": {"$lt": cutoff_time}}
-            ]
-        }).sort("last_analyzed_at", 1)  # Oldest first
+        cursor = self.collection.find(
+            {
+                "$or": [
+                    {"last_analyzed_at": None},
+                    {"last_analyzed_at": {"$lt": cutoff_time}},
+                ]
+            }
+        ).sort(
+            "last_analyzed_at", 1
+        )  # Oldest first
 
         items = []
         async for item_dict in cursor:
@@ -238,9 +225,7 @@ class WatchlistRepository:
             items.append(WatchlistItem(**item_dict))
 
         logger.info(
-            "Stale watchlist items retrieved",
-            count=len(items),
-            min_age_minutes=minutes
+            "Stale watchlist items retrieved", count=len(items), min_age_minutes=minutes
         )
 
         return items

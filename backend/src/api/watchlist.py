@@ -52,15 +52,14 @@ async def add_to_watchlist(
             "Watchlist item added",
             user_id=user_id,
             symbol=watchlist_item.symbol,
-            watchlist_id=watchlist_item.watchlist_id
+            watchlist_id=watchlist_item.watchlist_id,
         )
 
         return watchlist_item
 
     except DuplicateKeyError:
         raise HTTPException(
-            status_code=409,
-            detail=f"Symbol {item.symbol} is already in your watchlist"
+            status_code=409, detail=f"Symbol {item.symbol} is already in your watchlist"
         )
     except Exception as e:
         logger.error(
@@ -68,11 +67,11 @@ async def add_to_watchlist(
             user_id=user_id,
             symbol=item.symbol,
             error=str(e),
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to add symbol to watchlist. Please try again later."
+            detail="Unable to add symbol to watchlist. Please try again later.",
         )
 
 
@@ -99,11 +98,7 @@ async def get_watchlist(
 
         items = await watchlist_repo.get_by_user(user_id)
 
-        logger.info(
-            "Watchlist retrieved",
-            user_id=user_id,
-            count=len(items)
-        )
+        logger.info("Watchlist retrieved", user_id=user_id, count=len(items))
 
         return items
 
@@ -112,11 +107,11 @@ async def get_watchlist(
             "Failed to get watchlist",
             user_id=user_id,
             error=str(e),
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to retrieve watchlist. Please try again later."
+            detail="Unable to retrieve watchlist. Please try again later.",
         )
 
 
@@ -149,15 +144,10 @@ async def remove_from_watchlist(
         deleted = await watchlist_repo.delete(watchlist_id, user_id)
 
         if not deleted:
-            raise HTTPException(
-                status_code=404,
-                detail="Watchlist item not found"
-            )
+            raise HTTPException(status_code=404, detail="Watchlist item not found")
 
         logger.info(
-            "Watchlist item removed",
-            user_id=user_id,
-            watchlist_id=watchlist_id
+            "Watchlist item removed", user_id=user_id, watchlist_id=watchlist_id
         )
 
     except HTTPException:
@@ -168,11 +158,11 @@ async def remove_from_watchlist(
             user_id=user_id,
             watchlist_id=watchlist_id,
             error=str(e),
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to remove symbol from watchlist. Please try again later."
+            detail="Unable to remove symbol from watchlist. Please try again later.",
         )
 
 
@@ -204,8 +194,7 @@ async def trigger_watchlist_analysis(
         # Get analyzer from app state
         if not hasattr(request.app.state, "watchlist_analyzer"):
             raise HTTPException(
-                status_code=500,
-                detail="Watchlist analyzer not initialized"
+                status_code=500, detail="Watchlist analyzer not initialized"
             )
 
         analyzer = request.app.state.watchlist_analyzer
@@ -216,7 +205,7 @@ async def trigger_watchlist_analysis(
 
         return {
             "status": "analysis_started",
-            "message": "Watchlist analysis has been triggered"
+            "message": "Watchlist analysis has been triggered",
         }
 
     except Exception as e:
@@ -224,9 +213,9 @@ async def trigger_watchlist_analysis(
             "Failed to trigger watchlist analysis",
             user_id=user_id,
             error=str(e),
-            error_type=type(e).__name__
+            error_type=type(e).__name__,
         )
         raise HTTPException(
             status_code=500,
-            detail="Unable to trigger watchlist analysis. Please try again later."
+            detail="Unable to trigger watchlist analysis. Please try again later.",
         )

@@ -8,8 +8,8 @@ NOTE: Temporarily disabled - requires migration from yfinance to alternative dat
 from datetime import datetime
 
 import structlog
-# import yfinance as yf  # DISABLED: Removed yfinance dependency
 
+# import yfinance as yf  # DISABLED: Removed yfinance dependency
 from ...api.models import StockFundamentalsResponse
 
 logger = structlog.get_logger()
@@ -40,7 +40,9 @@ class StockAnalyzer:
 
             self.symbol = symbol.upper()
             # DISABLED: yfinance removed - requires Alpha Vantage fundamentals implementation
-            raise NotImplementedError("Fundamentals analysis requires Alpha Vantage integration")
+            raise NotImplementedError(
+                "Fundamentals analysis requires Alpha Vantage integration"
+            )
 
             # Get basic info and price data
             info = self.ticker_data.info

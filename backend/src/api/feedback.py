@@ -105,7 +105,9 @@ async def generate_image_upload_url(
         )
 
         # Construct public URL for later access
-        public_url = f"https://{oss_service.bucket_name}.{oss_service.endpoint}/{object_key}"
+        public_url = (
+            f"https://{oss_service.bucket_name}.{oss_service.endpoint}/{object_key}"
+        )
 
         logger.info(
             "Generated image upload URL",

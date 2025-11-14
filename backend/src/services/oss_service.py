@@ -9,10 +9,8 @@ This service handles secure file uploads to OSS with:
 """
 
 import hashlib
-import mimetypes
 import re
-from datetime import datetime, timedelta
-from typing import Literal
+from datetime import datetime
 
 import oss2
 import structlog
@@ -60,7 +58,9 @@ class OSSService:
         # Initialize OSS auth and bucket (use HTTPS endpoint)
         auth = oss2.Auth(access_key_id, access_key_secret)
         # Ensure endpoint uses HTTPS for presigned URLs
-        https_endpoint = f"https://{endpoint}" if not endpoint.startswith("http") else endpoint
+        https_endpoint = (
+            f"https://{endpoint}" if not endpoint.startswith("http") else endpoint
+        )
         self.bucket = oss2.Bucket(auth, https_endpoint, bucket_name)
 
         logger.info(
@@ -97,7 +97,7 @@ class OSSService:
         file_hash = hashlib.sha256(hash_input.encode()).hexdigest()[:12]
 
         # Clean filename (sanitize: keep only alphanumeric, dash, underscore, dot)
-        clean_filename = re.sub(r'[^\w\-.]', '_', filename)
+        clean_filename = re.sub(r"[^\w\-.]", "_", filename)
 
         # Construct key: feedback/2025/10/30/{user_id}/{hash}_{filename}
         return f"{prefix}/{date_path}/{user_id}/{file_hash}_{clean_filename}"

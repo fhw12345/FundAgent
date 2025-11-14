@@ -16,6 +16,7 @@ try:
     ALPACA_AVAILABLE = True
 except ImportError:
     ALPACA_AVAILABLE = False
+
     # Create mock TimeFrame for type hints when Alpaca not installed
     class TimeFrame:
         Minute = "1Min"

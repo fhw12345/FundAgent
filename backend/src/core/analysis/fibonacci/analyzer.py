@@ -4,7 +4,7 @@ Orchestrates trend detection, level calculation, and pressure zone analysis usin
 """
 
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 import structlog
@@ -153,36 +153,33 @@ class FibonacciAnalyzer:
     ) -> pd.DataFrame:
         """Fetch stock data with timeframe-appropriate interval using AlphaVantageMarketDataService."""
         try:
-            # Map timeframe to Polygon interval
+            # Map timeframe to Alpha Vantage interval format
+            # For intraday (1h, 4h, etc.), AlphaVantage always returns 1 day of data with extended hours
             interval_map = {
-                "1h": "hour",
-                "1d": "day",
-                "1w": "week",
-                "1M": "month",
+                "1h": "60m",    # Intraday: 1 hour bars (will get 1 trading day)
+                "4h": "60m",    # Intraday: 1 hour bars (will get 1 trading day, can aggregate)
+                "1d": "1d",     # Daily
+                "1w": "1wk",    # Weekly
+                "1M": "1mo",    # Monthly
             }
-            interval = interval_map.get(self.timeframe, "day")
-
-            # Default periods for different timeframes
-            period_map = {
-                "1h": "60d",
-                "1d": "6mo",
-                "1w": "2y",
-                "1M": "5y",
-            }
-            period = period_map.get(self.timeframe, "6mo")
+            interval = interval_map.get(self.timeframe, "1d")
 
             # Fetch bars from Alpha Vantage via market service
+            # Note: For intraday intervals, AlphaVantage returns ~1 day of data automatically
+            # with extended_hours=True (includes pre/post market)
             bars = await self.market_service.get_price_bars(
                 symbol=self.symbol,
                 interval=interval,
-                period=period,
+                period="6mo",  # Only used for daily/weekly/monthly
+                start_date=start_date,
+                end_date=end_date,
             )
 
             if bars.empty:
                 logger.error("No data returned for symbol", symbol=self.symbol)
                 return pd.DataFrame()
 
-            # bars is already a properly formatted DataFrame from Polygon
+            # bars is already a properly formatted DataFrame
             data = bars
 
             logger.info(

@@ -126,14 +126,14 @@ Top Matches: {', '.join(formatted[:3])}
             # Format output with Key Metrics table
             output_lines = [
                 f"## {symbol} - {name}",
-                f"",
+                "",
                 f"**Industry**: {industry} | **Sector**: {sector}",
                 f"**Exchange**: {exchange} | **Country**: {country}",
-                f"",
+                "",
                 f"**Description**: {description}",
-                f"",
-                f"### Key Metrics",
-                f"",
+                "",
+                "### Key Metrics",
+                "",
             ]
 
             # Build metrics table
@@ -217,24 +217,21 @@ Top Matches: {', '.join(formatted[:3])}
 
             # Filter and sort by sentiment
             positive_news = [
-                item for item in feed
-                if item.get("overall_sentiment_score", 0) > 0.15
+                item for item in feed if item.get("overall_sentiment_score", 0) > 0.15
             ]
             negative_news = [
-                item for item in feed
-                if item.get("overall_sentiment_score", 0) < -0.15
+                item for item in feed if item.get("overall_sentiment_score", 0) < -0.15
             ]
 
             # Sort and limit
             positive_news = sorted(
                 positive_news,
                 key=lambda x: x.get("overall_sentiment_score", 0),
-                reverse=True
+                reverse=True,
             )[:max_positive]
 
             negative_news = sorted(
-                negative_news,
-                key=lambda x: x.get("overall_sentiment_score", 0)
+                negative_news, key=lambda x: x.get("overall_sentiment_score", 0)
             )[:max_negative]
 
             # Format output
@@ -246,9 +243,7 @@ Top Matches: {', '.join(formatted[:3])}
                     score = item.get("overall_sentiment_score", 0)
                     title = item.get("title", "")[:80]
                     source = item.get("source", "Unknown")
-                    output_lines.append(
-                        f"  • [{score:+.2f}] {title}... ({source})"
-                    )
+                    output_lines.append(f"  • [{score:+.2f}] {title}... ({source})")
 
             if negative_news:
                 output_lines.append(f"\n❌ NEGATIVE ({len(negative_news)}):")
@@ -256,9 +251,7 @@ Top Matches: {', '.join(formatted[:3])}
                     score = item.get("overall_sentiment_score", 0)
                     title = item.get("title", "")[:80]
                     source = item.get("source", "Unknown")
-                    output_lines.append(
-                        f"  • [{score:+.2f}] {title}... ({source})"
-                    )
+                    output_lines.append(f"  • [{score:+.2f}] {title}... ({source})")
 
             if not positive_news and not negative_news:
                 output_lines.append("No strongly positive or negative news found")
@@ -374,7 +367,7 @@ Top Matches: {', '.join(formatted[:3])}
                 "Financial statements tool failed",
                 symbol=symbol,
                 statement_type=statement_type,
-                error=str(e)
+                error=str(e),
             )
             return f"Financial statements error for {symbol}: {str(e)}"
 

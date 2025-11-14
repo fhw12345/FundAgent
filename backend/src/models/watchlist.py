@@ -28,11 +28,10 @@ class WatchlistItem(BaseModel):
     # Timestamps
     added_at: datetime = Field(
         default_factory=datetime.utcnow,
-        description="When symbol was added to watchlist"
+        description="When symbol was added to watchlist",
     )
     last_analyzed_at: datetime | None = Field(
-        None,
-        description="Last time this symbol was analyzed"
+        None, description="Last time this symbol was analyzed"
     )
 
     # Metadata

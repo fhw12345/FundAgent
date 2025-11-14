@@ -187,13 +187,17 @@ class CompanyOverviewResponse(BaseModel):
     pe_ratio: float | None = Field(None, description="Price-to-earnings ratio")
     eps: float | None = Field(None, description="Earnings per share")
     profit_margin: float | None = Field(None, description="Profit margin percentage")
-    revenue_ttm: float | None = Field(None, description="Revenue trailing twelve months")
+    revenue_ttm: float | None = Field(
+        None, description="Revenue trailing twelve months"
+    )
     dividend_yield: float | None = Field(None, description="Dividend yield percentage")
     beta: float | None = Field(None, description="Stock beta")
 
     # Ownership
     percent_insiders: float | None = Field(None, description="Percent held by insiders")
-    percent_institutions: float | None = Field(None, description="Percent held by institutions")
+    percent_institutions: float | None = Field(
+        None, description="Percent held by institutions"
+    )
 
     # Price metrics
     week_52_high: float | None = Field(None, description="52-week high")
@@ -225,10 +229,14 @@ class BalanceSheetResponse(BaseModel):
     fiscal_date_ending: str = Field(..., description="Fiscal date ending")
     total_assets: float | None = Field(None, description="Total assets")
     total_liabilities: float | None = Field(None, description="Total liabilities")
-    total_shareholder_equity: float | None = Field(None, description="Total shareholder equity")
+    total_shareholder_equity: float | None = Field(
+        None, description="Total shareholder equity"
+    )
     current_assets: float | None = Field(None, description="Current assets")
     current_liabilities: float | None = Field(None, description="Current liabilities")
-    cash_and_equivalents: float | None = Field(None, description="Cash and cash equivalents")
+    cash_and_equivalents: float | None = Field(
+        None, description="Cash and cash equivalents"
+    )
     balance_sheet_summary: str = Field(..., description="Balance sheet summary")
 
 
@@ -239,7 +247,9 @@ class NewsArticle(BaseModel):
     url: str = Field(..., description="Article URL")
     source: str = Field(..., description="News source")
     sentiment_score: float = Field(..., description="Sentiment score (-1 to 1)")
-    sentiment_label: str = Field(..., description="Sentiment label (Bullish/Bearish/Neutral)")
+    sentiment_label: str = Field(
+        ..., description="Sentiment label (Bullish/Bearish/Neutral)"
+    )
 
 
 class NewsSentimentResponse(BaseModel):
@@ -266,7 +276,9 @@ class MarketMoversResponse(BaseModel):
 
     top_gainers: list[MarketMover] = Field(..., description="Top gaining stocks")
     top_losers: list[MarketMover] = Field(..., description="Top losing stocks")
-    most_active: list[MarketMover] = Field(..., description="Most actively traded stocks")
+    most_active: list[MarketMover] = Field(
+        ..., description="Most actively traded stocks"
+    )
     last_updated: str = Field(..., description="Last updated timestamp")
 
 

@@ -6,7 +6,7 @@ on watchlist symbols every 5 minutes.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
@@ -17,7 +17,7 @@ from ..database.repositories.chat_repository import ChatRepository
 from ..database.repositories.message_repository import MessageRepository
 from ..database.repositories.watchlist_repository import WatchlistRepository
 from ..models.chat import ChatCreate
-from ..models.message import MessageMetadata, MessageCreate
+from ..models.message import MessageCreate, MessageMetadata
 
 logger = structlog.get_logger()
 
@@ -66,19 +66,22 @@ class WatchlistAnalyzer:
         chats = await self.chat_repo.list_by_user("portfolio_agent")
         for chat in chats:
             if chat.title and chat.title.startswith(f"{symbol} "):
-                logger.info("Found existing chat for symbol", symbol=symbol, chat_id=chat.chat_id)
+                logger.info(
+                    "Found existing chat for symbol",
+                    symbol=symbol,
+                    chat_id=chat.chat_id,
+                )
                 return chat.chat_id
 
         # Create new chat for this symbol
-        chat_create = ChatCreate(
-            title=f"{symbol} Analysis",
-            user_id="portfolio_agent"
-        )
+        chat_create = ChatCreate(title=f"{symbol} Analysis", user_id="portfolio_agent")
         chat = await self.chat_repo.create(chat_create)
         logger.info("Created new chat for symbol", symbol=symbol, chat_id=chat.chat_id)
         return chat.chat_id
 
-    async def analyze_symbol(self, symbol: str, user_id: str = "default_user", analysis_id: str | None = None) -> bool:
+    async def analyze_symbol(
+        self, symbol: str, user_id: str = "default_user", analysis_id: str | None = None
+    ) -> bool:
         """
         Run LLM agent analysis on a single symbol with MCP tools.
 
@@ -94,14 +97,24 @@ class WatchlistAnalyzer:
             # Generate analysis_id if not provided (format: symbol_YYYYMMDD_HHMMSS)
             if analysis_id is None:
                 from datetime import datetime
+
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 analysis_id = f"{symbol}_{timestamp}"
 
-            logger.info("Running agent-based analysis", symbol=symbol, user_id=user_id, analysis_id=analysis_id, has_agent=self.agent is not None)
+            logger.info(
+                "Running agent-based analysis",
+                symbol=symbol,
+                user_id=user_id,
+                analysis_id=analysis_id,
+                has_agent=self.agent is not None,
+            )
 
             # If no agent, fall back to basic Fibonacci
             if not self.agent:
-                logger.warning("No agent available, falling back to basic Fibonacci analysis", symbol=symbol)
+                logger.warning(
+                    "No agent available, falling back to basic Fibonacci analysis",
+                    symbol=symbol,
+                )
                 return await self._fallback_fibonacci_analysis(symbol, analysis_id)
 
             # Use LLM agent for comprehensive analysis
@@ -127,11 +140,15 @@ REASONING: [your analysis]
             # Invoke agent
             response = await self.agent.ainvoke(prompt)
 
-            logger.info("Agent analysis complete", symbol=symbol, response_length=len(str(response)))
+            logger.info(
+                "Agent analysis complete",
+                symbol=symbol,
+                response_length=len(str(response)),
+            )
 
             # Parse agent response - extract final_answer from dict response
-            if isinstance(response, dict) and 'final_answer' in response:
-                response_text = response['final_answer']
+            if isinstance(response, dict) and "final_answer" in response:
+                response_text = response["final_answer"]
             else:
                 response_text = str(response)
 
@@ -140,17 +157,24 @@ REASONING: [your analysis]
             position_size = None
 
             if "DECISION:" in response_text:
-                decision_line = [line for line in response_text.split('\n') if 'DECISION:' in line][0]
+                decision_line = [
+                    line for line in response_text.split("\n") if "DECISION:" in line
+                ][0]
                 if "BUY" in decision_line.upper():
                     decision = "BUY"
                 elif "SELL" in decision_line.upper():
                     decision = "SELL"
 
             if "POSITION_SIZE:" in response_text:
-                size_line = [line for line in response_text.split('\n') if 'POSITION_SIZE:' in line][0]
+                size_line = [
+                    line
+                    for line in response_text.split("\n")
+                    if "POSITION_SIZE:" in line
+                ][0]
                 # Extract percentage (e.g., "5%" or "5") - match number followed by %
                 import re
-                match = re.search(r'(\d+)%', size_line)
+
+                match = re.search(r"(\d+)%", size_line)
                 if match:
                     position_size = int(match.group(1))
 
@@ -170,7 +194,9 @@ REASONING: [your analysis]
                 interval="1d",
                 analysis_id=analysis_id,
                 # Add decision metadata for order placement
-                trend_direction=decision.lower() if decision in ["BUY", "SELL"] else None,
+                trend_direction=(
+                    decision.lower() if decision in ["BUY", "SELL"] else None
+                ),
             )
 
             message_create = MessageCreate(
@@ -218,9 +244,13 @@ REASONING: [your analysis]
                     # Persist order to MongoDB for audit trail
                     if self.order_repository:
                         await self.order_repository.create(order)
-                        logger.info("Order persisted to MongoDB", order_id=order.order_id)
+                        logger.info(
+                            "Order persisted to MongoDB", order_id=order.order_id
+                        )
                     else:
-                        logger.warning("Order repository not available - order not persisted to MongoDB")
+                        logger.warning(
+                            "Order repository not available - order not persisted to MongoDB"
+                        )
 
                     logger.info(
                         "Order placed successfully",
@@ -233,7 +263,9 @@ REASONING: [your analysis]
                     if message:
                         metadata.order_placed = True
                         metadata.order_id = order.alpaca_order_id
-                        await self.message_repo.update_metadata(message.message_id, metadata)
+                        await self.message_repo.update_metadata(
+                            message.message_id, metadata
+                        )
 
                 except Exception as e:
                     logger.error(
@@ -271,8 +303,16 @@ REASONING: [your analysis]
                 timeframe="1d",
             )
 
-            trend = result.market_structure.trend_direction if result.market_structure else None
-            levels = [level.price for level in result.fibonacci_levels[:5]] if result.fibonacci_levels else []
+            trend = (
+                result.market_structure.trend_direction
+                if result.market_structure
+                else None
+            )
+            levels = (
+                [level.price for level in result.fibonacci_levels[:5]]
+                if result.fibonacci_levels
+                else []
+            )
 
             metadata = MessageMetadata(
                 symbol=symbol,
@@ -298,7 +338,9 @@ REASONING: [your analysis]
             )
             await self.message_repo.create(message_create)
 
-            logger.info("Fallback Fibonacci analysis completed", symbol=symbol, trend=trend)
+            logger.info(
+                "Fallback Fibonacci analysis completed", symbol=symbol, trend=trend
+            )
             return True
 
         except Exception as e:
@@ -355,7 +397,7 @@ REASONING: [your analysis]
                     await self.watchlist_repo.update_last_analyzed(
                         watchlist_id=item.watchlist_id,
                         user_id=item.user_id,
-                        timestamp=datetime.utcnow()
+                        timestamp=datetime.utcnow(),
                     )
 
                 # Small delay between analyses to avoid rate limiting

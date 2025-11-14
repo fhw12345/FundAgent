@@ -8,8 +8,9 @@ Wraps MCP tools to provide:
 """
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 import structlog
 

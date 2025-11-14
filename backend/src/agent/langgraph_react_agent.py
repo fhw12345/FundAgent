@@ -38,6 +38,7 @@ import structlog
 
 # Patch DashScope error handling BEFORE importing ChatTongyi
 from ..core.utils.dashscope_fix import patch_tongyi_check_response
+
 patch_tongyi_check_response()
 
 from langchain_community.chat_models import ChatTongyi
@@ -48,10 +49,10 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
 from ..core.analysis.fibonacci.analyzer import FibonacciAnalyzer
-from ..core.utils import extract_token_usage_from_messages
 from ..core.analysis.stochastic_analyzer import StochasticAnalyzer
 from ..core.config import Settings
 from ..core.data.ticker_data_service import TickerDataService
+from ..core.utils import extract_token_usage_from_messages
 from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
@@ -498,8 +499,8 @@ Summary: {result.analysis_summary}"""
             ]
 
             # Extract token usage from all AI messages
-            total_input_tokens, total_output_tokens, _ = extract_token_usage_from_messages(
-                result["messages"]
+            total_input_tokens, total_output_tokens, _ = (
+                extract_token_usage_from_messages(result["messages"])
             )
 
             logger.info(
@@ -525,6 +526,7 @@ Summary: {result.analysis_summary}"""
         except Exception as e:
             # Get full traceback for debugging
             import traceback
+
             tb_str = traceback.format_exc()
 
             logger.error(
