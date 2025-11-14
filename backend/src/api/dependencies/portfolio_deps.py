@@ -9,8 +9,8 @@ from ...core.data.ticker_data_service import TickerDataService
 from ...database.mongodb import MongoDB
 from ...database.redis import RedisCache
 from ...database.repositories.holding_repository import HoldingRepository
-from ...services.alpaca_data_service import AlpacaDataService
 from ...services.alpaca_trading_service import AlpacaTradingService
+from ...services.alphavantage_market_data import AlphaVantageMarketDataService
 from ...services.portfolio_service import PortfolioService
 from .auth import get_mongodb  # Import shared auth
 from .chat_deps import get_redis
@@ -24,23 +24,22 @@ def get_holding_repository(
     return HoldingRepository(holdings_collection)
 
 
-def get_alpaca_data_service(
-    settings: Settings = Depends(get_settings),
-) -> AlpacaDataService | None:
-    """Get Alpaca data service instance (returns None if credentials not set)."""
-    if not settings.alpaca_api_key or not settings.alpaca_secret_key:
-        return None
-    return AlpacaDataService(settings=settings)
+def get_market_service() -> AlphaVantageMarketDataService:
+    """Get AlphaVantage market service instance from app state."""
+    from ...main import app
+
+    market_service: AlphaVantageMarketDataService = app.state.market_service
+    return market_service
 
 
 def get_ticker_data_service(
     redis_cache: RedisCache = Depends(get_redis),
-    alpaca_service: AlpacaDataService | None = Depends(get_alpaca_data_service),
+    market_service: AlphaVantageMarketDataService = Depends(get_market_service),
 ) -> TickerDataService:
-    """Get ticker data service instance."""
+    """Get ticker data service instance with AlphaVantage."""
     return TickerDataService(
         redis_cache=redis_cache,
-        alpaca_data_service=alpaca_service,  # Can be None, will fall back to yfinance
+        alpha_vantage_service=market_service,
     )
 
 

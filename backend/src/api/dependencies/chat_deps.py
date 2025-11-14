@@ -69,11 +69,23 @@ def get_chat_agent(
     return ChatAgent(settings=settings)
 
 
+def get_market_service() -> "AlphaVantageMarketDataService":
+    """Get AlphaVantage market service instance from app state."""
+    from ...main import app
+    from ...services.alphavantage_market_data import AlphaVantageMarketDataService
+
+    market_service: AlphaVantageMarketDataService = app.state.market_service
+    return market_service
+
+
 def get_ticker_data_service(
     redis_cache: RedisCache = Depends(get_redis),
+    market_service: "AlphaVantageMarketDataService" = Depends(get_market_service),
 ) -> TickerDataService:
-    """Get ticker data service instance."""
-    return TickerDataService(redis_cache=redis_cache)
+    """Get ticker data service instance with AlphaVantage."""
+    return TickerDataService(
+        redis_cache=redis_cache, alpha_vantage_service=market_service
+    )
 
 
 def get_react_agent(
@@ -111,10 +123,11 @@ def get_react_agent(
     # why app.state.react_agent is None.
     if _react_agent_singleton is None:
         import structlog
+
         logger = structlog.get_logger()
         logger.warning(
             "Creating fallback agent without tool execution tracking",
-            reason="app.state.react_agent not found"
+            reason="app.state.react_agent not found",
         )
 
         _react_agent_singleton = FinancialAnalysisReActAgent(

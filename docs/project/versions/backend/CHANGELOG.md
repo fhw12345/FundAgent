@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2025-11-14
+
+### Added
+- fix(data): Complete AlphaVantage integration across all TickerDataService instantiations
+
+
+## [0.6.1] - 2025-11-14
+
+### Added
+- fix(k8s): add namespace env var and RBAC permissions for metrics API
+
+
 ## [0.5.20] - 2025-11-12
 
 ### Added

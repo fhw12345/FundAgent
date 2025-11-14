@@ -15,7 +15,6 @@ from ..core.financial_analysis import (
     FibonacciAnalyzer,
     MacroAnalyzer,
     StochasticAnalyzer,
-    StockAnalyzer,
 )
 from ..database.redis import RedisCache
 from ..services.alphavantage_market_data import AlphaVantageMarketDataService
@@ -41,7 +40,6 @@ from .models import (
     StockFundamentalsResponse,
     ToolCall,
 )
-
 
 # Tool Registry for UI Metadata
 TOOL_REGISTRY = {
@@ -81,8 +79,11 @@ def create_tool_call(
 
 
 def get_market_service() -> AlphaVantageMarketDataService:
-    """Dependency to get market data service."""
-    return AlphaVantageMarketDataService(get_settings())
+    """Dependency to get market data service from app state."""
+    from ..main import app
+
+    market_service: AlphaVantageMarketDataService = app.state.market_service
+    return market_service
 
 
 def validate_date_range(start_date: str | None, end_date: str | None) -> None:
@@ -374,7 +375,9 @@ async def stock_fundamentals(
         company_name = overview.get("Name", symbol)
 
         # Price Data
-        current_price = safe_float(overview.get("50DayMovingAverage"))  # Use MA as proxy
+        current_price = safe_float(
+            overview.get("50DayMovingAverage")
+        )  # Use MA as proxy
         fifty_two_week_high = safe_float(overview.get("52WeekHigh"), current_price)
         fifty_two_week_low = safe_float(overview.get("52WeekLow"), current_price)
 
@@ -382,18 +385,42 @@ async def stock_fundamentals(
         market_cap = safe_float(overview.get("MarketCapitalization"))
 
         # Valuation Ratios
-        pe_ratio = safe_float(overview.get("PERatio")) if overview.get("PERatio") != "None" else None
-        forward_pe = safe_float(overview.get("ForwardPE")) if overview.get("ForwardPE") != "None" else None
-        pb_ratio = safe_float(overview.get("PriceToBookRatio")) if overview.get("PriceToBookRatio") != "None" else None
-        peg_ratio = safe_float(overview.get("PEGRatio")) if overview.get("PEGRatio") != "None" else None
-        price_to_sales = safe_float(overview.get("PriceToSalesRatioTTM")) if overview.get("PriceToSalesRatioTTM") != "None" else None
+        pe_ratio = (
+            safe_float(overview.get("PERatio"))
+            if overview.get("PERatio") != "None"
+            else None
+        )
+        forward_pe = (
+            safe_float(overview.get("ForwardPE"))
+            if overview.get("ForwardPE") != "None"
+            else None
+        )
+        pb_ratio = (
+            safe_float(overview.get("PriceToBookRatio"))
+            if overview.get("PriceToBookRatio") != "None"
+            else None
+        )
+        peg_ratio = (
+            safe_float(overview.get("PEGRatio"))
+            if overview.get("PEGRatio") != "None"
+            else None
+        )
+        price_to_sales = (
+            safe_float(overview.get("PriceToSalesRatioTTM"))
+            if overview.get("PriceToSalesRatioTTM") != "None"
+            else None
+        )
 
         # Profitability Metrics
         eps = safe_float(overview.get("EPS")) if overview.get("EPS") != "None" else None
         profit_margin_decimal = safe_float(overview.get("ProfitMargin"))
-        profit_margin = profit_margin_decimal * 100 if profit_margin_decimal > 0 else None
+        profit_margin = (
+            profit_margin_decimal * 100 if profit_margin_decimal > 0 else None
+        )
         operating_margin_decimal = safe_float(overview.get("OperatingMarginTTM"))
-        operating_margin = operating_margin_decimal * 100 if operating_margin_decimal > 0 else None
+        operating_margin = (
+            operating_margin_decimal * 100 if operating_margin_decimal > 0 else None
+        )
 
         # Return Metrics
         roe_decimal = safe_float(overview.get("ReturnOnEquityTTM"))
@@ -403,18 +430,38 @@ async def stock_fundamentals(
 
         # Growth Metrics
         revenue_ttm = safe_float(overview.get("RevenueTTM"))
-        quarterly_earnings_growth_decimal = safe_float(overview.get("QuarterlyEarningsGrowthYOY"))
-        quarterly_earnings_growth = quarterly_earnings_growth_decimal * 100 if quarterly_earnings_growth_decimal != 0 else None
-        quarterly_revenue_growth_decimal = safe_float(overview.get("QuarterlyRevenueGrowthYOY"))
-        quarterly_revenue_growth = quarterly_revenue_growth_decimal * 100 if quarterly_revenue_growth_decimal != 0 else None
+        quarterly_earnings_growth_decimal = safe_float(
+            overview.get("QuarterlyEarningsGrowthYOY")
+        )
+        quarterly_earnings_growth = (
+            quarterly_earnings_growth_decimal * 100
+            if quarterly_earnings_growth_decimal != 0
+            else None
+        )
+        quarterly_revenue_growth_decimal = safe_float(
+            overview.get("QuarterlyRevenueGrowthYOY")
+        )
+        quarterly_revenue_growth = (
+            quarterly_revenue_growth_decimal * 100
+            if quarterly_revenue_growth_decimal != 0
+            else None
+        )
 
         # Dividend & Risk
         dividend_yield_decimal = safe_float(overview.get("DividendYield"))
-        dividend_yield = dividend_yield_decimal * 100 if dividend_yield_decimal > 0 else None
-        beta = safe_float(overview.get("Beta")) if overview.get("Beta") != "None" else None
+        dividend_yield = (
+            dividend_yield_decimal * 100 if dividend_yield_decimal > 0 else None
+        )
+        beta = (
+            safe_float(overview.get("Beta")) if overview.get("Beta") != "None" else None
+        )
 
         # Analyst Data
-        analyst_target_price = safe_float(overview.get("AnalystTargetPrice")) if overview.get("AnalystTargetPrice") != "None" else None
+        analyst_target_price = (
+            safe_float(overview.get("AnalystTargetPrice"))
+            if overview.get("AnalystTargetPrice") != "None"
+            else None
+        )
 
         # Calculate price position in 52-week range
         price_range = fifty_two_week_high - fifty_two_week_low
@@ -454,10 +501,14 @@ async def stock_fundamentals(
         # Valuation Ratios Section
         if pe_ratio is not None and pe_ratio > 0:
             pe_interpretation = (
-                "expensive" if pe_ratio > 25 else "reasonable" if pe_ratio > 15 else "cheap"
+                "expensive"
+                if pe_ratio > 25
+                else "reasonable" if pe_ratio > 15 else "cheap"
             )
             key_metrics.append(f"P/E Ratio (TTM): {pe_ratio:.2f} ({pe_interpretation})")
-            summary += f"P/E ratio of {pe_ratio:.2f} suggests {pe_interpretation} valuation. "
+            summary += (
+                f"P/E ratio of {pe_ratio:.2f} suggests {pe_interpretation} valuation. "
+            )
 
         if forward_pe is not None and forward_pe > 0:
             key_metrics.append(f"Forward P/E: {forward_pe:.2f}")
@@ -469,7 +520,11 @@ async def stock_fundamentals(
             key_metrics.append(f"P/B Ratio: {pb_ratio:.2f} ({pb_interpretation})")
 
         if peg_ratio is not None and peg_ratio > 0:
-            peg_interpretation = "attractive" if peg_ratio < 1 else "fair" if peg_ratio < 2 else "expensive"
+            peg_interpretation = (
+                "attractive"
+                if peg_ratio < 1
+                else "fair" if peg_ratio < 2 else "expensive"
+            )
             key_metrics.append(f"PEG Ratio: {peg_ratio:.2f} ({peg_interpretation})")
 
         if price_to_sales is not None and price_to_sales > 0:
@@ -480,8 +535,14 @@ async def stock_fundamentals(
             key_metrics.append(f"EPS (TTM): ${eps:.2f}")
 
         if profit_margin is not None:
-            margin_quality = "excellent" if profit_margin > 20 else "good" if profit_margin > 10 else "moderate"
-            key_metrics.append(f"Profit Margin: {profit_margin:.1f}% ({margin_quality})")
+            margin_quality = (
+                "excellent"
+                if profit_margin > 20
+                else "good" if profit_margin > 10 else "moderate"
+            )
+            key_metrics.append(
+                f"Profit Margin: {profit_margin:.1f}% ({margin_quality})"
+            )
 
         if operating_margin is not None:
             key_metrics.append(f"Operating Margin: {operating_margin:.1f}%")
@@ -500,15 +561,23 @@ async def stock_fundamentals(
 
         if quarterly_earnings_growth is not None:
             growth_trend = "growing" if quarterly_earnings_growth > 0 else "declining"
-            key_metrics.append(f"Q Earnings Growth YoY: {quarterly_earnings_growth:+.1f}% ({growth_trend})")
+            key_metrics.append(
+                f"Q Earnings Growth YoY: {quarterly_earnings_growth:+.1f}% ({growth_trend})"
+            )
 
         if quarterly_revenue_growth is not None:
             growth_trend = "growing" if quarterly_revenue_growth > 0 else "declining"
-            key_metrics.append(f"Q Revenue Growth YoY: {quarterly_revenue_growth:+.1f}% ({growth_trend})")
+            key_metrics.append(
+                f"Q Revenue Growth YoY: {quarterly_revenue_growth:+.1f}% ({growth_trend})"
+            )
 
         # Dividend & Risk Section
         if dividend_yield is not None and dividend_yield > 0:
-            div_quality = "high income" if dividend_yield > 4 else "moderate income" if dividend_yield > 2 else "low income"
+            div_quality = (
+                "high income"
+                if dividend_yield > 4
+                else "moderate income" if dividend_yield > 2 else "low income"
+            )
             key_metrics.append(f"Dividend Yield: {dividend_yield:.2f}% ({div_quality})")
             if dividend_yield > 4:
                 summary += "High dividend yield suggests income focus. "
@@ -519,9 +588,11 @@ async def stock_fundamentals(
 
         # Analyst Target
         if analyst_target_price is not None and analyst_target_price > 0:
-            upside_pct = ((analyst_target_price - current_price) / current_price * 100)
+            upside_pct = (analyst_target_price - current_price) / current_price * 100
             upside_dir = "upside" if upside_pct > 0 else "downside"
-            key_metrics.append(f"Analyst Target: ${analyst_target_price:.2f} ({upside_pct:+.1f}% {upside_dir})")
+            key_metrics.append(
+                f"Analyst Target: ${analyst_target_price:.2f} ({upside_pct:+.1f}% {upside_dir})"
+            )
 
         result = StockFundamentalsResponse(
             symbol=symbol,
@@ -553,7 +624,9 @@ async def stock_fundamentals(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid symbol: {str(e)}") from e
     except Exception as e:
-        logger.error("Fundamentals analysis failed", symbol=request.symbol, error=str(e))
+        logger.error(
+            "Fundamentals analysis failed", symbol=request.symbol, error=str(e)
+        )
         raise HTTPException(
             status_code=500, detail=f"Fundamentals analysis failed: {str(e)}"
         ) from e
@@ -582,7 +655,9 @@ async def company_overview(
         if cached_result:
             return CompanyOverviewResponse.model_validate(cached_result)
 
-        logger.info("Fetching company overview from Alpha Vantage", symbol=request.symbol)
+        logger.info(
+            "Fetching company overview from Alpha Vantage", symbol=request.symbol
+        )
 
         # Get company overview from Alpha Vantage
         overview = await market_service.get_company_overview(request.symbol)
@@ -617,7 +692,9 @@ async def company_overview(
         profit_margin = profit_margin_decimal * 100 if profit_margin_decimal else None
         revenue_ttm = safe_float(overview.get("RevenueTTM"))
         dividend_yield_decimal = safe_float(overview.get("DividendYield"))
-        dividend_yield = dividend_yield_decimal * 100 if dividend_yield_decimal else None
+        dividend_yield = (
+            dividend_yield_decimal * 100 if dividend_yield_decimal else None
+        )
         beta = safe_float(overview.get("Beta"))
 
         # Ownership metrics (Alpha Vantage returns these as percentages already, not decimals)
@@ -684,7 +761,9 @@ async def company_overview(
         # Cache for 4 hours - Company info rarely changes
         await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
 
-        logger.info("Company overview completed", symbol=symbol, company_name=company_name)
+        logger.info(
+            "Company overview completed", symbol=symbol, company_name=company_name
+        )
         return result
 
     except ValueError as e:
@@ -760,7 +839,9 @@ async def cash_flow(
         raise HTTPException(status_code=400, detail=f"Invalid symbol: {str(e)}") from e
     except Exception as e:
         logger.error("Cash flow failed", symbol=request.symbol, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Cash flow failed: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Cash flow failed: {str(e)}"
+        ) from e
 
 
 @router.post("/balance-sheet", response_model=BalanceSheetResponse)
@@ -831,7 +912,9 @@ async def balance_sheet(
         raise HTTPException(status_code=400, detail=f"Invalid symbol: {str(e)}") from e
     except Exception as e:
         logger.error("Balance sheet failed", symbol=request.symbol, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Balance sheet failed: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Balance sheet failed: {str(e)}"
+        ) from e
 
 
 @router.post("/news-sentiment", response_model=NewsSentimentResponse)
@@ -853,7 +936,9 @@ async def news_sentiment(
 
         logger.info("Fetching news sentiment from Alpha Vantage", symbol=request.symbol)
 
-        data = await market_service.get_news_sentiment(tickers=request.symbol, limit=50, sort="LATEST")
+        data = await market_service.get_news_sentiment(
+            tickers=request.symbol, limit=50, sort="LATEST"
+        )
         feed = data.get("feed", [])
 
         if not feed:
@@ -866,9 +951,10 @@ async def news_sentiment(
                 url=item["url"],
                 source=item.get("source", "Unknown"),
                 sentiment_score=item["overall_sentiment_score"],
-                sentiment_label="Bullish"
+                sentiment_label="Bullish",
             )
-            for item in feed if item.get("overall_sentiment_score", 0) > 0.15
+            for item in feed
+            if item.get("overall_sentiment_score", 0) > 0.15
         ][:3]
 
         negative = [
@@ -877,9 +963,10 @@ async def news_sentiment(
                 url=item["url"],
                 source=item.get("source", "Unknown"),
                 sentiment_score=item["overall_sentiment_score"],
-                sentiment_label="Bearish"
+                sentiment_label="Bearish",
             )
-            for item in feed if item.get("overall_sentiment_score", 0) < -0.15
+            for item in feed
+            if item.get("overall_sentiment_score", 0) < -0.15
         ][:3]
 
         overall = f"Found {len(positive)} positive and {len(negative)} negative articles for {request.symbol}"
@@ -891,7 +978,9 @@ async def news_sentiment(
             overall_sentiment=overall,
         )
 
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)  # 1 hour
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=3600
+        )  # 1 hour
         logger.info("News sentiment completed", symbol=request.symbol)
         return result
 
@@ -899,7 +988,9 @@ async def news_sentiment(
         raise HTTPException(status_code=400, detail=f"Invalid symbol: {str(e)}") from e
     except Exception as e:
         logger.error("News sentiment failed", symbol=request.symbol, error=str(e))
-        raise HTTPException(status_code=500, detail=f"News sentiment failed: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"News sentiment failed: {str(e)}"
+        ) from e
 
 
 @router.get("/market-movers", response_model=MarketMoversResponse)
@@ -928,7 +1019,7 @@ async def market_movers(
                 price=float(item["price"]),
                 change_amount=float(item["change_amount"]),
                 change_percentage=item["change_percentage"],
-                volume=int(item["volume"])
+                volume=int(item["volume"]),
             )
             for item in data.get("top_gainers", [])[:5]
         ]
@@ -939,7 +1030,7 @@ async def market_movers(
                 price=float(item["price"]),
                 change_amount=float(item["change_amount"]),
                 change_percentage=item["change_percentage"],
-                volume=int(item["volume"])
+                volume=int(item["volume"]),
             )
             for item in data.get("top_losers", [])[:5]
         ]
@@ -950,7 +1041,7 @@ async def market_movers(
                 price=float(item["price"]),
                 change_amount=float(item["change_amount"]),
                 change_percentage=item["change_percentage"],
-                volume=int(item["volume"])
+                volume=int(item["volume"]),
             )
             for item in data.get("most_actively_traded", [])[:5]
         ]
@@ -962,13 +1053,17 @@ async def market_movers(
             last_updated=datetime.now(UTC).isoformat(),
         )
 
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)  # 1 hour
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=3600
+        )  # 1 hour
         logger.info("Market movers completed")
         return result
 
     except Exception as e:
         logger.error("Market movers failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Market movers failed: {str(e)}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Market movers failed: {str(e)}"
+        ) from e
 
 
 @router.post("/stochastic", response_model=StochasticAnalysisResponse)
@@ -976,6 +1071,7 @@ async def stochastic_analysis(
     request: StochasticAnalysisRequest,
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
+    market_service: AlphaVantageMarketDataService = Depends(get_market_service),
 ) -> StochasticAnalysisResponse:
     """
     Perform Stochastic Oscillator technical analysis on a stock symbol.
@@ -1041,10 +1137,12 @@ async def stochastic_analysis(
             d_period=request.d_period,
         )
 
-        # Initialize TickerDataService and analyzer
+        # Initialize TickerDataService and analyzer with AlphaVantage
         from ..core.data.ticker_data_service import TickerDataService
 
-        ticker_service = TickerDataService(redis_cache)
+        ticker_service = TickerDataService(
+            redis_cache=redis_cache, alpha_vantage_service=market_service
+        )
         analyzer = StochasticAnalyzer(ticker_service)
 
         result = await analyzer.analyze(
@@ -1182,7 +1280,6 @@ async def get_analysis_history(
     Used for portfolio chart markers and analysis timeline.
     """
     try:
-        from ..database.mongodb import MongoDB
         from ..database.repositories.message_repository import MessageRepository
 
         # Get MongoDB connection
@@ -1206,15 +1303,17 @@ async def get_analysis_history(
             if aid not in analysis_sessions:
                 analysis_sessions[aid] = []
 
-            analysis_sessions[aid].append({
-                "message_id": msg.message_id,
-                "timestamp": msg.timestamp.isoformat(),
-                "symbol": msg.metadata.symbol,
-                "content": msg.content[:200],  # Truncate for summary
-                "selected_tool": msg.metadata.selected_tool,
-                "confidence_score": msg.metadata.confidence_score,
-                "trend_direction": msg.metadata.trend_direction,
-            })
+            analysis_sessions[aid].append(
+                {
+                    "message_id": msg.message_id,
+                    "timestamp": msg.timestamp.isoformat(),
+                    "symbol": msg.metadata.symbol,
+                    "content": msg.content[:200],  # Truncate for summary
+                    "selected_tool": msg.metadata.selected_tool,
+                    "confidence_score": msg.metadata.confidence_score,
+                    "trend_direction": msg.metadata.trend_direction,
+                }
+            )
 
         logger.info(
             "Analysis history queried",
@@ -1239,6 +1338,5 @@ async def get_analysis_history(
             error=str(e),
         )
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get analysis history: {str(e)}"
+            status_code=500, detail=f"Failed to get analysis history: {str(e)}"
         ) from e
