@@ -14,12 +14,12 @@ logger = structlog.get_logger()
 class KubernetesMetricsService:
     """Service for collecting Kubernetes pod and node metrics."""
 
-    def __init__(self, namespace: str = "klinematrix-test") -> None:
+    def __init__(self, namespace: str = "default") -> None:
         """
         Initialize Kubernetes metrics service.
 
         Args:
-            namespace: Kubernetes namespace to query (default: klinematrix-test)
+            namespace: Kubernetes namespace to query (configurable via KUBERNETES_NAMESPACE env var)
         """
         self.namespace = namespace
         self.available = False

@@ -47,7 +47,7 @@ patches:
 images:
 - name: klinematrix/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend
-  newTag: "prod-v0.6.0"
+  newTag: "prod-v0.6.1"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend
   newTag: "prod-v0.9.0"

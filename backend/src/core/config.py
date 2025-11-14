@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     rate_limit_requests: int = 100
     rate_limit_window: int = 60  # per minute
 
+    # Kubernetes configuration
+    kubernetes_namespace: str = "default"  # K8s namespace for metrics collection
+
     @property
     def database_name(self) -> str:
         """Extract database name from MongoDB URL."""

@@ -75,6 +75,10 @@ spec:
         - name: CORS_ORIGINS
           value: '["https://klinecubic.cn"]'
 
+        # Kubernetes namespace for metrics collection
+        - name: KUBERNETES_NAMESPACE
+          value: "klinematrix-prod"
+
         # Production resource limits
         resources:
           requests:

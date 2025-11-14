@@ -7,6 +7,7 @@ from datetime import datetime
 import structlog
 from fastapi import APIRouter, Depends
 
+from ..core.config import get_settings
 from ..database.mongodb import MongoDB
 from ..models.user import User
 from ..services.database_stats_service import DatabaseStatsService
@@ -28,7 +29,8 @@ def get_database_stats_service(
 
 def get_kubernetes_metrics_service() -> KubernetesMetricsService:
     """Get Kubernetes metrics service instance."""
-    return KubernetesMetricsService(namespace="klinematrix-test")
+    settings = get_settings()
+    return KubernetesMetricsService(namespace=settings.kubernetes_namespace)
 
 
 @router.get("/health", response_model=HealthResponse)
