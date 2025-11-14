@@ -15,14 +15,17 @@ from ..core.config import Settings
 from ..core.utils import (
     get_valid_frontend_intervals,
 )
+from ..core.utils.cache_utils import get_tool_ttl
+from ..database.redis import RedisCache
 from ..services.alphavantage_market_data import AlphaVantageMarketDataService
 from .dependencies.auth import get_current_user_id
+from .dependencies.chat_deps import get_redis
 
 router = APIRouter(prefix="/api/market", tags=["Market Data"])
 logger = structlog.get_logger()
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
@@ -130,7 +133,9 @@ async def search_symbols(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error("Symbol search failed", query=q, error=str(e), error_type=type(e).__name__)
+        logger.error(
+            "Symbol search failed", query=q, error=str(e), error_type=type(e).__name__
+        )
         raise HTTPException(
             status_code=500, detail=f"Symbol search failed: {str(e)}"
         ) from e
@@ -275,8 +280,16 @@ async def get_symbol_info(
         return {
             "symbol": matching_asset.symbol,
             "name": matching_asset.name,
-            "exchange": matching_asset.exchange.value if hasattr(matching_asset.exchange, "value") else str(matching_asset.exchange),
-            "type": matching_asset.asset_class.value if hasattr(matching_asset.asset_class, "value") else "EQUITY",
+            "exchange": (
+                matching_asset.exchange.value
+                if hasattr(matching_asset.exchange, "value")
+                else str(matching_asset.exchange)
+            ),
+            "type": (
+                matching_asset.asset_class.value
+                if hasattr(matching_asset.asset_class, "value")
+                else "EQUITY"
+            ),
         }
 
     except ValueError as e:
@@ -312,7 +325,9 @@ async def get_company_overview(
 
         data = await service.get_company_overview(symbol)
 
-        logger.info("Company overview fetched", symbol=symbol, company_name=data.get("Name"))
+        logger.info(
+            "Company overview fetched", symbol=symbol, company_name=data.get("Name")
+        )
 
         return data
 
@@ -331,7 +346,9 @@ async def get_news_sentiment(
     user_id: str = Depends(get_current_user_id),
     service: AlphaVantageMarketDataService = Depends(get_market_service),
     limit: int = Query(50, ge=1, le=1000, description="Max news items (1-1000)"),
-    sort: str = Query("LATEST", description="Sort order: LATEST | EARLIEST | RELEVANCE"),
+    sort: str = Query(
+        "LATEST", description="Sort order: LATEST | EARLIEST | RELEVANCE"
+    ),
 ) -> dict:
     """
     Get news articles with sentiment analysis for a stock.
@@ -347,14 +364,16 @@ async def get_news_sentiment(
         if not symbol:
             raise ValueError("Symbol is required")
 
-        logger.info("News sentiment request", symbol=symbol, user_id=user_id, limit=limit)
+        logger.info(
+            "News sentiment request", symbol=symbol, user_id=user_id, limit=limit
+        )
 
         data = await service.get_news_sentiment(tickers=symbol, limit=limit, sort=sort)
 
         logger.info(
             "News sentiment fetched",
             symbol=symbol,
-            news_count=len(data.get("feed", []))
+            news_count=len(data.get("feed", [])),
         )
 
         return data
@@ -399,7 +418,7 @@ async def get_cash_flow(
             "Cash flow fetched",
             symbol=symbol,
             annual_count=len(data.get("annualReports", [])),
-            quarterly_count=len(data.get("quarterlyReports", []))
+            quarterly_count=len(data.get("quarterlyReports", [])),
         )
 
         return data
@@ -444,7 +463,7 @@ async def get_balance_sheet(
             "Balance sheet fetched",
             symbol=symbol,
             annual_count=len(data.get("annualReports", [])),
-            quarterly_count=len(data.get("quarterlyReports", []))
+            quarterly_count=len(data.get("quarterlyReports", [])),
         )
 
         return data
@@ -462,9 +481,10 @@ async def get_balance_sheet(
 async def get_market_movers(
     user_id: str = Depends(get_current_user_id),
     service: AlphaVantageMarketDataService = Depends(get_market_service),
+    redis_cache: RedisCache = Depends(get_redis),
 ) -> dict:
     """
-    Get today's top market movers.
+    Get today's top market movers with 30-minute caching.
 
     Returns:
     - top_gainers: Top 20 stocks with highest price increase (% and $)
@@ -472,17 +492,39 @@ async def get_market_movers(
     - most_actively_traded: Top 20 stocks by trading volume
 
     Each entry includes: ticker, price, change_amount, change_percentage, volume
+
+    Cache Duration: 30 minutes (configured in cache_utils.py)
+    - Market movers change throughout trading day but not every second
+    - 30-min refresh balances freshness vs API efficiency
+    - Reduces Alpha Vantage API calls by 12x per 6-hour period
     """
     try:
         logger.info("Market movers request", user_id=user_id)
 
+        # Generate cache key
+        cache_key = "market_movers:top_gainers_losers"
+
+        # Check cache first
+        cached_data = await redis_cache.get(cache_key)
+        if cached_data is not None:
+            logger.info("Market movers cache hit", user_id=user_id)
+            return cached_data
+
+        logger.info("Market movers cache miss, fetching from API", user_id=user_id)
+
+        # Fetch from Alpha Vantage API
         data = await service.get_top_gainers_losers()
 
+        # Cache with 30-minute TTL (configured in TOOL_TTL_MAP)
+        ttl = get_tool_ttl("TOP_GAINERS_LOSERS")  # Returns 1800 seconds (30 minutes)
+        await redis_cache.set(cache_key, data, ttl_seconds=ttl)
+
         logger.info(
-            "Market movers fetched",
+            "Market movers fetched and cached",
             gainers_count=len(data.get("top_gainers", [])),
             losers_count=len(data.get("top_losers", [])),
-            active_count=len(data.get("most_actively_traded", []))
+            active_count=len(data.get("most_actively_traded", [])),
+            ttl_seconds=ttl,
         )
 
         return data

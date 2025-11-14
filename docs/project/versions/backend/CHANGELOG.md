@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2025-11-14
+
+### Added
+- perf: add 30-minute Redis caching to market movers endpoint to reduce API calls
+
+
 ## [0.6.1] - 2025-11-14
 
 ### Added
