@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2025-11-16
+
+### Performance
+- Batch chunk streaming: Reduce SSE events by 90% (CHUNK_SIZE=10 chars/event vs 1 char/event)
+- Reduces typical 1300-char response from 1300 events to 130 events
+
+### Reliability
+- Add circuit breaker for tool event queue (MAX_QUEUE_SIZE=100) to prevent memory exhaustion
+- Fix deadlock in background streaming loop - check agent completion in timeout handler
+- Fix generator early exit bug preventing final answer streaming
+
+### Bug Fixes
+- Fix tool progress message injection causing assistant message displacement
+- Add agent completion check in asyncio.TimeoutError handler
+- Ensure streaming completes gracefully when agent finishes
+
+## [0.7.0] - 2025-11-15
+
+### Added
+- feat(agent): add real-time tool execution streaming with SSE callbacks and strategic prompt engineering
+
+
 ## [0.6.2] - 2025-11-14
 
 ### Added

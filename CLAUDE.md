@@ -247,8 +247,8 @@ curl https://klinematrix.com/api/health
 ## Quick Reference Commands
 
 ```bash
-# Dev/Local Environment (Docker Compose)
-make dev            # Start all services (docker-compose up -d)
+# Dev/Local Environment (Docker Compose v2)
+make dev            # Start all services (docker compose up -d)
 make test           # Run all tests
 make fmt            # Format code
 make lint           # Check code quality

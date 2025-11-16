@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2025-11-16
+
+### UX Improvements
+- Tool progress cards now flow inline with messages (removed separate stacked area)
+- Assistant response always appears after tool execution completes
+- Request deduplication: Prevent concurrent agent invocations from rapid button clicks
+
+### Bug Fixes
+- Fix assistant message placeholder displacement when tool events inserted
+- Add isPending check to prevent duplicate chat submissions
+
+## [0.10.0] - 2025-11-15
+
+### Added
+- feat(chat): add real-time tool execution progress display with animated UI components
+
+
 ## [0.8.15] - 2025-11-12
 
 ### Fixed
