@@ -12,6 +12,7 @@ import rehypeRaw from "rehype-raw";
 import { Loader2 } from "lucide-react";
 import type { ChatMessage } from "../../types/api";
 import { ToolMessageWrapper } from "./ToolMessageWrapper";
+import { ToolExecutionProgress } from "./ToolExecutionProgress";
 
 interface ChatMessagesProps {
   messages: ChatMessage[];
@@ -315,7 +316,8 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   const visibleMessages = useMemo(() => {
     return messages.filter(msg =>
       // Skip empty assistant messages (streaming placeholders)
-      msg.role !== "assistant" || msg.content.trim()
+      // BUT keep tool progress messages even if they have empty content
+      msg.role !== "assistant" || msg.content.trim() || msg.tool_progress
     );
   }, [messages]);
 
@@ -344,6 +346,9 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
       {visibleMessages.map((msg: ChatMessage, index: number) => {
         const isLastUserMessage = msg.role === "user" && index === lastUserIdx;
 
+        // Check if this is a tool progress message
+        const isToolProgress = msg.role === "assistant" && msg.tool_progress;
+
         // Check if this is a tool message with tool_call metadata
         const isToolMessage = msg.role === "assistant" && msg.tool_call;
 
@@ -352,7 +357,9 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             key={msg._id || msg.timestamp}
             ref={isLastUserMessage ? lastUserMessageRef : null}
           >
-            {isToolMessage && msg.tool_call ? (
+            {isToolProgress && msg.tool_progress ? (
+              <ToolExecutionProgress {...msg.tool_progress} />
+            ) : isToolMessage && msg.tool_call ? (
               <ToolMessageWrapper
                 toolCall={msg.tool_call}
                 content={<MessageBubble msg={msg} />}

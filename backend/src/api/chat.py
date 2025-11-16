@@ -15,6 +15,7 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
+from ..agent.callbacks.tool_execution_callback import ToolExecutionCallback
 from ..agent.chat_agent import ChatAgent
 from ..agent.langgraph_react_agent import FinancialAnalysisReActAgent
 from ..core.exceptions import NotFoundError
@@ -628,7 +629,7 @@ async def _stream_with_react_agent(
     credit_service: CreditService,
     debug: bool = False,
 ) -> StreamingResponse:
-    """Stream using SDK ReAct Agent (v3).
+    """Stream using SDK ReAct Agent (v3) with real-time tool execution visibility.
 
     Args:
         request: Chat request with message and options
@@ -642,6 +643,7 @@ async def _stream_with_react_agent(
     async def generate_stream() -> AsyncGenerator[str, None]:
         chat_id = None
         transaction = None
+        tool_event_queue = None
 
         try:
             # Create or get chat
@@ -736,16 +738,96 @@ async def _stream_with_react_agent(
                 ],
             )
 
-            # Invoke ReAct agent (auto-loop handles tool chaining) with timeout protection
+            # ===== TOOL EXECUTION CALLBACK SETUP =====
+            # Create event queue for real-time tool execution streaming
+            tool_event_queue = asyncio.Queue()
+            tool_callback = ToolExecutionCallback(tool_event_queue)
+            agent_task = None
+            stream_active = True
+
+            # Background task to continuously drain and stream tool events
+            async def stream_tool_events_background():
+                """Continuously drain tool event queue and yield SSE events in real-time"""
+                nonlocal stream_active, agent_task
+                MAX_QUEUE_SIZE = 100  # Circuit breaker threshold
+                while stream_active:
+                    try:
+                        # Circuit breaker: Check queue size to prevent overflow
+                        queue_size = tool_event_queue.qsize()
+                        if queue_size > MAX_QUEUE_SIZE:
+                            logger.error(
+                                "Event queue overflow - circuit breaker triggered",
+                                queue_size=queue_size,
+                                max_size=MAX_QUEUE_SIZE,
+                            )
+                            # Drain queue to prevent memory exhaustion
+                            while not tool_event_queue.empty():
+                                try:
+                                    tool_event_queue.get_nowait()
+                                except asyncio.QueueEmpty:
+                                    break
+                            stream_active = False
+                            break
+
+                        # Use short timeout to check stream_active flag frequently
+                        event = await asyncio.wait_for(
+                            tool_event_queue.get(), timeout=0.1
+                        )
+                        # Stream tool event immediately to frontend
+                        yield f"data: {json.dumps(event)}\n\n"
+                        logger.debug(
+                            "Tool event streamed in real-time",
+                            event_type=event["type"],
+                            tool_name=event["tool_name"],
+                        )
+                    except asyncio.TimeoutError:
+                        # No event available - check if agent completed
+                        if agent_task and agent_task.done():
+                            logger.info("Agent completed, stopping tool event stream")
+                            stream_active = False
+                            break
+                        continue
+                    except Exception as e:
+                        logger.error(
+                            "Error streaming tool event", error=str(e), exc_info=True
+                        )
+                        break
+
+                # Final drain after agent completes
+                while not tool_event_queue.empty():
+                    try:
+                        event = tool_event_queue.get_nowait()
+                        yield f"data: {json.dumps(event)}\n\n"
+                        logger.debug("Tool event drained", event_type=event["type"])
+                    except asyncio.QueueEmpty:
+                        break
+
+            # Invoke ReAct agent with callback (auto-loop handles tool chaining)
             try:
-                result = await asyncio.wait_for(
-                    agent.ainvoke(
-                        user_message=request.message,
-                        conversation_history=conversation_history,
-                        debug=debug,
-                    ),
-                    timeout=120.0,  # 2 minutes max for agent response
+                # Create agent invocation task
+                agent_task = asyncio.create_task(
+                    asyncio.wait_for(
+                        agent.ainvoke(
+                            user_message=request.message,
+                            conversation_history=conversation_history,
+                            debug=debug,
+                            additional_callbacks=[tool_callback],
+                        ),
+                        timeout=120.0,  # 2 minutes max for agent response
+                    )
                 )
+
+                # Stream tool events concurrently while agent runs
+                # The generator will automatically stop when agent completes
+                logger.info("Starting tool event streaming loop")
+                async for tool_event in stream_tool_events_background():
+                    yield tool_event
+
+                # Generator has exited, agent is done
+                logger.info("Tool event streaming completed")
+                result = await agent_task
+                logger.info("Agent result received", has_result=bool(result))
+
             except TimeoutError:
                 logger.error(
                     "Agent execution timeout",
@@ -753,6 +835,11 @@ async def _stream_with_react_agent(
                     user_id=user_id,
                     timeout_seconds=120,
                 )
+                # Drain any pending tool events before erroring
+                if tool_event_queue:
+                    async for tool_event in stream_tool_events():
+                        yield tool_event
+
                 # Fail transaction to release credits
                 if transaction:
                     await credit_service.fail_transaction(transaction.transaction_id)
@@ -771,6 +858,11 @@ async def _stream_with_react_agent(
                     error=str(e),
                     exc_info=True,
                 )
+                # Drain any pending tool events before erroring
+                if tool_event_queue:
+                    async for tool_event in stream_tool_events():
+                        yield tool_event
+
                 # Fail transaction to release credits
                 if transaction:
                     await credit_service.fail_transaction(transaction.transaction_id)
@@ -785,9 +877,11 @@ async def _stream_with_react_agent(
             final_answer = result["final_answer"]
             tool_executions = result.get("tool_executions", 0)
             trace_id = result.get("trace_id", "unknown")
+            logger.info("Extracted result fields", answer_len=len(final_answer), trace_id=trace_id)
 
             # Extract token usage from agent result
             token_usage = extract_token_usage_from_agent_result(result)
+            logger.info("Token usage extracted", input=token_usage["input_tokens"], output=token_usage["output_tokens"])
             input_tokens = token_usage["input_tokens"]
             output_tokens = token_usage["output_tokens"]
             total_tokens = token_usage["total_tokens"]
@@ -849,11 +943,22 @@ async def _stream_with_react_agent(
                 }
                 yield f"data: {json.dumps(tool_info)}\n\n"
 
-            # Stream final answer character-by-character
-            for char in final_answer:
-                chunk = {"type": "chunk", "content": char}
+            # Stream final answer in batches (10 chars at a time)
+            # Reduces SSE events by 90% while maintaining smooth UX
+            CHUNK_SIZE = 10
+            logger.info(
+                "Starting to stream final answer",
+                answer_length=len(final_answer),
+                chunk_size=CHUNK_SIZE,
+                chat_id=chat_id,
+            )
+            for i in range(0, len(final_answer), CHUNK_SIZE):
+                chunk_text = final_answer[i : i + CHUNK_SIZE]
+                chunk = {"type": "chunk", "content": chunk_text}
                 yield f"data: {json.dumps(chunk)}\n\n"
-                await asyncio.sleep(0.01)  # Smooth streaming
+                await asyncio.sleep(0.03)  # Proportional delay (10 chars → 0.03s)
+
+            logger.info("Finished streaming final answer", chat_id=chat_id)
 
             # Save assistant message with metadata (including transaction linkage)
             assistant_message = await chat_service.add_message(

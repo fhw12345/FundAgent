@@ -200,6 +200,11 @@ export function EnhancedChatInterface() {
   // Old complex pattern matching logic removed
   const handleSendMessage = useCallback(() => {
     if (!message.trim()) return;
+    // Request deduplication: Prevent concurrent agent invocations
+    if (chatMutation.isPending) {
+      console.log("⏭️ Skipping message submit: request already in progress");
+      return;
+    }
     chatMutation.mutate(message); // All user messages go to LLM
     setMessage("");
   }, [message, chatMutation]);

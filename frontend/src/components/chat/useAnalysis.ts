@@ -7,6 +7,7 @@
  */
 
 import { flushSync } from "react-dom";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { analysisService } from "../../services/analysis";
 import { chatService } from "../../services/api";
@@ -29,6 +30,7 @@ import {
   extractStochasticMetadata,
 } from "../../utils/analysisMetadataExtractor";
 import { createToolCall, TOOL_REGISTRY, type ToolName } from "../../constants/toolRegistry";
+import type { ModelSettings } from "../../types/models";
 
 // Formatting functions moved to analysisFormatters.ts
 
@@ -41,13 +43,13 @@ export const useAnalysis = (
   _selectedInterval?: string,
   chatId?: string | null,
   setChatId?: (id: string) => void,
-  modelSettings?: { model: string; thinking_enabled: boolean; max_tokens: number },
+  modelSettings?: ModelSettings,
   agentMode?: "v2" | "v3",
 ) => {
   const queryClient = useQueryClient();
   const optimisticDeduction = useOptimisticCreditDeduction();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationKey: ["chat", chatId],
     mutationFn: async (userMessage: string) => {
       // Input validation
@@ -145,6 +147,69 @@ export const useAnalysis = (
             );
             reject(new Error(error));
           },
+          // Tool event callbacks (agent mode v3 only)
+          (event) => {
+            // Tool started - add tool progress message
+            const toolProgressMessage = {
+              role: "assistant" as const,
+              content: "",
+              timestamp: new Date().toISOString(),
+              _id: `tool_${event.run_id}`,
+              tool_progress: {
+                toolName: event.tool_name,
+                displayName: event.display_name,
+                icon: event.icon,
+                status: "running" as const,
+                symbol: event.symbol,
+                inputs: event.inputs,
+              },
+            };
+
+            setMessages((prev) => {
+              // Find and preserve assistant placeholder (may have accumulated content)
+              const placeholder = prev.find(msg => msg._id === assistantMessageId);
+              const withoutPlaceholder = prev.filter(msg => msg._id !== assistantMessageId);
+
+              // Insert tool message, then re-add placeholder at end (preserves streamed content)
+              return [...withoutPlaceholder, toolProgressMessage, placeholder || assistantMessageObj];
+            });
+          },
+          (event) => {
+            // Tool completed successfully - update the tool progress message
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg._id === `tool_${event.run_id}` && msg.tool_progress
+                  ? {
+                      ...msg,
+                      tool_progress: {
+                        ...msg.tool_progress,
+                        status: "success" as const,
+                        output: event.output,
+                        durationMs: event.duration_ms,
+                      },
+                    }
+                  : msg,
+              ),
+            );
+          },
+          (event) => {
+            // Tool failed - update the tool progress message with error
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg._id === `tool_${event.run_id}` && msg.tool_progress
+                  ? {
+                      ...msg,
+                      tool_progress: {
+                        ...msg.tool_progress,
+                        status: "error" as const,
+                        error: event.error,
+                        durationMs: event.duration_ms,
+                      },
+                    }
+                  : msg,
+              ),
+            );
+          },
           // LLM Configuration options
           modelSettings ? {
             model: modelSettings.model,
@@ -157,6 +222,8 @@ export const useAnalysis = (
       });
     },
   });
+
+  return mutation;
 };
 
 // Button analysis hook - direct API calls

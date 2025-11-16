@@ -48,6 +48,17 @@ export interface ChatMessage {
   analysis_data?: Record<string, unknown>;
   _id?: string | number; // Optional ID for frontend tracking
   tool_call?: ToolCall;
+  tool_progress?: {
+    toolName: string;
+    displayName: string;
+    icon: string;
+    status: "running" | "success" | "error";
+    symbol?: string;
+    inputs?: Record<string, unknown>;
+    output?: string;
+    error?: string;
+    durationMs?: number;
+  };
 }
 
 export interface ChatRequest {
@@ -189,4 +200,37 @@ export type StreamEvent =
   | {
       type: "error";
       error?: string;
+    }
+  | {
+      type: "tool_start";
+      tool_name: string;
+      display_name: string;
+      icon: string;
+      inputs: Record<string, unknown>;
+      symbol?: string;
+      run_id: string;
+      timestamp: string;
+    }
+  | {
+      type: "tool_end";
+      tool_name: string;
+      output: string;
+      duration_ms: number;
+      run_id: string;
+      status: "success";
+      timestamp: string;
+    }
+  | {
+      type: "tool_error";
+      tool_name: string;
+      error: string;
+      duration_ms: number;
+      run_id: string;
+      status: "error";
+      timestamp: string;
+    }
+  | {
+      type: "tool_info";
+      tool_executions: number;
+      trace_id: string;
     };
