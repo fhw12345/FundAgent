@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { HelpCircle } from "lucide-react";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
 import HealthPage from "./pages/HealthPage";
@@ -7,6 +8,7 @@ import { TransactionHistory } from "./pages/TransactionHistory";
 import PortfolioDashboard from "./pages/PortfolioDashboard";
 import { CreditBalance } from "./components/credits/CreditBalance";
 import { authStorage, logout } from "./services/authService";
+import HelpModal from "./components/HelpModal";
 
 function App() {
   const [activeTab, setActiveTab] = useState<
@@ -15,6 +17,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
   // Check if user is already logged in
   useEffect(() => {
@@ -189,6 +192,21 @@ function App() {
           </p>
         </div>
       </footer>
+
+      {/* Floating Help Button */}
+      <button
+        onClick={() => setIsHelpModalOpen(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-110 transition-all duration-200 flex items-center justify-center z-40 group"
+        aria-label="Open help modal"
+      >
+        <HelpCircle className="w-7 h-7 group-hover:rotate-12 transition-transform duration-200" />
+      </button>
+
+      {/* Help Modal */}
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
     </div>
   );
 }

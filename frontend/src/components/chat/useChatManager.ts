@@ -12,11 +12,27 @@ import type { ChatMessage } from "../../types/api";
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
     role: "assistant",
-    content: `## Welcome to Financial Agent 👋
+    content: `# 🎯 Welcome to Financial Agent!
 
-**Get Started:** Search for a stock symbol on the right (e.g., "AAPL" or "Apple") to begin your analysis.
+---
 
-> *Professional trading interface with AI-powered insights, interactive charts, and real-time data.*`,
+### ✨ **First Time Here?**
+
+Click the **❓** button in the bottom-right corner for a quick interactive guide!
+
+---
+
+### 🚀 **Three Powerful Modes to Explore:**
+
+🤖 **Agent Mode** — Let AI automatically analyze and provide insights
+
+💬 **Copilot Mode** — You control, AI guides
+
+📊 **Portfolio Tracking** — Monitor your investment performance
+
+---
+
+> 💡 **Pro Tip:** Start by asking a question or searching for a stock symbol to see the magic happen!`,
     timestamp: new Date().toISOString(),
   },
 ];
