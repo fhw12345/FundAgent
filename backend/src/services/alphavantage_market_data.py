@@ -561,8 +561,8 @@ class AlphaVantageMarketDataService:
                     )
 
             elif interval in ["1d", "day"]:
-                # Daily
-                df = await self.get_daily_bars(symbol, "full")
+                # Daily - use compact mode (100 bars) per user principle
+                df = await self.get_daily_bars(symbol, "compact")
             elif interval in ["1wk", "1w", "week"]:
                 # Weekly
                 df = await self.get_weekly_bars(symbol, "full")
@@ -575,7 +575,7 @@ class AlphaVantageMarketDataService:
                     f"Unsupported interval '{interval}', defaulting to daily",
                     symbol=symbol,
                 )
-                df = await self.get_daily_bars(symbol, "full")
+                df = await self.get_daily_bars(symbol, "compact")
 
             # Filter by date range if provided (overrides 1-day filter for intraday)
             if start_date and end_date:
