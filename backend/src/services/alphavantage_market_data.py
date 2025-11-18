@@ -3,8 +3,10 @@ Alpha Vantage market data service.
 Provides symbol search, quotes, and historical data using Alpha Vantage API.
 """
 
+import asyncio
 import re
-from typing import Any
+from datetime import datetime, time
+from typing import Any, Literal
 
 import httpx
 import pandas as pd
@@ -13,6 +15,107 @@ import structlog
 from ..core.config import Settings
 
 logger = structlog.get_logger()
+
+
+def get_market_session(timestamp: pd.Timestamp) -> Literal["pre", "regular", "post", "closed"]:
+    """
+    Determine market session for a given timestamp (US Eastern Time).
+
+    Market hours (ET):
+    - Pre-market: 4:00 AM - 9:30 AM
+    - Regular: 9:30 AM - 4:00 PM
+    - Post-market: 4:00 PM - 8:00 PM
+    - Closed: 8:00 PM - 4:00 AM, weekends
+
+    Args:
+        timestamp: Timestamp to check (should be in ET timezone)
+
+    Returns:
+        Market session: "pre", "regular", "post", or "closed"
+    """
+    # Convert to ET if not already
+    if timestamp.tz is None:
+        # Assume UTC, convert to ET
+        timestamp = timestamp.tz_localize('UTC').tz_convert('America/New_York')
+    elif str(timestamp.tz) != 'America/New_York':
+        timestamp = timestamp.tz_convert('America/New_York')
+
+    # Check if weekend
+    if timestamp.weekday() >= 5:  # Saturday=5, Sunday=6
+        return "closed"
+
+    time_of_day = timestamp.time()
+
+    # Define session boundaries
+    pre_start = time(4, 0)   # 4:00 AM
+    regular_start = time(9, 30)  # 9:30 AM
+    regular_end = time(16, 0)    # 4:00 PM
+    post_end = time(20, 0)       # 8:00 PM
+
+    if pre_start <= time_of_day < regular_start:
+        return "pre"
+    elif regular_start <= time_of_day < regular_end:
+        return "regular"
+    elif regular_end <= time_of_day < post_end:
+        return "post"
+    else:
+        return "closed"
+
+
+def validate_date_range(
+    start_date: str | None,
+    end_date: str | None,
+    interval: str,
+) -> tuple[bool, str | None]:
+    """
+    Validate date range based on interval constraints.
+
+    Rules:
+    - Intraday (1m, 1h): Must be today only (enforced in UI via market status)
+    - Daily+ (1d, 1w, 1mo): No restrictions, any historical range allowed
+
+    Args:
+        start_date: Start date string (YYYY-MM-DD)
+        end_date: End date string (YYYY-MM-DD)
+        interval: Data interval (1m, 1h, 1d, etc.)
+
+    Returns:
+        (is_valid, error_message)
+    """
+    # If no custom dates provided, always valid (use defaults)
+    if not start_date or not end_date:
+        return True, None
+
+    # Parse dates
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError as e:
+        return False, f"Invalid date format: {e}. Use YYYY-MM-DD"
+
+    # Validate start <= end
+    if start > end:
+        return False, "Start date must be before or equal to end date"
+
+    # For intraday intervals, allow recent dates (last 30 days)
+    # Show whatever data is available - market closed/pre/post hours data included
+    intraday_intervals = ["1m", "1h", "60min"]
+    if interval in intraday_intervals:
+        # Get current date in Eastern Time
+        now_et = pd.Timestamp.now(tz='America/New_York')
+        today = now_et.date()
+
+        # Allow dates within last 30 days (Alpha Vantage intraday limit)
+        earliest_allowed = today - pd.Timedelta(days=30)
+
+        if start.date() < earliest_allowed:
+            return False, f"Intraday data ({interval}) only available for last 30 days (since {earliest_allowed})"
+
+        if end.date() > today:
+            return False, f"End date cannot be in the future (today is {today})"
+
+    # Daily+ intervals: no restrictions
+    return True, None
 
 
 class AlphaVantageMarketDataService:
@@ -277,6 +380,11 @@ class AlphaVantageMarketDataService:
             df.set_index("timestamp", inplace=True)
             df.sort_index(inplace=True)  # Ensure chronological order
 
+            # Alpha Vantage returns intraday timestamps in US Eastern Time
+            # Localize naive timestamps to ET for proper session detection
+            if not df.empty and df.index.tz is None:
+                df.index = df.index.tz_localize('America/New_York')
+
             logger.info(
                 "Intraday bars fetched",
                 symbol=symbol,
@@ -295,26 +403,203 @@ class AlphaVantageMarketDataService:
             )
             raise
 
+    async def get_intraday_bars_extended(
+        self,
+        symbol: str,
+        interval: str = "1min",
+        months: int = 3,
+    ) -> pd.DataFrame:
+        """
+        Get extended intraday bars using TIME_SERIES_INTRADAY_EXTENDED (Premium feature).
+
+        This endpoint provides up to 2 years of historical intraday data by fetching
+        monthly slices. Each slice represents one month of data.
+
+        Args:
+            symbol: Stock symbol
+            interval: 1min, 5min, 15min, 30min, 60min
+            months: Number of recent months to fetch (1-24, default 3)
+
+        Returns:
+            DataFrame with Open, High, Low, Close, Volume columns
+
+        Note:
+            - Requires Premium API key
+            - Each month is fetched as a separate "slice" (year1month1, year1month2, etc.)
+            - year1month1 = most recent month, year2month1 = 13-24 months ago
+            - Extended hours (pre/post market) included by default
+        """
+        try:
+            if months < 1 or months > 24:
+                raise ValueError("months must be between 1 and 24")
+
+            # Prepare all API requests concurrently for better performance
+            async def fetch_slice(month_offset: int) -> tuple[str, httpx.Response | None]:
+                """Fetch a single month slice."""
+                year = ((month_offset - 1) // 12) + 1
+                month = ((month_offset - 1) % 12) + 1
+                slice_name = f"year{year}month{month}"
+
+                logger.info(
+                    "Fetching extended intraday slice",
+                    symbol=symbol,
+                    interval=interval,
+                    slice=slice_name,
+                    month_offset=month_offset,
+                )
+
+                try:
+                    response = await self.client.get(
+                        self.base_url,
+                        params={
+                            "function": "TIME_SERIES_INTRADAY_EXTENDED",
+                            "symbol": symbol,
+                            "interval": interval,
+                            "slice": slice_name,
+                            "adjusted": "false",  # Raw prices
+                            "apikey": self.api_key,
+                        },
+                    )
+                    return slice_name, response
+                except Exception as e:
+                    logger.warning(
+                        "Extended intraday slice fetch exception",
+                        symbol=symbol,
+                        slice=slice_name,
+                        error=str(e),
+                    )
+                    return slice_name, None
+
+            # Fetch all slices concurrently (3x faster for 3 months)
+            tasks = [fetch_slice(i) for i in range(1, months + 1)]
+            results = await asyncio.gather(*tasks)
+
+            # Process all responses and parse CSV using pandas
+            all_dataframes = []
+            for slice_name, response in results:
+                if response is None or response.status_code != 200:
+                    if response is not None:
+                        sanitized_text = self._sanitize_text(response.text)
+                        logger.warning(
+                            "Extended intraday slice fetch failed",
+                            symbol=symbol,
+                            slice=slice_name,
+                            status=response.status_code,
+                            error=sanitized_text,
+                        )
+                    continue
+
+                # Check for API error messages before parsing
+                response_text = response.text.strip()
+                if not response_text or "Error" in response_text or "please see" in response_text:
+                    logger.warning(
+                        "API error or no data in extended intraday slice",
+                        symbol=symbol,
+                        slice=slice_name,
+                        response_preview=response_text[:200] if response_text else "empty",
+                    )
+                    continue
+
+                # Parse CSV using pandas (2-3x faster than manual parsing)
+                try:
+                    from io import StringIO
+
+                    df_slice = pd.read_csv(
+                        StringIO(response_text),
+                        parse_dates=[0],  # First column is timestamp
+                        index_col=0,  # Use timestamp as index
+                        names=["timestamp", "Open", "High", "Low", "Close", "Volume"],
+                        dtype={
+                            "Open": float,
+                            "High": float,
+                            "Low": float,
+                            "Close": float,
+                            "Volume": int,
+                        },
+                        on_bad_lines='skip',  # Skip malformed lines
+                    )
+
+                    if not df_slice.empty:
+                        all_dataframes.append(df_slice)
+                    else:
+                        logger.warning(
+                            "No data in extended intraday slice",
+                            symbol=symbol,
+                            slice=slice_name,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to parse CSV for slice",
+                        symbol=symbol,
+                        slice=slice_name,
+                        error=str(e),
+                    )
+
+            if not all_dataframes:
+                error_msg = (
+                    f"No extended intraday data retrieved for {symbol}. "
+                    f"API Note: TIME_SERIES_INTRADAY_EXTENDED has been deprecated and merged into TIME_SERIES_INTRADAY."
+                )
+                logger.error(
+                    "Extended endpoint failed - API deprecated",
+                    symbol=symbol,
+                    interval=interval,
+                    months_requested=months,
+                )
+                raise ValueError(error_msg)
+
+            # Combine all dataframes efficiently
+            df = pd.concat(all_dataframes, axis=0)
+            df.sort_index(inplace=True)  # Ensure chronological order
+
+            # Remove duplicates (in case of overlapping slices)
+            df = df[~df.index.duplicated(keep='first')]
+
+            # Alpha Vantage returns intraday timestamps in US Eastern Time
+            # Localize naive timestamps to ET for proper session detection
+            if not df.empty and df.index.tz is None:
+                df.index = df.index.tz_localize('America/New_York')
+
+            logger.info(
+                "Extended intraday bars fetched",
+                symbol=symbol,
+                interval=interval,
+                bars_count=len(df),
+                months_fetched=months,
+                date_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+            )
+
+            return df
+
+        except Exception as e:
+            logger.error(
+                "Extended intraday bars fetch failed",
+                symbol=symbol,
+                interval=interval,
+                error=str(e),
+            )
+            raise
+
     async def get_daily_bars(
         self,
         symbol: str,
         outputsize: str = "compact",
     ) -> pd.DataFrame:
         """
-        Get daily bars using TIME_SERIES_DAILY.
+        Get daily bars using TIME_SERIES_DAILY_ADJUSTED (split-adjusted prices).
 
         Args:
             symbol: Stock symbol
             outputsize: compact (latest 100 days) or full (20+ years)
 
         Returns:
-            DataFrame with Open, High, Low, Close, Volume columns
+            DataFrame with Open, High, Low, Close, Volume columns (split-adjusted)
         """
         try:
             response = await self.client.get(
                 self.base_url,
                 params={
-                    "function": "TIME_SERIES_DAILY",
+                    "function": "TIME_SERIES_DAILY_ADJUSTED",
                     "symbol": symbol,
                     "outputsize": outputsize,
                     "apikey": self.api_key,
@@ -329,12 +614,15 @@ class AlphaVantageMarketDataService:
 
             data = response.json()
 
-            if "Time Series (Daily)" not in data:
-                raise ValueError(f"No daily data for symbol: {symbol}")
+            # DAILY_ADJUSTED returns data with different key name
+            key = "Time Series (Daily)"
+            if key not in data:
+                raise ValueError(f"No daily data for symbol: {symbol}. Keys: {list(data.keys())}")
 
-            time_series = data["Time Series (Daily)"]
+            time_series = data[key]
 
             # Convert to DataFrame
+            # DAILY_ADJUSTED provides: adjusted close (field 5), dividend (7), split coeff (8)
             df_data = []
             for date, values in time_series.items():
                 df_data.append(
@@ -343,8 +631,8 @@ class AlphaVantageMarketDataService:
                         "Open": float(values["1. open"]),
                         "High": float(values["2. high"]),
                         "Low": float(values["3. low"]),
-                        "Close": float(values["4. close"]),
-                        "Volume": int(values["5. volume"]),
+                        "Close": float(values["5. adjusted close"]),  # Use adjusted close
+                        "Volume": int(values["6. volume"]),  # Volume is field 6 in DAILY_ADJUSTED
                     }
                 )
 
@@ -353,7 +641,7 @@ class AlphaVantageMarketDataService:
             df.sort_index(inplace=True)
 
             logger.info(
-                "Daily bars fetched",
+                "Daily bars fetched (split-adjusted)",
                 symbol=symbol,
                 bars_count=len(df),
             )
@@ -535,34 +823,30 @@ class AlphaVantageMarketDataService:
         """
         try:
             # Map intervals to Alpha Vantage format
-            if interval in ["1m", "5m", "15m", "30m", "60m"]:
-                # Intraday - fetch compact (100 points) for better performance
-                # For 60m: 100 points = ~15 trading days
-                # For 5m: 100 points = ~8 hours of trading
-                # For 1m: 100 points = ~1.5 hours of trading
-                av_interval = interval.replace("m", "min")
+            if interval in ["1m", "5m", "15m", "30m", "60m", "60min", "1h"]:
+                # Map to Alpha Vantage interval format
+                if interval in ["1h", "60m"]:
+                    av_interval = "60min"
+                else:
+                    av_interval = interval.replace("m", "min")
+
+                # Use TIME_SERIES_INTRADAY (converged API with extended hours support)
+                # Use compact mode (100 bars) per user principle: "for below and including 1day use compact mode"
+                # Note: Extended endpoint (TIME_SERIES_INTRADAY_EXTENDED) has been deprecated
                 df = await self.get_intraday_bars(symbol, av_interval, "compact")
 
-                # Filter to last 1 day for intraday intervals
-                if not df.empty and not (start_date and end_date):
-                    # Get the latest timestamp
-                    latest_time = df.index.max()
-                    # Filter to last 1 trading day (24 hours)
-                    one_day_ago = latest_time - pd.Timedelta(days=1)
-                    df = df[df.index >= one_day_ago]
-
-                    logger.info(
-                        "Filtered intraday data to last 1 day",
-                        symbol=symbol,
-                        interval=av_interval,
-                        original_points=len(df),
-                        filtered_points=len(df),
-                        time_range=f"{df.index.min()} to {df.index.max()}",
-                    )
+                logger.info(
+                    "Fetched intraday data",
+                    symbol=symbol,
+                    interval=interval,
+                    outputsize="compact",
+                    bars_count=len(df),
+                    time_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+                )
 
             elif interval in ["1d", "day"]:
-                # Daily - use compact mode (100 bars) per user principle
-                df = await self.get_daily_bars(symbol, "compact")
+                # Daily - use full mode for complete historical data (20+ years)
+                df = await self.get_daily_bars(symbol, "full")
             elif interval in ["1wk", "1w", "week"]:
                 # Weekly
                 df = await self.get_weekly_bars(symbol, "full")
@@ -577,11 +861,132 @@ class AlphaVantageMarketDataService:
                 )
                 df = await self.get_daily_bars(symbol, "compact")
 
-            # Filter by date range if provided (overrides 1-day filter for intraday)
-            if start_date and end_date:
-                start = pd.to_datetime(start_date)
-                end = pd.to_datetime(end_date)
-                df = df[(df.index >= start) & (df.index <= end)]
+            # For intraday data, always return the most recent data available
+            # Don't filter by requested dates - if Sunday is requested, show Friday's data
+            # This matches behavior of other trading platforms
+            if interval in ["1m", "5m", "15m", "30m", "60m", "60min", "1h"] and not df.empty:
+                logger.info(
+                    "Returning latest available intraday data",
+                    symbol=symbol,
+                    requested_range=f"{start_date} to {end_date}" if start_date and end_date else "none",
+                    actual_range=f"{df.index.min()} to {df.index.max()}",
+                )
+
+            # Apply interval-specific time caps to reduce API load and optimize data volume
+            # User preference: "1d 2 year max, 1w 6 year, 1mo go full"
+            if not df.empty:
+                from datetime import datetime, timedelta
+
+                # Define time caps per interval
+                time_cap_years = {
+                    "1d": 2,      # Daily: 2 years (~500 trading days)
+                    "day": 2,
+                    "1w": 6,      # Weekly: 6 years (~312 weeks)
+                    "1wk": 6,
+                    "week": 6,
+                    # Monthly: No cap - full historical data
+                    # Intraday (60m, 1m, etc.): No cap - compact mode already limits
+                }
+
+                years_cap = time_cap_years.get(interval)
+
+                if years_cap:
+                    # Calculate cutoff date based on interval-specific cap
+                    cutoff_date = datetime.now() - timedelta(days=years_cap*365)
+
+                    # Check if DataFrame index is timezone-aware
+                    if df.index.tz is not None:
+                        # Timezone-aware (intraday data) - localize cutoff to Eastern Time
+                        cutoff_dt = pd.to_datetime(cutoff_date).tz_localize('America/New_York')
+                    else:
+                        # Timezone-naive (daily/weekly/monthly data) - use naive timestamp
+                        cutoff_dt = pd.to_datetime(cutoff_date)
+
+                    original_count = len(df)
+                    df = df[df.index >= cutoff_dt]
+
+                    logger.info(
+                        "Applied time cap",
+                        symbol=symbol,
+                        interval=interval,
+                        years_cap=years_cap,
+                        cutoff_date=cutoff_dt,
+                        original_count=original_count,
+                        filtered_count=len(df),
+                        date_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+                    )
+                else:
+                    logger.info(
+                        "No time cap applied (full historical data)",
+                        symbol=symbol,
+                        interval=interval,
+                        bars_count=len(df),
+                        date_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+                    )
+
+            # Filter data by custom date range OR apply default limits
+            if not df.empty:
+                # If custom dates provided, filter to that range
+                if start_date and end_date:
+                    # Check if DataFrame index is timezone-aware
+                    if df.index.tz is not None:
+                        # Timezone-aware (intraday data) - localize timestamps to Eastern Time
+                        start_dt = pd.to_datetime(start_date).tz_localize('America/New_York')
+                        end_dt = (pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)).tz_localize('America/New_York')
+                    else:
+                        # Timezone-naive (daily/weekly/monthly data) - use naive timestamps
+                        start_dt = pd.to_datetime(start_date)
+                        end_dt = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
+                    original_count = len(df)
+                    original_df_copy = df.copy()  # Save copy before filtering
+                    df = df[(df.index >= start_dt) & (df.index <= end_dt)]
+
+                    logger.info(
+                        "Filtered to custom date range",
+                        symbol=symbol,
+                        interval=interval,
+                        start_date=start_date,
+                        end_date=end_date,
+                        original_count=original_count,
+                        filtered_count=len(df),
+                    )
+
+                    # For intraday: if filtering resulted in no data, fall back to most recent available
+                    if df.empty and interval in ["1m", "60m", "1h", "60min"]:
+                        logger.info(
+                            "No data for requested date range, returning most recent intraday data",
+                            symbol=symbol,
+                            interval=interval,
+                            requested_range=f"{start_date} to {end_date}",
+                        )
+                        # Restore original DataFrame and take most recent bars
+                        df = original_df_copy
+                        max_bars = 420 if interval == "1m" else 85  # 1 day of 1min or 1 week of 1h
+                        if len(df) > max_bars:
+                            df = df.tail(max_bars)
+                else:
+                    # Apply default bar limits for specific intervals
+                    # Following principle: cache full data efficiently, show what we got
+                    max_bars_map = {
+                        "1m": 100,    # Compact mode returns 100 bars
+                        "1h": 100,    # Compact mode returns 100 bars
+                        "60min": 100, # Compact mode returns 100 bars
+                        # Note: 1d, 1w, 1mo have NO limit - show all historical data (full mode)
+                        # Note: 5m, 15m, 30m also have NO limit - full historical data
+                    }
+                    max_bars = max_bars_map.get(interval)
+                    if max_bars and len(df) > max_bars:
+                        original_count = len(df)
+                        df = df.tail(max_bars)
+                        logger.info(
+                            "Limited data to max bars",
+                            symbol=symbol,
+                            interval=interval,
+                            original_count=original_count,
+                            limited_count=len(df),
+                            max_bars=max_bars,
+                        )
 
             return df
 

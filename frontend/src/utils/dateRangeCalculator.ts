@@ -30,24 +30,33 @@ export function calculateDateRange(
   }
 
   // Otherwise, calculate default range based on interval
+  // Updated to professional financial analysis standards
   const today = new Date();
   let periodsBack: Date;
 
   switch (interval) {
-    case "1h":
-      // 1-hour interval: last 30 days
-      periodsBack = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    case "1m":
+      // 1-minute interval: TODAY only (intraday data restriction)
+      periodsBack = today;
+      break;
+    case "60m":
+      // 60-minute interval: last 2 weeks (professional intraday analysis standard)
+      // Captures multi-day swing points for meaningful Fibonacci retracements
+      periodsBack = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
       break;
     case "1w":
-      // 1-week interval: last 1 year
-      periodsBack = new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
+      // 1-week interval: last 2 years (professional standard)
+      // Provides sufficient context for major support/resistance identification
+      periodsBack = new Date(today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000);
       break;
     case "1mo":
-      // 1-month interval: last 2 years
-      periodsBack = new Date(today.getTime() - 2 * 365 * 24 * 60 * 60 * 1000);
+      // 1-month interval: last 5 years (institutional-grade macro analysis)
+      // Captures complete market cycles and provides robust stochastic oscillations
+      periodsBack = new Date(today.getTime() - 5 * 365 * 24 * 60 * 60 * 1000);
       break;
     default:
       // 1-day interval (default): last 6 months
+      // Optimal for short-term trading and technical analysis
       periodsBack = new Date(today.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
   }
 
@@ -66,9 +75,11 @@ export function calculateDateRange(
  */
 export function getPeriodForInterval(
   interval: TimeInterval,
-): "1mo" | "6mo" | "1y" | "2y" {
+): "1d" | "1mo" | "6mo" | "1y" | "2y" {
   switch (interval) {
-    case "1h":
+    case "1m":
+      return "1d";
+    case "60m":
       return "1mo";
     case "1d":
       return "6mo";
