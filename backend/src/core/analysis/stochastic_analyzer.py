@@ -5,14 +5,16 @@ crossover signals, and potential reversals in stock price movements.
 """
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import pandas as pd
 import structlog
 from scipy.signal import find_peaks
 
 from ...api.models import StochasticAnalysisResponse, StochasticLevel
-from ..data.ticker_data_service import TickerDataService
+
+if TYPE_CHECKING:
+    from ...services.alphavantage_market_data import AlphaVantageMarketDataService
 
 logger = structlog.get_logger()
 
@@ -20,14 +22,14 @@ logger = structlog.get_logger()
 class StochasticAnalyzer:
     """Stochastic Oscillator technical analysis engine."""
 
-    def __init__(self, ticker_data_service: TickerDataService):
+    def __init__(self, market_service: "AlphaVantageMarketDataService"):
         """
-        Initialize analyzer with ticker data service.
+        Initialize analyzer with AlphaVantage market data service.
 
         Args:
-            ticker_data_service: Service for fetching and caching ticker data
+            market_service: AlphaVantage service for fetching market data
         """
-        self.ticker_data_service = ticker_data_service
+        self.market_service = market_service
         self.data: pd.DataFrame | None = None
         self.symbol: str = ""
         self.timeframe: str = "1d"
@@ -149,41 +151,43 @@ class StochasticAnalyzer:
         self, start_date: str | None = None, end_date: str | None = None
     ) -> pd.DataFrame:
         """
-        Fetch stock data using TickerDataService.
+        Fetch stock data using AlphaVantageMarketDataService.
 
-        Uses the centralized ticker data service for intelligent caching
-        and deduplication of API calls.
+        Uses AlphaVantage for reliable data access, matching Fibonacci analyzer.
         """
         try:
-            if start_date and end_date:
-                # Use explicit date range
-                data = await self.ticker_data_service.get_ticker_history(
-                    symbol=self.symbol,
-                    interval=self.timeframe,
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-            else:
-                # Use period-based fetch (will be normalized to dates by service)
-                period_map = {
-                    "1h": "60d",  # 60 days max for hourly data
-                    "1d": "6mo",
-                    "1w": "2y",
-                    "1M": "5y",
-                }
-                period = period_map.get(self.timeframe, "6mo")
-                data = await self.ticker_data_service.get_ticker_history(
-                    symbol=self.symbol, interval=self.timeframe, period=period
-                )
+            # Map frontend timeframe to AlphaVantage interval
+            interval_map = {
+                "1h": "60min",   # Intraday hourly
+                "1d": "1d",      # Daily
+                "1w": "1wk",     # Weekly
+                "1M": "1mo",     # Monthly
+            }
+            interval = interval_map.get(self.timeframe, "1d")
 
-            if data.empty:
+            # Fetch bars from Alpha Vantage via market service
+            # Note: For intraday intervals, AlphaVantage returns ~1 day of data automatically
+            # with extended_hours=True (includes pre/post market)
+            bars = await self.market_service.get_price_bars(
+                symbol=self.symbol,
+                interval=interval,
+                period="6mo",  # Only used for daily/weekly/monthly
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+            if bars.empty:
                 logger.error("No data returned for symbol", symbol=self.symbol)
                 return pd.DataFrame()
 
+            # bars is already a properly formatted DataFrame
+            data = bars
+
             logger.info(
-                "Fetched stock data via TickerDataService",
+                "Fetched stock data via AlphaVantageMarketDataService",
                 symbol=self.symbol,
                 timeframe=self.timeframe,
+                interval=interval,
                 data_points=len(data),
                 start=data.index[0],
                 end=data.index[-1],

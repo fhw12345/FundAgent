@@ -28,6 +28,7 @@ export interface PriceDataPoint {
   low: number;
   close: number;
   volume: number;
+  market_session?: "pre" | "regular" | "post" | "closed"; // Market session indicator for intraday data
 }
 
 export interface PriceDataResponse {
@@ -57,7 +58,7 @@ export const TIME_INTERVALS = {
   "5m": "5 Minutes",
   "15m": "15 Minutes",
   "30m": "30 Minutes",
-  "1h": "1 Hour",
+  "60m": "60 Minutes (1 Hour)",
   // Daily+ intervals
   "1d": "1 Day",
   "5d": "5 Days",
@@ -177,7 +178,7 @@ export const marketService = {
     const intervalMap: Record<TimePeriod, TimeInterval> = {
       "1d": "5m",
       "5d": "15m",
-      "1mo": "1h",
+      "1mo": "60m",
       "3mo": "1d",
       "6mo": "1d",
       "1y": "1d",

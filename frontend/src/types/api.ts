@@ -104,6 +104,14 @@ export interface MacroData {
   overall_confidence: number;
 }
 
+export interface MarketStatus {
+  is_open: boolean;
+  current_session: "pre" | "regular" | "post" | "closed";
+  next_open: string | null;
+  next_close: string | null;
+  timestamp: string;
+}
+
 export interface ErrorResponse {
   detail: string;
   error_code?: string;

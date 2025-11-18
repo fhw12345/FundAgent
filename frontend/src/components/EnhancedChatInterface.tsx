@@ -135,16 +135,17 @@ export function EnhancedChatInterface() {
       selectedDateRange.start,
       selectedDateRange.end,
     ],
-    queryFn: () =>
-      marketService.getPriceData(currentSymbol, {
+    queryFn: () => {
+      // Don't send dates - just use period for all intervals
+      // This follows the principle: "show what we got" - full data without filtering
+      // 1m, 60m: compact mode (100 bars)
+      // 1d, 1w, 1mo: full mode (20+ years)
+      return marketService.getPriceData(currentSymbol, {
         interval: selectedInterval,
-        period:
-          selectedDateRange.start && selectedDateRange.end
-            ? undefined
-            : getPeriodForInterval(selectedInterval),
-        start_date: selectedDateRange.start || undefined,
-        end_date: selectedDateRange.end || undefined,
-      }),
+        period: getPeriodForInterval(selectedInterval),
+        // No custom dates - always show full available data
+      });
+    },
     enabled: !!currentSymbol,
     staleTime: 30000,
     refetchInterval: 60000,

@@ -252,51 +252,41 @@ class MacroAnalyzer:
         major_indices: dict[str, float],
         sector_performance: dict[str, float],
     ) -> tuple[str, str, list[str]]:
-        """Generate human-readable macro insights."""
+        """Generate human-readable macro insights for economic indicators."""
 
-        # Sentiment summary
-        sentiment_summary = f"Market sentiment is currently {vix_interpretation} with VIX at {vix_level:.1f}. "
+        # Sentiment summary based on commodity prices and economic data
+        sentiment_summary = f"Economic conditions showing {vix_interpretation} commodity prices (WTI: ${vix_level:.2f}/barrel). "
 
         if major_indices:
-            avg_performance = sum(major_indices.values()) / len(major_indices)
-            if avg_performance > 0:
-                sentiment_summary += (
-                    f"Major indices are up an average of {avg_performance:.1f}% today."
-                )
-            else:
-                sentiment_summary += f"Major indices are down an average of {abs(avg_performance):.1f}% today."
+            # Count growth vs absolute indicators
+            growth_indicators = [k for k in major_indices.keys() if "Growth" in k or "MoM" in k or "YoY" in k]
+            if growth_indicators:
+                sentiment_summary += f"Economic indicators tracked: {len(major_indices)} metrics. "
 
-        # Market outlook
-        if vix_level > 25:
-            outlook = (
-                "Elevated volatility suggests caution is warranted in the near term."
-            )
-        elif vix_level < 15:
-            outlook = "Low volatility environment may indicate complacency or strong confidence."
+        # Market outlook based on commodity price trends
+        if vix_level > 80:
+            outlook = "High commodity prices may indicate inflationary pressures and economic expansion."
+        elif vix_level < 50:
+            outlook = "Lower commodity prices may suggest economic slowdown or reduced demand."
         else:
-            outlook = "Moderate volatility suggests balanced market conditions."
+            outlook = "Moderate commodity prices indicate stable economic conditions."
 
-        # Key factors
+        # Key factors - format economic indicators correctly
         key_factors = [
-            f"VIX at {vix_level:.1f} indicates {vix_interpretation} sentiment",
+            f"WTI Crude Oil: ${vix_level:.2f}/barrel ({vix_interpretation})",
         ]
 
         if major_indices:
-            best_index = max(major_indices.items(), key=lambda x: x[1])
-            worst_index = min(major_indices.items(), key=lambda x: x[1])
-            key_factors.extend(
-                [
-                    f"Best performing index: {best_index[0]} ({best_index[1]:+.1f}%)",
-                    f"Worst performing index: {worst_index[0]} ({worst_index[1]:+.1f}%)",
-                ]
-            )
-
-        if sector_performance:
-            sector_items = list(sector_performance.items())
-            if sector_items:
-                best_sector = max(sector_items, key=lambda x: x[1])
-                key_factors.append(
-                    f"Leading sector: {best_sector[0]} ({best_sector[1]:+.1f}%)"
-                )
+            # Format each indicator appropriately
+            for indicator, value in sorted(major_indices.items()):
+                if "Growth" in indicator or "MoM" in indicator or "YoY" in indicator:
+                    # These are percentage changes
+                    key_factors.append(f"{indicator}: {value:+.2f}%")
+                elif "Rate" in indicator:
+                    # These are absolute percentages
+                    key_factors.append(f"{indicator}: {abs(value):.1f}%")
+                else:
+                    # Generic format
+                    key_factors.append(f"{indicator}: {value:.2f}")
 
         return sentiment_summary, outlook, key_factors

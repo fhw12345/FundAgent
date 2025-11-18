@@ -6,6 +6,7 @@ import type {
   UpdateUIStateRequest,
   Chat,
   StreamEvent,
+  MarketStatus,
 } from "../types/api";
 import type {
   UserProfile,
@@ -182,6 +183,28 @@ export const chatService = {
     onTitleGenerated?: (title: string) => void,
     onDone?: (chatId: string, messageCount: number) => void,
     onError?: (error: string) => void,
+    onToolStart?: (event: {
+      tool_name: string;
+      display_name: string;
+      icon: string;
+      symbol?: string;
+      run_id: string;
+      inputs: Record<string, unknown>;
+    }) => void,
+    onToolEnd?: (event: {
+      tool_name: string;
+      output: string;
+      duration_ms: number;
+      run_id: string;
+      status: "success";
+    }) => void,
+    onToolError?: (event: {
+      tool_name: string;
+      error: string;
+      duration_ms: number;
+      run_id: string;
+      status: "error";
+    }) => void,
     options?: {
       title?: string;
       role?: string;
@@ -278,6 +301,31 @@ export const chatService = {
               } else if (data.type === "error" && onError) {
                 console.error("SSE error:", data.error);
                 onError(data.error || "Unknown error");
+              } else if (data.type === "tool_start" && onToolStart) {
+                onToolStart({
+                  tool_name: data.tool_name,
+                  display_name: data.display_name,
+                  icon: data.icon,
+                  symbol: data.symbol,
+                  run_id: data.run_id,
+                  inputs: data.inputs,
+                });
+              } else if (data.type === "tool_end" && onToolEnd) {
+                onToolEnd({
+                  tool_name: data.tool_name,
+                  output: data.output,
+                  duration_ms: data.duration_ms,
+                  run_id: data.run_id,
+                  status: "success",
+                });
+              } else if (data.type === "tool_error" && onToolError) {
+                onToolError({
+                  tool_name: data.tool_name,
+                  error: data.error,
+                  duration_ms: data.duration_ms,
+                  run_id: data.run_id,
+                  status: "error",
+                });
               }
             }
           }
@@ -338,6 +386,17 @@ export const creditService = {
       "/api/admin/credits/adjust",
       request,
     );
+    return response.data;
+  },
+};
+
+// ===== Market Status API =====
+export const marketStatusService = {
+  /**
+   * Get current market status (open/closed, current session)
+   */
+  async getMarketStatus(): Promise<MarketStatus> {
+    const response = await api.get<MarketStatus>("/api/market/status");
     return response.data;
   },
 };

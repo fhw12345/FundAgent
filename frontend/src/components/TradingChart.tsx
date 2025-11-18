@@ -95,7 +95,6 @@ export const TradingChart: React.FC<TradingChartProps> = ({
     time: "",
     price: 0,
   });
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   const handleDateRangeSelect = (startDate: string, endDate: string) => {
     setDateSelection({ startDate, endDate, clickCount: 0 });
@@ -120,32 +119,10 @@ export const TradingChart: React.FC<TradingChartProps> = ({
   React.useEffect(() => {
     const chartData = convertToChartData();
     setChartData(chartData, highlightDateRange);
-    // Update last sync time when data changes
-    if (data && data.length > 0) {
-      setLastSyncTime(new Date());
-    }
   }, [data, convertToChartData, setChartData, highlightDateRange]);
 
-  // Calculate date range from actual chart data
-  const actualDateRange = React.useMemo(() => {
-    if (!data || data.length === 0) return null;
-
-    const startDate = new Date(data[0].time);
-    const endDate = new Date(data[data.length - 1].time);
-
-    // Format as YYYY-MM-DD
-    const formatDate = (date: Date) => {
-      return date.toISOString().split('T')[0];
-    };
-
-    return {
-      start: formatDate(startDate),
-      end: formatDate(endDate),
-    };
-  }, [data]);
-
-  // Use highlightDateRange if available (from Fibonacci/Stochastic), otherwise use actual data range
-  const displayDateRange = highlightDateRange || actualDateRange || undefined;
+  // Use highlightDateRange if available (from Fibonacci/Stochastic)
+  const displayDateRange = highlightDateRange || undefined;
 
   return (
     <div className={`relative ${className}`}>
@@ -157,7 +134,6 @@ export const TradingChart: React.FC<TradingChartProps> = ({
         onIntervalChange={onIntervalChange}
         onTimezoneChange={setSelectedTimezone}
         highlightDateRange={displayDateRange}
-        lastSyncTime={lastSyncTime}
       />
       <div className="relative">
         <div

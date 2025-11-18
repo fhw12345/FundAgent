@@ -53,6 +53,7 @@ from ..core.analysis.stochastic_analyzer import StochasticAnalyzer
 from ..core.config import Settings
 from ..core.data.ticker_data_service import TickerDataService
 from ..core.utils import extract_token_usage_from_messages
+from ..services.alphavantage_response_formatter import AlphaVantageResponseFormatter
 from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
@@ -131,9 +132,9 @@ class FinancialAnalysisReActAgent:
                     error=str(e),
                 )
 
-        # Initialize analysis tools
+        # Initialize analysis tools (both use AlphaVantage for reliable data)
         self.fibonacci_analyzer = FibonacciAnalyzer(market_service)
-        self.stochastic_analyzer = StochasticAnalyzer(ticker_data_service)
+        self.stochastic_analyzer = StochasticAnalyzer(market_service)
 
         # Initialize LLM with centralized configuration
         self.llm = ChatTongyi(
@@ -151,8 +152,13 @@ class FinancialAnalysisReActAgent:
         ]
         self.tools = base_tools.copy()
 
+        # Create formatter for Alpha Vantage responses
+        alpha_vantage_formatter = AlphaVantageResponseFormatter()
+
         # Add Alpha Vantage tools (search, overview, news, financials, movers)
-        alpha_vantage_tools = create_alpha_vantage_tools(market_service)
+        alpha_vantage_tools = create_alpha_vantage_tools(
+            market_service, alpha_vantage_formatter
+        )
         self.tools.extend(alpha_vantage_tools)
 
         # Track tool counts for logging
@@ -408,6 +414,7 @@ Summary: {result.analysis_summary}"""
         user_message: str,
         conversation_history: list[dict[str, str]] | None = None,
         debug: bool = False,
+        additional_callbacks: list | None = None,
     ) -> dict[str, Any]:
         """
         Invoke ReAct agent with user message and conversation history.
@@ -423,6 +430,7 @@ Summary: {result.analysis_summary}"""
             user_message: User's query
             conversation_history: Previous messages (optional, for new threads)
             debug: If True, log full LLM prompt for debugging
+            additional_callbacks: Optional list of additional callbacks (e.g., ToolExecutionCallback)
 
         Returns:
             Agent response with messages and final answer
@@ -461,10 +469,22 @@ Summary: {result.analysis_summary}"""
             "recursion_limit": 50,  # Allow up to 50 tool calls for complex analyses (default: 25)
         }
 
-        # Add callbacks if Langfuse is configured
+        # Build callbacks list
+        callbacks = []
+        if additional_callbacks:
+            callbacks.extend(additional_callbacks)
         if langfuse_handler:
-            config["callbacks"] = [langfuse_handler]
-            logger.info("Langfuse tracing enabled for this invocation")
+            callbacks.append(langfuse_handler)
+
+        # Add callbacks to config if any are configured
+        if callbacks:
+            config["callbacks"] = callbacks
+            logger.info(
+                "Callbacks configured for agent invocation",
+                callback_count=len(callbacks),
+                has_langfuse=langfuse_handler is not None,
+                has_additional=bool(additional_callbacks),
+            )
 
         # Debug logging: Show full prompt sent to LLM
         if debug:

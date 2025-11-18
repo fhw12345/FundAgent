@@ -248,6 +248,12 @@ ${recentSignals
 export function formatCompanyOverviewResponse(
   result: CompanyOverviewResponse,
 ): string {
+  // Use backend-generated markdown if available
+  if (result.formatted_markdown) {
+    return result.formatted_markdown;
+  }
+
+  // Fallback to frontend formatting for backward compatibility
   return `## 🏢 Company Overview - ${result.symbol}
 *${result.company_name}*
 
@@ -274,6 +280,12 @@ ${result.week_52_low ? `| 52W Low | $${result.week_52_low.toFixed(2)} |` : ""}
 export function formatCashFlowResponse(
   result: CashFlowResponse,
 ): string {
+  // Use backend-generated markdown if available
+  if (result.formatted_markdown) {
+    return result.formatted_markdown;
+  }
+
+  // Fallback to frontend formatting for backward compatibility
   return `## 💵 Cash Flow - ${result.symbol}
 *${result.company_name} • ${result.fiscal_date_ending}*
 
@@ -295,6 +307,12 @@ ${result.cashflow_summary}
 export function formatBalanceSheetResponse(
   result: BalanceSheetResponse,
 ): string {
+  // Use backend-generated markdown if available
+  if (result.formatted_markdown) {
+    return result.formatted_markdown;
+  }
+
+  // Fallback to frontend formatting for backward compatibility
   return `## 📊 Balance Sheet - ${result.symbol}
 *${result.company_name} • ${result.fiscal_date_ending}*
 
@@ -318,6 +336,12 @@ ${result.balance_sheet_summary}
 export function formatNewsSentimentResponse(
   result: NewsSentimentResponse,
 ): string {
+  // Use backend-generated markdown if available
+  if (result.formatted_markdown) {
+    return result.formatted_markdown;
+  }
+
+  // Fallback to frontend formatting for backward compatibility
   return `## 📰 News Sentiment - ${result.symbol}
 
 ### 📝 Overall Sentiment
@@ -359,6 +383,12 @@ ${result.negative_news
 export function formatMarketMoversResponse(
   result: MarketMoversResponse,
 ): string {
+  // Use backend-generated markdown if available
+  if (result.formatted_markdown) {
+    return result.formatted_markdown;
+  }
+
+  // Fallback to frontend formatting for backward compatibility
   return `## 📊 Market Movers
 *Last Updated: ${new Date(result.last_updated).toLocaleString()}*
 

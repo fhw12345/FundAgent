@@ -76,6 +76,16 @@ class FibonacciAnalyzer:
 
             self.data = stock_data
 
+            # Validate sufficient data for analysis
+            min_data_points = self._get_minimum_data_points(timeframe)
+            if len(self.data) < min_data_points:
+                raise ValueError(
+                    f"Insufficient data for {timeframe} Fibonacci analysis. "
+                    f"Got {len(self.data)} bars, need at least {min_data_points} "
+                    f"(calculated as {timeframe} swing_lookback × 3). "
+                    f"This ensures enough data for trend pattern detection."
+                )
+
             # Detect top trends using directional greedy accumulation
             top_trends = self.trend_detector.detect_top_trends(self.data)
 
@@ -83,7 +93,11 @@ class FibonacciAnalyzer:
             primary_trend = top_trends[0] if top_trends else None
             if not primary_trend:
                 raise ValueError(
-                    "Could not identify any significant trends in the data."
+                    f"Could not identify any significant trends in the data for {symbol} on {timeframe} timeframe. "
+                    f"This typically happens when: (1) insufficient price movement in the available data, "
+                    f"(2) the stock is moving sideways with low volatility, "
+                    f"or (3) the date range doesn't capture a complete trend cycle. "
+                    f"Consider using a longer date range or different timeframe (1h or 1d)."
                 )
 
             # Calculate analysis components
@@ -148,14 +162,37 @@ class FibonacciAnalyzer:
             logger.error("Fibonacci analysis failed", symbol=symbol, error=str(e))
             raise
 
+    def _get_minimum_data_points(self, timeframe: str) -> int:
+        """
+        Calculate minimum required data points based on algorithm requirements.
+
+        Instead of hardcoded values, calculates based on swing_lookback parameter
+        from the timeframe config. This ensures minimums scale with algorithm needs.
+
+        Formula: swing_lookback * 3 (ensures enough bars for trend pattern detection)
+        Floor: 20 bars minimum (absolute minimum for any meaningful analysis)
+
+        Results:
+        - 1m: 10 * 3 = 30 bars (~30 minutes)
+        - 1h: 5 * 3 = 15 → max(15, 20) = 20 bars (~20 hours)
+        - 1d: 3 * 3 = 9 → max(9, 20) = 20 bars (~20 days)
+        - 1w: 2 * 3 = 6 → max(6, 20) = 20 bars (~20 weeks)
+        - 1M: 1 * 3 = 3 → max(3, 20) = 20 bars (~20 months)
+        """
+        config = TimeframeConfigs.get_config(timeframe)
+        # Need at least 3x swing_lookback for meaningful trend detection
+        calculated_min = config.swing_lookback * 3
+        return max(calculated_min, 20)
+
     async def _fetch_stock_data(
         self, start_date: str | None = None, end_date: str | None = None
     ) -> pd.DataFrame:
         """Fetch stock data with timeframe-appropriate interval using AlphaVantageMarketDataService."""
         try:
             # Map timeframe to Alpha Vantage interval format
-            # For intraday (1h, 4h, etc.), AlphaVantage always returns 1 day of data with extended hours
+            # For intraday (1m, 1h, 4h, etc.), AlphaVantage returns intraday data
             interval_map = {
+                "1m": "1m",     # Intraday: 1 minute bars
                 "1h": "60m",    # Intraday: 1 hour bars (will get 1 trading day)
                 "4h": "60m",    # Intraday: 1 hour bars (will get 1 trading day, can aggregate)
                 "1d": "1d",     # Daily

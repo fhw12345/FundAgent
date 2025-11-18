@@ -10,7 +10,7 @@ export interface FibonacciAnalysisRequest {
   symbol: string;
   start_date?: string;
   end_date?: string;
-  timeframe?: "1h" | "1d" | "1w" | "1mo";
+  timeframe?: "60m" | "1d" | "1w" | "1mo";
   include_chart?: boolean;
 }
 
@@ -18,7 +18,7 @@ export interface StochasticAnalysisRequest {
   symbol: string;
   start_date?: string;
   end_date?: string;
-  timeframe?: "1h" | "1d" | "1w" | "1mo";
+  timeframe?: "60m" | "1d" | "1w" | "1mo";
   k_period?: number;
   d_period?: number;
 }
@@ -158,6 +158,7 @@ export interface CompanyOverviewResponse {
   week_52_low?: number;
   overview_summary: string;
   key_metrics: string[];
+  formatted_markdown?: string;
 }
 
 export interface CashFlowResponse {
@@ -169,6 +170,7 @@ export interface CashFlowResponse {
   free_cashflow?: number;
   dividend_payout?: number;
   cashflow_summary: string;
+  formatted_markdown?: string;
 }
 
 export interface BalanceSheetResponse {
@@ -182,6 +184,7 @@ export interface BalanceSheetResponse {
   current_liabilities?: number;
   cash_and_equivalents?: number;
   balance_sheet_summary: string;
+  formatted_markdown?: string;
 }
 
 export interface NewsArticle {
@@ -197,6 +200,7 @@ export interface NewsSentimentResponse {
   positive_news: NewsArticle[];
   negative_news: NewsArticle[];
   overall_sentiment: string;
+  formatted_markdown?: string;
 }
 
 export interface MarketMover {
@@ -212,6 +216,7 @@ export interface MarketMoversResponse {
   top_losers: MarketMover[];
   most_active: MarketMover[];
   last_updated: string;
+  formatted_markdown?: string;
 }
 
 export interface ChartGenerationResponse {
