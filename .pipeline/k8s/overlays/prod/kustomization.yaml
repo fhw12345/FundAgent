@@ -47,10 +47,10 @@ patches:
 images:
 - name: klinematrix/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend
-  newTag: "prod-v0.6.1"
+  newTag: "prod-v0.7.0"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend
-  newTag: "prod-v0.9.0"
+  newTag: "prod-v0.10.0"
 
 # Resource allocation for production
 replicas:

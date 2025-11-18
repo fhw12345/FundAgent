@@ -5,6 +5,8 @@ metadata:
 spec:
   template:
     spec:
+      imagePullSecrets:
+      - name: acr-secret
       containers:
       - name: backend
         image: klinematrix/backend  # Will be replaced by Kustomize
