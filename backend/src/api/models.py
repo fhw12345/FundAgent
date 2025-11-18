@@ -207,6 +207,11 @@ class CompanyOverviewResponse(BaseModel):
     overview_summary: str = Field(..., description="Formatted company overview summary")
     key_metrics: list[str] = Field(..., description="Key metrics highlighted")
 
+    # Rich markdown representation
+    formatted_markdown: str | None = Field(
+        None, description="Rich markdown output with metadata and trends"
+    )
+
 
 class CashFlowResponse(BaseModel):
     """Cash flow statement response."""
@@ -219,6 +224,11 @@ class CashFlowResponse(BaseModel):
     free_cashflow: float | None = Field(None, description="Free cash flow")
     dividend_payout: float | None = Field(None, description="Dividend payout")
     cashflow_summary: str = Field(..., description="Cash flow summary")
+
+    # Rich markdown representation
+    formatted_markdown: str | None = Field(
+        None, description="Rich markdown output with metadata and trends"
+    )
 
 
 class BalanceSheetResponse(BaseModel):
@@ -238,6 +248,11 @@ class BalanceSheetResponse(BaseModel):
         None, description="Cash and cash equivalents"
     )
     balance_sheet_summary: str = Field(..., description="Balance sheet summary")
+
+    # Rich markdown representation
+    formatted_markdown: str | None = Field(
+        None, description="Rich markdown output with metadata and trends"
+    )
 
 
 class NewsArticle(BaseModel):
@@ -260,6 +275,11 @@ class NewsSentimentResponse(BaseModel):
     negative_news: list[NewsArticle] = Field(..., description="Negative sentiment news")
     overall_sentiment: str = Field(..., description="Overall sentiment summary")
 
+    # Rich markdown representation
+    formatted_markdown: str | None = Field(
+        None, description="Rich markdown output with metadata and trends"
+    )
+
 
 class MarketMover(BaseModel):
     """Single market mover entry."""
@@ -280,6 +300,11 @@ class MarketMoversResponse(BaseModel):
         ..., description="Most actively traded stocks"
     )
     last_updated: str = Field(..., description="Last updated timestamp")
+
+    # Rich markdown representation
+    formatted_markdown: str | None = Field(
+        None, description="Rich markdown output with metadata and trends"
+    )
 
 
 class ChartGenerationResponse(BaseModel):
@@ -360,8 +385,8 @@ class FibonacciAnalysisRequest(BaseModel):
     symbol: str = Field(..., description="Stock symbol to analyze")
     start_date: str | None = Field(default=None, description="Start date (YYYY-MM-DD)")
     end_date: str | None = Field(default=None, description="End date (YYYY-MM-DD)")
-    timeframe: Literal["1h", "1d", "1w", "1mo", "1M"] = Field(
-        default="1d", description="Analysis timeframe (1h, 1d, 1w, 1mo)"
+    timeframe: Literal["1m", "1h", "60m", "60min", "1d", "1w", "1wk", "1mo", "1M"] = Field(
+        default="1d", description="Analysis timeframe (1m, 1h, 60m, 1d, 1w, 1mo)"
     )
     include_chart: bool = Field(default=True, description="Whether to generate a chart")
 
@@ -413,8 +438,8 @@ class StochasticAnalysisRequest(BaseModel):
     )
     start_date: str | None = Field(default=None, description="Start date (YYYY-MM-DD)")
     end_date: str | None = Field(default=None, description="End date (YYYY-MM-DD)")
-    timeframe: Literal["1h", "1d", "1w", "1mo", "1M"] = Field(
-        default="1d", description="Analysis timeframe (1h, 1d, 1w, 1mo)"
+    timeframe: Literal["1m", "1h", "60m", "60min", "1d", "1w", "1wk", "1mo", "1M"] = Field(
+        default="1d", description="Analysis timeframe (1m, 1h, 60m, 1d, 1w, 1mo)"
     )
     k_period: int = Field(
         default=14,

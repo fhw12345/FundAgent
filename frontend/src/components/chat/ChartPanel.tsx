@@ -124,28 +124,30 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
         {/* Analysis Buttons - Only show when symbol selected */}
         {currentSymbol && (
           <div className="space-y-2">
-            {/* Technical Analysis */}
-            <div>
-              <div className="text-xs font-medium text-gray-500 mb-1.5">Technical Analysis</div>
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => handleQuickAnalysis("fibonacci")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-xs transition-all"
-                >
-                  <BarChart3 className="h-3.5 w-3.5" />
-                  Fibonacci
-                </button>
-                <button
-                  onClick={() => handleQuickAnalysis("stochastic")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 text-xs transition-all"
-                >
-                  <Activity className="h-3.5 w-3.5" />
-                  Stochastic
-                </button>
+            {/* Technical Analysis - Hidden for 1min interval (insufficient data) */}
+            {selectedInterval !== "1m" && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 mb-1.5">Technical Analysis</div>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => handleQuickAnalysis("fibonacci")}
+                    disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
+                  >
+                    {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BarChart3 className="h-3.5 w-3.5" />}
+                    Fibonacci
+                  </button>
+                  <button
+                    onClick={() => handleQuickAnalysis("stochastic")}
+                    disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
+                  >
+                    {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
+                    Stochastic
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Fundamental Analysis */}
             <div>
@@ -153,26 +155,26 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => handleQuickAnalysis("company_overview")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 text-xs transition-all"
+                  disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
-                  <Building2 className="h-3.5 w-3.5" />
+                  {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
                   Overview
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("cash_flow")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 text-xs transition-all"
+                  disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
-                  <FileText className="h-3.5 w-3.5" />
+                  {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                   Cash Flow
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("balance_sheet")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50 text-xs transition-all"
+                  disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
-                  <FileText className="h-3.5 w-3.5" />
+                  {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                   Balance Sheet
                 </button>
               </div>
@@ -184,26 +186,26 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => handleQuickAnalysis("news_sentiment")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-xs transition-all"
+                  disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
-                  <Newspaper className="h-3.5 w-3.5" />
+                  {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Newspaper className="h-3.5 w-3.5" />}
                   News Sentiment
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("macro")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-xs transition-all"
+                  disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
-                  <TrendingUp className="h-3.5 w-3.5" />
+                  {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="h-3.5 w-3.5" />}
                   Macro
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("market_movers")}
-                  disabled={analysisMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 text-xs transition-all"
+                  disabled={analysisMutation.isPending || priceDataQuery.isLoading}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
-                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUpDown className="h-3.5 w-3.5" />}
                   Market Movers
                 </button>
               </div>

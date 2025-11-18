@@ -18,6 +18,7 @@ from ..core.financial_analysis import (
 )
 from ..database.redis import RedisCache
 from ..services.alphavantage_market_data import AlphaVantageMarketDataService
+from ..services.alphavantage_response_formatter import AlphaVantageResponseFormatter
 from .dependencies.auth import get_current_user_id
 from .health import get_redis
 from .models import (
@@ -84,6 +85,11 @@ def get_market_service() -> AlphaVantageMarketDataService:
 
     market_service: AlphaVantageMarketDataService = app.state.market_service
     return market_service
+
+
+def get_formatter() -> AlphaVantageResponseFormatter:
+    """Dependency to get Alpha Vantage response formatter."""
+    return AlphaVantageResponseFormatter()
 
 
 def validate_date_range(start_date: str | None, end_date: str | None) -> None:
@@ -169,16 +175,31 @@ async def fibonacci_analysis(
         # Validate date range first
         validate_date_range(request.start_date, request.end_date)
 
+        # Intraday intervals (1m, 60m) are not supported for Fibonacci analysis
+        # Reason: Insufficient historical data (Alpha Vantage compact mode ~100 bars)
+        # and excessive noise in intraday swings make analysis unreliable
+        if request.timeframe in ["1m", "60m", "60min", "1h"]:
+            logger.error(
+                "Fibonacci analysis not supported for intraday intervals",
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+            )
+            raise ValueError(
+                f"Fibonacci analysis is not available for {request.timeframe} interval. "
+                f"Please use daily (1d), weekly (1w), or monthly (1mo) intervals for reliable analysis."
+            )
+
         # Require both start and end dates for Fibonacci analysis
         if not request.start_date or not request.end_date:
             logger.error(
                 "Fibonacci analysis request failed - missing date range",
                 symbol=request.symbol,
+                timeframe=request.timeframe,
                 start_date=request.start_date,
                 end_date=request.end_date,
             )
             raise ValueError(
-                "Both start_date and end_date are required for Fibonacci analysis"
+                f"Both start_date and end_date are required for {request.timeframe} Fibonacci analysis"
             )
 
         # Check cache first
@@ -639,6 +660,7 @@ async def company_overview(
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
     market_service: AlphaVantageMarketDataService = Depends(get_market_service),
+    formatter: AlphaVantageResponseFormatter = Depends(get_formatter),
 ) -> CompanyOverviewResponse:
     """
     Get comprehensive company overview with key metrics and ownership data.
@@ -736,6 +758,13 @@ async def company_overview(
         if week_52_low:
             key_metrics.append(f"52W Low: ${week_52_low:.2f}")
 
+        # Generate rich markdown using formatter
+        formatted_markdown = formatter.format_company_overview(
+            raw_data=overview,
+            symbol=symbol,
+            invoked_at=datetime.now(UTC).isoformat(),
+        )
+
         result = CompanyOverviewResponse(
             symbol=symbol,
             company_name=company_name,
@@ -757,6 +786,7 @@ async def company_overview(
             week_52_low=week_52_low,
             overview_summary=summary,
             key_metrics=key_metrics,
+            formatted_markdown=formatted_markdown,
         )
 
         # Cache for 4 hours - Company info rarely changes
@@ -782,6 +812,7 @@ async def cash_flow(
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
     market_service: AlphaVantageMarketDataService = Depends(get_market_service),
+    formatter: AlphaVantageResponseFormatter = Depends(get_formatter),
 ) -> CashFlowResponse:
     """Get cash flow statement for a company."""
     try:
@@ -821,6 +852,13 @@ async def cash_flow(
         if free_cf:
             summary += f"Free cash flow: ${free_cf/1e6:.1f}M. "
 
+        # Generate rich markdown using formatter
+        formatted_markdown = formatter.format_cash_flow(
+            raw_data=data,
+            symbol=request.symbol,
+            invoked_at=datetime.now(UTC).isoformat(),
+        )
+
         result = CashFlowResponse(
             symbol=request.symbol,
             company_name=company_name,
@@ -830,6 +868,7 @@ async def cash_flow(
             free_cashflow=free_cf,
             dividend_payout=dividend,
             cashflow_summary=summary,
+            formatted_markdown=formatted_markdown,
         )
 
         await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
@@ -851,6 +890,7 @@ async def balance_sheet(
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
     market_service: AlphaVantageMarketDataService = Depends(get_market_service),
+    formatter: AlphaVantageResponseFormatter = Depends(get_formatter),
 ) -> BalanceSheetResponse:
     """Get balance sheet for a company."""
     try:
@@ -892,6 +932,13 @@ async def balance_sheet(
         if equity:
             summary += f"Shareholder equity: ${equity/1e6:.1f}M. "
 
+        # Generate rich markdown using formatter
+        formatted_markdown = formatter.format_balance_sheet(
+            raw_data=data,
+            symbol=request.symbol,
+            invoked_at=datetime.now(UTC).isoformat(),
+        )
+
         result = BalanceSheetResponse(
             symbol=request.symbol,
             company_name=company_name,
@@ -903,6 +950,7 @@ async def balance_sheet(
             current_liabilities=current_liabilities,
             cash_and_equivalents=cash,
             balance_sheet_summary=summary,
+            formatted_markdown=formatted_markdown,
         )
 
         await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
@@ -924,6 +972,7 @@ async def news_sentiment(
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
     market_service: AlphaVantageMarketDataService = Depends(get_market_service),
+    formatter: AlphaVantageResponseFormatter = Depends(get_formatter),
 ) -> NewsSentimentResponse:
     """Get news sentiment for a stock."""
     try:
@@ -972,11 +1021,19 @@ async def news_sentiment(
 
         overall = f"Found {len(positive)} positive and {len(negative)} negative articles for {request.symbol}"
 
+        # Generate rich markdown using formatter
+        formatted_markdown = formatter.format_news_sentiment(
+            raw_data=data,
+            symbol=request.symbol,
+            invoked_at=datetime.now(UTC).isoformat(),
+        )
+
         result = NewsSentimentResponse(
             symbol=request.symbol,
             positive_news=positive,
             negative_news=negative,
             overall_sentiment=overall,
+            formatted_markdown=formatted_markdown,
         )
 
         await redis_cache.set(
@@ -999,6 +1056,7 @@ async def market_movers(
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
     market_service: AlphaVantageMarketDataService = Depends(get_market_service),
+    formatter: AlphaVantageResponseFormatter = Depends(get_formatter),
 ) -> MarketMoversResponse:
     """Get today's market movers (gainers, losers, most active)."""
     try:
@@ -1047,11 +1105,18 @@ async def market_movers(
             for item in data.get("most_actively_traded", [])[:5]
         ]
 
+        # Generate rich markdown using formatter
+        formatted_markdown = formatter.format_market_movers(
+            raw_data=data,
+            invoked_at=datetime.now(UTC).isoformat(),
+        )
+
         result = MarketMoversResponse(
             top_gainers=gainers,
             top_losers=losers,
             most_active=active,
             last_updated=datetime.now(UTC).isoformat(),
+            formatted_markdown=formatted_markdown,
         )
 
         await redis_cache.set(
@@ -1097,6 +1162,19 @@ async def stochastic_analysis(
         # Validate date range if provided
         validate_date_range(request.start_date, request.end_date)
 
+        # Intraday intervals (1m, 60m) are not supported for Stochastic analysis
+        # Reason: Insufficient historical data and excessive noise
+        if request.timeframe in ["1m", "60m", "60min", "1h"]:
+            logger.error(
+                "Stochastic analysis not supported for intraday intervals",
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+            )
+            raise ValueError(
+                f"Stochastic analysis is not available for {request.timeframe} interval. "
+                f"Please use daily (1d), weekly (1w), or monthly (1mo) intervals for reliable analysis."
+            )
+
         # Check cache first
         cache_start_time = time.time()
         cache_key = f"stochastic:{request.symbol}:{request.start_date}:{request.end_date}:{request.timeframe}:{request.k_period}:{request.d_period}"
@@ -1138,13 +1216,8 @@ async def stochastic_analysis(
             d_period=request.d_period,
         )
 
-        # Initialize TickerDataService and analyzer with AlphaVantage
-        from ..core.data.ticker_data_service import TickerDataService
-
-        ticker_service = TickerDataService(
-            redis_cache=redis_cache, alpha_vantage_service=market_service
-        )
-        analyzer = StochasticAnalyzer(ticker_service)
+        # Initialize analyzer with AlphaVantage (same as Fibonacci)
+        analyzer = StochasticAnalyzer(market_service)
 
         result = await analyzer.analyze(
             symbol=request.symbol,

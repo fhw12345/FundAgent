@@ -289,14 +289,14 @@ export const useButtonAnalysis = (
           // Calculate date range using shared utility
           const dateRange = calculateDateRange(
             selectedDateRange,
-            (selectedInterval as "1h" | "1d" | "1w" | "1mo") || "1d",
+            (selectedInterval as "1d" | "1w" | "1mo") || "1d",
           );
 
           const result = await analysisService.fibonacciAnalysis({
             symbol: currentSymbol,
             start_date: dateRange.start,
             end_date: dateRange.end,
-            timeframe: (selectedInterval || "1d") as "1h" | "1d" | "1w" | "1mo",
+            timeframe: (selectedInterval || "1d") as "1d" | "1w" | "1mo",
           });
           response = {
             type: "fibonacci",
@@ -333,14 +333,14 @@ export const useButtonAnalysis = (
           // Calculate date range using shared utility
           const dateRange = calculateDateRange(
             selectedDateRange,
-            (selectedInterval as "1h" | "1d" | "1w" | "1mo") || "1d",
+            (selectedInterval as "1d" | "1w" | "1mo") || "1d",
           );
 
           const result = await analysisService.stochasticAnalysis({
             symbol: currentSymbol,
             start_date: dateRange.start,
             end_date: dateRange.end,
-            timeframe: (selectedInterval as "1h" | "1d" | "1w" | "1mo") || "1d",
+            timeframe: (selectedInterval as "1d" | "1w" | "1mo") || "1d",
             k_period: 14,
             d_period: 3,
           });
@@ -474,6 +474,9 @@ export const useButtonAnalysis = (
                   // Still resolve with response data (analysis succeeded even if save failed)
                   resolve(response);
                 },
+                undefined, // onToolStart
+                undefined, // onToolEnd
+                undefined, // onToolError
                 {
                   title: chatTitle,
                   role: "assistant",
@@ -504,6 +507,9 @@ export const useButtonAnalysis = (
               // Reject because user can't continue without saving the request
               reject(new Error(`Failed to save analysis: ${error}`));
             },
+            undefined, // onToolStart
+            undefined, // onToolEnd
+            undefined, // onToolError
             {
               title: chatTitle,
               role: "user",

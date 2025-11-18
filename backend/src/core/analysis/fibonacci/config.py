@@ -37,18 +37,33 @@ class TimeframeConfigs:
 
     # Configurations adapted for different market scales and volatility
     CONFIGS: dict[str, TimeframeConfig] = {
+        "1m": TimeframeConfig(
+            "1m", 10, 0.1, 0.01, 0.002
+        ),  # 1-minute: 1% min magnitude, 0.2% tolerance
         "1h": TimeframeConfig(
             "1h", 5, 0.3, 0.03, 0.005
         ),  # Hourly: 3% min magnitude, 0.5% tolerance
+        "60m": TimeframeConfig(
+            "60m", 5, 0.3, 0.03, 0.005
+        ),  # 60-minute (same as 1h): 3% min magnitude, 0.5% tolerance
+        "60min": TimeframeConfig(
+            "60min", 5, 0.3, 0.03, 0.005
+        ),  # 60-minute alias (same as 1h): 3% min magnitude, 0.5% tolerance
         "1d": TimeframeConfig(
             "1d", 3, 0.5, 0.05, 0.007
         ),  # Daily: 5% min magnitude, 0.7% tolerance
         "1w": TimeframeConfig(
             "1wk", 2, 1.0, 0.08, 0.02
         ),  # Weekly: 8% min magnitude, 2% tolerance
+        "1wk": TimeframeConfig(
+            "1wk", 2, 1.0, 0.08, 0.02
+        ),  # Weekly alias: 8% min magnitude, 2% tolerance
         "1M": TimeframeConfig(
             "1mo", 1, 1.5, 0.10, 0.03
         ),  # Monthly: 10% min magnitude, 3% tolerance
+        "1mo": TimeframeConfig(
+            "1mo", 1, 1.5, 0.10, 0.03
+        ),  # Monthly alias: 10% min magnitude, 3% tolerance
     }
 
     @classmethod
