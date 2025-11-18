@@ -92,10 +92,18 @@ class PriceDataResponse(BaseModel):
 class MarketStatusResponse(BaseModel):
     """Market status response."""
 
-    is_open: bool = Field(..., description="Whether market is currently open for trading")
-    current_session: str = Field(..., description="Current market session: pre, regular, post, or closed")
-    next_open: str | None = Field(None, description="Next market open time (ISO format)")
-    next_close: str | None = Field(None, description="Next market close time (ISO format)")
+    is_open: bool = Field(
+        ..., description="Whether market is currently open for trading"
+    )
+    current_session: str = Field(
+        ..., description="Current market session: pre, regular, post, or closed"
+    )
+    next_open: str | None = Field(
+        None, description="Next market open time (ISO format)"
+    )
+    next_close: str | None = Field(
+        None, description="Next market close time (ISO format)"
+    )
     timestamp: str = Field(..., description="Current timestamp (ISO format)")
 
 
@@ -350,7 +358,7 @@ async def get_market_status(
     """
     try:
         # Get current time in Eastern Time
-        now = pd.Timestamp.now(tz='America/New_York')
+        now = pd.Timestamp.now(tz="America/New_York")
 
         # Get current session
         current_session = get_market_session(now)
@@ -369,10 +377,14 @@ async def get_market_status(
                 if days_until_monday == 0:
                     days_until_monday = 1  # If Sunday, next Monday
                 next_open_dt = now + timedelta(days=days_until_monday)
-                next_open_dt = next_open_dt.replace(hour=4, minute=0, second=0, microsecond=0)
+                next_open_dt = next_open_dt.replace(
+                    hour=4, minute=0, second=0, microsecond=0
+                )
             else:  # Weeknight
                 next_open_dt = now + timedelta(days=1)
-                next_open_dt = next_open_dt.replace(hour=4, minute=0, second=0, microsecond=0)
+                next_open_dt = next_open_dt.replace(
+                    hour=4, minute=0, second=0, microsecond=0
+                )
 
             next_open = next_open_dt.isoformat()
 
@@ -408,7 +420,9 @@ async def get_market_status(
         )
 
     except Exception as e:
-        logger.error("Market status check failed", error=str(e), error_type=type(e).__name__)
+        logger.error(
+            "Market status check failed", error=str(e), error_type=type(e).__name__
+        )
         raise HTTPException(
             status_code=500, detail=f"Failed to check market status: {str(e)}"
         ) from e

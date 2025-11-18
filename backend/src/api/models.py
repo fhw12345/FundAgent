@@ -385,8 +385,8 @@ class FibonacciAnalysisRequest(BaseModel):
     symbol: str = Field(..., description="Stock symbol to analyze")
     start_date: str | None = Field(default=None, description="Start date (YYYY-MM-DD)")
     end_date: str | None = Field(default=None, description="End date (YYYY-MM-DD)")
-    timeframe: Literal["1m", "1h", "60m", "60min", "1d", "1w", "1wk", "1mo", "1M"] = Field(
-        default="1d", description="Analysis timeframe (1m, 1h, 60m, 1d, 1w, 1mo)"
+    timeframe: Literal["1m", "1h", "60m", "60min", "1d", "1w", "1wk", "1mo", "1M"] = (
+        Field(default="1d", description="Analysis timeframe (1m, 1h, 60m, 1d, 1w, 1mo)")
     )
     include_chart: bool = Field(default=True, description="Whether to generate a chart")
 
@@ -438,8 +438,8 @@ class StochasticAnalysisRequest(BaseModel):
     )
     start_date: str | None = Field(default=None, description="Start date (YYYY-MM-DD)")
     end_date: str | None = Field(default=None, description="End date (YYYY-MM-DD)")
-    timeframe: Literal["1m", "1h", "60m", "60min", "1d", "1w", "1wk", "1mo", "1M"] = Field(
-        default="1d", description="Analysis timeframe (1m, 1h, 60m, 1d, 1w, 1mo)"
+    timeframe: Literal["1m", "1h", "60m", "60min", "1d", "1w", "1wk", "1mo", "1M"] = (
+        Field(default="1d", description="Analysis timeframe (1m, 1h, 60m, 1d, 1w, 1mo)")
     )
     k_period: int = Field(
         default=14,

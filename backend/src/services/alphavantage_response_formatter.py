@@ -210,43 +210,55 @@ class AlphaVantageResponseFormatter:
             metrics.append(
                 (
                     f"Market Cap | {self._format_large_number(market_cap)}",
-                    f"P/E Ratio | {pe_ratio:.2f}" if pe_ratio > 0 else "P/E Ratio | N/A",
+                    (
+                        f"P/E Ratio | {pe_ratio:.2f}"
+                        if pe_ratio > 0
+                        else "P/E Ratio | N/A"
+                    ),
                 )
             )
         if eps != 0:
             metrics.append(
                 (
                     f"EPS | ${eps:.2f}",
-                    f"Profit Margin | {profit_margin:.2f}%"
-                    if profit_margin > 0
-                    else "Profit Margin | N/A",
+                    (
+                        f"Profit Margin | {profit_margin:.2f}%"
+                        if profit_margin > 0
+                        else "Profit Margin | N/A"
+                    ),
                 )
             )
         if revenue_ttm > 0:
             metrics.append(
                 (
                     f"Revenue (TTM) | {self._format_large_number(revenue_ttm)}",
-                    f"Dividend Yield | {dividend_yield:.2f}%"
-                    if dividend_yield > 0
-                    else "Dividend Yield | N/A",
+                    (
+                        f"Dividend Yield | {dividend_yield:.2f}%"
+                        if dividend_yield > 0
+                        else "Dividend Yield | N/A"
+                    ),
                 )
             )
         if beta != 0:
             metrics.append(
                 (
                     f"Beta | {beta:.2f}",
-                    f"% Insiders | {percent_insiders:.2f}%"
-                    if percent_insiders > 0
-                    else "% Insiders | N/A",
+                    (
+                        f"% Insiders | {percent_insiders:.2f}%"
+                        if percent_insiders > 0
+                        else "% Insiders | N/A"
+                    ),
                 )
             )
         if percent_institutions > 0:
             metrics.append(
                 (
                     f"% Institutions | {percent_institutions:.2f}%",
-                    f"52W High | ${week_52_high:.2f}"
-                    if week_52_high > 0
-                    else "52W High | N/A",
+                    (
+                        f"52W High | ${week_52_high:.2f}"
+                        if week_52_high > 0
+                        else "52W High | N/A"
+                    ),
                 )
             )
         if week_52_low > 0:
@@ -338,7 +350,9 @@ class AlphaVantageResponseFormatter:
 
                 q_operating = self._safe_float(q.get("operatingCashflow"))
                 q_capex = self._safe_float(q.get("capitalExpenditures"))
-                q_free_cf = q_operating - abs(q_capex) if q_operating and q_capex else None
+                q_free_cf = (
+                    q_operating - abs(q_capex) if q_operating and q_capex else None
+                )
 
                 qoq_growth = self._calculate_qoq_growth(q_free_cf, previous_fcf)
 
@@ -355,13 +369,11 @@ class AlphaVantageResponseFormatter:
                 latest_q = current_year_quarters[-1]
                 prev_q = current_year_quarters[-2]
 
-                latest_fcf = (
-                    self._safe_float(latest_q.get("operatingCashflow"))
-                    - abs(self._safe_float(latest_q.get("capitalExpenditures")))
+                latest_fcf = self._safe_float(latest_q.get("operatingCashflow")) - abs(
+                    self._safe_float(latest_q.get("capitalExpenditures"))
                 )
-                prev_fcf = (
-                    self._safe_float(prev_q.get("operatingCashflow"))
-                    - abs(self._safe_float(prev_q.get("capitalExpenditures")))
+                prev_fcf = self._safe_float(prev_q.get("operatingCashflow")) - abs(
+                    self._safe_float(prev_q.get("capitalExpenditures"))
                 )
 
                 growth = self._calculate_qoq_growth(latest_fcf, prev_fcf)
@@ -419,9 +431,7 @@ class AlphaVantageResponseFormatter:
         total_liabilities = self._safe_float(latest_annual.get("totalLiabilities"))
         equity = self._safe_float(latest_annual.get("totalShareholderEquity"))
         current_assets = self._safe_float(latest_annual.get("currentAssets"))
-        current_liabilities = self._safe_float(
-            latest_annual.get("currentLiabilities")
-        )
+        current_liabilities = self._safe_float(latest_annual.get("currentLiabilities"))
         cash = self._safe_float(
             latest_annual.get("cashAndCashEquivalentsAtCarryingValue")
         )
@@ -537,7 +547,9 @@ class AlphaVantageResponseFormatter:
 
         # Sort and limit
         positive_news = sorted(
-            positive_news, key=lambda x: x.get("overall_sentiment_score", 0), reverse=True
+            positive_news,
+            key=lambda x: x.get("overall_sentiment_score", 0),
+            reverse=True,
         )[:3]
         negative_news = sorted(
             negative_news, key=lambda x: x.get("overall_sentiment_score", 0)
@@ -547,7 +559,7 @@ class AlphaVantageResponseFormatter:
             header,
             f"## 📰 News Sentiment - {symbol}",
             "",
-            f"### 📝 Overall Summary",
+            "### 📝 Overall Summary",
             f"Found {len(positive_news)} strongly positive and {len(negative_news)} strongly negative articles",
             "",
         ]

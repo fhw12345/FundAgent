@@ -10,7 +10,6 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..core.config import get_settings
 from ..core.financial_analysis import (
     FibonacciAnalyzer,
     MacroAnalyzer,

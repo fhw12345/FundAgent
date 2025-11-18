@@ -148,7 +148,9 @@ class TickerDataService:
         cache_key = f"current_price:{symbol}"
         cached_price = await self.redis_cache.get(cache_key)
         if cached_price is not None:
-            logger.debug("Cache hit for current price", symbol=symbol, price=cached_price)
+            logger.debug(
+                "Cache hit for current price", symbol=symbol, price=cached_price
+            )
             return float(cached_price)
 
         try:
@@ -159,9 +161,7 @@ class TickerDataService:
                 logger.info("Fetching current price from Alpaca", symbol=symbol)
                 price = await self.alpaca_data_service.get_latest_price(symbol)
                 if price and price > 0:
-                    logger.info(
-                        "Got price from Alpaca", symbol=symbol, price=price
-                    )
+                    logger.info("Got price from Alpaca", symbol=symbol, price=price)
                 else:
                     logger.warning(
                         "Invalid price from Alpaca",
@@ -312,11 +312,11 @@ class TickerDataService:
 
                 # Fetch data using Alpaca
                 df = await self.alpaca_data_service.get_bars(
-                symbol=symbol,
-                interval=interval,
-                start_date=start_date,
-                end_date=end_date,
-            )
+                    symbol=symbol,
+                    interval=interval,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
 
                 if df.empty:
                     logger.warning(

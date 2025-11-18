@@ -17,7 +17,9 @@ from ..core.config import Settings
 logger = structlog.get_logger()
 
 
-def get_market_session(timestamp: pd.Timestamp) -> Literal["pre", "regular", "post", "closed"]:
+def get_market_session(
+    timestamp: pd.Timestamp,
+) -> Literal["pre", "regular", "post", "closed"]:
     """
     Determine market session for a given timestamp (US Eastern Time).
 
@@ -36,9 +38,9 @@ def get_market_session(timestamp: pd.Timestamp) -> Literal["pre", "regular", "po
     # Convert to ET if not already
     if timestamp.tz is None:
         # Assume UTC, convert to ET
-        timestamp = timestamp.tz_localize('UTC').tz_convert('America/New_York')
-    elif str(timestamp.tz) != 'America/New_York':
-        timestamp = timestamp.tz_convert('America/New_York')
+        timestamp = timestamp.tz_localize("UTC").tz_convert("America/New_York")
+    elif str(timestamp.tz) != "America/New_York":
+        timestamp = timestamp.tz_convert("America/New_York")
 
     # Check if weekend
     if timestamp.weekday() >= 5:  # Saturday=5, Sunday=6
@@ -47,10 +49,10 @@ def get_market_session(timestamp: pd.Timestamp) -> Literal["pre", "regular", "po
     time_of_day = timestamp.time()
 
     # Define session boundaries
-    pre_start = time(4, 0)   # 4:00 AM
+    pre_start = time(4, 0)  # 4:00 AM
     regular_start = time(9, 30)  # 9:30 AM
-    regular_end = time(16, 0)    # 4:00 PM
-    post_end = time(20, 0)       # 8:00 PM
+    regular_end = time(16, 0)  # 4:00 PM
+    post_end = time(20, 0)  # 8:00 PM
 
     if pre_start <= time_of_day < regular_start:
         return "pre"
@@ -102,14 +104,17 @@ def validate_date_range(
     intraday_intervals = ["1m", "1h", "60min"]
     if interval in intraday_intervals:
         # Get current date in Eastern Time
-        now_et = pd.Timestamp.now(tz='America/New_York')
+        now_et = pd.Timestamp.now(tz="America/New_York")
         today = now_et.date()
 
         # Allow dates within last 30 days (Alpha Vantage intraday limit)
         earliest_allowed = today - pd.Timedelta(days=30)
 
         if start.date() < earliest_allowed:
-            return False, f"Intraday data ({interval}) only available for last 30 days (since {earliest_allowed})"
+            return (
+                False,
+                f"Intraday data ({interval}) only available for last 30 days (since {earliest_allowed})",
+            )
 
         if end.date() > today:
             return False, f"End date cannot be in the future (today is {today})"
@@ -383,7 +388,7 @@ class AlphaVantageMarketDataService:
             # Alpha Vantage returns intraday timestamps in US Eastern Time
             # Localize naive timestamps to ET for proper session detection
             if not df.empty and df.index.tz is None:
-                df.index = df.index.tz_localize('America/New_York')
+                df.index = df.index.tz_localize("America/New_York")
 
             logger.info(
                 "Intraday bars fetched",
@@ -434,7 +439,9 @@ class AlphaVantageMarketDataService:
                 raise ValueError("months must be between 1 and 24")
 
             # Prepare all API requests concurrently for better performance
-            async def fetch_slice(month_offset: int) -> tuple[str, httpx.Response | None]:
+            async def fetch_slice(
+                month_offset: int,
+            ) -> tuple[str, httpx.Response | None]:
                 """Fetch a single month slice."""
                 year = ((month_offset - 1) // 12) + 1
                 month = ((month_offset - 1) % 12) + 1
@@ -491,12 +498,18 @@ class AlphaVantageMarketDataService:
 
                 # Check for API error messages before parsing
                 response_text = response.text.strip()
-                if not response_text or "Error" in response_text or "please see" in response_text:
+                if (
+                    not response_text
+                    or "Error" in response_text
+                    or "please see" in response_text
+                ):
                     logger.warning(
                         "API error or no data in extended intraday slice",
                         symbol=symbol,
                         slice=slice_name,
-                        response_preview=response_text[:200] if response_text else "empty",
+                        response_preview=(
+                            response_text[:200] if response_text else "empty"
+                        ),
                     )
                     continue
 
@@ -516,7 +529,7 @@ class AlphaVantageMarketDataService:
                             "Close": float,
                             "Volume": int,
                         },
-                        on_bad_lines='skip',  # Skip malformed lines
+                        on_bad_lines="skip",  # Skip malformed lines
                     )
 
                     if not df_slice.empty:
@@ -553,12 +566,12 @@ class AlphaVantageMarketDataService:
             df.sort_index(inplace=True)  # Ensure chronological order
 
             # Remove duplicates (in case of overlapping slices)
-            df = df[~df.index.duplicated(keep='first')]
+            df = df[~df.index.duplicated(keep="first")]
 
             # Alpha Vantage returns intraday timestamps in US Eastern Time
             # Localize naive timestamps to ET for proper session detection
             if not df.empty and df.index.tz is None:
-                df.index = df.index.tz_localize('America/New_York')
+                df.index = df.index.tz_localize("America/New_York")
 
             logger.info(
                 "Extended intraday bars fetched",
@@ -566,7 +579,9 @@ class AlphaVantageMarketDataService:
                 interval=interval,
                 bars_count=len(df),
                 months_fetched=months,
-                date_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+                date_range=(
+                    f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty"
+                ),
             )
 
             return df
@@ -617,7 +632,9 @@ class AlphaVantageMarketDataService:
             # DAILY_ADJUSTED returns data with different key name
             key = "Time Series (Daily)"
             if key not in data:
-                raise ValueError(f"No daily data for symbol: {symbol}. Keys: {list(data.keys())}")
+                raise ValueError(
+                    f"No daily data for symbol: {symbol}. Keys: {list(data.keys())}"
+                )
 
             time_series = data[key]
 
@@ -631,8 +648,12 @@ class AlphaVantageMarketDataService:
                         "Open": float(values["1. open"]),
                         "High": float(values["2. high"]),
                         "Low": float(values["3. low"]),
-                        "Close": float(values["5. adjusted close"]),  # Use adjusted close
-                        "Volume": int(values["6. volume"]),  # Volume is field 6 in DAILY_ADJUSTED
+                        "Close": float(
+                            values["5. adjusted close"]
+                        ),  # Use adjusted close
+                        "Volume": int(
+                            values["6. volume"]
+                        ),  # Volume is field 6 in DAILY_ADJUSTED
                     }
                 )
 
@@ -841,7 +862,11 @@ class AlphaVantageMarketDataService:
                     interval=interval,
                     outputsize="compact",
                     bars_count=len(df),
-                    time_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+                    time_range=(
+                        f"{df.index.min()} to {df.index.max()}"
+                        if not df.empty
+                        else "empty"
+                    ),
                 )
 
             elif interval in ["1d", "day"]:
@@ -864,11 +889,18 @@ class AlphaVantageMarketDataService:
             # For intraday data, always return the most recent data available
             # Don't filter by requested dates - if Sunday is requested, show Friday's data
             # This matches behavior of other trading platforms
-            if interval in ["1m", "5m", "15m", "30m", "60m", "60min", "1h"] and not df.empty:
+            if (
+                interval in ["1m", "5m", "15m", "30m", "60m", "60min", "1h"]
+                and not df.empty
+            ):
                 logger.info(
                     "Returning latest available intraday data",
                     symbol=symbol,
-                    requested_range=f"{start_date} to {end_date}" if start_date and end_date else "none",
+                    requested_range=(
+                        f"{start_date} to {end_date}"
+                        if start_date and end_date
+                        else "none"
+                    ),
                     actual_range=f"{df.index.min()} to {df.index.max()}",
                 )
 
@@ -879,9 +911,9 @@ class AlphaVantageMarketDataService:
 
                 # Define time caps per interval
                 time_cap_years = {
-                    "1d": 2,      # Daily: 2 years (~500 trading days)
+                    "1d": 2,  # Daily: 2 years (~500 trading days)
                     "day": 2,
-                    "1w": 6,      # Weekly: 6 years (~312 weeks)
+                    "1w": 6,  # Weekly: 6 years (~312 weeks)
                     "1wk": 6,
                     "week": 6,
                     # Monthly: No cap - full historical data
@@ -892,12 +924,14 @@ class AlphaVantageMarketDataService:
 
                 if years_cap:
                     # Calculate cutoff date based on interval-specific cap
-                    cutoff_date = datetime.now() - timedelta(days=years_cap*365)
+                    cutoff_date = datetime.now() - timedelta(days=years_cap * 365)
 
                     # Check if DataFrame index is timezone-aware
                     if df.index.tz is not None:
                         # Timezone-aware (intraday data) - localize cutoff to Eastern Time
-                        cutoff_dt = pd.to_datetime(cutoff_date).tz_localize('America/New_York')
+                        cutoff_dt = pd.to_datetime(cutoff_date).tz_localize(
+                            "America/New_York"
+                        )
                     else:
                         # Timezone-naive (daily/weekly/monthly data) - use naive timestamp
                         cutoff_dt = pd.to_datetime(cutoff_date)
@@ -913,7 +947,11 @@ class AlphaVantageMarketDataService:
                         cutoff_date=cutoff_dt,
                         original_count=original_count,
                         filtered_count=len(df),
-                        date_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+                        date_range=(
+                            f"{df.index.min()} to {df.index.max()}"
+                            if not df.empty
+                            else "empty"
+                        ),
                     )
                 else:
                     logger.info(
@@ -921,7 +959,11 @@ class AlphaVantageMarketDataService:
                         symbol=symbol,
                         interval=interval,
                         bars_count=len(df),
-                        date_range=f"{df.index.min()} to {df.index.max()}" if not df.empty else "empty",
+                        date_range=(
+                            f"{df.index.min()} to {df.index.max()}"
+                            if not df.empty
+                            else "empty"
+                        ),
                     )
 
             # Filter data by custom date range OR apply default limits
@@ -931,12 +973,22 @@ class AlphaVantageMarketDataService:
                     # Check if DataFrame index is timezone-aware
                     if df.index.tz is not None:
                         # Timezone-aware (intraday data) - localize timestamps to Eastern Time
-                        start_dt = pd.to_datetime(start_date).tz_localize('America/New_York')
-                        end_dt = (pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)).tz_localize('America/New_York')
+                        start_dt = pd.to_datetime(start_date).tz_localize(
+                            "America/New_York"
+                        )
+                        end_dt = (
+                            pd.to_datetime(end_date)
+                            + pd.Timedelta(days=1)
+                            - pd.Timedelta(seconds=1)
+                        ).tz_localize("America/New_York")
                     else:
                         # Timezone-naive (daily/weekly/monthly data) - use naive timestamps
                         start_dt = pd.to_datetime(start_date)
-                        end_dt = pd.to_datetime(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+                        end_dt = (
+                            pd.to_datetime(end_date)
+                            + pd.Timedelta(days=1)
+                            - pd.Timedelta(seconds=1)
+                        )
 
                     original_count = len(df)
                     original_df_copy = df.copy()  # Save copy before filtering
@@ -962,16 +1014,18 @@ class AlphaVantageMarketDataService:
                         )
                         # Restore original DataFrame and take most recent bars
                         df = original_df_copy
-                        max_bars = 420 if interval == "1m" else 85  # 1 day of 1min or 1 week of 1h
+                        max_bars = (
+                            420 if interval == "1m" else 85
+                        )  # 1 day of 1min or 1 week of 1h
                         if len(df) > max_bars:
                             df = df.tail(max_bars)
                 else:
                     # Apply default bar limits for specific intervals
                     # Following principle: cache full data efficiently, show what we got
                     max_bars_map = {
-                        "1m": 100,    # Compact mode returns 100 bars
-                        "1h": 100,    # Compact mode returns 100 bars
-                        "60min": 100, # Compact mode returns 100 bars
+                        "1m": 100,  # Compact mode returns 100 bars
+                        "1h": 100,  # Compact mode returns 100 bars
+                        "60min": 100,  # Compact mode returns 100 bars
                         # Note: 1d, 1w, 1mo have NO limit - show all historical data (full mode)
                         # Note: 5m, 15m, 30m also have NO limit - full historical data
                     }
@@ -1467,9 +1521,7 @@ class AlphaVantageMarketDataService:
             logger.error("UNEMPLOYMENT fetch failed", error=str(e))
             raise
 
-    async def get_commodity_prices(
-        self, interval: str = "monthly"
-    ) -> pd.DataFrame:
+    async def get_commodity_prices(self, interval: str = "monthly") -> pd.DataFrame:
         """
         Get Global Price Index of All Commodities using WTI endpoint as proxy.
 

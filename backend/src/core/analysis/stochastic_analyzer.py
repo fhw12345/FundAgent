@@ -158,10 +158,10 @@ class StochasticAnalyzer:
         try:
             # Map frontend timeframe to AlphaVantage interval
             interval_map = {
-                "1h": "60min",   # Intraday hourly
-                "1d": "1d",      # Daily
-                "1w": "1wk",     # Weekly
-                "1M": "1mo",     # Monthly
+                "1h": "60min",  # Intraday hourly
+                "1d": "1d",  # Daily
+                "1w": "1wk",  # Weekly
+                "1M": "1mo",  # Monthly
             }
             interval = interval_map.get(self.timeframe, "1d")
 

@@ -14,6 +14,11 @@ from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from ..core.config import Settings
+from ..core.localization import (
+    DEFAULT_LANGUAGE,
+    SupportedLanguage,
+    get_language_instruction,
+)
 
 logger = structlog.get_logger()
 
@@ -298,3 +303,18 @@ Risk: Based on 6-month data. Market weakness or company news could quickly inval
 Example - Follow-Up ("What about the P/E ratio?"):
 "The P/E is elevated at 28x, above the S&P 500's 20x average. This reflects premium valuation for AAPL's strong fundamentals and brand moat. Not a concern for quality growth, but means less margin for error if earnings disappoint."
 """
+
+
+def get_system_prompt_with_language(
+    language: SupportedLanguage = DEFAULT_LANGUAGE,
+) -> str:
+    """
+    Get the financial agent system prompt with language instruction appended.
+
+    Args:
+        language: Target response language ("zh-CN" or "en")
+
+    Returns:
+        Complete system prompt with language requirement
+    """
+    return FINANCIAL_AGENT_SYSTEM_PROMPT + get_language_instruction(language)

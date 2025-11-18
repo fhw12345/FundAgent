@@ -192,12 +192,12 @@ class FibonacciAnalyzer:
             # Map timeframe to Alpha Vantage interval format
             # For intraday (1m, 1h, 4h, etc.), AlphaVantage returns intraday data
             interval_map = {
-                "1m": "1m",     # Intraday: 1 minute bars
-                "1h": "60m",    # Intraday: 1 hour bars (will get 1 trading day)
-                "4h": "60m",    # Intraday: 1 hour bars (will get 1 trading day, can aggregate)
-                "1d": "1d",     # Daily
-                "1w": "1wk",    # Weekly
-                "1M": "1mo",    # Monthly
+                "1m": "1m",  # Intraday: 1 minute bars
+                "1h": "60m",  # Intraday: 1 hour bars (will get 1 trading day)
+                "4h": "60m",  # Intraday: 1 hour bars (will get 1 trading day, can aggregate)
+                "1d": "1d",  # Daily
+                "1w": "1wk",  # Weekly
+                "1M": "1mo",  # Monthly
             }
             interval = interval_map.get(self.timeframe, "1d")
 

@@ -154,7 +154,9 @@ class MacroAnalyzer:
                 if not gdp_df.empty:
                     # Calculate YoY growth
                     latest_gdp = gdp_df["value"].iloc[-1]
-                    year_ago_gdp = gdp_df["value"].iloc[-4] if len(gdp_df) >= 4 else latest_gdp
+                    year_ago_gdp = (
+                        gdp_df["value"].iloc[-4] if len(gdp_df) >= 4 else latest_gdp
+                    )
                     gdp_growth = ((latest_gdp - year_ago_gdp) / year_ago_gdp) * 100
                     indicators["Real GDP Growth (YoY)"] = round(gdp_growth, 2)
                     self.economic_indicators["GDP"] = gdp_df
@@ -166,7 +168,9 @@ class MacroAnalyzer:
                 if not cpi_df.empty:
                     # Calculate MoM change
                     latest_cpi = cpi_df["value"].iloc[-1]
-                    prev_cpi = cpi_df["value"].iloc[-2] if len(cpi_df) >= 2 else latest_cpi
+                    prev_cpi = (
+                        cpi_df["value"].iloc[-2] if len(cpi_df) >= 2 else latest_cpi
+                    )
                     cpi_change = ((latest_cpi - prev_cpi) / prev_cpi) * 100
                     indicators["CPI (MoM)"] = round(cpi_change, 2)
                     self.economic_indicators["CPI"] = cpi_df
@@ -259,9 +263,15 @@ class MacroAnalyzer:
 
         if major_indices:
             # Count growth vs absolute indicators
-            growth_indicators = [k for k in major_indices.keys() if "Growth" in k or "MoM" in k or "YoY" in k]
+            growth_indicators = [
+                k
+                for k in major_indices.keys()
+                if "Growth" in k or "MoM" in k or "YoY" in k
+            ]
             if growth_indicators:
-                sentiment_summary += f"Economic indicators tracked: {len(major_indices)} metrics. "
+                sentiment_summary += (
+                    f"Economic indicators tracked: {len(major_indices)} metrics. "
+                )
 
         # Market outlook based on commodity price trends
         if vix_level > 80:
