@@ -11,6 +11,7 @@ This directory contains documentation for bugs, fixes, and common issues encount
 - [External Secrets Sync](external-secrets-sync.md) - Secrets not updating from Azure Key Vault, force-sync procedures
 - [MongoDB Cosmos DB](mongodb-cosmos-db.md) - Throughput modes, indexes, unique constraints with NULL values
 - [Git History Rewrite](git-history-rewrite.md) - Team awareness for git history rewrites, recovery steps
+- [Technical Analysis Limitations](technical-analysis-limitations.md) - Intraday analysis not available, insufficient data errors
 - [Transaction Reconciliation Fix](transaction-reconciliation-datetime-fix.md) - Datetime deprecation fix
 
 ### Bug Reports
@@ -94,9 +95,13 @@ Azure Key Vault secret updates not syncing, force-sync procedures, secret rotati
 ### MongoDB Cosmos DB
 Azure Cosmos DB limitations, throughput modes, index configuration, unique constraints with NULL values
 
+## Historical Reference
+
+For resolved issues with detailed root cause analysis (ACK-specific, CORS deep dives, etc.), see [docs/archive/troubleshooting-history/](../archive/troubleshooting-history/).
+
 ## Emergency Contacts
 
 If you encounter a critical production issue:
 1. Check [deployment/workflow.md](../deployment/workflow.md) for rollback procedures
-2. Review logs: `kubectl logs -f deployment/backend -n klinematrix-test`
-3. Check health: `curl https://klinematrix.com/api/health`
+2. Review logs: `kubectl logs -f deployment/backend -n klinematrix-prod`
+3. Check health: `curl https://klinecubic.cn/api/health`

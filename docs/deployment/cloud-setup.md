@@ -58,28 +58,6 @@
 - **Alerting**: CPU/Memory thresholds configured
 - **Rule Groups**: Node, Kubernetes, and UX recording rules
 
-### Resources to Create
-
-#### Cosmos DB
-- **Account Name**: `financialagent-mongodb`
-- **API**: MongoDB API (compatible)
-- **Purpose**: Primary database for application data
-- **Configuration**: Multi-region, auto-scaling
-
-#### Azure Key Vault
-- **Name**: `klinematrix-test-kv`
-- **Purpose**: Centralized secret management
-- **Secrets to Store**:
-  - `mongodb-url`: Cosmos DB connection string
-  - `dashscope-api-key`: Alibaba Cloud DashScope API key
-  - `tencent-ses-secret-id`: Tencent Cloud SES credentials
-  - `tencent-ses-secret-key`: Tencent Cloud SES credentials
-
-#### Azure Container Registry (ACR)
-- **Registry Name**: `financialAgent`
-- **SKU**: Basic
-- **Purpose**: Store Docker images for deployment
-
 ## Alibaba Cloud Environment
 
 ### Configuration Status
@@ -103,25 +81,6 @@
 - **CIDR Block**: `172.16.0.0/12`
 - **Status**: Available
 - **Purpose**: Network isolation for Alibaba Cloud resources
-
-### Resources to Create
-
-#### OSS (Object Storage Service)
-- **Purpose**: Chart and file storage
-- **Features**:
-  - Multi-region replication
-  - CDN integration for global delivery
-  - Pre-signed URLs for secure access
-  - Lifecycle policies for cost optimization
-
-#### DashScope API Access
-- **Model**: Qwen-VL-Plus (or latest)
-- **Region**: cn-hangzhou
-- **Purpose**: AI-powered chart interpretation and analysis
-- **Configuration**:
-  - API authentication
-  - Rate limiting
-  - Model inference caching
 
 ## Cross-Cloud Integration
 

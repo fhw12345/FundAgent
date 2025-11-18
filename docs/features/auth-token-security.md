@@ -60,442 +60,66 @@ Implement **dual-token authentication** with automatic refresh:
 
 ### Architecture Changes
 
-**New Data Models**:
+**RefreshToken Model**: `token_id`, `user_id`, `token_hash` (SHA256), `expires_at`, `created_at`, `last_used_at`, `revoked`, `revoked_at`, `user_agent`, `ip_address`. Properties: `is_expired`, `is_valid`.
 
-```python
-# backend/src/database/models/refresh_token.py
-from datetime import datetime, timedelta
-from pydantic import BaseModel, Field
-from typing import Optional
+**TokenPair Response**: `access_token`, `refresh_token`, `token_type`, `expires_in`, `refresh_expires_in`
 
-class RefreshToken(BaseModel):
-    """Refresh token stored in database"""
-    token_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    token_hash: str  # SHA256 hash of actual token
-    expires_at: datetime
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_used_at: datetime = Field(default_factory=datetime.utcnow)
-    revoked: bool = False
-    revoked_at: Optional[datetime] = None
-    user_agent: Optional[str] = None  # Browser fingerprint
-    ip_address: Optional[str] = None  # For security logging
-
-    @property
-    def is_expired(self) -> bool:
-        return datetime.utcnow() > self.expires_at
-
-    @property
-    def is_valid(self) -> bool:
-        return not self.revoked and not self.is_expired
-```
-
-**Updated Auth Response**:
-
-```python
-# backend/src/api/schemas/auth_models.py
-class TokenPair(BaseModel):
-    """Access token + refresh token pair"""
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int  # seconds until access token expires
-    refresh_expires_in: int  # seconds until refresh token expires
-
-class LoginResponse(BaseModel):
-    """Login response with user info and tokens"""
-    user: UserProfile
-    tokens: TokenPair
-```
+**LoginResponse**: `user: UserProfile`, `tokens: TokenPair`
 
 **API Endpoints**:
-
-```
-POST /api/auth/login           Login (returns access + refresh tokens)
-POST /api/auth/refresh         Refresh access token using refresh token
-POST /api/auth/logout          Logout (revoke current refresh token)
-POST /api/auth/logout-all      Logout all devices (revoke all user's refresh tokens)
-```
+- `POST /api/auth/login` - Returns access + refresh tokens
+- `POST /api/auth/refresh` - Refresh access token
+- `POST /api/auth/logout` - Revoke current refresh token
+- `POST /api/auth/logout-all` - Revoke all user's refresh tokens
 
 ### Technical Implementation Details
 
 #### 1. Token Generation
 
-**JWT Payload Structure**:
+**JWT Payload**:
+- **Access Token** (30 min): `sub`, `username`, `email`, `type: "access"`, `exp`, `iat`, `jti`
+- **Refresh Token** (7 days): `sub`, `type: "refresh"`, `token_id`, `exp`, `iat`, `jti`
 
-```python
-# Access Token (30 min)
-{
-    "sub": "user_id_123",
-    "username": "allenpan",
-    "email": "allen@example.com",
-    "type": "access",
-    "exp": 1234567890,  # 30 minutes from now
-    "iat": 1234565090,
-    "jti": "unique_token_id"
-}
+**TokenService** (`token_service.py`):
 
-# Refresh Token (7 days)
-{
-    "sub": "user_id_123",
-    "type": "refresh",
-    "token_id": "uuid-v4",  # Links to database record
-    "exp": 1235171890,  # 7 days from now
-    "iat": 1234565090,
-    "jti": "unique_refresh_id"
-}
-```
+Key methods:
+- `create_token_pair(user, user_agent, ip_address)` → Generate access + refresh tokens, store hash in DB
+- `_create_access_token(user)` → JWT with user claims, 30 min expiry
+- `_create_refresh_token(user, token_value)` → JWT with token_value, 7 day expiry
+- `_hash_token(token)` → SHA256 hash for DB storage
+- `refresh_access_token(refresh_token)` → Decode JWT, verify hash in DB, update last_used_at, return new access token
+- `revoke_token(token_hash)` → Set revoked=True in DB
+- `revoke_all_user_tokens(user_id)` → Revoke all refresh tokens for user
 
-**Token Service**:
-
-```python
-# backend/src/services/token_service.py
-from datetime import datetime, timedelta
-import jwt
-import hashlib
-import secrets
-
-class TokenService:
-    ACCESS_TOKEN_EXPIRE_MINUTES = 30
-    REFRESH_TOKEN_EXPIRE_DAYS = 7
-
-    def __init__(self, secret_key: str):
-        self.secret_key = secret_key
-
-    def create_token_pair(
-        self,
-        user: User,
-        user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None
-    ) -> TokenPair:
-        """Create access token + refresh token pair"""
-        # Generate access token
-        access_token = self._create_access_token(user)
-
-        # Generate refresh token
-        refresh_token_value = secrets.token_urlsafe(32)
-        refresh_token_jwt = self._create_refresh_token(user, refresh_token_value)
-
-        # Store refresh token in database
-        refresh_token_record = RefreshToken(
-            user_id=user.id,
-            token_hash=self._hash_token(refresh_token_value),
-            expires_at=datetime.utcnow() + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS),
-            user_agent=user_agent,
-            ip_address=ip_address
-        )
-        await self.refresh_token_repo.create(refresh_token_record)
-
-        return TokenPair(
-            access_token=access_token,
-            refresh_token=refresh_token_jwt,
-            expires_in=self.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            refresh_expires_in=self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600
-        )
-
-    def _create_access_token(self, user: User) -> str:
-        """Create short-lived access token"""
-        now = datetime.utcnow()
-        payload = {
-            "sub": user.id,
-            "username": user.username,
-            "email": user.email,
-            "type": "access",
-            "exp": now + timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES),
-            "iat": now,
-            "jti": str(uuid.uuid4())
-        }
-        return jwt.encode(payload, self.secret_key, algorithm="HS256")
-
-    def _create_refresh_token(self, user: User, token_value: str) -> str:
-        """Create long-lived refresh token"""
-        now = datetime.utcnow()
-        payload = {
-            "sub": user.id,
-            "type": "refresh",
-            "token_value": token_value,  # Will be verified against DB hash
-            "exp": now + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS),
-            "iat": now,
-            "jti": str(uuid.uuid4())
-        }
-        return jwt.encode(payload, self.secret_key, algorithm="HS256")
-
-    def _hash_token(self, token: str) -> str:
-        """Hash token for database storage"""
-        return hashlib.sha256(token.encode()).hexdigest()
-
-    async def refresh_access_token(self, refresh_token: str) -> str:
-        """Generate new access token from refresh token"""
-        try:
-            # Decode refresh token
-            payload = jwt.decode(refresh_token, self.secret_key, algorithms=["HS256"])
-
-            if payload.get("type") != "refresh":
-                raise HTTPException(status_code=401, detail="Invalid token type")
-
-            # Verify token exists in database and is valid
-            token_value = payload.get("token_value")
-            token_hash = self._hash_token(token_value)
-
-            db_token = await self.refresh_token_repo.find_by_hash(token_hash)
-            if not db_token or not db_token.is_valid:
-                raise HTTPException(status_code=401, detail="Invalid or revoked token")
-
-            # Update last_used_at
-            db_token.last_used_at = datetime.utcnow()
-            await self.refresh_token_repo.update(db_token)
-
-            # Get user and generate new access token
-            user = await self.user_repo.find_by_id(payload["sub"])
-            if not user:
-                raise HTTPException(status_code=401, detail="User not found")
-
-            return self._create_access_token(user)
-
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Refresh token expired")
-        except jwt.InvalidTokenError:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
-
-    async def revoke_token(self, token_hash: str) -> bool:
-        """Revoke a refresh token"""
-        db_token = await self.refresh_token_repo.find_by_hash(token_hash)
-        if db_token:
-            db_token.revoked = True
-            db_token.revoked_at = datetime.utcnow()
-            await self.refresh_token_repo.update(db_token)
-            return True
-        return False
-
-    async def revoke_all_user_tokens(self, user_id: str) -> int:
-        """Revoke all refresh tokens for a user (logout all devices)"""
-        return await self.refresh_token_repo.revoke_all_for_user(user_id)
-```
+**Constants**: `ACCESS_TOKEN_EXPIRE_MINUTES = 30`, `REFRESH_TOKEN_EXPIRE_DAYS = 7`
 
 #### 2. Frontend Token Management
 
-**Token Storage Strategy**:
+**TokenStorage** (`tokenStorage.ts`):
 
-```typescript
-// frontend/src/services/tokenStorage.ts
+Methods: `saveTokens(tokens)`, `getAccessToken()`, `getRefreshToken()`, `getExpiresAt()`, `isAccessTokenExpired()` (1 min buffer), `clearTokens()`
 
-interface TokenData {
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number; // Unix timestamp
-}
+Storage keys: `access_token`, `refresh_token`, `token_expires_at` (localStorage)
 
-class TokenStorage {
-  private static ACCESS_TOKEN_KEY = 'access_token';
-  private static REFRESH_TOKEN_KEY = 'refresh_token';
-  private static EXPIRES_AT_KEY = 'token_expires_at';
+**Axios Interceptors** (`api.ts`):
 
-  static saveTokens(tokens: TokenPair): void {
-    const expiresAt = Date.now() + tokens.expires_in * 1000;
+**Request Interceptor**:
+- Check if access token expired → auto-refresh using refresh token
+- Queue concurrent requests during refresh
+- Add `Authorization: Bearer {token}` header
 
-    localStorage.setItem(this.ACCESS_TOKEN_KEY, tokens.access_token);
-    localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refresh_token);
-    localStorage.setItem(this.EXPIRES_AT_KEY, expiresAt.toString());
-  }
-
-  static getAccessToken(): string | null {
-    return localStorage.getItem(this.ACCESS_TOKEN_KEY);
-  }
-
-  static getRefreshToken(): string | null {
-    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
-  }
-
-  static getExpiresAt(): number | null {
-    const expiresAt = localStorage.getItem(this.EXPIRES_AT_KEY);
-    return expiresAt ? parseInt(expiresAt, 10) : null;
-  }
-
-  static isAccessTokenExpired(): boolean {
-    const expiresAt = this.getExpiresAt();
-    if (!expiresAt) return true;
-
-    // Consider expired 1 minute before actual expiry (buffer)
-    return Date.now() > expiresAt - 60000;
-  }
-
-  static clearTokens(): void {
-    localStorage.removeItem(this.ACCESS_TOKEN_KEY);
-    localStorage.removeItem(this.REFRESH_TOKEN_KEY);
-    localStorage.removeItem(this.EXPIRES_AT_KEY);
-  }
-}
-```
-
-**Axios Interceptor with Auto-Refresh**:
-
-```typescript
-// frontend/src/services/api.ts
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: unknown) => void;
-  reject: (reason?: unknown) => void;
-}> = [];
-
-const processQueue = (error: Error | null) => {
-  failedQueue.forEach(prom => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve();
-    }
-  });
-  failedQueue = [];
-};
-
-// Request interceptor: Add access token to headers
-api.interceptors.request.use(
-  async (config: InternalAxesRequestConfig) => {
-    // Check if token is about to expire
-    if (TokenStorage.isAccessTokenExpired()) {
-      const refreshToken = TokenStorage.getRefreshToken();
-
-      if (refreshToken && !isRefreshing) {
-        try {
-          isRefreshing = true;
-          const response = await axios.post('/api/auth/refresh', {
-            refresh_token: refreshToken
-          });
-
-          TokenStorage.saveTokens(response.data);
-          processQueue(null);
-        } catch (error) {
-          processQueue(error as Error);
-          TokenStorage.clearTokens();
-          window.location.href = '/login';
-          throw error;
-        } finally {
-          isRefreshing = false;
-        }
-      }
-    }
-
-    const token = TokenStorage.getAccessToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor: Handle 401 and retry with refresh
-api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        // Wait for ongoing refresh to complete
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then(() => {
-          return api(originalRequest);
-        });
-      }
-
-      originalRequest._retry = true;
-      const refreshToken = TokenStorage.getRefreshToken();
-
-      if (!refreshToken) {
-        TokenStorage.clearTokens();
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
-
-      try {
-        isRefreshing = true;
-        const response = await axios.post('/api/auth/refresh', {
-          refresh_token: refreshToken
-        });
-
-        TokenStorage.saveTokens(response.data);
-        processQueue(null);
-
-        // Retry original request with new token
-        originalRequest.headers.Authorization = `Bearer ${response.data.access_token}`;
-        return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError as Error);
-        TokenStorage.clearTokens();
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
-```
+**Response Interceptor**:
+- On 401: Queue failed request, refresh token, retry original request
+- On refresh failure: Clear tokens, redirect to `/login`
+- Mutex pattern with `isRefreshing` flag prevents concurrent refresh calls
 
 #### 3. Database Schema
 
-**MongoDB Collection**:
+**RefreshTokenRepository** (`refresh_token_repo.py`):
 
-```python
-# backend/src/database/repositories/refresh_token_repo.py
-class RefreshTokenRepository:
-    def __init__(self, db: AsyncIOMotorDatabase):
-        self.collection = db.refresh_tokens
-        self._ensure_indexes()
+**Indexes**: `token_hash` (unique), `user_id`, `expires_at`, `(user_id, revoked)` compound
 
-    async def _ensure_indexes(self):
-        """Create indexes for efficient queries"""
-        await self.collection.create_index("token_hash", unique=True)
-        await self.collection.create_index("user_id")
-        await self.collection.create_index("expires_at")
-        await self.collection.create_index([("user_id", 1), ("revoked", 1)])
-
-    async def create(self, token: RefreshToken) -> RefreshToken:
-        result = await self.collection.insert_one(token.dict())
-        token.id = str(result.inserted_id)
-        return token
-
-    async def find_by_hash(self, token_hash: str) -> Optional[RefreshToken]:
-        doc = await self.collection.find_one({"token_hash": token_hash})
-        return RefreshToken(**doc) if doc else None
-
-    async def find_active_by_user(self, user_id: str) -> list[RefreshToken]:
-        """Get all active (non-revoked, non-expired) tokens for a user"""
-        now = datetime.utcnow()
-        cursor = self.collection.find({
-            "user_id": user_id,
-            "revoked": False,
-            "expires_at": {"$gt": now}
-        })
-        return [RefreshToken(**doc) async for doc in cursor]
-
-    async def revoke_all_for_user(self, user_id: str) -> int:
-        """Revoke all refresh tokens for a user"""
-        result = await self.collection.update_many(
-            {"user_id": user_id, "revoked": False},
-            {
-                "$set": {
-                    "revoked": True,
-                    "revoked_at": datetime.utcnow()
-                }
-            }
-        )
-        return result.modified_count
-
-    async def cleanup_expired(self) -> int:
-        """Delete expired tokens (run as cron job)"""
-        result = await self.collection.delete_many({
-            "expires_at": {"$lt": datetime.utcnow()}
-        })
-        return result.deleted_count
-```
+**Methods**: `create(token)`, `find_by_hash(token_hash)`, `find_active_by_user(user_id)`, `revoke_all_for_user(user_id)`, `cleanup_expired()` (cron job)
 
 ## Implementation Plan
 
@@ -567,142 +191,53 @@ class RefreshTokenRepository:
 
 ## Testing Strategy
 
-**Unit Tests**:
-- TokenService: Token generation, validation, refresh
-- RefreshTokenRepository: CRUD operations, queries
-- Axios interceptor: Token addition, refresh logic
+**Unit Tests**: TokenService (generation, validation, refresh), RefreshTokenRepository (CRUD), Axios interceptor (token handling)
 
-**Integration Tests**:
-- Login flow: Returns access + refresh tokens
-- Refresh flow: Valid refresh token → new access token
-- Revocation: Revoked tokens rejected
-- Expiration: Expired tokens rejected
+**Integration Tests**: Login flow (both tokens), Refresh flow (valid → new access), Revocation (rejected), Expiration (rejected)
 
-**Manual Testing**:
-1. Login → verify both tokens saved
-2. Wait 30+ minutes → verify auto-refresh
-3. Make API call with expired access token → verify auto-refresh
-4. Logout → verify tokens cleared and revoked
-5. Use old refresh token → verify rejection
-6. Login on multiple devices → verify independent sessions
-7. Logout all → verify all sessions revoked
+**Manual Testing**: Login/token save, 30+ min auto-refresh, expired token refresh, logout/revoke, multi-device sessions, logout-all
 
-**Security Testing**:
-- Attempt to use access token after refresh token revoked
-- Attempt to refresh with expired refresh token
-- Attempt to refresh with invalid/tampered token
-- Verify refresh token not exposed in network logs
-- Test rate limiting on /auth/refresh
+**Security Testing**: Use token after revocation, expired refresh, tampered tokens, network log inspection, rate limiting
 
 ## Security Considerations
 
-**Token Storage**:
-- localStorage: Vulnerable to XSS but acceptable for SPA
-- httpOnly cookies: More secure but harder to manage in SPA
-- **Decision**: localStorage for MVP, consider httpOnly cookies in Phase 2
+**Token Storage**: localStorage for MVP (XSS-vulnerable but SPA-friendly), consider httpOnly cookies in Phase 2
 
-**Token Rotation**:
-- Issue new refresh token on each access token refresh
-- Revoke old refresh token immediately
-- Prevents stolen refresh token from being reused indefinitely
+**Token Rotation**: New refresh token on each access token refresh, revoke old immediately
 
-**Brute Force Protection**:
-- Rate limit /auth/refresh: 10 requests per minute per user
-- Rate limit /auth/login: 5 requests per minute per IP
-- Lock account after 10 failed login attempts (future)
+**Rate Limiting**: /auth/refresh (10/min/user), /auth/login (5/min/IP), account lock after 10 failures (future)
 
-**Token Blacklist**:
-- Store revoked refresh tokens in database
-- Clean up expired tokens daily
-- Consider Redis for faster blacklist checks (future)
-
-**Audit Logging**:
-- Log all token refresh events (user_id, ip, timestamp)
-- Log all logout events
-- Alert on suspicious patterns (many refreshes from different IPs)
+**Audit Logging**: Token refresh events, logout events, suspicious pattern alerts (many refreshes from different IPs)
 
 ## Performance Considerations
 
-**Database Impact**:
-- Each refresh: 1 read + 1 write to refresh_tokens collection
-- Expected: ~10 refreshes/user/day (30 min expiry)
-- For 1000 users: ~10K operations/day (~0.1 ops/sec - negligible)
+**Database**: ~10 refreshes/user/day, 1000 users = ~10K ops/day (~0.1 ops/sec - negligible)
 
-**Network Impact**:
-- Additional /auth/refresh call every 30 minutes
-- Tiny payload (<500 bytes)
-- Minimal impact on bandwidth
+**Network**: /auth/refresh every 30 min, <500 bytes payload
 
-**Frontend Complexity**:
-- Axios interceptor adds ~100ms latency max
-- Queue mechanism prevents request stampede
-- Minimal impact on user experience
-
-**Caching**:
-- Cache user data in access token payload (reduce DB lookups)
-- Cache refresh token validation for 5 seconds (prevent double-check)
+**Frontend**: Axios interceptor ~100ms max latency, queue mechanism prevents request stampede
 
 ## Rollout Strategy
 
-**Development**:
-1. Implement backend dual-token system
-2. Update frontend token management
-3. Test thoroughly in local environment
+**Dev**: Backend dual-token system → Frontend token management → Local testing
 
-**Test Environment**:
-1. Deploy backend with /auth/refresh endpoint
-2. Deploy frontend with new interceptors
-3. Test with real users (beta testers)
-4. Monitor for errors and UX issues
+**Test**: Deploy, beta testers, monitor errors/UX
 
-**Production**:
-1. Feature flag: `DUAL_TOKEN_AUTH_ENABLED=true`
-2. Deploy during low-traffic window
-3. Migrate existing tokens (issue refresh tokens to logged-in users)
-4. Monitor error rates and user feedback
-5. Gradually reduce access token expiry (7d → 4h → 1h → 30m)
-
-**Migration for Existing Users**:
-```python
-# One-time migration script
-async def migrate_existing_sessions():
-    """Issue refresh tokens to users with valid access tokens"""
-    # Find all users with valid sessions (from existing JWT)
-    # Generate refresh token for each
-    # Notify users to refresh page
-    pass
-```
+**Prod**: Feature flag `DUAL_TOKEN_AUTH_ENABLED=true`, low-traffic deploy, migrate existing tokens, gradually reduce expiry (7d → 4h → 1h → 30m)
 
 ## Open Questions
 
-1. **Token Rotation**: Rotate refresh token on every use?
-   - **Pro**: More secure (stolen refresh token has limited uses)
-   - **Con**: More database writes, complexity
-   - **Decision**: Yes, implement rotation
-
-2. **Remember Me**: Separate expiry for "remember me"?
-   - **Options**: 2 hours default, 30 days if "remember me" checked
-   - **Decision**: Single 7-day expiry for MVP, add checkbox in Phase 2
-
-3. **Token Storage**: Move to httpOnly cookies?
-   - **Pro**: XSS-safe, more secure
-   - **Con**: CSRF risk, CORS complexity
-   - **Decision**: Stick with localStorage for MVP, re-evaluate after security audit
+1. **Token Rotation**: Rotate on every use? → **Yes** (implement rotation)
+2. **Remember Me**: Separate expiry? → Single 7-day for MVP, checkbox in Phase 2
+3. **Token Storage**: httpOnly cookies? → localStorage for MVP, re-evaluate after audit
 
 ## Dependencies
 
-**Backend**:
-- PyJWT: Already installed
-- motor: Already installed (MongoDB)
-- APScheduler: For token cleanup cron job (new dependency)
+**Backend**: PyJWT (installed), motor (installed), APScheduler (new - token cleanup cron)
 
-**Frontend**:
-- axios: Already installed
-- React Query: Already installed
+**Frontend**: axios (installed), React Query (installed)
 
-**Infrastructure**:
-- MongoDB indexes (automatic via repository)
-- Cron job for cleanup (can use K8s CronJob)
+**Infrastructure**: MongoDB indexes (auto), K8s CronJob (cleanup)
 
 ## Risks and Mitigations
 

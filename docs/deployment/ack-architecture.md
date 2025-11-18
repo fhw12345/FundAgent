@@ -186,7 +186,7 @@ spec:
       - name: acr-secret  # ← References the secret
       containers:
       - name: backend
-        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend:prod-v0.6.0
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend:prod-v0.7.0
 ```
 
 #### 3. Image Pull Workflow
@@ -357,7 +357,7 @@ Edit `.pipeline/k8s/overlays/prod/kustomization.yaml`:
 images:
 - name: klinematrix/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend
-  newTag: "prod-v0.6.0"  # ← Update version
+  newTag: "prod-v0.7.0"  # ← Update version
 ```
 
 ### 3. Apply Configuration
@@ -499,5 +499,5 @@ kubectl delete secret klinecubic-tls -n klinematrix-prod
 - **High Availability**: Single-node for cost optimization, multi-node planned for HA
 - **Monitoring**: Integrated with Alibaba Cloud monitoring + Langfuse for LLM observability
 
-**Last Updated:** 2025-11-13
-**Production Version:** Backend v0.6.0, Frontend v0.9.0
+**Last Updated:** 2025-11-18
+**Production Version:** Backend v0.7.0, Frontend v0.10.0

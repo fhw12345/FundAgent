@@ -104,372 +104,70 @@ Frontend Chart (color-coded by session)
 
 ### Phase 1: Alpha Vantage Integration (Day 1-2)
 
-**Files to Create**:
-- `backend/src/core/data/extended_hours_service.py`
-  - `ExtendedHoursDataService` class
-  - `get_extended_hours_data(symbol, interval) -> dict`
-  - `_split_by_session(data) -> {pre_market, regular, after_hours}`
-  - `_classify_session(timestamp) -> "pre" | "regular" | "after"`
+**Service**: `ExtendedHoursDataService` with methods: `get_extended_hours_data()`, `_split_by_session()`, `_classify_session()`
 
-**Configuration** (`backend/src/core/config.py`):
-```python
-# Add Alpha Vantage credentials
-alpha_vantage_api_key: str = Field(..., env="ALPHA_VANTAGE_API_KEY")
-alpha_vantage_base_url: str = Field(
-    default="https://www.alphavantage.co/query"
-)
-enable_extended_hours: bool = Field(default=True, env="ENABLE_EXTENDED_HOURS")
-```
+**Config**: `ALPHA_VANTAGE_API_KEY`, `ENABLE_EXTENDED_HOURS`
 
-**Environment Variables** (`.env.test`, K8s secrets):
-```bash
-ALPHA_VANTAGE_API_KEY=<YOUR_API_KEY>
-ENABLE_EXTENDED_HOURS=true
-```
-
-**Alpha Vantage Setup**:
-- Sign up at https://www.alphavantage.co/support/#api-key
-- Free tier: 25 API calls per day (sufficient for testing)
-- Premium tier: 75 calls/min, $50/month (for production)
+**Pricing**: Free (25/day) or Premium ($50/mo, 75/min)
 
 ### Phase 2: Backend API Endpoint (Day 2-3)
 
-**Files to Modify**:
-- `backend/src/api/market_data.py`
-  - Add `GET /api/market/price/{symbol}/extended` endpoint
-  - Validate interval (1min, 5min, 15min, 30min, 60min)
-  - Call `ExtendedHoursDataService.get_extended_hours_data()`
-  - Return structured response
+**Endpoint**: `GET /api/market/price/{symbol}/extended?interval=5min`
 
-**API Endpoint**:
-```python
-@router.get("/price/{symbol}/extended")
-async def get_extended_hours_price(
-    symbol: str,
-    interval: str = Query(
-        default="5min",
-        regex="^(1min|5min|15min|30min|60min)$"
-    ),
-    extended_hours_service: ExtendedHoursDataService = Depends(),
-) -> dict[str, Any]:
-    """
-    Get price data including pre-market and after-hours sessions.
-
-    Returns:
-        {
-            "symbol": "AAPL",
-            "interval": "5min",
-            "sessions": {
-                "pre_market": [...],
-                "regular": [...],
-                "after_hours": [...]
-            },
-            "metadata": {
-                "timezone": "US/Eastern",
-                "last_refreshed": "2025-10-30 16:00:00"
-            }
-        }
-    """
-    data = await extended_hours_service.get_extended_hours_data(
-        symbol, interval
-    )
-    return data
-```
-
-**Response Format**:
-```json
-{
-  "symbol": "AAPL",
-  "interval": "5min",
-  "sessions": {
-    "pre_market": [
-      {
-        "time": "2025-10-30T04:00:00-04:00",
-        "open": 275.00,
-        "high": 275.50,
-        "low": 274.80,
-        "close": 275.20,
-        "volume": 125000
-      }
-    ],
-    "regular": [...],
-    "after_hours": [...]
-  },
-  "metadata": {
-    "timezone": "US/Eastern",
-    "last_refreshed": "2025-10-30T16:00:00-04:00"
-  }
-}
-```
+**Response**: `{ symbol, interval, sessions: { pre_market: [], regular: [], after_hours: [] }, metadata }`
 
 ### Phase 3: Session Classification Logic (Day 3)
 
-**Algorithm** (`_classify_session()`):
-```python
-from datetime import datetime
-from zoneinfo import ZoneInfo
+**Algorithm**: Convert timestamp to ET, classify by hour:
+- 04:00-09:29 → pre_market
+- 09:30-15:59 → regular
+- 16:00-19:59 → after_hours
+- else → closed
 
-def _classify_session(timestamp: str) -> str:
-    """
-    Classify timestamp into trading session.
-
-    Args:
-        timestamp: ISO format "2025-10-30T08:15:00-04:00"
-
-    Returns:
-        "pre_market" | "regular" | "after_hours" | "closed"
-    """
-    dt = datetime.fromisoformat(timestamp)
-
-    # Convert to Eastern Time (market timezone)
-    et = dt.astimezone(ZoneInfo("America/New_York"))
-    hour = et.hour
-    minute = et.minute
-
-    # Pre-Market: 4:00 AM - 9:29 AM ET
-    if hour < 4:
-        return "closed"
-    if hour < 9 or (hour == 9 and minute < 30):
-        return "pre_market"
-
-    # Regular Hours: 9:30 AM - 3:59 PM ET
-    if hour < 16:
-        return "regular"
-
-    # After-Hours: 4:00 PM - 8:00 PM ET
-    if hour < 20:
-        return "after_hours"
-
-    # Outside all trading hours
-    return "closed"
-```
-
-**Edge Cases**:
-- Handle daylight saving time transitions (use `zoneinfo`)
-- Weekends/holidays return "closed" (future enhancement)
-- Handle missing data points gracefully
+**Edge Cases**: DST transitions (use zoneinfo), weekends/holidays (future)
 
 ### Phase 4: Frontend Session Toggle (Day 4-5)
 
-**Files to Modify**:
-- `frontend/src/components/chat/ChartPanel.tsx`
-  - Add session toggle buttons
-  - Add `session` state: `'all' | 'pre' | 'regular' | 'after'`
-  - Filter chart data based on selected session
-  - Color-code candlesticks by session
+**Component** (`ChartPanel.tsx`): Session toggle buttons (All/Pre-Market/Regular/After-Hours)
 
-**UI Component**:
-```typescript
-const [session, setSession] = useState<'all' | 'pre' | 'regular' | 'after'>('all');
+**State**: `session: 'all' | 'pre' | 'regular' | 'after'`
 
-// In render:
-<div className="flex gap-2 mb-4 items-center">
-  <span className="text-sm text-gray-600 font-medium">Sessions:</span>
-  <button
-    onClick={() => setSession('all')}
-    className={`px-3 py-1 rounded ${
-      session === 'all'
-        ? 'bg-blue-500 text-white'
-        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-    }`}
-  >
-    All
-  </button>
-  <button
-    onClick={() => setSession('pre')}
-    className={`px-3 py-1 rounded ${
-      session === 'pre'
-        ? 'bg-blue-500 text-white'
-        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-    }`}
-  >
-    Pre-Market
-  </button>
-  <button
-    onClick={() => setSession('regular')}
-    className={`px-3 py-1 rounded ${
-      session === 'regular'
-        ? 'bg-blue-500 text-white'
-        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-    }`}
-  >
-    Regular
-  </button>
-  <button
-    onClick={() => setSession('after')}
-    className={`px-3 py-1 rounded ${
-      session === 'after'
-        ? 'bg-blue-500 text-white'
-        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-    }`}
-  >
-    After-Hours
-  </button>
-</div>
-```
-
-**Data Filtering**:
-```typescript
-const filteredData = useMemo(() => {
-  if (session === 'all') {
-    return [
-      ...extendedData.sessions.pre_market,
-      ...extendedData.sessions.regular,
-      ...extendedData.sessions.after_hours,
-    ];
-  }
-
-  const sessionMap = {
-    pre: 'pre_market',
-    regular: 'regular',
-    after: 'after_hours',
-  };
-
-  return extendedData.sessions[sessionMap[session]];
-}, [session, extendedData]);
-```
+**Data Filtering**: Filter `extendedData.sessions` based on selected session
 
 ### Phase 5: Chart Styling by Session (Day 5-6)
 
 **Color Scheme**:
-```typescript
-const getSessionColor = (time: string) => {
-  const sessionType = classifySession(time);
+- Pre-Market: Blue (#3B82F6 up, #1E40AF down)
+- Regular: Green/Red (#10B981 up, #EF4444 down)
+- After-Hours: Orange (#F59E0B up, #D97706 down)
 
-  return {
-    pre_market: {
-      up: '#3B82F6',    // Blue (bullish pre-market)
-      down: '#1E40AF',  // Dark Blue (bearish pre-market)
-    },
-    regular: {
-      up: '#10B981',    // Green (bullish regular)
-      down: '#EF4444',  // Red (bearish regular)
-    },
-    after_hours: {
-      up: '#F59E0B',    // Orange (bullish after-hours)
-      down: '#D97706',  // Dark Orange (bearish after-hours)
-    },
-  }[sessionType];
-};
-```
-
-**Chart Legend**:
-```typescript
-<div className="flex gap-4 text-xs text-gray-600 mb-2">
-  <div className="flex items-center gap-1">
-    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-    <span>Pre-Market</span>
-  </div>
-  <div className="flex items-center gap-1">
-    <div className="w-3 h-3 bg-green-500 rounded"></div>
-    <span>Regular Hours</span>
-  </div>
-  <div className="flex items-center gap-1">
-    <div className="w-3 h-3 bg-orange-500 rounded"></div>
-    <span>After-Hours</span>
-  </div>
-</div>
-```
+**Legend**: Color indicators for each session type
 
 ---
 
 ## Data Models
 
-### Backend Response
+**Backend** (`ExtendedHoursDataResponse`): `symbol`, `interval`, `sessions: dict[str, list[PricePoint]]`, `metadata`
 
-```python
-class ExtendedHoursDataResponse(BaseModel):
-    symbol: str
-    interval: str
-    sessions: dict[str, list[PricePoint]]
-    metadata: dict[str, Any]
+**PricePoint**: `time` (ISO 8601), `open`, `high`, `low`, `close`, `volume`, `session` ("pre_market" | "regular" | "after_hours")
 
-class PricePoint(BaseModel):
-    time: str  # ISO 8601 format
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
-    session: str  # "pre_market" | "regular" | "after_hours"
-```
-
-### Frontend Types
-
-```typescript
-interface ExtendedHoursData {
-  symbol: string;
-  interval: string;
-  sessions: {
-    pre_market: PricePoint[];
-    regular: PricePoint[];
-    after_hours: PricePoint[];
-  };
-  metadata: {
-    timezone: string;
-    last_refreshed: string;
-  };
-}
-
-interface PricePoint {
-  time: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  session: 'pre_market' | 'regular' | 'after_hours';
-}
-```
+**Frontend** (`ExtendedHoursData`): Same structure with TypeScript types. Sessions contain arrays of PricePoint objects.
 
 ---
 
 ## API Endpoints
 
-### 1. Get Extended Hours Data (NEW)
+### Get Extended Hours Data (NEW)
 
-```http
-GET /api/market/price/{symbol}/extended?interval=5min
+**Endpoint**: `GET /api/market/price/{symbol}/extended?interval=5min`
 
-Response:
-{
-  "symbol": "AAPL",
-  "interval": "5min",
-  "sessions": {
-    "pre_market": [
-      {
-        "time": "2025-10-30T04:00:00-04:00",
-        "open": 275.00,
-        "high": 275.50,
-        "low": 274.80,
-        "close": 275.20,
-        "volume": 125000,
-        "session": "pre_market"
-      }
-    ],
-    "regular": [...],
-    "after_hours": [...]
-  },
-  "metadata": {
-    "timezone": "US/Eastern",
-    "last_refreshed": "2025-10-30T16:00:00-04:00"
-  }
-}
+**Response**: `{ symbol, interval, sessions: { pre_market: [], regular: [], after_hours: [] }, metadata: { timezone, last_refreshed } }`
 
-Status Codes:
-- 200: Success
-- 400: Invalid symbol or interval
-- 429: Rate limit exceeded (Alpha Vantage)
-- 500: API error
-```
+**Status Codes**: 200 (Success), 400 (Invalid input), 429 (Rate limit), 500 (API error)
 
-### 2. Regular Data Endpoint (Unchanged)
+### Regular Data Endpoint (Unchanged)
 
-```http
-GET /api/market/price/{symbol}?interval=1d&period=6mo
-
-# Keeps existing behavior (yfinance, regular hours only)
-```
+`GET /api/market/price/{symbol}?interval=1d&period=6mo` - Keeps existing behavior (yfinance, regular hours only)
 
 ---
 
@@ -494,45 +192,11 @@ GET /api/market/price/{symbol}?interval=1d&period=6mo
 
 ## Alpha Vantage Integration
 
-### API Details
-
 **Endpoint**: `https://www.alphavantage.co/query`
 
-**Parameters**:
-- `function=TIME_SERIES_INTRADAY`
-- `symbol=AAPL`
-- `interval=5min` (1min, 5min, 15min, 30min, 60min)
-- `extended_hours=true` (KEY: enables pre/post-market data)
-- `outputsize=full` (last 30 days) or `compact` (last 100 data points)
-- `apikey=YOUR_API_KEY`
+**Key Parameters**: `function=TIME_SERIES_INTRADAY`, `symbol`, `interval` (1min/5min/15min/30min/60min), `extended_hours=true`, `outputsize` (compact/full), `apikey`
 
-**Example Request**:
-```bash
-curl "https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=AAPL&interval=5min&extended_hours=true&apikey=demo"
-```
-
-**Response Format**:
-```json
-{
-  "Meta Data": {
-    "1. Information": "Intraday (5min) open, high, low, close prices and volume",
-    "2. Symbol": "AAPL",
-    "3. Last Refreshed": "2025-10-30 16:00:00",
-    "4. Interval": "5min",
-    "5. Output Size": "Compact",
-    "6. Time Zone": "US/Eastern"
-  },
-  "Time Series (5min)": {
-    "2025-10-30 16:00:00": {
-      "1. open": "275.00",
-      "2. high": "275.50",
-      "3. low": "274.80",
-      "4. close": "275.20",
-      "5. volume": "125000"
-    }
-  }
-}
-```
+**Response**: Meta Data (symbol, interval, timezone) + Time Series with OHLCV data keyed by timestamp
 
 ### Rate Limits
 
@@ -541,171 +205,40 @@ curl "https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=AAP
 | Free | 25 | 5 | $0 |
 | Premium | Unlimited | 75 | $50/month |
 
-**Rate Limit Handling**:
-```python
-# Cache responses in Redis (same as existing market data)
-# TTL: 5 minutes for intraday data
-# Fallback to regular hours data if rate limit exceeded
-```
+**Handling**: Cache in Redis (5 min TTL), fallback to regular hours if rate limited
 
 ---
 
 ## Security Considerations
 
-### API Key Management
+**API Key Management**: Store in K8s Secret or Azure Key Vault (External Secrets Operator), accessible only to backend service
 
-1. **Environment Variable**: Store API key in K8s secret
-   ```yaml
-   apiVersion: v1
-   kind: Secret
-   metadata:
-     name: alpha-vantage-secret
-   data:
-     ALPHA_VANTAGE_API_KEY: <base64-encoded-key>
-   ```
-
-2. **Azure Key Vault**: Use External Secrets Operator (existing setup)
-   ```bash
-   az keyvault secret set \
-     --vault-name financial-agent-kv \
-     --name alpha-vantage-api-key \
-     --value "<YOUR_API_KEY>"
-   ```
-
-3. **Access Control**: API key only accessible to backend service
-
-### Data Validation
-
-```python
-# Validate timestamps are in expected range
-# Reject data points outside 4:00 AM - 8:00 PM ET
-# Verify price/volume values are positive
-# Sanitize symbol input (prevent injection)
-```
+**Data Validation**: Validate timestamps (4:00 AM - 8:00 PM ET), verify positive price/volume values, sanitize symbol input
 
 ---
 
 ## Performance Considerations
 
-### Caching Strategy
+**Caching**: Redis key `extended_hours:{symbol}:{interval}:latest`, 5-minute TTL
 
-```python
-# Redis cache key: f"extended_hours:{symbol}:{interval}:latest"
-# TTL: 5 minutes (balance freshness vs. API calls)
-# Cache by session: Separate keys for pre/regular/after
-
-async def get_extended_hours_data(symbol, interval):
-    cache_key = f"extended_hours:{symbol}:{interval}:latest"
-
-    # Try cache first
-    cached = await redis.get(cache_key)
-    if cached:
-        return json.loads(cached)
-
-    # Fetch from Alpha Vantage
-    data = await self._fetch_from_alpha_vantage(symbol, interval)
-
-    # Cache for 5 minutes
-    await redis.setex(cache_key, 300, json.dumps(data))
-
-    return data
-```
-
-### Optimization
-
-1. **Background Refresh**: Pre-fetch data for popular symbols
-2. **Parallel Requests**: Fetch regular + extended data simultaneously
-3. **Data Compression**: Use Redis compression for large datasets
-4. **Progressive Loading**: Load regular hours first, extended hours second
+**Optimization**: Background refresh for popular symbols, parallel regular + extended requests, progressive loading
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
+**Unit Tests** (`test_extended_hours_service.py`):
+- `test_classify_pre_market`: 08:15 ET → "pre_market"
+- `test_classify_regular_hours`: 14:30 ET → "regular"
+- `test_classify_after_hours`: 18:45 ET → "after_hours"
+- `test_classify_closed`: 21:00 ET → "closed"
+- `test_split_by_session`: Data correctly split into 3 session arrays
 
-```python
-# backend/tests/test_extended_hours_service.py
+**Integration Tests** (`chart-extended-hours.test.tsx`):
+- Session toggle filters data correctly (All/Pre/Regular/After)
+- Chart colors match session (blue pre-market, green/red regular, orange after-hours)
 
-def test_classify_pre_market():
-    """Test 4:00 AM - 9:29 AM ET classification."""
-    timestamp = "2025-10-30T08:15:00-04:00"
-    assert _classify_session(timestamp) == "pre_market"
-
-def test_classify_regular_hours():
-    """Test 9:30 AM - 3:59 PM ET classification."""
-    timestamp = "2025-10-30T14:30:00-04:00"
-    assert _classify_session(timestamp) == "regular"
-
-def test_classify_after_hours():
-    """Test 4:00 PM - 8:00 PM ET classification."""
-    timestamp = "2025-10-30T18:45:00-04:00"
-    assert _classify_session(timestamp) == "after_hours"
-
-def test_classify_closed():
-    """Test outside trading hours."""
-    timestamp = "2025-10-30T21:00:00-04:00"
-    assert _classify_session(timestamp) == "closed"
-
-def test_split_by_session():
-    """Test data splitting into 3 sessions."""
-    data = {
-        "Time Series (5min)": {
-            "2025-10-30 08:00:00": {...},  # Pre-market
-            "2025-10-30 14:00:00": {...},  # Regular
-            "2025-10-30 18:00:00": {...},  # After-hours
-        }
-    }
-    result = _split_by_session(data)
-    assert len(result["pre_market"]) == 1
-    assert len(result["regular"]) == 1
-    assert len(result["after_hours"]) == 1
-```
-
-### Integration Tests
-
-```typescript
-// frontend/tests/chart-extended-hours.test.tsx
-
-test('Session toggle filters data correctly', () => {
-  render(<ChartPanel extendedData={mockData} />);
-
-  // Default: All sessions
-  expect(screen.getByText('All')).toHaveClass('bg-blue-500');
-
-  // Click "Pre-Market"
-  fireEvent.click(screen.getByText('Pre-Market'));
-  // Verify only pre-market data displayed
-
-  // Click "Regular"
-  fireEvent.click(screen.getByText('Regular'));
-  // Verify only regular hours data displayed
-});
-
-test('Chart colors match session', () => {
-  render(<ChartPanel extendedData={mockData} />);
-
-  // Pre-market candles should be blue
-  const preMarketCandles = screen.getAllByTestId('pre-market-candle');
-  expect(preMarketCandles[0]).toHaveStyle('fill: #3B82F6');
-
-  // Regular candles should be green/red
-  const regularCandles = screen.getAllByTestId('regular-candle');
-  expect(regularCandles[0]).toHaveStyle('fill: #10B981');
-});
-```
-
-### Manual Testing Checklist
-
-- [ ] Fetch extended hours data for AAPL, TSLA, MSFT
-- [ ] Verify pre-market data shows 4:00 AM - 9:29 AM ET
-- [ ] Verify regular hours data shows 9:30 AM - 3:59 PM ET
-- [ ] Verify after-hours data shows 4:00 PM - 8:00 PM ET
-- [ ] Toggle session buttons → Chart updates correctly
-- [ ] Color-coding matches session (blue, green/red, orange)
-- [ ] Handle missing data gracefully (weekends, holidays)
-- [ ] Rate limit handling (exhaust free tier, verify fallback)
-- [ ] Mobile responsive (session buttons stack vertically)
+**Manual Testing**: Fetch AAPL/TSLA/MSFT extended data, verify session time ranges, toggle buttons, color-coding, rate limit handling, mobile responsiveness
 
 ---
 
@@ -747,68 +280,24 @@ test('Chart colors match session', () => {
 
 ## Rollout Plan
 
-### Development Phase (1-2 weeks)
+**Week 1**: Alpha Vantage integration (Day 1-2), API endpoint + caching (Day 3), Frontend session toggle (Day 4-5), Chart styling (Day 6)
 
-1. **Week 1**:
-   - Day 1-2: Alpha Vantage integration + session splitter
-   - Day 3: Backend API endpoint + caching
-   - Day 4-5: Frontend session toggle + data filtering
-   - Day 6: Chart styling by session
+**Week 2**: Testing + bug fixes (Day 1-2), Documentation (Day 3), Deploy + user testing (Day 4-5)
 
-2. **Week 2**:
-   - Day 1-2: Testing + bug fixes
-   - Day 3: Documentation
-   - Day 4: Deploy to test environment
-   - Day 5: User testing + feedback
+**Deployment Strategy**:
+1. **Alpha**: Test environment, free tier (25/day), 5-10 users
+2. **Beta**: 50% users (A/B test), upgrade to Premium if needed
+3. **GA**: 100% rollout, onboarding education
 
-### Deployment Strategy
-
-1. **Alpha Phase** (Test Environment):
-   - Deploy backend with Alpha Vantage integration
-   - Test with free tier (25 calls/day)
-   - Gather feedback from 5-10 active traders
-   - Monitor API usage and costs
-
-2. **Beta Phase** (Production Soft Launch):
-   - Enable for 50% of users (A/B test)
-   - Upgrade to Premium tier ($50/month) if needed
-   - Collect metrics (usage, satisfaction, API costs)
-
-3. **General Availability**:
-   - Roll out to 100% of users
-   - Add to onboarding flow (educate users on sessions)
-
-### Monitoring
-
-```bash
-# Metrics to track:
-- Extended hours API call count (daily)
-- Session toggle click distribution (All vs. Pre vs. Regular vs. After)
-- Alpha Vantage API errors (rate limits, downtime)
-- User engagement (time spent viewing extended hours)
-- Cost per API call ($50/month ÷ calls)
-```
+**Monitoring**: API call count, session toggle distribution, errors, user engagement, cost per call
 
 ---
 
 ## Dependencies
 
-### External Services
+**External**: Alpha Vantage API (Free: 25/day, Premium: $50/mo)
 
-- **Alpha Vantage API**: Extended hours intraday data
-  - Free tier: 25 calls/day, 5 calls/min
-  - Premium tier: $50/month, 75 calls/min
-  - Signup: https://www.alphavantage.co/support/#api-key
-
-### Python Libraries
-
-- `aiohttp`: Async HTTP client (already installed)
-- `zoneinfo`: Timezone handling (Python 3.9+ standard library)
-
-### Frontend Libraries
-
-- No new dependencies needed
-- Use existing chart library (lightweight-charts)
+**Libraries**: `aiohttp` (async HTTP), `zoneinfo` (stdlib), existing lightweight-charts (frontend)
 
 ---
 

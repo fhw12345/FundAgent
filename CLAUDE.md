@@ -300,7 +300,7 @@ kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 - [ ] **Feature spec created** (for new features): Document in `docs/features/`
 - [ ] Run `make fmt && make test && make lint`
 - [ ] **Bump version** (required): `./scripts/bump-version.sh [component] [patch|minor|major]`
-- [ ] **Document version file** (required): Fill out `docs/project/versions/[component]/v*.md` with overview, features, technical details before committing
+- [ ] **Update CHANGELOG** (required): Add entry to `docs/project/versions/[component]/CHANGELOG.md`
 - [ ] Check data contracts (Pydantic ↔ TypeScript)
 - [ ] Verify no secrets in code
 

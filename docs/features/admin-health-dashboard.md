@@ -51,348 +51,47 @@ As a system administrator, I want a comprehensive health dashboard to monitor re
 
 ### Architecture Changes
 
-**Backend Changes**:
+**Admin Middleware**: `require_admin(username)` checks if username == "allenpan" (MVP). `@admin_required` decorator returns 403 for non-admins.
 
-```python
-# New admin middleware
-from functools import wraps
-from fastapi import HTTPException, status
+**Data Models** (`admin_models.py`):
+- `PodMetrics`: name, cpu_usage, memory_usage, cpu_percentage, memory_percentage
+- `NodeMetrics`: name, cpu/memory usage & capacity, percentages
+- `DatabaseStats`: collection, document_count, size_bytes, size_mb, avg_document_size_bytes
+- `SystemMetrics`: timestamp, pods[], nodes[], database[], health_status
 
-def require_admin(username: str) -> bool:
-    """Check if user is admin (MVP: hardcoded username)"""
-    return username == "allenpan"
-
-def admin_required(func):
-    @wraps(func)
-    async def wrapper(*args, current_user: User = Depends(get_current_user), **kwargs):
-        if not require_admin(current_user.username):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin access required"
-            )
-        return await func(*args, current_user=current_user, **kwargs)
-    return wrapper
-```
-
-**New Data Models**:
-
-```python
-# backend/src/api/schemas/admin_models.py
-
-class PodMetrics(BaseModel):
-    """Pod resource usage metrics"""
-    name: str
-    cpu_usage: str  # e.g., "150m" (millicores)
-    memory_usage: str  # e.g., "256Mi"
-    cpu_percentage: float  # % of requested
-    memory_percentage: float  # % of requested
-
-class NodeMetrics(BaseModel):
-    """Node resource usage metrics"""
-    name: str
-    cpu_usage: str
-    memory_usage: str
-    cpu_capacity: str
-    memory_capacity: str
-    cpu_percentage: float
-    memory_percentage: float
-
-class DatabaseStats(BaseModel):
-    """Database collection statistics"""
-    collection: str
-    document_count: int
-    size_bytes: int
-    size_mb: float
-    avg_document_size_bytes: int
-
-class SystemMetrics(BaseModel):
-    """Complete system metrics"""
-    timestamp: datetime
-    pods: list[PodMetrics]
-    nodes: list[NodeMetrics]
-    database: list[DatabaseStats]
-    health_status: str  # "healthy" | "warning" | "critical"
-```
-
-**API Endpoints**:
-
-```
-GET  /api/admin/health          Get comprehensive system metrics (admin-only)
-GET  /api/admin/metrics/pods    Get pod resource usage (admin-only)
-GET  /api/admin/metrics/nodes   Get node resource usage (admin-only)
-GET  /api/admin/metrics/database Get database statistics (admin-only)
-```
+**API Endpoints** (all admin-only):
+- `GET /api/admin/health` - Complete system metrics
+- `GET /api/admin/metrics/pods` - Pod resource usage
+- `GET /api/admin/metrics/nodes` - Node resource usage
+- `GET /api/admin/metrics/database` - Database statistics
 
 ### Technical Implementation Details
 
 #### 1. Admin Access Control
 
-**User Model Enhancement**:
-```python
-# backend/src/database/models/user.py
-class User(BaseModel):
-    username: str
-    email: str
-    hashed_password: str
-    is_admin: bool = False  # Future: database-driven admin flag
-    created_at: datetime
+**User Model**: Add `is_admin: bool = False` field. Property `admin` returns `username == "allenpan" or is_admin`.
 
-    @property
-    def admin(self) -> bool:
-        """Check admin status (MVP: hardcoded, Future: DB-driven)"""
-        return self.username == "allenpan" or self.is_admin
-```
-
-**Frontend Route Protection**:
-```typescript
-// frontend/src/components/Layout.tsx
-const Layout = () => {
-  const { user } = useAuth();
-  const isAdmin = user?.username === 'allenpan';
-
-  return (
-    <nav>
-      {isAdmin && (
-        <NavLink to="/health">Health</NavLink>
-      )}
-      {/* other nav items */}
-    </nav>
-  );
-};
-```
+**Frontend**: Conditionally render Health nav item based on `user?.username === 'allenpan'`
 
 #### 2. Kubernetes Metrics Integration
 
-**Challenge**: Access Kubernetes metrics from inside pod without exposing cluster credentials
+**RBAC Setup**: ServiceAccount `backend-sa`, Role `metrics-reader` (get/list on metrics.k8s.io/pods,nodes), RoleBinding
 
-**Solution**: Use in-cluster config with RBAC permissions
-
-```yaml
-# .pipeline/k8s/base/backend/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: backend-sa
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: metrics-reader
-rules:
-- apiGroups: ["metrics.k8s.io"]
-  resources: ["pods", "nodes"]
-  verbs: ["get", "list"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: backend-metrics-reader
-subjects:
-- kind: ServiceAccount
-  name: backend-sa
-roleRef:
-  kind: Role
-  name: metrics-reader
-  apiGroup: rbac.authorization.k8s.io
-```
-
-**Backend Implementation**:
-```python
-# backend/src/services/kubernetes_metrics.py
-from kubernetes import client, config
-from kubernetes.client.rest import ApiException
-
-class KubernetesMetricsService:
-    def __init__(self):
-        try:
-            # Load in-cluster config when running in K8s
-            config.load_incluster_config()
-        except config.ConfigException:
-            # Fallback to kubeconfig for local development
-            config.load_kube_config()
-
-        self.core_api = client.CoreV1Api()
-        self.custom_api = client.CustomObjectsApi()
-
-    async def get_pod_metrics(self, namespace: str = "klinematrix-test") -> list[PodMetrics]:
-        """Get CPU and memory usage for all pods"""
-        try:
-            # Query metrics-server API
-            metrics = self.custom_api.list_namespaced_custom_object(
-                group="metrics.k8s.io",
-                version="v1beta1",
-                namespace=namespace,
-                plural="pods"
-            )
-
-            pod_metrics = []
-            for item in metrics.get("items", []):
-                containers = item.get("containers", [])
-                total_cpu = sum(self._parse_cpu(c["usage"]["cpu"]) for c in containers)
-                total_memory = sum(self._parse_memory(c["usage"]["memory"]) for c in containers)
-
-                pod_metrics.append(PodMetrics(
-                    name=item["metadata"]["name"],
-                    cpu_usage=f"{total_cpu}m",
-                    memory_usage=f"{total_memory}Mi",
-                    cpu_percentage=self._calculate_percentage(total_cpu, "cpu"),
-                    memory_percentage=self._calculate_percentage(total_memory, "memory")
-                ))
-
-            return pod_metrics
-        except ApiException as e:
-            logger.error(f"Failed to get pod metrics: {e}")
-            return []
-
-    def _parse_cpu(self, cpu_str: str) -> int:
-        """Parse CPU string to millicores (e.g., '150m' -> 150, '1.5' -> 1500)"""
-        if cpu_str.endswith('n'):
-            return int(cpu_str[:-1]) // 1_000_000
-        elif cpu_str.endswith('m'):
-            return int(cpu_str[:-1])
-        else:
-            return int(float(cpu_str) * 1000)
-
-    def _parse_memory(self, mem_str: str) -> int:
-        """Parse memory string to MiB (e.g., '256Mi' -> 256, '1Gi' -> 1024)"""
-        units = {'Ki': 1/1024, 'Mi': 1, 'Gi': 1024, 'Ti': 1024*1024}
-        for suffix, multiplier in units.items():
-            if mem_str.endswith(suffix):
-                return int(int(mem_str[:-2]) * multiplier)
-        # Assume bytes if no suffix
-        return int(mem_str) // (1024 * 1024)
-```
+**KubernetesMetricsService**: Use in-cluster config (fallback to kubeconfig), query `metrics.k8s.io/v1beta1` for pods/nodes, parse CPU (millicores) and memory (MiB) from container usage, handle ApiException gracefully
 
 #### 3. Database Statistics
 
-**MongoDB Aggregation**:
-```python
-# backend/src/services/database_stats.py
-from motor.motor_asyncio import AsyncIOMotorDatabase
-
-class DatabaseStatsService:
-    def __init__(self, db: AsyncIOMotorDatabase):
-        self.db = db
-
-    async def get_collection_stats(self) -> list[DatabaseStats]:
-        """Get statistics for all collections"""
-        collection_names = await self.db.list_collection_names()
-        stats = []
-
-        for name in collection_names:
-            collection = self.db[name]
-
-            # Get document count
-            count = await collection.count_documents({})
-
-            # Get collection stats (size, avg doc size)
-            coll_stats = await self.db.command("collStats", name)
-
-            stats.append(DatabaseStats(
-                collection=name,
-                document_count=count,
-                size_bytes=coll_stats.get("size", 0),
-                size_mb=coll_stats.get("size", 0) / (1024 * 1024),
-                avg_document_size_bytes=coll_stats.get("avgObjSize", 0)
-            ))
-
-        # Sort by size (largest first)
-        stats.sort(key=lambda x: x.size_bytes, reverse=True)
-        return stats
-```
+**DatabaseStatsService**: List collections, for each run `count_documents` and `collStats` command, return sorted by size descending
 
 #### 4. Frontend Health Dashboard
 
-**Enhanced Health Page**:
-```typescript
-// frontend/src/pages/HealthPage.tsx
-interface SystemMetrics {
-  timestamp: string;
-  pods: PodMetric[];
-  nodes: NodeMetric[];
-  database: DatabaseStat[];
-  health_status: 'healthy' | 'warning' | 'critical';
-}
-
-const HealthPage = () => {
-  const { data: metrics, isLoading } = useQuery<SystemMetrics>(
-    'system-metrics',
-    () => api.get('/admin/health').then(r => r.data),
-    { refetchInterval: 10000 } // Refresh every 10s
-  );
-
-  if (isLoading) return <LoadingSpinner />;
-
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">System Health Dashboard</h1>
-
-      {/* Overall Status */}
-      <StatusBadge status={metrics.health_status} />
-
-      {/* Resource Metrics */}
-      <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Resource Usage</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {metrics.pods.map(pod => (
-            <PodMetricCard key={pod.name} pod={pod} />
-          ))}
-        </div>
-      </section>
-
-      {/* Database Statistics */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Database Collections</h2>
-        <table className="w-full border">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2">Collection</th>
-              <th className="p-2">Documents</th>
-              <th className="p-2">Size (MB)</th>
-              <th className="p-2">Avg Doc Size</th>
-            </tr>
-          </thead>
-          <tbody>
-            {metrics.database.map(stat => (
-              <tr key={stat.collection} className="border-t">
-                <td className="p-2 font-mono">{stat.collection}</td>
-                <td className="p-2 text-right">{stat.document_count.toLocaleString()}</td>
-                <td className="p-2 text-right">{stat.size_mb.toFixed(2)}</td>
-                <td className="p-2 text-right">{formatBytes(stat.avg_document_size_bytes)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-    </div>
-  );
-};
-```
+**HealthPage.tsx**: React Query with 10s refetch interval, StatusBadge for overall health, PodMetricCard grid for resource usage, table for database collections (name, count, size MB, avg doc size)
 
 #### 5. Favicon Implementation
 
-**Assets**:
-```bash
-# Generate favicon set (use online tool or design software)
-frontend/public/
-  ├── favicon.ico           # 32x32, 16x16 multi-size
-  ├── favicon-16x16.png
-  ├── favicon-32x32.png
-  ├── apple-touch-icon.png  # 180x180 for iOS
-  └── site.webmanifest      # PWA manifest
-```
+**Assets**: `favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png`, `apple-touch-icon.png`, `site.webmanifest`
 
-**HTML Update**:
-```html
-<!-- frontend/index.html -->
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="manifest" href="/site.webmanifest">
-</head>
-```
+**HTML**: Link tags in `index.html` for all favicon variants
 
 ## Implementation Plan
 
@@ -475,92 +174,39 @@ frontend/public/
 
 ## Testing Strategy
 
-**Unit Tests**:
-- Admin middleware: Test username validation
-- KubernetesMetricsService: Test CPU/memory parsing
-- DatabaseStatsService: Test aggregation logic
-- Frontend: Test conditional rendering
+**Unit Tests**: Admin middleware (username validation), KubernetesMetricsService (CPU/memory parsing), DatabaseStatsService (aggregation), Frontend (conditional rendering)
 
-**Integration Tests**:
-- End-to-end admin login → health page access
-- Metrics collection from real cluster
-- Database stats with test data
+**Integration Tests**: Admin login → health page, metrics from real cluster, database stats
 
-**Manual Testing**:
-1. Login as admin → verify health page visible
-2. Login as regular user → verify health page hidden
-3. Check pod metrics match `kubectl top pods`
-4. Verify database stats accuracy
-5. Test auto-refresh behavior
-6. Test favicon on multiple browsers/devices
+**Manual Testing**: Admin vs non-admin access, compare pod metrics with `kubectl top pods`, database stats accuracy, auto-refresh, favicon on browsers
 
 ## Security Considerations
 
-**Access Control**:
-- Admin check must be server-side (not just frontend hiding)
-- JWT token must contain user identity for admin verification
-- Consider rate limiting on admin endpoints
+**Access Control**: Server-side admin check (not just frontend), JWT identity verification, rate limiting
 
-**Information Disclosure**:
-- Health metrics reveal infrastructure details (pod names, sizes)
-- Only expose to trusted admins
-- Sanitize error messages (no stack traces to non-admin)
+**Information Disclosure**: Metrics reveal infrastructure → admin-only, sanitize error messages
 
-**RBAC Permissions**:
-- Minimal permissions: only `get/list` on metrics
-- No write access to cluster resources
-- Namespace-scoped (not cluster-wide)
+**RBAC**: Minimal permissions (get/list only), no write access, namespace-scoped
 
-**Future Enhancement**:
-- Database-driven admin roles (not hardcoded username)
-- Audit logging for admin actions
-- IP allowlist for admin endpoints
+**Future**: Database-driven admin roles, audit logging, IP allowlist
 
 ## Performance Considerations
 
-**Kubernetes API Calls**:
-- Metrics queries are relatively fast (<100ms)
-- Cache metrics for 5-10 seconds to reduce API load
-- Use async/await for parallel queries
+**K8s API**: <100ms queries, cache 5-10s, async parallel
 
-**Database Stats**:
-- `collStats` command can be slow on large collections
-- Cache results for 30-60 seconds
-- Consider background job for expensive aggregations
+**Database**: Cache collStats 30-60s, timeout expensive queries
 
-**Frontend**:
-- Lazy load health page (code splitting)
-- Debounce auto-refresh if user navigates away
-- Use React Query caching
-
-**Expected Load**:
-- Single admin user checking dashboard
-- ~1 request per 10 seconds
-- Negligible impact on system performance
+**Frontend**: Lazy load, React Query caching, debounce auto-refresh
 
 ## Rollout Strategy
 
-**Development**:
-1. Implement on local development cluster
-2. Test with kubectl port-forward
-3. Verify metrics accuracy
+**Dev**: Local cluster → kubectl port-forward → verify metrics
 
-**Test Environment**:
-1. Deploy RBAC changes first
-2. Deploy backend with admin endpoints
-3. Deploy frontend with updated health page
-4. Test with real metrics-server data
+**Test**: RBAC first → backend endpoints → frontend → real metrics-server
 
-**Production**:
-1. Feature flag: `ADMIN_HEALTH_ENABLED=true`
-2. Deploy during low-traffic window
-3. Monitor for errors in logs
-4. Verify admin can access, regular users cannot
+**Prod**: Feature flag `ADMIN_HEALTH_ENABLED=true`, low-traffic deploy, monitor logs
 
-**Rollback Plan**:
-- If admin endpoints fail → disable feature flag
-- If metrics errors → return cached/mock data
-- If RBAC issues → revert to previous ServiceAccount
+**Rollback**: Disable feature flag, return cached data, revert ServiceAccount
 
 ## Open Questions
 

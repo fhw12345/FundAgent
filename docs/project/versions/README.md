@@ -180,14 +180,13 @@ docs/project/versions/
 ├── README.md                    # This file
 ├── VERSION_MATRIX.md            # Component compatibility matrix
 ├── backend/
-│   ├── CHANGELOG.md            # Backend version history
-│   ├── v0.1.0.md              # Detailed release notes
-│   ├── v0.2.0.md
-│   └── v1.0.0.md
+│   └── CHANGELOG.md            # Backend version history (primary)
 └── frontend/
-    ├── CHANGELOG.md            # Frontend version history
-    ├── v0.1.0.md              # Detailed release notes
-    └── v0.2.0.md
+    └── CHANGELOG.md            # Frontend version history (primary)
+
+docs/archive/versions/          # Historical detailed release notes
+├── backend/v*.md              # Archived backend version files
+└── frontend/v*.md             # Archived frontend version files
 ```
 
 ### Changelog Format
@@ -208,45 +207,9 @@ Each component maintains a CHANGELOG.md following [Keep a Changelog](https://kee
 
 ### Fixed
 - Dividend yield validation for MSFT
-
-### Breaking Changes
-- None
 ```
 
-### Version Documentation Files
-
-Each version gets a detailed markdown file:
-
-```markdown
-# Backend v0.2.0
-
-**Release Date**: 2025-10-04
-**Docker Image**: `financial-agent/backend:0.2.0`
-
-## Features
-
-- **Stochastic Oscillator Analysis**: New endpoint for stochastic analysis
-- **Enhanced Symbol Validation**: Verify price data availability before suggestions
-
-## Changes
-
-- Improved error messages for 422 validation errors
-- Updated dependency: yfinance 0.2.50
-
-## Breaking Changes
-
-None
-
-## Migration Guide
-
-No migration required - fully backward compatible.
-
-## Compatibility
-
-- Frontend: >= 0.1.0
-- Database: MongoDB 7.0+
-- Redis: 7.2+
-```
+> **Note**: Detailed historical release notes are archived in `docs/archive/versions/`. The CHANGELOG.md files contain the essential version history.
 
 ## Compatibility Matrix
 

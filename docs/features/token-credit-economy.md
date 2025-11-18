@@ -80,68 +80,17 @@ A lightweight **Reconciliation Worker** handles edge cases (server crashes, netw
 
 ### System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    POST /api/chat/stream-v2                 │
-│                   (User sends message)                       │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 1: Preliminary Credit Check                           │
-│  - Check: user.credits >= MIN_CREDIT_THRESHOLD (10)        │
-│  - If insufficient: Reject with 402 Payment Required        │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 2: Create PENDING Transaction (Safety Net)            │
-│  - Generate unique transaction_id                            │
-│  - Insert into transactions collection:                      │
-│    {                                                         │
-│      transaction_id: "txn_abc123",                          │
-│      user_id: "user_xyz",                                   │
-│      status: "PENDING",                                     │
-│      estimated_cost: 10.0,  // Conservative estimate        │
-│      created_at: timestamp                                   │
-│    }                                                         │
-│  - This ensures we never lose a billable request            │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 3: Call LLM & Stream Response                         │
-│  - Add system prompt + conversation history                  │
-│  - Call DashScope Qwen-plus with streaming=True             │
-│  - Stream chunks to client via Server-Sent Events           │
-│  - Accumulate full response                                  │
-│  - Capture token usage from final response                   │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 4: Save Assistant Message with Transaction Link       │
-│  - Save message to messages collection                       │
-│  - Include transaction_id in metadata                        │
-│  - This creates audit trail for refunds/disputes            │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 5: ACID Transaction - Deduct Credits & Complete       │
-│  MongoDB Transaction:                                        │
-│    1. Calculate cost: tokens_used / 200 = credits           │
-│    2. Update user: credits -= cost (atomic)                 │
-│    3. Update transaction:                                    │
-│       - status = "COMPLETED"                                 │
-│       - actual_tokens = input + output                       │
-│       - actual_cost = calculated cost                        │
-│       - completed_at = timestamp                             │
-│    4. Commit or Rollback (all-or-nothing)                   │
-│  - Backend does NOT send balance back to client             │
-│  - Frontend uses optimistic updates (see below)             │
-└─────────────────────────────────────────────────────────────┘
-```
+**Request Flow** (`POST /api/chat/stream-v2`):
+
+1. **Credit Check**: Verify `user.credits >= MIN_THRESHOLD (10)` → 402 if insufficient
+2. **Create PENDING Transaction**: Generate `transaction_id`, insert with estimated_cost
+3. **Stream LLM Response**: Call DashScope, stream via SSE, capture token usage
+4. **Save Message**: Link to transaction_id for audit trail
+5. **ACID Deduction**: MongoDB transaction → calculate cost, deduct credits, complete transaction
+
+**Key Points**:
+- Backend does NOT send balance back (frontend uses optimistic updates)
+- Transaction record ensures we never lose a billable request
 
 ### Reconciliation Worker (Failure Safety Net)
 
@@ -379,634 +328,151 @@ Frontend uses optimistic updates and periodic refetch to sync with backend truth
 
 ## Frontend Changes
 
-### 1. Credit Balance Display
+### Components
 
-**Location**: Header area in `App.tsx`
+1. **CreditBalance** (`App.tsx` header): Balance display with color coding (green >100, yellow 10-100, red <10)
+2. **Cost Indicator** (chat input): Show "Estimated cost: ~5-10 credits"
+3. **Transaction History** (`/credits/history`): Paginated list with filters
 
-**Design**:
-```tsx
-// Current:
-<span className="text-sm text-gray-700">👤 {username}</span>
+### State Management (Optimistic Updates)
 
-// New:
-<div className="flex items-center gap-4">
-  <span className="text-sm text-gray-700">👤 {username}</span>
-  <CreditBalance balance={user.credits} />
-</div>
-```
+**Hook**: `useUserProfile()` - Query with 30s staleTime, refetch on window focus
 
-**Component** (`src/components/CreditBalance.tsx`):
-```tsx
-interface CreditBalanceProps {
-  balance: number;
-}
-
-// Shows:
-// - Current balance with coin icon
-// - Color coding: green (>100), yellow (10-100), red (<10)
-// - Click to view transaction history
-```
-
----
-
-### 2. Cost Indicators
-
-**Location**: Chat input area
-
-**Design**: Show estimated cost before sending
-
-```tsx
-<div className="text-xs text-gray-500 mb-2">
-  Estimated cost: ~5-10 credits
-</div>
-```
-
----
-
-### 3. Transaction History Page
-
-**Route**: `/credits/history`
-
-**Features**:
-- Paginated transaction list
-- Filters: Status, date range
-- Export to CSV (future)
-
----
-
-### 4. State Management (Optimistic Updates)
-
-**Pattern**: Optimistically deduct credits immediately, backend is source of truth
-
-**New Hook**: `useUserProfile()`
+**Pattern**: Optimistically deduct on `onMutate`, rollback on error, invalidate on success
 
 ```typescript
-export function useUserProfile() {
-  return useQuery({
-    queryKey: ['user', 'profile'],
-    queryFn: () => api.get('/api/users/me'),
-    staleTime: 30000, // Refetch every 30s to sync with backend
-    refetchOnWindowFocus: true
-  });
-}
+// Cost estimation: baseTokens(300) + messageTokens(length/4) + outputEstimate(500)
+const estimatedCost = Math.ceil(totalTokens / 200);
 ```
 
-**Optimistic Updates**: Deduct credits immediately when sending message
-
-```typescript
-const mutation = useMutation({
-  mutationFn: (message: string) => api.sendMessageStreamPersistent(message, chatId, ...),
-  onMutate: async (message) => {
-    // Cancel in-flight refetches
-    await queryClient.cancelQueries({ queryKey: ['user', 'profile'] });
-
-    // Snapshot previous value
-    const previous = queryClient.getQueryData(['user', 'profile']);
-
-    // Optimistically deduct estimated cost
-    const estimatedCost = estimateCost(message); // ~10 credits average
-    queryClient.setQueryData(['user', 'profile'], (old) => ({
-      ...old,
-      credits: old.credits - estimatedCost
-    }));
-
-    return { previous }; // For rollback
-  },
-  onError: (err, variables, context) => {
-    // Rollback on error
-    if (context?.previous) {
-      queryClient.setQueryData(['user', 'profile'], context.previous);
-    }
-  },
-  onSuccess: () => {
-    // Invalidate to sync with backend truth (actual cost may differ)
-    queryClient.invalidateQueries({ queryKey: ['user', 'profile'] });
-  }
-});
-```
-
-**Cost Estimation Function**:
-```typescript
-function estimateCost(message: string): number {
-  // Conservative estimate based on message length
-  const baseTokens = 300; // System prompt + history average
-  const messageTokens = Math.ceil(message.length / 4); // ~4 chars per token
-  const estimatedOutput = 500; // Average response length
-  const totalTokens = baseTokens + messageTokens + estimatedOutput;
-  return Math.ceil(totalTokens / 200); // Convert to credits, round up
-}
-```
-
-**Benefits**:
-- ✅ Instant UI feedback (no waiting for backend)
-- ✅ Backend remains simple (no need to send balance)
-- ✅ Eventually consistent (refetch syncs with truth)
-- ✅ Follows existing optimistic pattern in codebase
+**Benefits**: Instant UI feedback, backend simplicity, eventual consistency
 
 ---
 
 ## Edge Cases & Error Handling
 
-### 1. Insufficient Credits
-
-**Scenario**: User has 5 credits, tries to send message (estimated 10 credits)
-
-**Handling**:
-1. Preliminary check blocks request
-2. Return 402 Payment Required
-3. Frontend shows: "Insufficient credits. Please purchase more."
-4. Suggest credit purchase (future)
-
----
-
-### 2. Token Estimate vs Actual
-
-**Scenario**: Estimated 10 credits, actual usage 12 credits
-
-**Handling**:
-- **Allow once as goodwill** (don't block mid-stream)
-- Deduct actual cost (may go slightly negative)
-- Block next request if balance < MIN_THRESHOLD
-- Log warning for review
-
----
-
-### 3. Stream Cancellation
-
-**Scenario**: User closes browser mid-stream
-
-**Handling**:
-- Backend detects client disconnect
-- Still complete transaction (user consumed tokens from DashScope)
-- Mark transaction COMPLETED with actual tokens used
-- Transaction appears in history as "incomplete response"
-
----
-
-### 4. LLM Provider Error
-
-**Scenario**: DashScope returns 500 error
-
-**Handling**:
-1. Don't deduct credits
-2. Mark transaction FAILED
-3. Show user-friendly error
-4. Log for investigation
-
----
-
-### 5. Missing Token Count
-
-**Scenario**: DashScope response doesn't include `usage` field
-
-**Handling**:
-- Fallback: Use `tiktoken` library to count tokens manually
-- Conservative estimate (round up)
-- Log warning for investigation
-- Still complete transaction
-
----
-
-### 6. Concurrent Requests
-
-**Scenario**: User sends 2 messages before first completes
-
-**Handling**:
-- MongoDB transactions ensure atomic credit deduction
-- Both requests check balance independently
-- If combined cost exceeds balance, second may fail
-- Use optimistic locking: `findOneAndUpdate` with version field
-
----
-
-### 7. Reconciliation Race Condition
-
-**Scenario**: Worker tries to complete transaction while API is completing it
-
-**Handling**:
-```python
-# Use atomic update with status condition
-result = transactions.find_one_and_update(
-    {"transaction_id": txn_id, "status": "PENDING"},  # Only if still PENDING
-    {"$set": {"status": "COMPLETED", ...}},
-    return_document=ReturnDocument.AFTER
-)
-
-if result is None:
-    # Already completed by API - skip
-    return
-```
+| Scenario | Handling |
+|----------|----------|
+| **Insufficient Credits** | Return 402, show purchase suggestion |
+| **Estimate vs Actual Differs** | Allow once (goodwill), block next if < threshold |
+| **Stream Cancellation** | Complete transaction with actual tokens used |
+| **LLM Provider Error** | Mark FAILED, don't deduct credits |
+| **Missing Token Count** | Fallback to tiktoken, round up conservatively |
+| **Concurrent Requests** | MongoDB atomic transactions, optimistic locking |
+| **Reconciliation Race** | Atomic update with status condition (PENDING only) |
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
+**Unit Tests**: CreditService (cost calc, balance check, atomic deduction), TransactionRepository (CRUD, reconciliation queries)
 
-**CreditService** (`test_credit_service.py`):
-- `test_calculate_cost()` - Token to credit conversion
-- `test_check_balance_sufficient()` - Balance validation
-- `test_check_balance_insufficient()` - Rejection logic
-- `test_deduct_credits_atomic()` - Transaction isolation
-- `test_deduct_credits_insufficient_rollback()` - Rollback on failure
+**Integration Tests**: Full chat flow, 402 rejection, concurrent requests, stream cancellation
 
-**TransactionRepository** (`test_transaction_repository.py`):
-- `test_create_transaction()` - PENDING transaction creation
-- `test_complete_transaction()` - Status update
-- `test_fail_transaction()` - Failure marking
-- `test_find_stuck_transactions()` - Reconciliation query
-
----
-
-### Integration Tests
-
-**Transaction Flow** (`test_transaction_flow.py`):
-- `test_full_chat_flow_with_credits()` - End-to-end
-- `test_insufficient_credits_rejection()` - 402 error
-- `test_concurrent_requests()` - Race conditions
-- `test_stream_cancellation()` - Client disconnect
-
----
-
-### Manual Testing Checklist
-
-**Kubernetes Test Environment**:
+**Manual Checklist**:
 - [ ] New user gets 1000 credits
-- [ ] Send message deducts correct credits
-- [ ] Balance updates in UI after message
-- [ ] Transaction history shows correct records
-- [ ] Insufficient credits blocks request
+- [ ] Send message deducts correctly
+- [ ] Transaction history shows records
 - [ ] Reconciliation worker completes stuck transactions
 - [ ] Admin can adjust credits
-- [ ] MongoDB transactions work (Cosmos DB)
-
-**Local Development**:
-- [ ] Transaction fallback works (no MongoDB replica set)
-- [ ] Token counting accurate
-- [ ] Error handling graceful
 
 ---
 
 ## Rollout Plan
 
-### Phase 1: Backend Infrastructure (v0.6.0-alpha)
-
-**Changes**:
-- Database schema updates
-- CreditService implementation
-- Transaction repository
-- Modified chat endpoint
-- Unit tests
-
-**Deployment**: Test environment only
-**Users**: Internal testing only
-**Risk**: Low (no user impact)
-
----
-
-### Phase 2: API + Frontend (v0.6.0-beta)
-
-**Changes**:
-- New credit endpoints
-- Frontend credit display
-- Transaction history page
-- Integration tests
-
-**Deployment**: Test environment
-**Users**: Beta testers (5-10 users)
-**Risk**: Medium (user-facing changes)
-
----
-
-### Phase 3: Reconciliation + Polish (v0.6.0)
-
-**Changes**:
-- Reconciliation worker
-- CronJob deployment
-- Edge case handling
-- Performance optimization
-
-**Deployment**: Test environment → Production
-**Users**: All users
-**Risk**: Medium (billing correctness critical)
+| Phase | Changes | Deployment | Risk |
+|-------|---------|------------|------|
+| **Alpha** | Schema, CreditService, repos | Test env | Low |
+| **Beta** | Credit endpoints, frontend display | Test env (5-10 users) | Medium |
+| **v0.6.0** | Reconciliation worker, CronJob | Test → Prod | Medium |
 
 ---
 
 ## Monitoring & Observability
 
-### Metrics to Track
+**Business Metrics**: Credits purchased/spent, avg cost per conversation, conversion rate
 
-**Business Metrics**:
-- Total credits purchased (per day/week/month)
-- Total credits spent (per day/week/month)
-- Average cost per conversation
-- Credit balance distribution (how many users < 100 credits)
-- Conversion rate (free → paid)
+**Technical Metrics**: Transaction completion rate, failure rate, reconciliation corrections
 
-**Technical Metrics**:
-- Transaction completion rate (COMPLETED / TOTAL)
-- Transaction failure rate (FAILED / TOTAL)
-- Reconciliation corrections per day
-- Average tokens per request
-- Token estimate accuracy (estimated vs actual)
+**Alerts**: Failure rate >1%, reconciliation >10/hr, negative balance
 
-**Alerts**:
-- Transaction failure rate > 1%
-- Reconciliation corrections > 10/hour
-- User balance < 0 (should never happen)
-- Token counting errors
-
----
-
-### Logging
-
-**Structured Logs** (via structlog):
-
-```python
-# Transaction creation
-logger.info("Transaction created",
-    transaction_id=txn_id,
-    user_id=user_id,
-    estimated_cost=cost)
-
-# Credit deduction
-logger.info("Credits deducted",
-    transaction_id=txn_id,
-    user_id=user_id,
-    tokens=tokens,
-    cost=cost,
-    new_balance=new_balance)
-
-# Reconciliation
-logger.warning("Transaction reconciled",
-    transaction_id=txn_id,
-    age_minutes=age)
-
-# Errors
-logger.error("Credit deduction failed",
-    transaction_id=txn_id,
-    error=str(e),
-    balance=user.credits)
-```
+**Logging**: Structured logs for transaction creation, credit deduction, reconciliation, errors
 
 ---
 
 ## Security Considerations
 
-### 1. Credit Injection Prevention
-
-**Risk**: Malicious user tries to modify credit balance
-
-**Mitigation**:
-- All credit operations server-side only
-- No client-side balance updates (only display)
-- Admin endpoints require `is_admin=True` check
-- Audit log for all manual adjustments
+| Risk | Mitigation |
+|------|------------|
+| Credit injection | All operations server-side, admin audit logs |
+| Token manipulation | Trust DashScope API, fallback to tiktoken |
+| Transaction replay | Unique IDs, idempotent updates |
+| Race conditions | MongoDB atomic transactions, reconciliation |
 
 ---
 
-### 2. Token Counting Manipulation
+## Decisions Made
 
-**Risk**: User tries to manipulate token count to pay less
-
-**Mitigation**:
-- Token count comes from DashScope API (trusted source)
-- Fallback to server-side counting (tiktoken)
-- Never trust client-provided counts
-- Log discrepancies for investigation
-
----
-
-### 3. Transaction Replay
-
-**Risk**: Replay attack to deduct credits multiple times
-
-**Mitigation**:
-- Unique transaction_id per request
-- Idempotent updates (check status=PENDING)
-- MongoDB transaction isolation
-
----
-
-### 4. Balance Race Conditions
-
-**Risk**: Concurrent requests bypass balance check
-
-**Mitigation**:
-- Atomic credit deduction with MongoDB transactions
-- Conservative estimate at request start
-- Reconciliation catches inconsistencies
-
----
-
-## Open Questions & Decisions Needed
-
-### 1. Pricing Validation
-**Question**: Does 1 Credit = 200 Tokens achieve 84% margin with Qwen-plus pricing?
-
-**Action Required**:
-- Confirm Alibaba DashScope Qwen-plus pricing
-- Calculate actual cost per token
-- Adjust conversion rate if needed
-
-**Recommendation**: Document actual costs in this spec before launch
-
----
-
-### 2. Negative Balance Handling
-**Question**: Should we allow users to go slightly negative?
-
-**Options**:
-- A) Strict: Never allow negative (block mid-stream if needed)
-- B) Lenient: Allow one "goodwill" negative, then block
-- C) Credit limit: Allow up to -50 credits (like credit card)
-
-**Recommendation**: Option B - balances user experience with revenue protection
-
----
-
-### 3. Credit Purchase Integration
-**Question**: Which payment providers to support?
-
-**Options**:
-- Alipay (most common in China)
-- WeChat Pay (mobile-first)
-- Credit card (international)
-- Cryptocurrency (future)
-
-**Recommendation**: Start with Alipay + WeChat Pay (v0.7.0)
-
----
-
-### 4. Free Credit Replenishment
-**Question**: Should users get periodic free credits?
-
-**Options**:
-- A) One-time 1000 credits, then must purchase
-- B) 100 credits per month (retention strategy)
-- C) Earn credits by referrals/feedback
-
-**Recommendation**: Start with Option A, evaluate retention metrics
-
----
-
-### 5. Admin Credit Adjustment Limits
-**Question**: Should there be limits on manual credit adjustments?
-
-**Options**:
-- A) Unlimited (full trust in admins)
-- B) Max 1000 credits per adjustment (require multiple for large refunds)
-- C) Require two-person approval for >500 credits
-
-**Recommendation**: Option B with audit logging
+1. **Negative Balance**: Option B - Allow one goodwill negative, then block
+2. **Payment Providers**: Alipay + WeChat Pay (v0.7.0)
+3. **Free Credits**: One-time 1000 credits
+4. **Admin Limits**: Max 1000 credits per adjustment with audit logging
 
 ---
 
 ## Success Criteria
 
-### Business Success
-- ✅ 80%+ of users stay above 0 credits (healthy engagement)
-- ✅ <5% support tickets related to billing
-- ✅ Transaction failure rate <0.1%
-- ✅ Gross margin ≥75% (target 84%)
+**Business**: 80%+ users above 0 credits, <5% billing tickets, ≥75% margin
 
-### Technical Success
-- ✅ Zero double-charging incidents
-- ✅ Zero credit loss incidents (reconciliation catches all)
-- ✅ 99.9% transaction completion rate
-- ✅ <100ms latency added to chat endpoint
+**Technical**: Zero double-charging, 99.9% completion rate, <100ms latency added
 
-### User Experience Success
-- ✅ Users understand credit costs (survey)
-- ✅ No "surprise" out-of-credits errors
-- ✅ Transaction history page used by 30%+ users
-- ✅ NPS score ≥8/10 for billing transparency
+**UX**: Clear cost understanding, no surprise errors, 30%+ use transaction history
 
 ---
 
 ## Risks & Mitigation
 
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| Double charging | High | Low | ACID transactions + reconciliation audit |
-| Credit loss (not charging) | High | Low | Reconciliation worker + alerts |
-| Token counting errors | Medium | Medium | Fallback to tiktoken + logging |
-| Race conditions | Medium | Medium | MongoDB transactions + testing |
-| Reconciliation bugs | Medium | Low | Dry-run mode + monitoring |
-| User confusion | Medium | Medium | Clear UI + transaction history |
+| Risk | Mitigation |
+|------|------------|
+| Double charging | ACID transactions + reconciliation audit |
+| Credit loss | Reconciliation worker + alerts |
+| Token counting errors | Fallback to tiktoken + logging |
+| Race conditions | MongoDB transactions + testing |
 
 ---
 
-## Future Enhancements (Post v0.6.0)
+## Future Enhancements
 
-### v0.7.0: Payment Integration
-- Alipay integration
-- WeChat Pay integration
-- Purchase credits flow
-- Invoice generation
-
-### v0.8.0: Advanced Features
-- Credit packages (bulk discounts)
-- Subscription plans (monthly credits)
-- Referral credits
-- Credit gifting
-
-### v0.9.0: Analytics & Optimization
-- Cost prediction models
-- Usage optimization suggestions
-- Credit usage dashboard
-- Budget alerts
+- **v0.7.0**: Alipay/WeChat Pay integration, invoice generation
+- **v0.8.0**: Credit packages, subscriptions, referrals
+- **v0.9.0**: Cost prediction, usage dashboard, budget alerts
 
 ---
 
 ## References
 
-### Internal Documents
 - [System Design](../architecture/system-design.md)
-- [Development Workflow](../deployment/workflow.md)
-- [Coding Standards](../development/coding-standards.md)
-
-### External Resources
 - [Alibaba DashScope Pricing](https://help.aliyun.com/zh/dashscope/developer-reference/tongyi-thousand-questions-metering-and-billing)
 - [MongoDB Transactions](https://www.mongodb.com/docs/manual/core/transactions/)
-- [Azure Cosmos DB Transactions](https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/feature-support-42#transactions)
 
 ---
 
-## Appendix A: File Structure
+## File Structure
 
-```
-backend/src/
-├── models/
-│   ├── user.py (modify - add credits field)
-│   ├── transaction.py (new)
-│   └── message.py (modify - add transaction_id)
-├── database/repositories/
-│   ├── user_repository.py (modify - credit operations)
-│   └── transaction_repository.py (new)
-├── services/
-│   └── credit_service.py (new)
-├── api/
-│   ├── chat.py (modify - transaction logic)
-│   └── credits.py (new - endpoints)
-├── scripts/
-│   └── reconciliation_worker.py (new)
-└── tests/
-    ├── test_credit_service.py (new)
-    └── test_transaction_flow.py (new)
+**Backend**: `models/transaction.py`, `services/credit_service.py`, `api/credits.py`, `scripts/reconciliation_worker.py`
 
-frontend/src/
-├── types/
-│   └── api.ts (modify - add credits to User)
-├── components/
-│   ├── CreditBalance.tsx (new)
-│   └── TransactionHistory.tsx (new)
-├── hooks/
-│   └── useUserProfile.ts (new)
-└── services/
-    └── api.ts (modify - credit endpoints)
+**Frontend**: `components/CreditBalance.tsx`, `hooks/useUserProfile.ts`
 
-.pipeline/k8s/base/
-└── cronjob-reconciliation.yaml (new)
-```
+**K8s**: `cronjob-reconciliation.yaml`
 
 ---
 
-## Appendix B: Cost Calculation Examples
+## Cost Examples
 
-**Scenario 1: Simple Question**
-```
-User: "What's the current price of AAPL?"
-Input tokens: 100 (prompt + history)
-Output tokens: 50 (short answer)
-Total: 150 tokens
-Cost: 150 / 200 = 0.75 credits = ¥0.0075
-```
+| Scenario | Tokens | Credits | Cost (元) |
+|----------|--------|---------|----------|
+| Simple query | 150 | 0.75 | ¥0.0075 |
+| Technical analysis | 2,500 | 12.5 | ¥0.125 |
+| 10-message conversation | 8,000 | 40 | ¥0.40 |
 
-**Scenario 2: Technical Analysis Request**
-```
-User: "Analyze AAPL Fibonacci levels with detailed explanation"
-Input tokens: 500 (prompt + history + analysis data)
-Output tokens: 2000 (detailed explanation)
-Total: 2500 tokens
-Cost: 2500 / 200 = 12.5 credits = ¥0.125
-```
-
-**Scenario 3: Long Conversation (10 messages)**
-```
-Average per message:
-- Input: 300 tokens (growing history)
-- Output: 500 tokens
-- Per message: 800 tokens = 4 credits
-
-Total for 10 messages: 40 credits = ¥0.40
-```
-
-**Free Credit Utilization**:
-- 1000 free credits = ~10-15 conversations
-- Enough for 2-3 weeks of casual usage
-- Conversion point: When users get value, they'll pay
-
----
-
-**End of Feature Specification**
+**Free Credits**: 1000 = ~10-15 conversations (2-3 weeks casual usage)

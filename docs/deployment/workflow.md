@@ -25,7 +25,7 @@ git push origin main
 
 ### Step 2: Build and Push Docker Images
 
-**Image Naming**: Use `klinematrix/` prefix with versioned tags (e.g., `test-v${BACKEND_VERSION}`). Current versions: backend v0.5.4, frontend v0.8.4.
+**Image Naming**: Use `klinematrix/` prefix with versioned tags (e.g., `test-v${BACKEND_VERSION}`). Always get current versions from `pyproject.toml` and `package.json`.
 
 #### Option A: Build Both Images Together
 

@@ -98,305 +98,83 @@ User/Admin
 
 ### Phase 1: Backend Storage Setup (Day 1-2)
 
-**Files to Modify**:
-- `backend/src/core/config.py`
-  - Add `feedback_attachments_prefix: str = "feedback-attachments/"`
-  - Add `max_attachment_size_mb: int = 10`
-  - Add `allowed_attachment_types: list[str] = ["image/png", "image/jpeg", ...]`
+**Config**: Add `feedback_attachments_prefix`, `max_attachment_size_mb: 10`, `allowed_attachment_types`
 
-**Files to Create**:
-- `backend/src/services/oss_service.py`
-  - `OSSService` class
-  - `upload_feedback_attachment(file, filename, content_type) -> url`
-  - Use `oss2` library (already installed for Langfuse)
+**OSSService**: `upload_feedback_attachment(file, filename, content_type) -> url` using `oss2` library
 
-**Configuration**:
-```python
-# Use existing OSS credentials:
-OSS_ACCESS_KEY_ID = <REDACTED>
-OSS_SECRET_ACCESS_KEY = <REDACTED>
-OSS_BUCKET = "langfuse-events-prod"
-OSS_ENDPOINT = "https://oss-cn-hangzhou.aliyuncs.com"
-```
+**Storage**: Existing OSS bucket `langfuse-events-prod`, endpoint `https://oss-cn-hangzhou.aliyuncs.com`
 
 ### Phase 2: Backend Model & API (Day 2-3)
 
-**Files to Modify**:
-- `backend/src/models/feedback.py`
-  - Add `attachments: list[str] = Field(default=[], max_items=5)` to `FeedbackItemCreate`
-  - Add `attachments: list[str] = []` to `FeedbackItem`
+**Models**: Add `attachments: list[str]` (max 5) to FeedbackItemCreate and FeedbackItem
 
-- `backend/src/api/feedback.py`
-  - Add `POST /api/feedback/upload-attachment` endpoint
-  - Validate file type (PNG, JPG, GIF, WebP only)
-  - Validate file size (max 10MB)
-  - Upload to OSS, return URL
-  - Modify `POST /api/feedback/submit` to validate attachment URLs
-
-- `backend/src/services/feedback_service.py`
-  - Update `create_feedback()` to handle attachments
-
-**Validation Rules**:
-```python
-- Max 5 attachments per feedback
-- Max 10MB per file
-- Allowed types: image/png, image/jpeg, image/gif, image/webp
-- URLs must match pattern: https://langfuse-events-prod.oss-cn-hangzhou.aliyuncs.com/feedback-attachments/*
-```
+**API**: `POST /api/feedback/upload-attachment` - validate type (PNG/JPG/GIF/WebP), size (10MB max), upload to OSS, return URL. Modify submit to validate URLs match OSS bucket pattern.
 
 ### Phase 3: Frontend Form Enhancement (Day 4-5)
 
-**Files to Modify**:
-- `frontend/src/components/feedback/SubmitFeedbackForm.tsx`
-  - Add `attachments: string[]` state
-  - Add `uploadingFiles: boolean` state
-  - Add file input (accept images, multiple)
-  - Add upload handler → POST to `/api/feedback/upload-attachment`
-  - Display uploaded images as thumbnails with remove button
-  - Include attachments in form submission
-
-- `frontend/src/types/feedback.ts`
-  - Add `attachments?: string[]` to `FeedbackItemCreate`
-  - Add `attachments: string[]` to `FeedbackItem`
-
-**UI Components**:
-```typescript
-<input
-  type="file"
-  accept="image/png,image/jpeg,image/gif,image/webp"
-  multiple
-  onChange={handleFileUpload}
-/>
-
-<div className="grid grid-cols-2 gap-2">
-  {attachments.map((url, index) => (
-    <div className="relative group">
-      <img src={url} className="thumbnail" />
-      <button onClick={() => removeAttachment(index)}>
-        <X size={16} />
-      </button>
-    </div>
-  ))}
-</div>
-```
+**SubmitFeedbackForm.tsx**: Add `attachments[]` and `uploadingFiles` state, file input (accept images, multiple), upload handler, thumbnails with remove button
 
 ### Phase 4: Feedback Display Enhancement (Day 6)
 
-**Files to Modify**:
-- Create `frontend/src/components/feedback/FeedbackItem.tsx` (if not exists)
-  - Display feedback title, description, type, date
-  - Display attachments as thumbnails (3-column grid)
-  - Click thumbnail → Open in new tab
-
-**UI Layout**:
-```
-┌─────────────────────────────────────────┐
-│ [BUG] UI collapse arrow partially hidden│
-│ 2025-10-30 04:40 PM                     │
-├─────────────────────────────────────────┤
-│ Description: The collapse arrow on the  │
-│ chart panel is cut off...               │
-├─────────────────────────────────────────┤
-│ Attachments:                            │
-│ [img1] [img2] [img3]                    │
-└─────────────────────────────────────────┘
-```
+**FeedbackItem.tsx**: Display title, description, type, date, attachments as clickable thumbnails (3-column grid)
 
 ---
 
 ## Data Models
 
-### Backend (MongoDB)
+**Backend**: `FeedbackItem` - id, title, description, type, `attachments: list[str] = []` (NEW: OSS URLs), created_at, updated_at, user_id, status
 
-```python
-class FeedbackItem(BaseModel):
-    id: str
-    title: str
-    description: str
-    type: FeedbackType  # "bug" | "feature"
-    attachments: list[str] = []  # NEW: OSS URLs
-    created_at: datetime
-    updated_at: datetime
-    user_id: str | None = None
-    status: str = "pending"  # pending, reviewed, resolved
-```
-
-### Frontend (TypeScript)
-
-```typescript
-interface FeedbackItemCreate {
-  title: string;
-  description: string;
-  type: FeedbackType;
-  attachments?: string[];  // NEW: OSS URLs
-}
-
-interface FeedbackItem {
-  id: string;
-  title: string;
-  description: string;
-  type: FeedbackType;
-  attachments: string[];  // NEW
-  created_at: string;
-  updated_at: string;
-  user_id: string | null;
-  status: string;
-}
-```
+**Frontend**: `FeedbackItemCreate` - title, description, type, `attachments?: string[]`. `FeedbackItem` - same fields with `attachments: string[]`
 
 ---
 
 ## API Endpoints
 
-### 1. Upload Attachment
+### Upload Attachment
 
-```http
-POST /api/feedback/upload-attachment
-Content-Type: multipart/form-data
+`POST /api/feedback/upload-attachment` (multipart/form-data)
 
-file: <binary data>
+**Response**: `{ "url": "https://langfuse-events-prod.oss-cn-hangzhou.aliyuncs.com/feedback-attachments/..." }`
 
-Response:
-{
-  "url": "https://langfuse-events-prod.oss-cn-hangzhou.aliyuncs.com/feedback-attachments/20251030-abc123.png"
-}
+**Status Codes**: 200 (Success), 400 (Invalid type/size), 413 (Too large), 500 (Upload failed)
 
-Status Codes:
-- 200: Success
-- 400: Invalid file type or size
-- 413: File too large
-- 500: Upload failed
-```
+### Submit Feedback (Modified)
 
-### 2. Submit Feedback (Modified)
-
-```http
-POST /api/feedback/submit
-Content-Type: application/json
-
-{
-  "title": "UI collapse arrow partially hidden",
-  "description": "The collapse button is cut off...",
-  "type": "bug",
-  "attachments": [
-    "https://langfuse-events-prod.oss-cn-hangzhou.aliyuncs.com/feedback-attachments/20251030-abc123.png"
-  ]
-}
-
-Response:
-{
-  "id": "feedback_123",
-  "title": "...",
-  "attachments": ["https://..."],
-  "created_at": "2025-10-30T16:40:00Z"
-}
-```
+`POST /api/feedback/submit` now accepts `attachments?: string[]` (array of OSS URLs)
 
 ---
 
 ## Security Considerations
 
-### File Upload Security
+**Type Validation**: Only image MIME types, verify magic numbers, block SVG (XSS risk)
 
-1. **Type Validation**:
-   - Only allow image MIME types
-   - Verify content matches declared type (magic number check)
-   - Block SVG (potential XSS risk)
+**Size Limits**: Max 10MB/file, max 5 files/feedback, total 50MB
 
-2. **Size Limits**:
-   - Max 10MB per file (prevent DoS)
-   - Max 5 files per feedback (prevent storage abuse)
-   - Total limit: 50MB per feedback
+**Filename Sanitization**: Generate `{timestamp}-{uuid}.{ext}`, never use user-provided names
 
-3. **Filename Sanitization**:
-   - Generate unique filenames: `{timestamp}-{uuid}.{ext}`
-   - Never use user-provided filenames directly
+**URL Validation**: Only accept URLs from our OSS bucket domain
 
-4. **URL Validation**:
-   - Only accept URLs from our OSS bucket domain
-   - Prevent injection of external URLs
-
-5. **Access Control**:
-   - Use signed URLs with 7-day expiration
-   - Files not publicly listable (bucket permissions)
-
-### Storage Security
-
-```python
-# OSS bucket configuration:
-- Private bucket (not public-read)
-- Generate signed URLs with expiration
-- Separate prefix: feedback-attachments/
-- Lifecycle policy: Delete after 90 days (optional)
-```
+**Access Control**: Signed URLs (7-day expiration), private bucket, `feedback-attachments/` prefix, optional 90-day lifecycle policy
 
 ---
 
 ## Performance Considerations
 
-### Optimization Strategies
+**Client-Side Compression**: Resize to max 1920px width, target <500KB via Canvas API
 
-1. **Client-Side Image Compression**:
-   - Resize large images before upload (max 1920px width)
-   - Use browser Canvas API for compression
-   - Target: <500KB per file after compression
+**Lazy Loading**: Intersection observer for thumbnails, full-size on click
 
-2. **Lazy Loading**:
-   - Load thumbnails on scroll (intersection observer)
-   - Full-size images only on click
-
-3. **CDN (Future Enhancement)**:
-   - Use Alibaba Cloud CDN for faster image delivery
-   - Cache-Control headers: `max-age=604800` (7 days)
-
-4. **Thumbnail Generation (Future Enhancement)**:
-   - Generate 200x200 thumbnails on upload
-   - Store both original + thumbnail in OSS
-   - Load thumbnails in lists, original on click
+**Future**: Alibaba Cloud CDN, server-side thumbnail generation (200x200)
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
+**Backend Unit Tests**: `test_upload_valid_image`, `test_upload_invalid_type`, `test_upload_oversized_file`, `test_generate_unique_filename`, `test_signed_url_generation`, `test_submit_feedback_with_attachments`, `test_validate_attachment_urls`
 
-```python
-# backend/tests/test_oss_service.py
-- test_upload_valid_image()
-- test_upload_invalid_type()
-- test_upload_oversized_file()
-- test_generate_unique_filename()
-- test_signed_url_generation()
+**Frontend Integration Tests**: Upload single/multiple images, remove attachment, submit with attachments, display attachments
 
-# backend/tests/test_feedback_api.py
-- test_upload_attachment_success()
-- test_upload_attachment_invalid_type()
-- test_submit_feedback_with_attachments()
-- test_validate_attachment_urls()
-```
-
-### Integration Tests
-
-```typescript
-// frontend/tests/feedback.test.tsx
-- Upload single image → Verify URL returned
-- Upload multiple images → Verify all uploaded
-- Remove attachment → Verify state updated
-- Submit feedback with attachments → Verify saved
-- Display feedback with attachments → Verify rendered
-```
-
-### Manual Testing Checklist
-
-- [ ] Upload PNG, JPG, GIF, WebP (all should succeed)
-- [ ] Upload PDF, TXT (should fail with error)
-- [ ] Upload 11MB file (should fail with size error)
-- [ ] Upload 6 files (should fail with max limit error)
-- [ ] Remove attachment before submit (should exclude from submission)
-- [ ] Submit feedback with 0, 1, 3, 5 attachments (all should work)
-- [ ] View feedback in list (thumbnails display)
-- [ ] Click thumbnail (opens full-size in new tab)
-- [ ] Mobile responsive (file input works, thumbnails stack)
+**Manual Testing**: Upload PNG/JPG/GIF/WebP (success), upload PDF/TXT (fail), 11MB file (fail), 6 files (fail), remove before submit, view thumbnails, click for full-size, mobile responsive
 
 ---
 
@@ -439,36 +217,13 @@ Response:
 
 ## Rollout Plan
 
-### Development Phase (1 week)
+**Development** (1 week): Backend storage + API (Day 1-2), Frontend form (Day 3-4), Display updates (Day 5), Testing (Day 6), Documentation (Day 7)
 
-1. **Day 1-2**: Backend storage + API endpoints
-2. **Day 3-4**: Frontend form enhancements
-3. **Day 5**: Feedback display updates
-4. **Day 6**: Testing + bug fixes
-5. **Day 7**: Documentation + deployment
+**Test**: Deploy to K8s test namespace, verify OSS connectivity, test real uploads
 
-### Deployment Strategy
+**Production**: Backend first (backward compatible), frontend after validation, monitor error rates and storage
 
-1. **Test Environment**:
-   - Deploy to K8s test namespace
-   - Verify OSS connectivity
-   - Test with real uploads
-
-2. **Production Rollout** (when ready):
-   - Deploy backend first (backward compatible)
-   - Deploy frontend after backend validated
-   - Monitor error rates and storage usage
-
-### Monitoring
-
-```bash
-# Metrics to track:
-- Upload success rate
-- Average file size
-- Total storage used (GB)
-- Failed upload reasons (type, size, network)
-- Feedback with vs without attachments (%)
-```
+**Monitoring**: Upload success rate, average file size, total storage (GB), failed upload reasons, feedback with/without attachments (%)
 
 ---
 

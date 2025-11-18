@@ -409,61 +409,10 @@ kubectl get pods -n klinematrix-test -o json | \
 
 ## Troubleshooting
 
-### Pod CrashLoopBackOff
-
-```bash
-# Check logs for error
-kubectl logs -n klinematrix-test <pod-name> --previous
-
-# Describe pod for events
-kubectl describe pod -n klinematrix-test <pod-name>
-
-# Common causes:
-# - Missing environment variable
-# - Database connection failure
-# - Port already in use
-# - Security context permission denied
-```
-
-### Ingress Not Working
-
-```bash
-# Check ingress controller
-kubectl get pods -n ingress-nginx
-
-# Check ingress configuration
-kubectl describe ingress -n klinematrix-test klinematrix
-
-# Check cert-manager (if using HTTPS)
-kubectl get certificates -n klinematrix-test
-kubectl get certificaterequests -n klinematrix-test
-```
-
-### Database Connection Errors
-
-```bash
-# Check External Secrets sync
-kubectl describe externalsecret -n klinematrix-test mongodb-secret
-
-# Verify secret data
-kubectl get secret mongodb-secret -n klinematrix-test -o jsonpath='{.data.MONGODB_CONNECTION_STRING}' | base64 -d
-
-# Test from pod
-kubectl exec -n klinematrix-test deployment/backend -- env | grep MONGODB
-```
-
-### Image Pull Errors
-
-```bash
-# Check image pull secret
-kubectl get secret -n klinematrix-test
-
-# Verify ACR authentication
-az acr login --name financialagent
-
-# Check image exists
-az acr repository show-tags --name financialagent --repository klinematrix/backend
-```
+For detailed troubleshooting guides, see:
+- [Kubernetes Issues](../troubleshooting/kubernetes-issues.md) - Pod crashes, ingress, image pulls
+- [Deployment Issues](../troubleshooting/deployment-issues.md) - General deployment problems
+- [External Secrets Sync](../troubleshooting/external-secrets-sync.md) - Secret management issues
 
 ## Success Criteria
 

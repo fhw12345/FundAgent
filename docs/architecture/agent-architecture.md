@@ -8,13 +8,12 @@
 from pydantic_settings import BaseSettings
 
 class AgentConfig(BaseSettings):
-    langsmith_api_key: str
-    langsmith_project: str = "financial-agent"
+    langfuse_public_key: str
+    langfuse_secret_key: str
+    langfuse_host: str = "http://localhost:3001"
     mongodb_url: str
     redis_url: str
-    oss_access_key: str
-    oss_secret_key: str
-    qwen_api_key: str
+    dashscope_api_key: str
 
     class Config:
         env_file = ".env"
@@ -22,16 +21,20 @@ class AgentConfig(BaseSettings):
 
 ### Factor 2: Own Your Prompts
 ```python
-# LangSmith Hub prompt management
-from langchain import hub
+# Local prompt management with Langfuse tracking
+from langchain_core.prompts import ChatPromptTemplate
 
-# Centralized prompts in LangSmith Hub
+# Prompts defined locally, tracked in Langfuse
 PROMPTS = {
-    "intent_classifier": hub.pull("financial-agent/intent-classifier"),
-    "fibonacci_analyzer": hub.pull("financial-agent/fibonacci-analyzer"),
-    "chart_interpreter": hub.pull("financial-agent/chart-interpreter"),
-    "response_synthesizer": hub.pull("financial-agent/response-synthesizer")
+    "system": ChatPromptTemplate.from_messages([
+        ("system", "You are a financial analysis assistant..."),
+        ("human", "{input}")
+    ]),
+    "fibonacci_analyzer": ChatPromptTemplate.from_template(
+        "Analyze Fibonacci levels for {symbol}..."
+    )
 }
+# Note: Langfuse automatically tracks prompt usage and versions
 ```
 
 ### Factor 3: External Dependencies as Services
@@ -185,13 +188,13 @@ class IntentClassifier:
 
 ### Factor 9: Error Handling & Observability
 ```python
-from langsmith import traceable
+from langfuse.decorators import observe
 import structlog
 
 logger = structlog.get_logger()
 
 class FinancialAnalysisTool:
-    @traceable(name="fibonacci_analysis")
+    @observe(name="fibonacci_analysis")
     async def analyze_fibonacci(self, state: FinancialAgentState) -> FinancialAgentState:
         try:
             # Reuse existing CLI analyzer

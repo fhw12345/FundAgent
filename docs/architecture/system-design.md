@@ -12,16 +12,19 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 
 ### Cloud Platform
 **Hybrid Cloud Strategy**
-- **Primary Platform**: Microsoft Azure
-  - Container orchestration (AKS)
-  - Database (Cosmos DB with MongoDB API)
-  - Secrets management (Key Vault)
-  - Monitoring (Azure Monitor)
-
-- **Specialized Services**: Alibaba Cloud
+- **Production Platform**: Alibaba Cloud
+  - Container orchestration (ACK - Shanghai)
   - AI/LLM (Qwen-VL Model via DashScope)
   - Object Storage (OSS for charts)
-  - Geographic distribution for APAC markets
+
+- **Shared Services**: Microsoft Azure
+  - Container Registry (ACR)
+  - Secrets management (Key Vault)
+  - Database (Cosmos DB with MongoDB API)
+
+- **Test Platform**: Azure AKS (Planned)
+
+> **Environment details**: See [CLAUDE.md](../../CLAUDE.md#-environment-rules)
 
 ### Backend
 - **Framework**: Python 3.12 with FastAPI
@@ -134,18 +137,7 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 3. **Milestone 3+**: Layer features incrementally
 
 ### 12-Factor Agent Principles
-1. **Own Configuration**: Environment-based settings via Pydantic
-2. **Own Prompts**: Version-controlled prompts with Langfuse tracking
-3. **External Dependencies**: Clean service interfaces
-4. **Environment Parity**: Consistent environments via Kubernetes
-5. **Unified State**: Single state object through LangGraph
-6. **Pause/Resume**: Human-in-the-loop approval workflows
-7. **Stateless Service**: RESTful API with external state storage
-8. **Own Control Flow**: Explicit state machine with LangGraph
-9. **Error Handling**: Comprehensive observability
-10. **Small Agents**: Composable tools using LCEL
-11. **Triggerable**: HTTP endpoints for all operations
-12. **Stateless**: No server-side session state
+See [Agent 12-Factors](agent-12-factors.md) for the complete philosophy and [Agent Architecture](agent-architecture.md) for implementation details.
 
 ## Financial Analysis Features
 
@@ -249,21 +241,15 @@ The project transforms a sophisticated CLI financial analysis tool into a modern
 - ❌ Updates require full pod restart (Redis cache lost)
 - ❌ Resource limits shared across all containers
 
-### Development Environment
-- Local: Docker Compose for infrastructure (MongoDB, Redis), native Python/Node.js for code with hot reload
-- Cloud (Test): AKS test namespace (`klinematrix-test`)
-- Minimal resources (1 replica per pod)
-- In-cluster Redis (non-persistent)
-- JWT authentication with email verification (Tencent Cloud SES)
+### Environments
 
-### Production Environment
-- Multi-region AKS deployment
-- Azure Cosmos DB (multi-region)
-- ApsaraDB for Redis (managed)
-- JWT-based authentication with OAuth2/OIDC support
-- Progressive rollouts with health checks
-- Blue-green deployments for major releases
-- Separate pods for each service (frontend, backend, redis)
+| Environment | Platform | URL | Status |
+|-------------|----------|-----|--------|
+| **Local Dev** | Docker Compose | http://localhost:3000 | Active |
+| **Test** | Azure AKS | https://klinematrix.com | Planned |
+| **Prod** | Alibaba ACK (Shanghai) | https://klinecubic.cn | Active |
+
+> **Full environment configuration**: See [CLAUDE.md](../../CLAUDE.md#-environment-rules)
 
 ## Integration Points
 
@@ -304,7 +290,7 @@ The platform uses **LangGraph's SDK ReAct Agent** for autonomous financial analy
 
 **See**: [Agent Architecture Details](agent-architecture.md) | [SDK ReAct Agent Feature Spec](../features/langgraph-sdk-react-agent.md)
 
-**Current Deployment**: Deployed to Test (K8s) environment at https://klinematrix.com
+**Current Deployment**: Production at https://klinecubic.cn (ACK)
 
 ---
 

@@ -263,132 +263,40 @@ async def search_symbols(q: str) -> list[str]:
 
 ## React Closure Debugging
 
-### Problem: React Query Closure Trap
 React Query mutations capture state at creation time, not execution time.
 
-**Symptoms:**
-- UI shows correct state but API gets wrong parameters
-- Identical cache keys for different UI states
-- Debug logs show stale closure values
+**Solutions:**
+- Pass state via message parameters, not closures
+- Use direct parameter passing in mutationFn
+- Log both user messages AND parsed parameters
 
-### Solutions
-
-**Message-Based State Transfer:**
-```typescript
-// ✅ Pass state via message, not closures
-const handleAction = () => {
-    const message = `Analysis for ${symbol} (${selectedInterval} timeframe)`;
-    mutation.mutate(message);
-};
-```
-
-**Direct Parameter Passing:**
-```typescript
-// ✅ Bypass closures entirely
-const mutation = useMutation({
-    mutationFn: async ({ symbol, timeframe, dates }) => {
-        return api.analyze({ symbol, timeframe, ...dates });
-    }
-});
-```
-
-### Debugging Strategy
-1. Log user messages AND parsed parameters
-2. Check Redis cache keys: `kubectl exec -n klinematrix-test deployment/redis -- redis-cli keys "fibonacci:*"`
-3. Add structured logging: `logging.basicConfig(level=logging.INFO)`
-4. Use "zero-closure" patterns for complex state dependencies
+**Debug:** Check Redis cache keys for stale values, add structured logging.
 
 ## Data Contract Synchronization
 
-### Critical Rule
-When modifying **any** frontend or backend logic, always verify data contract alignment across all layers.
+**Critical Rule:** When modifying frontend or backend logic, verify data contract alignment across all layers.
 
 ### 4-Layer Contract Checklist
-1. **Backend Pydantic Models** - `Literal["value1", "NEW_VALUE"]`
-2. **Frontend TypeScript** - `'value1' | 'NEW_VALUE'` (must mirror backend)
-3. **User Input Parsing** - Handle new patterns in messages/UI
-4. **Business Logic** - Process new values appropriately
+1. **Backend Pydantic Models** - `Literal["value1", "value2"]`
+2. **Frontend TypeScript** - `'value1' | 'value2'` (must mirror backend)
+3. **User Input Parsing** - Handle new patterns
+4. **Business Logic** - Process new values
 
 ### Common Failures
+- **422 Errors**: TypeScript types don't match Pydantic Literals
+- **Silent Fallbacks**: Parsing fails but uses default instead of error
 
-**422 Errors (Backend validation failure):**
-```python
-# Backend Pydantic model
-class AnalysisRequest(BaseModel):
-    timeframe: Literal["1d", "5d", "1mo", "3mo", "6mo", "1y"]
-```
-
-```typescript
-// Frontend TypeScript type must match exactly
-type Timeframe = '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y';
-```
-
-**Silent Fallbacks:**
-```typescript
-// ❌ Bad: Frontend parsing fails, uses default
-const timeframe = parseTimeframe(message) || '6mo';
-
-// ✅ Good: Frontend parsing must succeed or show error
-const timeframe = parseTimeframe(message);
-if (!timeframe) {
-  throw new Error('Invalid timeframe in message');
-}
-```
-
-### Debugging Data Contracts
-1. Check Pydantic validation errors in backend logs
-2. Verify frontend types match backend models
-3. Test parsing logic with all valid values
-4. Ensure business logic handles all cases
+### Debug
+Check Pydantic errors in logs, verify types match, test all valid values.
 
 ## Development Hot Reload
 
-### Backend (uvicorn --reload)
+Hot reload works for ~90-95% of changes. **When in doubt, restart.**
 
-**Restart Required ❌**
-- **New dependencies**: `pip install`
-- **Module-level changes**: DB connections, decorators, constants
-- **Environment variable changes**: .env modifications
+- **Backend**: Most changes hot-reload. Restart for: new dependencies, env changes, module-level code
+- **Frontend**: Almost all changes hot-reload. Restart for: new dependencies, vite.config.ts
 
-**Hot Reload Works ✅**
-- **Function logic**: Business rules, calculations, API logic
-- **New routes**: Adding FastAPI endpoints
-- **Pydantic models**: Request/response models, validation rules
-- **~90% of development changes**
-
-**Quick Test**:
-```python
-print(f"🔄 Code updated: {datetime.now()}")
-```
-No print = restart needed.
-
-**Restart Command**: `Ctrl+C` then `uvicorn src.main:app --reload`
-
-### Frontend (Vite dev server)
-
-**Restart Required ❌**
-- **New dependencies**: `npm install`
-- **Vite config changes**: vite.config.ts modifications
-- **Environment variable changes**: .env modifications
-
-**Hot Module Reload Works ✅**
-- **React components**: UI logic, state management
-- **TypeScript files**: Business logic, utilities
-- **CSS/styling**: TailwindCSS, stylesheets
-- **~95% of development changes**
-
-**Restart Command**: `Ctrl+C` then `npm run dev`
-
-### Deployed Services (Kubernetes)
-
-For deployed services, restart pods after image changes:
-```bash
-kubectl rollout restart deployment/backend -n klinematrix-test
-kubectl rollout restart deployment/frontend -n klinematrix-test
-```
-
-### Golden Rule
-**Hot reload works for ~90-95% of changes. When in doubt, restart - 10 seconds vs 10 minutes debugging.**
+See [Getting Started](getting-started.md) for detailed hot reload guidelines.
 
 ## Testing Standards
 
@@ -563,66 +471,28 @@ async def get_market_data(symbol: str) -> dict:
 ## Documentation Standards
 
 ### File Documentation
-```python
-"""
-fibonacci_analyzer.py
-
-Fibonacci retracement analysis for financial instruments.
-
-This module calculates Fibonacci retracement levels based on swing highs
-and lows in price data. It identifies significant support/resistance levels
-using the Fibonacci sequence ratios (0.236, 0.382, 0.500, 0.618, 0.786).
-
-Key Features:
-- Automatic swing point detection
-- Multiple timeframe support
-- Confidence scoring based on price action
-- Integration with chart generation
-
-Dependencies:
-- pandas: For price data manipulation
-- numpy: For numerical calculations
-- yfinance: For market data retrieval
-"""
-```
+Every module should have a docstring with:
+- **Purpose**: What the module does
+- **Key Features**: Main capabilities (bullet list)
+- **Dependencies**: External packages used
 
 ### Function Documentation
+Use Google-style docstrings:
 ```python
-def calculate_fibonacci_levels(
-    high: float,
-    low: float,
-    direction: Literal["up", "down"] = "up"
-) -> dict[str, float]:
+def calculate_levels(high: float, low: float) -> dict[str, float]:
     """
-    Calculate Fibonacci retracement levels between high and low prices.
-
-    Fibonacci levels are calculated using standard ratios:
-    23.6%, 38.2%, 50%, 61.8%, and 78.6%.
+    Calculate Fibonacci retracement levels.
 
     Args:
         high: Swing high price
         low: Swing low price
-        direction: Direction of the trend ("up" for uptrend, "down" for downtrend)
 
     Returns:
-        Dictionary mapping level names to price values:
-        {
-            "0.0": float,    # Base level
-            "0.236": float,  # 23.6% retracement
-            "0.382": float,  # 38.2% retracement
-            "0.500": float,  # 50% retracement
-            "0.618": float,  # 61.8% retracement (golden ratio)
-            "0.786": float,  # 78.6% retracement
-            "1.0": float     # 100% retracement
-        }
+        Dictionary mapping level names to prices
 
     Raises:
-        ValueError: If high <= low or direction is invalid
-
-    Example:
-        >>> levels = calculate_fibonacci_levels(150.0, 100.0, "up")
-        >>> levels["0.618"]  # Golden ratio level
-        130.9
+        ValueError: If high <= low
     """
-    pass
 ```
+
+Include: brief description, Args, Returns, Raises, Example (optional).

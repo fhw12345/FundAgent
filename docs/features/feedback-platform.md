@@ -22,31 +22,11 @@ A self-contained system for collecting, prioritizing, and acting on user feedbac
 
 ## 2. Current Project Structure Analysis
 
-### Backend Architecture
-- **Framework**: FastAPI with async/await
-- **Layers**: API → Service → Repository → Database
-- **Authentication**: JWT-based with dependency injection
-  - `get_current_user_id()`: Extract user_id from JWT
-  - `get_current_user()`: Get full User object
-  - `require_admin()`: Admin-only endpoints
-- **Database**: Motor (async MongoDB client)
-- **Models**: Pydantic for validation/serialization
-- **Patterns**: Repository pattern for data access
-- **Logging**: Structured logging with structlog
+**Backend**: FastAPI + Motor (MongoDB) + Pydantic, Repository pattern, JWT auth (get_current_user_id, require_admin)
 
-### Frontend Architecture
-- **Framework**: React 18 + TypeScript 5
-- **Navigation**: Tab-based state (`activeTab: "health" | "chat"`)
-- **Auth**: localStorage token storage via `authService`
-- **Styling**: TailwindCSS with glassmorphism design
-- **State**: React Query for server state (used in chat feature)
-- **Markdown**: react-markdown with remark-gfm
+**Frontend**: React 18 + TypeScript 5, TailwindCSS, React Query, react-markdown + remark-gfm
 
-### Database Patterns
-- **Collections**: users, chats, messages, refresh_tokens
-- **ID Strategy**: Custom IDs (e.g., `chat_abc123`)
-- **Repository Layer**: Async methods for CRUD operations
-- **Motor**: AsyncIOMotorCollection for MongoDB
+**Database**: Custom IDs (e.g., `chat_abc123`), async repositories
 
 ---
 
@@ -90,128 +70,43 @@ A self-contained system for collecting, prioritizing, and acting on user feedbac
 
 ### 4.1 FeedbackItems Collection
 
-```json
-{
-  "_id": ObjectId("..."),
-  "item_id": "feedback_abc123",
-  "title": "Add dark mode toggle",
-  "description": "## Problem\nUsers want dark mode...",
-  "authorId": "user_xyz789",
-  "type": "feature",  // Enum: "feature" | "bug"
-  "status": "under_consideration",  // Enum: "under_consideration" | "planned" | "in_progress" | "completed"
-  "voteCount": 42,  // Atomic counter
-  "commentCount": 8,  // Atomic counter
-  "createdAt": ISODate("2025-10-12T10:00:00Z"),
-  "updatedAt": ISODate("2025-10-12T15:30:00Z")
-}
-```
+**Fields**: `item_id`, `title`, `description` (Markdown), `authorId`, `type` (feature|bug), `status` (under_consideration|planned|in_progress|completed), `voteCount`, `commentCount`, `createdAt`, `updatedAt`
 
-**Indexes**:
-- `item_id`: Unique
-- `type`: Filter by feature/bug
-- `voteCount`: Sort by votes (descending)
-- `createdAt`: Sort by date
+**Indexes**: `item_id` (unique), `type`, `voteCount` (desc), `createdAt`
 
 ### 4.2 Comments Collection
 
-```json
-{
-  "_id": ObjectId("..."),
-  "comment_id": "comment_abc123",
-  "itemId": "feedback_abc123",  // Reference to FeedbackItems
-  "authorId": "user_xyz789",
-  "content": "I agree, this would be very useful!",
-  "createdAt": ISODate("2025-10-12T11:00:00Z")
-}
-```
+**Fields**: `comment_id`, `itemId` (reference), `authorId`, `content`, `createdAt`
 
-**Indexes**:
-- `comment_id`: Unique
-- `itemId`: Filter comments for an item (fast lookup)
-- `createdAt`: Sort by date
+**Indexes**: `comment_id` (unique), `itemId` (fast lookup), `createdAt`
 
 ### 4.3 Users Collection (Modification)
 
-**Add new field**:
-```json
-{
-  ...existing fields...,
-  "feedbackVotes": ["feedback_abc123", "feedback_xyz789"]  // Array of voted item IDs
-}
-```
-
-**Purpose**: Track which items a user has voted on for UI state (show/hide vote button).
+**Add field**: `feedbackVotes: string[]` - Array of voted item IDs for UI state
 
 ---
 
 ## 5. Backend Implementation Plan
 
-### 5.1 Models (`backend/src/models/feedback.py`)
+### 5.1 Models (`feedback.py`)
 
-```python
-from datetime import datetime
-from typing import Literal
+**Types**: `FeedbackType = Literal["feature", "bug"]`, `FeedbackStatus = Literal["under_consideration", "planned", "in_progress", "completed"]`
 
-from pydantic import BaseModel, Field
+**Request Models**:
+- `FeedbackItemCreate`: title (5-200 chars), description (10-10000 chars), type
+- `CommentCreate`: content (1-5000 chars)
 
-# Enums
-FeedbackType = Literal["feature", "bug"]
-FeedbackStatus = Literal["under_consideration", "planned", "in_progress", "completed"]
-
-# Request Models
-class FeedbackItemCreate(BaseModel):
-    title: str = Field(..., min_length=5, max_length=200)
-    description: str = Field(..., min_length=10, max_length=10000)
-    type: FeedbackType
-
-class CommentCreate(BaseModel):
-    content: str = Field(..., min_length=1, max_length=5000)
-
-# Response Models
-class FeedbackItem(BaseModel):
-    item_id: str
-    title: str
-    description: str
-    authorId: str
-    type: FeedbackType
-    status: FeedbackStatus
-    voteCount: int
-    commentCount: int
-    createdAt: datetime
-    updatedAt: datetime
-
-    # Computed field for user context
-    hasVoted: bool = False  # Set by service layer
-
-class Comment(BaseModel):
-    comment_id: str
-    itemId: str
-    authorId: str
-    content: str
-    createdAt: datetime
-
-    # Author info (joined from users collection)
-    authorUsername: str | None = None
-```
+**Response Models**:
+- `FeedbackItem`: item_id, title, description, authorId, type, status, voteCount, commentCount, createdAt, updatedAt, hasVoted (computed)
+- `Comment`: comment_id, itemId, authorId, content, createdAt, authorUsername (joined)
 
 ### 5.2 Repositories
 
-**`backend/src/database/repositories/feedback_repository.py`**
-- `create(item: FeedbackItemCreate, authorId: str) -> FeedbackItem`
-- `get_by_id(item_id: str) -> FeedbackItem | None`
-- `list_by_type(type: FeedbackType, skip: int, limit: int) -> list[FeedbackItem]`
-- `increment_vote_count(item_id: str, delta: int) -> bool`
-- `increment_comment_count(item_id: str) -> bool`
-- `get_all() -> list[FeedbackItem]`  # For export
+**FeedbackRepository**: `create`, `get_by_id`, `list_by_type`, `increment_vote_count`, `increment_comment_count`, `get_all`
 
-**`backend/src/database/repositories/comment_repository.py`**
-- `create(comment: CommentCreate, itemId: str, authorId: str) -> Comment`
-- `list_by_item(itemId: str) -> list[Comment]`
+**CommentRepository**: `create`, `list_by_item`
 
-**`backend/src/database/repositories/user_repository.py` (Modification)**
-- `add_vote(user_id: str, item_id: str) -> bool`
-- `remove_vote(user_id: str, item_id: str) -> bool`
-- `get_user_votes(user_id: str) -> list[str]`
+**UserRepository (modified)**: `add_vote`, `remove_vote`, `get_user_votes`
 
 ### 5.3 Service Layer
 
@@ -237,215 +132,50 @@ class Comment(BaseModel):
     - Join with users collection for author usernames
   - `export_all() -> str`  # Generate Markdown snapshot
 
-### 5.4 API Endpoints (`backend/src/api/feedback.py`)
+### 5.4 API Endpoints (`api/feedback.py`)
 
-```python
-router = APIRouter(prefix="/api/feedback", tags=["feedback"])
+**Router**: `/api/feedback`
 
-# CREATE
-@router.post("/items", status_code=201)
-async def create_feedback_item(
-    item: FeedbackItemCreate,
-    user_id: str = Depends(get_current_user_id),
-    service: FeedbackService = Depends(get_feedback_service),
-) -> FeedbackItem:
-    """Create new feedback item (feature or bug)."""
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/items` | POST | Required | Create feedback item |
+| `/items` | GET | Optional | List items (filter by type) |
+| `/items/{item_id}` | GET | Optional | Get item details |
+| `/items/{item_id}/vote` | POST | Required | Cast vote (204) |
+| `/items/{item_id}/vote` | DELETE | Required | Remove vote (204) |
+| `/items/{item_id}/comments` | POST | Required | Add comment |
+| `/items/{item_id}/comments` | GET | Public | List comments |
+| `/export` | GET | Required | Markdown snapshot |
 
-# READ
-@router.get("/items")
-async def list_feedback_items(
-    type: FeedbackType | None = None,
-    user_id: str | None = Depends(get_current_user_id_optional),
-    service: FeedbackService = Depends(get_feedback_service),
-) -> list[FeedbackItem]:
-    """List feedback items, optionally filtered by type."""
-
-@router.get("/items/{item_id}")
-async def get_feedback_item(
-    item_id: str,
-    user_id: str | None = Depends(get_current_user_id_optional),
-    service: FeedbackService = Depends(get_feedback_service),
-) -> FeedbackItem:
-    """Get detailed view of a feedback item."""
-
-# VOTE
-@router.post("/items/{item_id}/vote", status_code=204)
-async def vote_feedback_item(
-    item_id: str,
-    user_id: str = Depends(get_current_user_id),
-    service: FeedbackService = Depends(get_feedback_service),
-):
-    """Cast a vote for a feedback item."""
-
-@router.delete("/items/{item_id}/vote", status_code=204)
-async def unvote_feedback_item(
-    item_id: str,
-    user_id: str = Depends(get_current_user_id),
-    service: FeedbackService = Depends(get_feedback_service),
-):
-    """Remove vote from a feedback item."""
-
-# COMMENTS
-@router.post("/items/{item_id}/comments", status_code=201)
-async def add_comment(
-    item_id: str,
-    comment: CommentCreate,
-    user_id: str = Depends(get_current_user_id),
-    service: FeedbackService = Depends(get_feedback_service),
-) -> Comment:
-    """Add a comment to a feedback item."""
-
-@router.get("/items/{item_id}/comments")
-async def get_comments(
-    item_id: str,
-    service: FeedbackService = Depends(get_feedback_service),
-) -> list[Comment]:
-    """Get all comments for a feedback item."""
-
-# EXPORT (Admin or AI agent)
-@router.get("/export")
-async def export_feedback(
-    user_id: str = Depends(get_current_user_id),
-    service: FeedbackService = Depends(get_feedback_service),
-) -> str:
-    """Generate Markdown snapshot of all feedback."""
-```
-
-**Note**: Need to create `get_current_user_id_optional` dependency for public endpoints.
+**Note**: Create `get_current_user_id_optional` dependency for public endpoints.
 
 ---
 
 ## 6. Frontend Implementation Plan
 
-### 6.1 Navigation Update (`frontend/src/App.tsx`)
+### 6.1 Navigation Update (`App.tsx`)
 
-**Changes**:
-1. Update `activeTab` type: `"health" | "chat" | "feedback"`
-2. Add "Feedback" button in navigation
-3. Add route for feedback page
+Update `activeTab` type to include `"feedback"`, add button and route for `<FeedbackPage />`
 
-```tsx
-const [activeTab, setActiveTab] = useState<"health" | "chat" | "feedback">("chat");
+### 6.2 Page & Components
 
-// In navigation:
-<button onClick={() => setActiveTab("feedback")}>
-  Feedback
-</button>
+**FeedbackPage.tsx**: PageHeader + SubmitButton + DualLeaderboards (features/bugs)
 
-// In main:
-{activeTab === "feedback" && <FeedbackPage />}
-```
+**FeedbackLeaderboard.tsx**: Props `type: "feature" | "bug"`, React Query fetch, vote counts, click → detail
 
-### 6.2 Page Component (`frontend/src/pages/FeedbackPage.tsx`)
+**FeedbackListItem.tsx**: Title, status badge, vote/comment counts, optimistic voting
 
-**Structure**:
-```tsx
-export function FeedbackPage() {
-  return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <PageHeader />
-      <SubmitButton />
-      <DualLeaderboards />
-    </div>
-  );
-}
-```
+**FeedbackDetailPage.tsx**: Back button, header, Markdown description (react-markdown + remark-gfm), comment section/form
 
-### 6.3 Leaderboard Components
+### 6.3 Forms
 
-**`frontend/src/components/feedback/FeedbackLeaderboard.tsx`**
-- Props: `type: "feature" | "bug"`
-- Fetch items from API
-- Display list with vote counts, comment counts
-- Vote button (toggle vote)
-- Click item → navigate to detail view
+**SubmitFeedbackForm.tsx**: Modal with title, description, type radio (feature/bug)
 
-```tsx
-interface FeedbackLeaderboardProps {
-  type: "feature" | "bug";
-}
+**CommentForm.tsx**: Textarea + submit button
 
-export function FeedbackLeaderboard({ type }: FeedbackLeaderboardProps) {
-  const { data: items, isLoading } = useQuery({
-    queryKey: ["feedback", type],
-    queryFn: () => api.listFeedbackItems(type),
-  });
+### 6.4 API Client (`feedbackApi.ts`)
 
-  return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold">
-        {type === "feature" ? "Feature Requests" : "Bug Reports"}
-      </h2>
-      {items?.map(item => (
-        <FeedbackListItem key={item.item_id} item={item} />
-      ))}
-    </div>
-  );
-}
-```
-
-**`frontend/src/components/feedback/FeedbackListItem.tsx`**
-- Display title, status badge, vote count, comment count
-- Vote button with optimistic updates
-- Click → navigate to detail page
-
-### 6.4 Detail View (`frontend/src/pages/FeedbackDetailPage.tsx`)
-
-**Structure**:
-1. Back button
-2. Header (title, status, vote button)
-3. Description (Markdown rendering)
-4. Comment section
-5. Comment form
-
-**Markdown Rendering**:
-```tsx
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-
-<ReactMarkdown remarkPlugins={[remarkGfm]}>
-  {item.description}
-</ReactMarkdown>
-```
-
-### 6.5 Forms
-
-**`frontend/src/components/feedback/SubmitFeedbackForm.tsx`**
-- Modal/drawer component
-- Fields: title, description (textarea), type (radio: feature/bug)
-- Markdown preview (optional for MVP)
-
-**`frontend/src/components/feedback/CommentForm.tsx`**
-- Simple textarea for comment
-- Submit button
-- Markdown support (plain textarea, renders on submit)
-
-### 6.6 API Client (`frontend/src/services/feedbackApi.ts`)
-
-```typescript
-export const feedbackApi = {
-  listItems: (type?: "feature" | "bug") =>
-    api.get(`/api/feedback/items${type ? `?type=${type}` : ""}`),
-
-  getItem: (itemId: string) =>
-    api.get(`/api/feedback/items/${itemId}`),
-
-  createItem: (data: FeedbackItemCreate) =>
-    api.post("/api/feedback/items", data),
-
-  voteItem: (itemId: string) =>
-    api.post(`/api/feedback/items/${itemId}/vote`),
-
-  unvoteItem: (itemId: string) =>
-    api.delete(`/api/feedback/items/${itemId}/vote`),
-
-  getComments: (itemId: string) =>
-    api.get(`/api/feedback/items/${itemId}/comments`),
-
-  addComment: (itemId: string, content: string) =>
-    api.post(`/api/feedback/items/${itemId}/comments`, { content }),
-};
-```
+Methods: `listItems(type?)`, `getItem(itemId)`, `createItem(data)`, `voteItem(itemId)`, `unvoteItem(itemId)`, `getComments(itemId)`, `addComment(itemId, content)`
 
 ---
 
@@ -500,61 +230,17 @@ export const feedbackApi = {
 
 ## 8. File Structure
 
-```
-backend/
-├── src/
-│   ├── models/
-│   │   └── feedback.py (NEW)
-│   ├── database/
-│   │   └── repositories/
-│   │       ├── feedback_repository.py (NEW)
-│   │       ├── comment_repository.py (NEW)
-│   │       └── user_repository.py (MODIFY)
-│   ├── services/
-│   │   └── feedback_service.py (NEW)
-│   └── api/
-│       ├── dependencies/
-│       │   └── feedback_deps.py (NEW)
-│       └── feedback.py (NEW)
+**Backend**: `models/feedback.py`, `repositories/feedback_repository.py`, `repositories/comment_repository.py`, `services/feedback_service.py`, `api/feedback.py`, `api/dependencies/feedback_deps.py`, `user_repository.py` (modify)
 
-frontend/
-├── src/
-│   ├── pages/
-│   │   ├── FeedbackPage.tsx (NEW)
-│   │   └── FeedbackDetailPage.tsx (NEW)
-│   ├── components/
-│   │   └── feedback/
-│   │       ├── FeedbackLeaderboard.tsx (NEW)
-│   │       ├── FeedbackListItem.tsx (NEW)
-│   │       ├── SubmitFeedbackForm.tsx (NEW)
-│   │       ├── CommentSection.tsx (NEW)
-│   │       └── CommentForm.tsx (NEW)
-│   ├── services/
-│   │   └── feedbackApi.ts (NEW)
-│   └── App.tsx (MODIFY)
-```
+**Frontend**: `pages/FeedbackPage.tsx`, `pages/FeedbackDetailPage.tsx`, `components/feedback/` (Leaderboard, ListItem, SubmitForm, CommentSection, CommentForm), `services/feedbackApi.ts`, `App.tsx` (modify)
 
 ---
 
 ## 9. Testing Strategy
 
-### Backend Tests
-```python
-# tests/test_feedback.py
-- test_create_feedback_item()
-- test_vote_idempotency()  # Vote twice → no double count
-- test_atomic_vote_counting()  # Concurrent votes
-- test_comment_creation()
-- test_markdown_export()
-```
+**Backend**: `test_create_feedback_item`, `test_vote_idempotency`, `test_atomic_vote_counting`, `test_comment_creation`, `test_markdown_export`
 
-### Frontend Tests
-```typescript
-// tests/FeedbackLeaderboard.test.tsx
-- renders leaderboard correctly
-- handles voting optimistically
-- filters by type correctly
-```
+**Frontend**: Renders leaderboard correctly, handles optimistic voting, filters by type
 
 ---
 

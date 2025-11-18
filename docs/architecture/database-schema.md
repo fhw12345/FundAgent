@@ -1,8 +1,8 @@
 # Database Schema Documentation
 
 > **Database**: Azure Cosmos DB for MongoDB API (v4.2)
-> **Last Updated**: 2025-10-24
-> **Version**: Reflects backend v0.5.5
+> **Last Updated**: 2025-11-18
+> **Version**: Reflects backend v0.7.0
 
 ## Overview
 
@@ -498,7 +498,3 @@ mongosh "$MONGODB_URL" --eval "
 - **Cosmos DB Compatibility**: [docs/deployment/cosmos-db-mongodb-compatibility.md](../deployment/cosmos-db-mongodb-compatibility.md)
 - **Troubleshooting**: [docs/troubleshooting/mongodb-cosmos-db.md](../troubleshooting/mongodb-cosmos-db.md)
 - **Credit System**: [docs/features/token-credit-economy.md](../features/token-credit-economy.md)
-
----
-
-**Last Updated**: 2025-10-24 (Backend v0.5.5)
