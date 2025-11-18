@@ -4,6 +4,7 @@
  */
 
 import { MessageSquare, Clock, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Chat } from "../../types/api";
 
 interface ChatListItemProps {
@@ -19,9 +20,11 @@ export function ChatListItem({
   onClick,
   onDelete,
 }: ChatListItemProps) {
+  const { t, i18n } = useTranslation(['chat', 'common']);
+
   // Format timestamp
   const formatTime = (timestamp: string | null) => {
-    if (!timestamp) return "No messages";
+    if (!timestamp) return t('chat:sidebar.noMessages');
 
     const date = new Date(timestamp);
     const now = new Date();
@@ -30,12 +33,12 @@ export function ChatListItem({
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 1) return t('chat:sidebar.justNow');
+    if (diffMins < 60) return t('chat:sidebar.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('chat:sidebar.hoursAgo', { count: diffHours });
+    if (diffDays < 7) return t('chat:sidebar.daysAgo', { count: diffDays });
 
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString(i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US', {
       month: "short",
       day: "numeric",
     });
@@ -116,7 +119,7 @@ export function ChatListItem({
                 onDelete(chat.chat_id);
               }}
               className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-all"
-              title="Delete chat"
+              title={t('chat:sidebar.deleteChat')}
             >
               <Trash2 size={14} className="text-gray-400 hover:text-red-500" />
             </button>

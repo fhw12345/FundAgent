@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Search, Building2, TrendingUp, CornerDownLeft } from "lucide-react";
 import { marketService, SymbolSearchResult } from "../services/market";
 
@@ -23,15 +24,19 @@ interface SymbolSearchProps {
 
 export const SymbolSearch: React.FC<SymbolSearchProps> = ({
   onSymbolSelect,
-  placeholder = "Type stock name or symbol, press Enter to search...",
+  placeholder,
   className = "",
   autoFocus = false,
 }) => {
+  const { t } = useTranslation(["market", "common"]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SymbolSearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+
+  // Use provided placeholder or default from translations
+  const searchPlaceholder = placeholder || t("market:search.placeholder");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -179,7 +184,7 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
               setIsOpen(true);
             }
           }}
-          placeholder={placeholder}
+          placeholder={searchPlaceholder}
           className="block w-full pl-10 pr-24 py-3 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           autoComplete="off"
         />
@@ -193,7 +198,7 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
             }}
             disabled={query.trim().length < 1}
             className="absolute inset-y-0 right-0 pr-2 flex items-center group"
-            title="Press Enter to search"
+            title={t("market:search.enterToSearch")}
           >
             <div className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
               query.trim().length >= 1
@@ -269,9 +274,9 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4">
           <div className="text-center text-gray-500">
             <Search className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm">No stocks found for &ldquo;{query}&rdquo;</p>
+            <p className="text-sm">{t("market:search.noResults", { query })}</p>
             <p className="text-xs text-gray-400 mt-1">
-              Try searching by company name or stock symbol
+              {t("market:search.noResultsHint")}
             </p>
           </div>
         </div>
@@ -281,10 +286,10 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
       {query.length === 0 && (
         <div className="mt-2 text-xs text-gray-500">
           <p>
-            💡 Type a company name or symbol, then press <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono">Enter</kbd> to search
+            {t("market:search.searchTip")} <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono">Enter</kbd>
           </p>
           <p className="mt-1 text-gray-400">
-            Examples: &ldquo;Apple&rdquo;, &ldquo;AAPL&rdquo;, &ldquo;Microsoft&rdquo;, &ldquo;Tesla&rdquo;
+            {t("market:search.searchExamples")}
           </p>
         </div>
       )}

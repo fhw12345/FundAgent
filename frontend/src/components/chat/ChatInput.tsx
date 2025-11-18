@@ -6,6 +6,7 @@
  */
 
 import React, { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Send, AlertCircle, Coins, Settings } from "lucide-react";
 import { useCurrentBalance } from "../../hooks/useCredits";
 import { estimateChatCost } from "../../utils/tokenEstimator";
@@ -33,6 +34,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   modelSettings,
   onModelSettingsChange,
 }) => {
+  const { t } = useTranslation(['chat', 'common']);
   const currentBalance = useCurrentBalance();
   const [showSettings, setShowSettings] = useState(false);
 
@@ -59,12 +61,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-red-800">
-              Insufficient Credits
+              {t('chat:input.insufficientCreditsTitle')}
             </p>
             <p className="text-xs text-red-600 mt-0.5">
-              You need at least {estimatedCost} credits to send this message.
-              Current balance: {currentBalance?.toFixed(1) ?? "Loading..."}{" "}
-              credits
+              {t('chat:input.insufficientCreditsMessage', {
+                required: estimatedCost,
+                balance: currentBalance?.toFixed(1) ?? t('common:buttons.loading')
+              })}
             </p>
           </div>
         </div>
@@ -78,11 +81,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           />
           <div className="flex-1">
             <p className="text-sm font-semibold text-orange-800">
-              Low Credit Balance
+              {t('chat:input.lowBalance')}
             </p>
             <p className="text-xs text-orange-600 mt-0.5">
-              You have {currentBalance?.toFixed(1)} credits remaining. Consider
-              topping up soon.
+              {t('chat:input.lowBalanceMessage', {
+                balance: currentBalance?.toFixed(1)
+              })}
             </p>
           </div>
         </div>
@@ -111,8 +115,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             }}
             placeholder={
               currentSymbol
-                ? `Ask about ${currentSymbol} or request analysis...`
-                : "Ask questions or search for a symbol on the right..."
+                ? t('chat:input.placeholderWithSymbol', { symbol: currentSymbol })
+                : t('chat:input.placeholderWithoutSymbol')
             }
             className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow"
             disabled={isPending || hasInsufficientCredits}
@@ -122,8 +126,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
               <Coins size={12} />
               <span>
-                Estimated cost: ~{estimatedCost} credits ({costEstimate.contextTokens}{" "}
-                context + {costEstimate.inputTokens} input tokens)
+                {t('chat:input.estimatedCost', {
+                  cost: estimatedCost,
+                  contextTokens: costEstimate.contextTokens,
+                  inputTokens: costEstimate.inputTokens
+                })}
               </span>
             </div>
           )}
@@ -132,7 +139,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           onClick={() => setShowSettings(!showSettings)}
           className="bg-gray-100 text-gray-700 px-4 py-3 rounded-xl hover:bg-gray-200 transition-colors"
-          title="Model settings"
+          title={t('chat:settings.modelSettings')}
         >
           <Settings className="h-5 w-5" />
         </button>
@@ -142,8 +149,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-5 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
           title={
             hasInsufficientCredits
-              ? "Insufficient credits"
-              : "Send message (Enter)"
+              ? t('chat:input.insufficientCredits')
+              : t('chat:input.sendTooltip')
           }
         >
           <Send className="h-5 w-5" />

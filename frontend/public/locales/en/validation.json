@@ -1,0 +1,99 @@
+{
+  "required": "This field is required",
+  "email": {
+    "required": "Please enter email",
+    "invalid": "Please enter a valid email address",
+    "exists": "This email is already registered"
+  },
+  "password": {
+    "required": "Please enter password",
+    "minLength": "Password must be at least {{min}} characters",
+    "maxLength": "Password cannot exceed {{max}} characters",
+    "weak": "Password is too weak",
+    "mismatch": "Passwords do not match",
+    "uppercase": "Must contain at least one uppercase letter",
+    "lowercase": "Must contain at least one lowercase letter",
+    "number": "Must contain at least one number",
+    "special": "Must contain at least one special character",
+    "noSpaces": "Password cannot contain spaces",
+    "current": "Current password is incorrect"
+  },
+  "username": {
+    "required": "Please enter username",
+    "minLength": "Username must be at least {{min}} characters",
+    "maxLength": "Username cannot exceed {{max}} characters",
+    "invalid": "Username can only contain letters, numbers, and underscores",
+    "exists": "This username is already taken",
+    "reserved": "This username is reserved"
+  },
+  "phone": {
+    "required": "Please enter phone number",
+    "invalid": "Please enter a valid phone number"
+  },
+  "number": {
+    "required": "Please enter a number",
+    "invalid": "Please enter a valid number",
+    "min": "Value cannot be less than {{min}}",
+    "max": "Value cannot be greater than {{max}}",
+    "positive": "Please enter a positive number",
+    "integer": "Please enter a whole number"
+  },
+  "date": {
+    "required": "Please select a date",
+    "invalid": "Please enter a valid date",
+    "future": "Date cannot be in the future",
+    "past": "Date cannot be in the past",
+    "min": "Date cannot be before {{min}}",
+    "max": "Date cannot be after {{max}}"
+  },
+  "text": {
+    "required": "Please enter content",
+    "minLength": "Must be at least {{min}} characters",
+    "maxLength": "Cannot exceed {{max}} characters",
+    "pattern": "Invalid format"
+  },
+  "feedback": {
+    "titleMinLength": "Title must be at least {{min}} characters",
+    "titleMaxLength": "Title must be less than {{max}} characters",
+    "descriptionMinLength": "Description must be at least {{min}} characters",
+    "descriptionMaxLength": "Description must be less than {{max}} characters",
+    "commentEmpty": "Comment cannot be empty",
+    "commentMaxLength": "Comment must be less than {{max}} characters"
+  },
+  "select": {
+    "required": "Please select an option",
+    "invalid": "Invalid selection"
+  },
+  "file": {
+    "required": "Please select a file",
+    "maxSize": "File size cannot exceed {{size}}",
+    "invalidType": "Unsupported file type",
+    "maxFiles": "Maximum {{max}} files allowed"
+  },
+  "url": {
+    "invalid": "Please enter a valid URL"
+  },
+  "symbol": {
+    "required": "Please enter a symbol",
+    "invalid": "Invalid symbol",
+    "notFound": "Symbol not found"
+  },
+  "amount": {
+    "required": "Please enter amount",
+    "invalid": "Please enter a valid amount",
+    "min": "Amount cannot be less than {{min}}",
+    "max": "Amount cannot be greater than {{max}}",
+    "insufficient": "Insufficient balance"
+  },
+  "quantity": {
+    "required": "Please enter quantity",
+    "invalid": "Please enter a valid quantity",
+    "min": "Quantity cannot be less than {{min}}",
+    "max": "Quantity cannot be greater than {{max}}",
+    "insufficient": "Insufficient holdings"
+  },
+  "generic": {
+    "invalid": "Invalid input",
+    "tryAgain": "Please try again"
+  }
+}

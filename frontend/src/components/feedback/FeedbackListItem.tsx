@@ -4,6 +4,7 @@
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { FeedbackItem } from "../../types/feedback";
 import { feedbackApi } from "../../services/feedbackApi";
 import { STATUS_LABELS, STATUS_COLORS } from "../../types/feedback";
@@ -19,6 +20,7 @@ export function FeedbackListItem({
   onItemClick,
   rank,
 }: FeedbackListItemProps) {
+  const { t } = useTranslation(['feedback', 'common']);
   const queryClient = useQueryClient();
 
   // Vote mutation with optimistic updates
@@ -93,19 +95,19 @@ export function FeedbackListItem({
       1: {
         emoji: "🏆",
         gradient: "from-yellow-400 via-yellow-500 to-amber-600",
-        text: "1st",
+        text: t('feedback:leaderboard.first'),
         shine: "shadow-xl shadow-yellow-500/50",
       },
       2: {
         emoji: "🥈",
         gradient: "from-gray-300 via-gray-400 to-gray-500",
-        text: "2nd",
+        text: t('feedback:leaderboard.second'),
         shine: "shadow-lg shadow-gray-400/50",
       },
       3: {
         emoji: "🥉",
         gradient: "from-orange-400 via-orange-500 to-orange-600",
-        text: "3rd",
+        text: t('feedback:leaderboard.third'),
         shine: "shadow-lg shadow-orange-400/50",
       },
     };
@@ -195,7 +197,7 @@ export function FeedbackListItem({
                   d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                 />
               </svg>
-              {item.authorUsername || "Unknown"}
+              {item.authorUsername || t('feedback:detail.unknownAuthor')}
             </span>
 
             {/* Comment Count */}

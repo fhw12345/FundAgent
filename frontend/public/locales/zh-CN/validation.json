@@ -1,0 +1,99 @@
+{
+  "required": "此项为必填",
+  "email": {
+    "required": "请输入邮箱",
+    "invalid": "请输入有效的邮箱地址",
+    "exists": "该邮箱已被注册"
+  },
+  "password": {
+    "required": "请输入密码",
+    "minLength": "密码至少{{min}}个字符",
+    "maxLength": "密码最多{{max}}个字符",
+    "weak": "密码强度太弱",
+    "mismatch": "两次输入的密码不一致",
+    "uppercase": "需要至少一个大写字母",
+    "lowercase": "需要至少一个小写字母",
+    "number": "需要至少一个数字",
+    "special": "需要至少一个特殊字符",
+    "noSpaces": "密码不能包含空格",
+    "current": "当前密码不正确"
+  },
+  "username": {
+    "required": "请输入用户名",
+    "minLength": "用户名至少{{min}}个字符",
+    "maxLength": "用户名最多{{max}}个字符",
+    "invalid": "用户名只能包含字母、数字和下划线",
+    "exists": "该用户名已被使用",
+    "reserved": "该用户名为保留词"
+  },
+  "phone": {
+    "required": "请输入手机号",
+    "invalid": "请输入有效的手机号"
+  },
+  "number": {
+    "required": "请输入数字",
+    "invalid": "请输入有效的数字",
+    "min": "数值不能小于{{min}}",
+    "max": "数值不能大于{{max}}",
+    "positive": "请输入正数",
+    "integer": "请输入整数"
+  },
+  "date": {
+    "required": "请选择日期",
+    "invalid": "请输入有效的日期",
+    "future": "日期不能是未来",
+    "past": "日期不能是过去",
+    "min": "日期不能早于{{min}}",
+    "max": "日期不能晚于{{max}}"
+  },
+  "text": {
+    "required": "请输入内容",
+    "minLength": "至少输入{{min}}个字符",
+    "maxLength": "最多输入{{max}}个字符",
+    "pattern": "格式不正确"
+  },
+  "feedback": {
+    "titleMinLength": "标题至少{{min}}个字符",
+    "titleMaxLength": "标题最多{{max}}个字符",
+    "descriptionMinLength": "描述至少{{min}}个字符",
+    "descriptionMaxLength": "描述最多{{max}}个字符",
+    "commentEmpty": "评论不能为空",
+    "commentMaxLength": "评论最多{{max}}个字符"
+  },
+  "select": {
+    "required": "请选择一项",
+    "invalid": "选择无效"
+  },
+  "file": {
+    "required": "请选择文件",
+    "maxSize": "文件大小不能超过{{size}}",
+    "invalidType": "不支持的文件类型",
+    "maxFiles": "最多上传{{max}}个文件"
+  },
+  "url": {
+    "invalid": "请输入有效的URL"
+  },
+  "symbol": {
+    "required": "请输入股票代码",
+    "invalid": "无效的股票代码",
+    "notFound": "未找到该股票"
+  },
+  "amount": {
+    "required": "请输入金额",
+    "invalid": "请输入有效的金额",
+    "min": "金额不能小于{{min}}",
+    "max": "金额不能大于{{max}}",
+    "insufficient": "余额不足"
+  },
+  "quantity": {
+    "required": "请输入数量",
+    "invalid": "请输入有效的数量",
+    "min": "数量不能小于{{min}}",
+    "max": "数量不能大于{{max}}",
+    "insufficient": "持仓不足"
+  },
+  "generic": {
+    "invalid": "输入无效",
+    "tryAgain": "请重试"
+  }
+}

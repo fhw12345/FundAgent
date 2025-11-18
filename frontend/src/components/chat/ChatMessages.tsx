@@ -6,6 +6,7 @@
  */
 
 import React, { useEffect, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -50,7 +51,7 @@ const parseThinkingContent = (content: string): { thinking: string[]; mainConten
 };
 
 // Memoized message component to prevent re-renders
-const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
+const MessageBubble = React.memo<{ msg: ChatMessage; t: (key: string, options?: Record<string, unknown>) => string }>(({ msg, t }) => {
   // Memoize thinking content parsing to avoid re-parsing on every render
   const { thinking, mainContent } = useMemo(() => {
     return msg.role === "assistant"
@@ -76,8 +77,8 @@ const MessageBubble = React.memo<{ msg: ChatMessage }>(({ msg }) => {
               <svg className="w-4 h-4 text-blue-600 flex-shrink-0 group-open:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              <span className="text-xs font-medium text-blue-700">Thinking Process</span>
-              <span className="text-xs text-blue-600/70 ml-auto">{thinking.join('').length} chars</span>
+              <span className="text-xs font-medium text-blue-700">{t('chat:message.thinkingProcess')}</span>
+              <span className="text-xs text-blue-600/70 ml-auto">{t('chat:message.thinkingChars', { count: thinking.join('').length })}</span>
             </summary>
             <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
               <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
@@ -233,6 +234,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   hasMore = false,
   isLoadingMore = false,
 }) => {
+  const { t } = useTranslation(['chat', 'common']);
   const lastUserMessageRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastScrolledUserMessageRef = useRef<string | null>(null);
@@ -334,10 +336,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             {isLoadingMore ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading...
+                {t('common:buttons.loading')}
               </>
             ) : (
-              "Load older messages"
+              t('chat:message.loadOlderMessages')
             )}
           </button>
         </div>
@@ -362,10 +364,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             ) : isToolMessage && msg.tool_call ? (
               <ToolMessageWrapper
                 toolCall={msg.tool_call}
-                content={<MessageBubble msg={msg} />}
+                content={<MessageBubble msg={msg} t={t} />}
               />
             ) : (
-              <MessageBubble msg={msg} />
+              <MessageBubble msg={msg} t={t} />
             )}
           </div>
         );
@@ -376,7 +378,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           <div className="w-full bg-white text-gray-900 px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
             <div className="flex items-center gap-3">
               <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-              <span className="text-sm font-medium">Analyzing...</span>
+              <span className="text-sm font-medium">{t('chat:message.analyzing')}</span>
             </div>
           </div>
         </div>

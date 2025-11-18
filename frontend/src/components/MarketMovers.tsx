@@ -15,6 +15,7 @@
  */
 
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   TrendingUp,
   TrendingDown,
@@ -44,6 +45,7 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({
   limit = 5,
   className = "",
 }) => {
+  const { t } = useTranslation(["market", "common"]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gainers, setGainers] = useState<MarketMover[]>([]);
@@ -198,12 +200,12 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({
     <div className={`bg-white border border-gray-200 rounded-lg ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">Market Movers</h3>
+        <h3 className="text-lg font-semibold text-gray-900">{t("market:movers.title")}</h3>
         <button
           onClick={handleRefresh}
           disabled={loading}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="Refresh market movers"
+          aria-label={t("market:movers.refreshAriaLabel")}
         >
           <RefreshCw
             className={`h-4 w-4 text-gray-600 ${loading ? "animate-spin" : ""}`}
@@ -215,19 +217,19 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({
       <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 overflow-x-auto">
         <TabButton
           tab="gainers"
-          label="Top Gainers"
+          label={t("market:movers.topGainers")}
           icon={<TrendingUp className="h-4 w-4" />}
           count={gainers.length}
         />
         <TabButton
           tab="losers"
-          label="Top Losers"
+          label={t("market:movers.topLosers")}
           icon={<TrendingDown className="h-4 w-4" />}
           count={losers.length}
         />
         <TabButton
           tab="active"
-          label="Most Active"
+          label={t("market:movers.mostActive")}
           icon={<Activity className="h-4 w-4" />}
           count={active.length}
         />
@@ -240,7 +242,7 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             <span className="ml-3 text-sm text-gray-600">
-              Loading market movers...
+              {t("market:movers.loadingMovers")}
             </span>
           </div>
         )}
@@ -251,7 +253,7 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({
             <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-red-800">
-                Failed to load market movers
+                {t("market:movers.failedToLoad")}
               </p>
               <p className="text-xs text-red-700 mt-1">{error}</p>
             </div>
@@ -270,14 +272,14 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({
             ) : (
               <div className="text-center py-8">
                 <Activity className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                <p className="text-sm text-gray-600">No data available</p>
+                <p className="text-sm text-gray-600">{t("market:movers.noData")}</p>
               </div>
             )}
 
             {/* Footer */}
             {lastUpdated && getCurrentData().length > 0 && (
               <div className="text-xs text-gray-500 text-center mt-4 pt-4 border-t border-gray-200">
-                Last updated: {lastUpdated.toLocaleTimeString()}
+                {t("market:movers.lastUpdated", { time: lastUpdated.toLocaleTimeString() })}
               </div>
             )}
           </div>

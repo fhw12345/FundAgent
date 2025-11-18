@@ -6,40 +6,52 @@
  * with a welcome message.
  */
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { ChatMessage } from "../../types/api";
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    role: "assistant",
-    content: `# 🎯 Welcome to Financial Agent!
-
----
-
-### ✨ **First Time Here?**
-
-Click the **❓** button in the bottom-right corner for a quick interactive guide!
-
----
-
-### 🚀 **Three Powerful Modes to Explore:**
-
-🤖 **Agent Mode** — Let AI automatically analyze and provide insights
-
-💬 **Copilot Mode** — You control, AI guides
-
-📊 **Portfolio Tracking** — Monitor your investment performance
-
----
-
-> 💡 **Pro Tip:** Start by asking a question or searching for a stock symbol to see the magic happen!`,
-    timestamp: new Date().toISOString(),
-  },
-];
-
 export const useChatManager = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
+  const { t, i18n } = useTranslation("chat");
+
+  const createWelcomeMessage = useCallback((): ChatMessage => ({
+    role: "assistant",
+    content: `# ${t("welcome.title")}
+
+---
+
+### ${t("welcome.firstTime")}
+
+${t("welcome.firstTimeHint")}
+
+---
+
+### ${t("welcome.modesTitle")}
+
+${t("welcome.agentMode")}
+
+${t("welcome.copilotMode")}
+
+${t("welcome.portfolioMode")}
+
+---
+
+> ${t("welcome.proTip")}`,
+    timestamp: new Date().toISOString(),
+  }), [t]);
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage()]);
   const [chatId, setChatId] = useState<string | null>(null);
+
+  // Update welcome message when language changes (only if it's the only message)
+  useEffect(() => {
+    setMessages(prev => {
+      // Only update if there's just the welcome message (no chat history)
+      if (prev.length === 1 && prev[0].role === "assistant") {
+        return [createWelcomeMessage()];
+      }
+      return prev;
+    });
+  }, [i18n.language, createWelcomeMessage]);
 
   return { messages, setMessages, chatId, setChatId };
 };

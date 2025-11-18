@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { FeedbackType } from "../../types/feedback";
 import { feedbackApi } from "../../services/feedbackApi";
 import { ImageUploadWidget } from "./ImageUploadWidget";
@@ -14,6 +15,7 @@ interface SubmitFeedbackFormProps {
 }
 
 export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
+  const { t } = useTranslation(["feedback", "common", "validation"]);
   const [type, setType] = useState<FeedbackType>("feature");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -38,16 +40,20 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
     const newErrors: { title?: string; description?: string } = {};
 
     if (title.length < 5) {
-      newErrors.title = "Title must be at least 5 characters";
+      newErrors.title = t("validation:feedback.titleMinLength", { min: 5 });
     }
     if (title.length > 200) {
-      newErrors.title = "Title must be less than 200 characters";
+      newErrors.title = t("validation:feedback.titleMaxLength", { max: 200 });
     }
     if (description.length < 10) {
-      newErrors.description = "Description must be at least 10 characters";
+      newErrors.description = t("validation:feedback.descriptionMinLength", {
+        min: 10,
+      });
     }
     if (description.length > 10000) {
-      newErrors.description = "Description must be less than 10,000 characters";
+      newErrors.description = t("validation:feedback.descriptionMaxLength", {
+        max: "10,000",
+      });
     }
 
     setErrors(newErrors);
@@ -83,7 +89,9 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
       <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Submit Feedback</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {t("feedback:form.header")}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -112,7 +120,7 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
           {/* Type Selection */}
           <div className="mb-6">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Type
+              {t("feedback:form.type")}
             </label>
             <div className="flex gap-4">
               <label className="flex-1">
@@ -129,10 +137,10 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
                     <span className="text-2xl">✨</span>
                     <div>
                       <div className="font-semibold text-gray-900">
-                        Feature Request
+                        {t("feedback:form.types.feature")}
                       </div>
                       <div className="text-sm text-gray-600">
-                        Suggest a new feature
+                        {t("feedback:form.types.featureDescription")}
                       </div>
                     </div>
                   </div>
@@ -152,10 +160,10 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
                     <span className="text-2xl">🐛</span>
                     <div>
                       <div className="font-semibold text-gray-900">
-                        Bug Report
+                        {t("feedback:form.types.bug")}
                       </div>
                       <div className="text-sm text-gray-600">
-                        Report an issue
+                        {t("feedback:form.types.bugDescription")}
                       </div>
                     </div>
                   </div>
@@ -170,14 +178,14 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
               htmlFor="title"
               className="block text-sm font-semibold text-gray-700 mb-2"
             >
-              Title *
+              {t("feedback:form.titleRequired")}
             </label>
             <input
               id="title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Brief summary of your feedback"
+              placeholder={t("feedback:form.titlePlaceholder")}
               className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.title ? "border-red-500" : "border-gray-300"
               }`}
@@ -187,7 +195,10 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
               <p className="mt-1 text-sm text-red-600">{errors.title}</p>
             )}
             <p className="mt-1 text-sm text-gray-500">
-              {title.length}/200 characters
+              {t("feedback:form.charactersCount", {
+                current: title.length,
+                max: 200,
+              })}
             </p>
           </div>
 
@@ -197,13 +208,13 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
               htmlFor="description"
               className="block text-sm font-semibold text-gray-700 mb-2"
             >
-              Description *
+              {t("feedback:form.descriptionRequired")}
             </label>
             <textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Provide detailed information. Markdown is supported."
+              placeholder={t("feedback:form.descriptionPlaceholder")}
               rows={8}
               className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm ${
                 errors.description ? "border-red-500" : "border-gray-300"
@@ -214,14 +225,18 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
               <p className="mt-1 text-sm text-red-600">{errors.description}</p>
             )}
             <p className="mt-1 text-sm text-gray-500">
-              {description.length}/10,000 characters · Markdown supported
+              {t("feedback:form.charactersCount", {
+                current: description.length,
+                max: "10,000",
+              })}{" "}
+              · {t("feedback:form.markdownSupported")}
             </p>
           </div>
 
           {/* Image Attachments */}
           <div className="mb-6">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Attachments (Optional)
+              {t("feedback:form.attachments")}
             </label>
             <ImageUploadWidget onImagesUploaded={setImageUrls} />
           </div>
@@ -229,9 +244,7 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
           {/* Error Message */}
           {createMutation.isError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-700">
-                Failed to submit feedback. Please try again.
-              </p>
+              <p className="text-red-700">{t("feedback:form.failed")}</p>
             </div>
           )}
         </form>
@@ -243,7 +256,7 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
             onClick={onClose}
             className="px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            Cancel
+            {t("common:buttons.cancel")}
           </button>
           <button
             type="submit"
@@ -251,7 +264,9 @@ export function SubmitFeedbackForm({ onClose }: SubmitFeedbackFormProps) {
             disabled={createMutation.isPending}
             className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {createMutation.isPending ? "Submitting..." : "Submit Feedback"}
+            {createMutation.isPending
+              ? t("feedback:form.submitting")
+              : t("feedback:form.submit")}
           </button>
         </div>
       </div>

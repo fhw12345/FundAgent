@@ -4,6 +4,7 @@
  */
 
 import { useState, memo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Plus,
   Archive,
@@ -35,6 +36,7 @@ export const ChatSidebar = memo(function ChatSidebar({
   filterUserId,
   readOnly = false,
 }: ChatSidebarProps) {
+  const { t } = useTranslation(['chat', 'common']);
   const [showArchived, setShowArchived] = useState(false);
 
   // Fetch chats - use portfolio chats if filterUserId is portfolio_agent
@@ -55,9 +57,7 @@ export const ChatSidebar = memo(function ChatSidebar({
 
   const handleDeleteChat = (chatId: string) => {
     if (
-      window.confirm(
-        "Are you sure you want to delete this chat? This action cannot be undone.",
-      )
+      window.confirm(t('chat:sidebar.deleteConfirm'))
     ) {
       deleteChat(chatId, {
         onSuccess: () => {
@@ -68,7 +68,9 @@ export const ChatSidebar = memo(function ChatSidebar({
         },
         onError: (error) => {
           alert(
-            `Failed to delete chat: ${error instanceof Error ? error.message : "Unknown error"}`,
+            t('chat:sidebar.deleteFailed', {
+              error: error instanceof Error ? error.message : t('common:errors.general')
+            }),
           );
         },
       });
@@ -82,7 +84,7 @@ export const ChatSidebar = memo(function ChatSidebar({
         <button
           onClick={onToggleCollapse}
           className="group relative"
-          title="Expand sidebar"
+          title={t('chat:sidebar.expandSidebar')}
         >
           {/* Vertical bar with hover effect */}
           <div className="w-1 h-16 bg-gradient-to-b from-blue-400 via-indigo-500 to-blue-600 rounded-full transition-all duration-300 group-hover:h-20 group-hover:w-1.5 group-hover:shadow-lg group-hover:shadow-blue-500/50" />
@@ -101,7 +103,7 @@ export const ChatSidebar = memo(function ChatSidebar({
       <button
         onClick={onToggleCollapse}
         className="group absolute right-0 top-1/2 -translate-y-1/2 z-10"
-        title="Collapse sidebar"
+        title={t('chat:sidebar.collapseSidebar')}
       >
         {/* Elegant vertical bar that peeks from edge */}
         <div className="relative flex items-center">
@@ -118,7 +120,7 @@ export const ChatSidebar = memo(function ChatSidebar({
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-200/50">
         <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-3">
-          {filterUserId === "portfolio_agent" ? "Analysis History" : "Chat History"}
+          {filterUserId === "portfolio_agent" ? t('chat:sidebar.analysisHistory') : t('chat:sidebar.title')}
         </h2>
 
         {/* New Chat Button - Hidden in readOnly mode */}
@@ -128,7 +130,7 @@ export const ChatSidebar = memo(function ChatSidebar({
             className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all duration-200 flex items-center justify-center gap-2"
           >
             <Plus size={18} />
-            New Chat
+            {t('chat:sidebar.newChat')}
           </button>
         )}
 
@@ -146,7 +148,7 @@ export const ChatSidebar = memo(function ChatSidebar({
           `}
         >
           <Archive size={16} />
-          {showArchived ? "Hide Archived" : "Show Archived"}
+          {showArchived ? t('chat:sidebar.hideArchived') : t('chat:sidebar.showArchived')}
         </button>
       </div>
 
@@ -162,10 +164,10 @@ export const ChatSidebar = memo(function ChatSidebar({
           <div className="px-4 py-6 text-center">
             <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
             <p className="text-sm text-red-600 font-medium">
-              Failed to load chats
+              {t('chat:sidebar.failedToLoadChats')}
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              {error instanceof Error ? error.message : "Unknown error"}
+              {error instanceof Error ? error.message : t('common:errors.general')}
             </p>
           </div>
         )}
@@ -173,10 +175,10 @@ export const ChatSidebar = memo(function ChatSidebar({
         {data && data.chats.length === 0 && (
           <div className="px-4 py-8 text-center">
             <p className="text-sm text-gray-500">
-              {showArchived ? "No archived chats" : "No chats yet"}
+              {showArchived ? t('chat:sidebar.noArchivedChats') : t('chat:sidebar.noChats')}
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Start a new conversation to begin
+              {t('chat:sidebar.startNewConversation')}
             </p>
           </div>
         )}
@@ -196,7 +198,7 @@ export const ChatSidebar = memo(function ChatSidebar({
       {data && data.total > 0 && (
         <div className="px-4 py-3 border-t border-gray-200/50">
           <p className="text-xs text-gray-500 text-center">
-            {data.chats.length} of {data.total} chats
+            {t('chat:sidebar.chatsCount', { count: data.chats.length, total: data.total })}
           </p>
         </div>
       )}

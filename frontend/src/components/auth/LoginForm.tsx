@@ -3,6 +3,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface LoginFormProps {
   onSubmit: (username: string, password: string) => Promise<void>;
@@ -19,6 +20,7 @@ export function LoginForm({
   loading,
   error,
 }: LoginFormProps) {
+  const { t } = useTranslation(["auth", "validation", "common"]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -30,8 +32,10 @@ export function LoginForm({
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
-        <p className="text-gray-600">Sign in to your account</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          {t("auth:login.subtitle")}
+        </h2>
+        <p className="text-gray-600">{t("auth:login.signInToAccount")}</p>
       </div>
 
       <div>
@@ -39,14 +43,14 @@ export function LoginForm({
           htmlFor="login-username"
           className="block text-sm font-medium text-gray-700 mb-2"
         >
-          Username
+          {t("auth:login.username")}
         </label>
         <input
           id="login-username"
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="your_username"
+          placeholder={t("auth:login.usernamePlaceholder")}
           required
           className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
         />
@@ -57,7 +61,7 @@ export function LoginForm({
           htmlFor="login-password"
           className="block text-sm font-medium text-gray-700 mb-2"
         >
-          Password
+          {t("auth:login.password")}
         </label>
         <input
           id="login-password"
@@ -81,7 +85,7 @@ export function LoginForm({
         disabled={loading}
         className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? "Signing in..." : "Sign In"}
+        {loading ? t("auth:login.submitting") : t("auth:login.submit")}
       </button>
 
       <div className="text-center space-y-2">
@@ -90,7 +94,7 @@ export function LoginForm({
           onClick={onSwitchToForgotPassword}
           className="text-sm text-gray-600 hover:text-gray-900"
         >
-          Forgot password?
+          {t("auth:login.forgotPassword")}
         </button>
         <div>
           <button
@@ -98,7 +102,7 @@ export function LoginForm({
             onClick={onSwitchToRegister}
             className="text-blue-600 hover:text-blue-800 font-medium text-sm"
           >
-            Don&apos;t have an account? Register →
+            {t("auth:login.register")} &rarr;
           </button>
         </div>
       </div>

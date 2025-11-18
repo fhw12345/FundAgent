@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ModelInfo, ModelSettings as IModelSettings } from '../../types/models';
 import { apiClient } from '../../services/api';
 
@@ -16,6 +17,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
   settings,
   onChange,
 }) => {
+  const { t } = useTranslation(['chat', 'common']);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
   if (loading) {
     return (
       <div className="p-4 text-sm text-gray-500">
-        Loading models...
+        {t('chat:settings.loadingModels')}
       </div>
     );
   }
@@ -92,7 +94,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
   if (error) {
     return (
       <div className="p-4 text-sm text-red-500">
-        {error}
+        {t('chat:settings.failedToLoadModels')}
       </div>
     );
   }
@@ -102,7 +104,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
       {/* Model Selector */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Model
+          {t('chat:settings.model')}
         </label>
         <select
           value={settings.model}
@@ -117,8 +119,8 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
         </select>
         {currentModel && (
           <p className="mt-1 text-xs text-gray-500">
-            Input: {(currentModel.pricing.input_cost_per_1k / 0.001).toFixed(1)} credits/1K tokens ·
-            Output: {(currentModel.pricing.output_cost_per_1k / 0.001).toFixed(1)} credits/1K tokens
+            {t('chat:settings.inputCost')}: {(currentModel.pricing.input_cost_per_1k / 0.001).toFixed(1)} {t('chat:settings.creditsPerKTokens')} ·
+            {t('chat:settings.outputCost')}: {(currentModel.pricing.output_cost_per_1k / 0.001).toFixed(1)} {t('chat:settings.creditsPerKTokens')}
           </p>
         )}
       </div>
@@ -133,7 +135,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
                 : 'text-gray-400'
             }`}
           >
-            Thinking Mode
+            {t('chat:settings.thinkingMode')}
           </label>
           <button
             type="button"
@@ -161,13 +163,13 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
         {currentModel?.supports_thinking && (
           <p className="mt-1 text-xs text-gray-500">
             {settings.thinking_enabled
-              ? `Enabled (${currentModel.pricing.thinking_output_multiplier}x output cost)`
-              : 'Disabled'}
+              ? t('chat:settings.thinkingEnabled', { multiplier: currentModel.pricing.thinking_output_multiplier })
+              : t('chat:settings.thinkingDisabled')}
           </p>
         )}
         {!currentModel?.supports_thinking && (
           <p className="mt-1 text-xs text-gray-400">
-            Not supported on this model
+            {t('chat:settings.thinkingNotSupported')}
           </p>
         )}
       </div>
@@ -176,7 +178,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-gray-700">
-            Debug Mode
+            {t('chat:settings.debugMode')}
           </label>
           <button
             type="button"
@@ -198,8 +200,8 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
         </div>
         <p className="mt-1 text-xs text-gray-500">
           {settings.debug_enabled
-            ? '🔍 Full LLM prompts logged to backend'
-            : 'Disabled - No debug logging'}
+            ? t('chat:settings.debugEnabled')
+            : t('chat:settings.debugDisabled')}
         </p>
       </div>
 
@@ -207,7 +209,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="text-sm font-medium text-gray-700">
-            Max Response Tokens
+            {t('chat:settings.maxResponseTokens')}
           </label>
           <span className="text-sm text-gray-600">{settings.max_tokens}</span>
         </div>
@@ -230,14 +232,14 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
       {currentModel && (
         <div className="pt-3 border-t border-gray-200">
           <p className="text-xs text-gray-600">
-            <strong>Estimated cost for {settings.max_tokens} output tokens:</strong>
+            <strong>{t('chat:settings.estimatedCost', { tokens: settings.max_tokens })}:</strong>
             <br />
             ~{(
               (settings.max_tokens / 1000) *
               currentModel.pricing.output_cost_per_1k *
               (settings.thinking_enabled ? currentModel.pricing.thinking_output_multiplier : 1) /
               0.001
-            ).toFixed(1)} credits
+            ).toFixed(1)} {t('chat:settings.credits')}
           </p>
         </div>
       )}

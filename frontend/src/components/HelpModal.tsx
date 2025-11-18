@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { X, Bot, MessageSquare, TrendingUp, ArrowRight, ChevronDown } from 'lucide-react'
 
 interface HelpModalProps {
@@ -7,6 +8,8 @@ interface HelpModalProps {
 }
 
 export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
+  const { t } = useTranslation('chat')
+
   if (!isOpen) return null
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -35,7 +38,7 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
         {/* eslint-enable jsx-a11y/no-static-element-interactions */}
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-indigo-500 text-white p-6 rounded-t-2xl flex justify-between items-center">
-          <h2 id="help-modal-title" className="text-2xl font-bold">How to Use Financial Agent</h2>
+          <h2 id="help-modal-title" className="text-2xl font-bold">{t('help.title')}</h2>
           <button
             onClick={onClose}
             className="text-white hover:bg-white/20 rounded-lg p-2 transition-colors"
@@ -54,14 +57,13 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                 <Bot className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-blue-900">🤖 Agent Mode</h3>
-                <p className="text-sm text-blue-700">Intelligent automated analysis</p>
+                <h3 className="text-xl font-bold text-blue-900">{t('help.agentMode.title')}</h3>
+                <p className="text-sm text-blue-700">{t('help.agentMode.subtitle')}</p>
               </div>
             </div>
 
             <p className="text-gray-700 mb-4">
-              The agent autonomously analyzes your query, automatically selects the right tools,
-              and provides comprehensive insights with actionable suggestions.
+              {t('help.agentMode.description')}
             </p>
 
             {/* Flow Diagram */}
@@ -69,30 +71,30 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex-1 text-center">
                   <div className="bg-blue-500 text-white rounded-lg py-2 px-3 mb-1 font-medium">
-                    1. Ask Question
+                    {t('help.agentMode.step1')}
                   </div>
-                  <p className="text-xs text-gray-600">Type your query</p>
+                  <p className="text-xs text-gray-600">{t('help.agentMode.step1Desc')}</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-blue-500 mx-2 flex-shrink-0" />
                 <div className="flex-1 text-center">
                   <div className="bg-blue-500 text-white rounded-lg py-2 px-3 mb-1 font-medium">
-                    2. Agent Analyzes
+                    {t('help.agentMode.step2')}
                   </div>
-                  <p className="text-xs text-gray-600">AI processes</p>
+                  <p className="text-xs text-gray-600">{t('help.agentMode.step2Desc')}</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-blue-500 mx-2 flex-shrink-0" />
                 <div className="flex-1 text-center">
                   <div className="bg-blue-500 text-white rounded-lg py-2 px-3 mb-1 font-medium">
-                    3. Auto-select Tools
+                    {t('help.agentMode.step3')}
                   </div>
-                  <p className="text-xs text-gray-600">Market data, news, etc.</p>
+                  <p className="text-xs text-gray-600">{t('help.agentMode.step3Desc')}</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-blue-500 mx-2 flex-shrink-0" />
                 <div className="flex-1 text-center">
                   <div className="bg-blue-500 text-white rounded-lg py-2 px-3 mb-1 font-medium">
-                    4. Get Insights
+                    {t('help.agentMode.step4')}
                   </div>
-                  <p className="text-xs text-gray-600">Suggestions & summary</p>
+                  <p className="text-xs text-gray-600">{t('help.agentMode.step4Desc')}</p>
                 </div>
               </div>
             </div>
@@ -105,14 +107,13 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                 <MessageSquare className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-purple-900">💬 Copilot Mode</h3>
-                <p className="text-sm text-purple-700">Manual exploration with AI guidance</p>
+                <h3 className="text-xl font-bold text-purple-900">{t('help.copilotMode.title')}</h3>
+                <p className="text-sm text-purple-700">{t('help.copilotMode.subtitle')}</p>
               </div>
             </div>
 
             <p className="text-gray-700 mb-4">
-              You control the analysis by clicking buttons to trigger specific analyses and view charts.
-              The AI helps you understand the results and provides context.
+              {t('help.copilotMode.description')}
             </p>
 
             {/* Flow Diagram */}
@@ -120,23 +121,23 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
               <div className="flex items-center justify-between text-sm">
                 <div className="flex-1 text-center">
                   <div className="bg-purple-500 text-white rounded-lg py-2 px-3 mb-1 font-medium">
-                    1. Click Analysis
+                    {t('help.copilotMode.step1')}
                   </div>
-                  <p className="text-xs text-gray-600">Choose tool button</p>
+                  <p className="text-xs text-gray-600">{t('help.copilotMode.step1Desc')}</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-purple-500 mx-2 flex-shrink-0" />
                 <div className="flex-1 text-center">
                   <div className="bg-purple-500 text-white rounded-lg py-2 px-3 mb-1 font-medium">
-                    2. View Chart
+                    {t('help.copilotMode.step2')}
                   </div>
-                  <p className="text-xs text-gray-600">Visual data display</p>
+                  <p className="text-xs text-gray-600">{t('help.copilotMode.step2Desc')}</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-purple-500 mx-2 flex-shrink-0" />
                 <div className="flex-1 text-center">
                   <div className="bg-purple-500 text-white rounded-lg py-2 px-3 mb-1 font-medium">
-                    3. AI Explains
+                    {t('help.copilotMode.step3')}
                   </div>
-                  <p className="text-xs text-gray-600">Context & insights</p>
+                  <p className="text-xs text-gray-600">{t('help.copilotMode.step3Desc')}</p>
                 </div>
               </div>
             </div>
@@ -149,14 +150,13 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                 <TrendingUp className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-green-900">📊 Portfolio Agent</h3>
-                <p className="text-sm text-green-700">Track simulated trading performance</p>
+                <h3 className="text-xl font-bold text-green-900">{t('help.portfolioAgent.title')}</h3>
+                <p className="text-sm text-green-700">{t('help.portfolioAgent.subtitle')}</p>
               </div>
             </div>
 
             <p className="text-gray-700 mb-4">
-              Navigate to the Portfolio page to view your simulated holdings, transaction history,
-              and profit/loss performance. The agent mimics real trading scenarios.
+              {t('help.portfolioAgent.description')}
             </p>
 
             {/* Flow Diagram */}
@@ -167,8 +167,8 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                     1
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-800">Go to Portfolio Tab</p>
-                    <p className="text-xs text-gray-600">Click &ldquo;Portfolio&rdquo; in the top navigation</p>
+                    <p className="font-medium text-gray-800">{t('help.portfolioAgent.step1')}</p>
+                    <p className="text-xs text-gray-600">{t('help.portfolioAgent.step1Desc')}</p>
                   </div>
                 </div>
                 <ChevronDown className="w-5 h-5 text-green-500 mx-auto" />
@@ -177,8 +177,8 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                     2
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-800">View Holdings Dashboard</p>
-                    <p className="text-xs text-gray-600">See current positions and allocations</p>
+                    <p className="font-medium text-gray-800">{t('help.portfolioAgent.step2')}</p>
+                    <p className="text-xs text-gray-600">{t('help.portfolioAgent.step2Desc')}</p>
                   </div>
                 </div>
                 <ChevronDown className="w-5 h-5 text-green-500 mx-auto" />
@@ -187,8 +187,8 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                     3
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-800">Check Transaction History</p>
-                    <p className="text-xs text-gray-600">Review buy/sell transactions</p>
+                    <p className="font-medium text-gray-800">{t('help.portfolioAgent.step3')}</p>
+                    <p className="text-xs text-gray-600">{t('help.portfolioAgent.step3Desc')}</p>
                   </div>
                 </div>
                 <ChevronDown className="w-5 h-5 text-green-500 mx-auto" />
@@ -197,8 +197,8 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
                     4
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-gray-800">Analyze P&L Performance</p>
-                    <p className="text-xs text-gray-600">Track earnings and losses over time</p>
+                    <p className="font-medium text-gray-800">{t('help.portfolioAgent.step4')}</p>
+                    <p className="text-xs text-gray-600">{t('help.portfolioAgent.step4Desc')}</p>
                   </div>
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function HelpModal({ isOpen, onClose }: HelpModalProps) {
         {/* Footer */}
         <div className="bg-gray-50 p-4 rounded-b-2xl text-center">
           <p className="text-sm text-gray-600">
-            Need more help? Contact support or check our documentation
+            {t('help.footer')}
           </p>
         </div>
       </div>

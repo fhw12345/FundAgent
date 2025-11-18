@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from ...api.models import ToolCall  # Import ToolCall for tool wrapper UI
+from ...core.localization import SupportedLanguage
 from ...models.chat import Chat, UIState
 from ...models.message import Message, MessageMetadata
 
@@ -69,6 +70,11 @@ class ChatRequest(BaseModel):
         ge=500,
         le=32768,
         description="Maximum output tokens (500-32768)",
+    )
+    # Language Configuration
+    language: SupportedLanguage = Field(
+        "zh-CN",
+        description="Response language: 'zh-CN' (Simplified Chinese) or 'en' (English)",
     )
 
 

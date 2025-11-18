@@ -19,6 +19,12 @@ from uuid import UUID
 import structlog
 from langchain_core.callbacks.base import AsyncCallbackHandler
 
+from ...core.localization import (
+    DEFAULT_LANGUAGE,
+    SupportedLanguage,
+    get_tool_display_name,
+)
+
 logger = structlog.get_logger()
 
 
@@ -35,20 +41,26 @@ class ToolExecutionCallback(AsyncCallbackHandler):
     as Server-Sent Events for real-time UI updates.
     """
 
-    def __init__(self, event_queue: asyncio.Queue):
+    def __init__(
+        self,
+        event_queue: asyncio.Queue,
+        language: SupportedLanguage = DEFAULT_LANGUAGE,
+    ):
         """
         Initialize callback handler with event queue.
 
         Args:
             event_queue: asyncio.Queue to push tool events for SSE streaming
+            language: Language for tool display names
         """
         super().__init__()
         self.event_queue = event_queue
+        self.language = language
         self.active_tools: dict[UUID, dict[str, Any]] = (
             {}
         )  # run_id -> {name, start_time, inputs}
 
-        logger.info("ToolExecutionCallback initialized")
+        logger.info("ToolExecutionCallback initialized", language=language)
 
     async def on_tool_start(
         self,
@@ -230,46 +242,29 @@ class ToolExecutionCallback(AsyncCallbackHandler):
         # Extract symbol from inputs if available
         symbol = inputs.get("symbol") or inputs.get("ticker")
 
-        # Tool metadata mapping
-        metadata_map = {
-            "search_ticker": {
-                "display_name": "Search Ticker",
-                "icon": "🔍",
-            },
-            "get_company_overview": {
-                "display_name": "Company Overview",
-                "icon": "🏢",
-            },
-            "get_news_sentiment": {
-                "display_name": "News Sentiment",
-                "icon": "📰",
-            },
-            "get_financial_statements": {
-                "display_name": "Financial Statements",
-                "icon": "📊",
-            },
-            "get_market_movers": {
-                "display_name": "Market Movers",
-                "icon": "📈",
-            },
-            "fibonacci_analysis_tool": {
-                "display_name": "Fibonacci Analysis",
-                "icon": "📐",
-            },
-            "stochastic_analysis_tool": {
-                "display_name": "Stochastic Analysis",
-                "icon": "📉",
-            },
+        # Tool icon mapping (icons are universal, no translation needed)
+        icon_map = {
+            "search_ticker": "🔍",
+            "get_company_overview": "🏢",
+            "get_news_sentiment": "📰",
+            "get_financial_statements": "📊",
+            "get_market_movers": "📈",
+            "fibonacci_analysis_tool": "📐",
+            "stochastic_analysis_tool": "📉",
+            "get_stock_price": "💹",
+            "get_earnings": "💰",
+            "get_cash_flow": "💵",
+            "get_balance_sheet": "📋",
         }
 
-        # Get metadata or use defaults
-        metadata = metadata_map.get(
-            tool_name,
-            {
-                "display_name": tool_name.replace("_", " ").title(),
-                "icon": "🔧",
-            },
-        )
+        # Get localized display name
+        display_name = get_tool_display_name(tool_name, self.language)
+        icon = icon_map.get(tool_name, "🔧")
+
+        metadata = {
+            "display_name": display_name,
+            "icon": icon,
+        }
 
         # Add symbol if available
         if symbol:

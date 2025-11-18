@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { usePortfolioSummary, usePortfolioHistory } from "../hooks/usePortfolio";
 import { usePortfolioChatDetail } from "../hooks/usePortfolioChatDetail";
 import { usePortfolioOrders } from "../hooks/usePortfolioOrders";
@@ -26,6 +27,7 @@ interface AnalysisMarker {
 }
 
 export default function PortfolioDashboard() {
+  const { t } = useTranslation(['portfolio', 'common']);
   const [period, setPeriod] = useState<Period>("1D");
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [symbolAnalyses, setSymbolAnalyses] = useState<AnalysisMarker[]>([]);
@@ -103,7 +105,7 @@ export default function PortfolioDashboard() {
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <p className="text-sm text-red-700">
-                  {error.message || "Error loading portfolio data"}
+                  {error.message || t('portfolio:errors.loadFailed')}
                 </p>
               </div>
             )}
@@ -168,7 +170,7 @@ export default function PortfolioDashboard() {
             }}
             className="ml-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
           >
-            Refresh
+            {t('common:buttons.refresh')}
           </button>
         </div>
 
@@ -176,7 +178,7 @@ export default function PortfolioDashboard() {
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           {isLoadingHistory ? (
             <div className="h-96 flex items-center justify-center">
-              <div className="text-gray-500">Loading chart...</div>
+              <div className="text-gray-500">{t('portfolio:chart.loadingChart')}</div>
             </div>
           ) : chartData.length > 0 ? (
             <PortfolioChart
@@ -191,8 +193,8 @@ export default function PortfolioDashboard() {
           ) : (
             <div className="h-96 flex items-center justify-center">
               <div className="text-center text-gray-500">
-                <p>No portfolio data available</p>
-                <p className="text-sm mt-2">Add holdings to see your portfolio chart</p>
+                <p>{t('portfolio:chart.noData')}</p>
+                <p className="text-sm mt-2">{t('portfolio:chart.addHoldings')}</p>
               </div>
             </div>
           )}
@@ -203,9 +205,9 @@ export default function PortfolioDashboard() {
               <div className="bg-white rounded-lg border border-gray-200">
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Order Execution Records</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">{t('portfolio:orders.title')}</h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Actual BUY/SELL orders placed through Alpaca API
+                    {t('portfolio:orders.description')}
                   </p>
                 </div>
 
@@ -213,35 +215,35 @@ export default function PortfolioDashboard() {
                 <div className="overflow-x-auto">
                   {isLoadingOrders ? (
                     <div className="h-48 flex items-center justify-center">
-                      <div className="text-gray-500">Loading orders...</div>
+                      <div className="text-gray-500">{t('portfolio:orders.loadingOrders')}</div>
                     </div>
                   ) : ordersData && ordersData.orders.length > 0 ? (
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Time
+                            {t('portfolio:orders.time')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Symbol
+                            {t('portfolio:orders.symbol')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Side
+                            {t('portfolio:orders.side')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Qty
+                            {t('portfolio:orders.qty')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
+                            {t('portfolio:orders.status')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Filled Qty
+                            {t('portfolio:orders.filledQty')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Avg Price
+                            {t('portfolio:orders.avgPrice')}
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Analysis ID
+                            {t('portfolio:orders.analysisId')}
                           </th>
                         </tr>
                       </thead>
@@ -314,8 +316,8 @@ export default function PortfolioDashboard() {
                   ) : (
                     <div className="h-48 flex items-center justify-center">
                       <div className="text-center text-gray-500">
-                        <p>No orders yet</p>
-                        <p className="text-sm mt-2">Orders will appear here when the portfolio agent executes trades</p>
+                        <p>{t('portfolio:orders.noOrders')}</p>
+                        <p className="text-sm mt-2">{t('portfolio:orders.noOrdersHint')}</p>
                       </div>
                     </div>
                   )}
@@ -330,7 +332,7 @@ export default function PortfolioDashboard() {
 
             {/* Footer */}
             <div className="mt-8 text-center text-xs text-gray-400">
-              <p>Portfolio data updates every 30 seconds</p>
+              <p>{t('portfolio:footer.dataUpdates')}</p>
             </div>
           </div>
         </div>
@@ -367,9 +369,11 @@ export default function PortfolioDashboard() {
               {/* Modal Header */}
               <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">{selectedSymbol} Analysis</h2>
+                  <h2 className="text-xl font-semibold text-gray-900">{t('portfolio:modal.analysisTitle', { symbol: selectedSymbol })}</h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    {symbolAnalyses.length} {symbolAnalyses.length === 1 ? "analysis" : "analyses"}
+                    {symbolAnalyses.length === 1
+                      ? t('portfolio:modal.analysisCount', { count: symbolAnalyses.length })
+                      : t('portfolio:modal.analysisCountPlural', { count: symbolAnalyses.length })}
                   </p>
                 </div>
                 <button
@@ -435,7 +439,7 @@ export default function PortfolioDashboard() {
                   onClick={() => setSelectedSymbol(null)}
                   className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors font-medium"
                 >
-                  Close
+                  {t('common:buttons.close')}
                 </button>
               </div>
             </div>
@@ -447,6 +451,7 @@ export default function PortfolioDashboard() {
 
 // Separate component to handle chat messages modal with data fetching
 function ChatMessagesModal({ chatId, onClose }: { chatId: string; onClose: () => void }) {
+  const { t } = useTranslation(['portfolio', 'common']);
   const { data: chatDetail, isLoading } = usePortfolioChatDetail(chatId);
 
   return (
@@ -455,7 +460,7 @@ function ChatMessagesModal({ chatId, onClose }: { chatId: string; onClose: () =>
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
-            {chatDetail?.chat?.title || "Analysis Messages"}
+            {chatDetail?.chat?.title || t('portfolio:modal.analysisMessages')}
           </h2>
           <button
             onClick={onClose}
@@ -470,13 +475,13 @@ function ChatMessagesModal({ chatId, onClose }: { chatId: string; onClose: () =>
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-gray-500">Loading messages...</div>
+              <div className="text-gray-500">{t('portfolio:modal.loadingMessages')}</div>
             </div>
           ) : chatDetail?.messages ? (
             <ChatMessages messages={chatDetail.messages} isAnalysisPending={false} chatId={chatId} />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <div className="text-gray-500">No messages found</div>
+              <div className="text-gray-500">{t('portfolio:modal.noMessages')}</div>
             </div>
           )}
         </div>

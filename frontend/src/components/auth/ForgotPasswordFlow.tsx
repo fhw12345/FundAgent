@@ -4,6 +4,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   sendVerificationCode,
   resetPassword,
@@ -21,6 +22,7 @@ export function ForgotPasswordFlow({
   onSuccess,
   onBack,
 }: ForgotPasswordFlowProps) {
+  const { t } = useTranslation(["auth", "validation", "common"]);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotCode, setForgotCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -38,7 +40,11 @@ export function ForgotPasswordFlow({
       await sendVerificationCode(forgotEmail);
       setForgotPasswordStep("code");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send code");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("auth:forgotPassword.failedToSendCode")
+      );
     } finally {
       setLoading(false);
     }
@@ -59,7 +65,7 @@ export function ForgotPasswordFlow({
       const response = await resetPassword(
         forgotEmail,
         forgotCode,
-        newPassword,
+        newPassword
       );
 
       // Store tokens and user
@@ -68,7 +74,9 @@ export function ForgotPasswordFlow({
       // Redirect to platform
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Password reset failed");
+      setError(
+        err instanceof Error ? err.message : t("auth:newPassword.failed")
+      );
     } finally {
       setLoading(false);
     }
@@ -83,11 +91,9 @@ export function ForgotPasswordFlow({
         >
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Reset password
+              {t("auth:forgotPassword.title")}
             </h2>
-            <p className="text-gray-600">
-              Enter your email to receive a verification code
-            </p>
+            <p className="text-gray-600">{t("auth:forgotPassword.subtitle")}</p>
           </div>
 
           <div>
@@ -95,14 +101,14 @@ export function ForgotPasswordFlow({
               htmlFor="forgot-email"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Email address
+              {t("auth:forgotPassword.email")}
             </label>
             <input
               id="forgot-email"
               type="email"
               value={forgotEmail}
               onChange={(e) => setForgotEmail(e.target.value)}
-              placeholder="your.email@163.com"
+              placeholder={t("auth:forgotPassword.emailPlaceholder")}
               required
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
@@ -120,7 +126,9 @@ export function ForgotPasswordFlow({
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Sending..." : "Send Verification Code"}
+              {loading
+                ? t("auth:forgotPassword.submitting")
+                : t("auth:forgotPassword.submit")}
             </button>
 
             <button
@@ -128,7 +136,7 @@ export function ForgotPasswordFlow({
               onClick={onBack}
               className="w-full text-gray-600 font-medium py-2 hover:text-gray-900 transition-colors"
             >
-              ← Back to login
+              &larr; {t("auth:forgotPassword.backToLogin")}
             </button>
           </div>
         </form>
@@ -138,20 +146,20 @@ export function ForgotPasswordFlow({
         <form onSubmit={handleForgotPasswordVerifyCode} className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Enter code
+              {t("auth:verification.title")}
             </h2>
             <p className="text-gray-600">
-              We sent a verification code to{" "}
+              {t("auth:verification.sentTo")}{" "}
               <span className="font-semibold">{forgotEmail}</span>
             </p>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm text-blue-800 font-medium mb-1">
-              📧 Check your email
+              {t("auth:verification.checkEmail")}
             </p>
             <p className="text-xs text-blue-700">
-              We&apos;ve sent a 6-digit verification code to your inbox.
+              {t("auth:verification.checkEmailHintShort")}
             </p>
           </div>
 
@@ -160,7 +168,7 @@ export function ForgotPasswordFlow({
               htmlFor="forgot-code"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Verification code
+              {t("auth:verification.code")}
             </label>
             <input
               id="forgot-code"
@@ -169,7 +177,7 @@ export function ForgotPasswordFlow({
               onChange={(e) =>
                 setForgotCode(e.target.value.replace(/\D/g, "").slice(0, 6))
               }
-              placeholder="000000"
+              placeholder={t("auth:verification.codePlaceholder")}
               required
               maxLength={6}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-center text-2xl font-mono tracking-widest"
@@ -188,7 +196,7 @@ export function ForgotPasswordFlow({
               disabled={forgotCode.length !== 6}
               className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Continue →
+              {t("auth:verification.continue")} &rarr;
             </button>
 
             <button
@@ -196,7 +204,7 @@ export function ForgotPasswordFlow({
               onClick={onBack}
               className="w-full text-gray-600 font-medium py-2 hover:text-gray-900 transition-colors"
             >
-              ← Back to login
+              &larr; {t("auth:forgotPassword.backToLogin")}
             </button>
           </div>
         </form>
@@ -209,11 +217,9 @@ export function ForgotPasswordFlow({
         >
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Create new password
+              {t("auth:newPassword.title")}
             </h2>
-            <p className="text-gray-600">
-              Choose a new password for your account
-            </p>
+            <p className="text-gray-600">{t("auth:newPassword.subtitle")}</p>
           </div>
 
           <div>
@@ -221,7 +227,7 @@ export function ForgotPasswordFlow({
               htmlFor="new-password"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              New password
+              {t("auth:newPassword.label")}
             </label>
             <input
               id="new-password"
@@ -233,7 +239,9 @@ export function ForgotPasswordFlow({
               minLength={8}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
-            <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {t("auth:newPassword.hint")}
+            </p>
           </div>
 
           {error && (
@@ -248,7 +256,9 @@ export function ForgotPasswordFlow({
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Resetting password..." : "Reset Password"}
+              {loading
+                ? t("auth:newPassword.submitting")
+                : t("auth:newPassword.submit")}
             </button>
 
             <button
@@ -256,7 +266,7 @@ export function ForgotPasswordFlow({
               onClick={onBack}
               className="w-full text-gray-600 font-medium py-2 hover:text-gray-900 transition-colors"
             >
-              ← Back to login
+              &larr; {t("auth:forgotPassword.backToLogin")}
             </button>
           </div>
         </form>

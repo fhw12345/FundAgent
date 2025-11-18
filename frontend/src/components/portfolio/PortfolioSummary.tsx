@@ -4,6 +4,7 @@
  * Displays total cost basis, market value, and P/L across all holdings.
  */
 
+import { useTranslation } from "react-i18next";
 import type { PortfolioSummary } from "../../types/portfolio";
 import { formatPL, getPLColor } from "../../services/portfolioApi";
 
@@ -16,6 +17,8 @@ export function PortfolioSummaryCard({
   summary,
   isLoading,
 }: PortfolioSummaryProps) {
+  const { t } = useTranslation(['portfolio', 'common']);
+
   if (isLoading) {
     return (
       <div className="bg-white p-6 rounded-lg shadow animate-pulse">
@@ -36,9 +39,9 @@ export function PortfolioSummaryCard({
     return (
       <div className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Portfolio Summary
+          {t('portfolio:summary.title')}
         </h2>
-        <p className="text-gray-500">No holdings to display</p>
+        <p className="text-gray-500">{t('portfolio:summaryCard.noHoldingsDisplay')}</p>
       </div>
     );
   }
@@ -54,13 +57,13 @@ export function PortfolioSummaryCard({
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        Portfolio Summary
+        {t('portfolio:summary.title')}
       </h2>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
         {/* Holdings Count */}
         <div>
-          <p className="text-sm text-gray-500 mb-1">Holdings</p>
+          <p className="text-sm text-gray-500 mb-1">{t('portfolio:summaryCard.holdings')}</p>
           <p className="text-2xl font-bold text-gray-900">
             {summary.holdings_count}
           </p>
@@ -68,7 +71,7 @@ export function PortfolioSummaryCard({
 
         {/* Total Cost Basis */}
         <div>
-          <p className="text-sm text-gray-500 mb-1">Cost Basis</p>
+          <p className="text-sm text-gray-500 mb-1">{t('portfolio:summaryCard.costBasis')}</p>
           <p className="text-2xl font-bold text-gray-900">
             {summary.total_cost_basis !== null
               ? `$${summary.total_cost_basis.toFixed(2)}`
@@ -78,7 +81,7 @@ export function PortfolioSummaryCard({
 
         {/* Total Market Value */}
         <div>
-          <p className="text-sm text-gray-500 mb-1">Market Value</p>
+          <p className="text-sm text-gray-500 mb-1">{t('portfolio:summaryCard.marketValue')}</p>
           <p className="text-2xl font-bold text-gray-900">
             {summary.total_market_value !== null
               ? `$${summary.total_market_value.toFixed(2)}`
@@ -89,14 +92,14 @@ export function PortfolioSummaryCard({
         {/* Total Unrealized Gain/Loss */}
         <div>
           <p className="text-sm text-gray-500 mb-1 flex items-center gap-1">
-            Total Gain/Loss
+            {t('portfolio:summary.totalGain')}
             <span className="text-gray-400 text-xs" title="Unrealized profit/loss across all holdings">
               ⓘ
             </span>
           </p>
           <p className={`text-2xl font-bold ${colorClass}`}>
             {summary.total_unrealized_pl === null ? (
-              <span className="text-gray-400 text-base">Calculating...</span>
+              <span className="text-gray-400 text-base">{t('portfolio:summaryCard.calculating')}</span>
             ) : (
               formatPL(summary.total_unrealized_pl, summary.total_unrealized_pl_pct)
             )}
@@ -108,7 +111,7 @@ export function PortfolioSummaryCard({
       <div className="mt-4 pt-4 border-t border-gray-200">
         <p className="text-xs text-gray-400 flex items-center">
           <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-          Prices update every 30 seconds
+          {t('portfolio:footer.priceUpdates')}
         </p>
       </div>
     </div>

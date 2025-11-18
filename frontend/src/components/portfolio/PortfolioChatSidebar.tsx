@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 interface Message {
   chat_id: string;
@@ -54,6 +55,7 @@ async function fetchPortfolioChatHistory(): Promise<ChatHistoryResponse> {
  * Portfolio Chat Sidebar Component.
  */
 export function PortfolioChatSidebar() {
+  const { t } = useTranslation(['portfolio', 'common']);
   const [expandedChats, setExpandedChats] = useState<Set<string>>(new Set());
 
   const { data, isLoading, error } = useQuery({
@@ -76,7 +78,7 @@ export function PortfolioChatSidebar() {
     return (
       <div className="h-full bg-gray-50 border-l border-gray-200 p-4">
         <div className="flex items-center justify-center h-full">
-          <div className="text-gray-500">Loading chat history...</div>
+          <div className="text-gray-500">{t('portfolio:chatSidebar.loading')}</div>
         </div>
       </div>
     );
@@ -86,7 +88,7 @@ export function PortfolioChatSidebar() {
     return (
       <div className="h-full bg-gray-50 border-l border-gray-200 p-4">
         <div className="flex items-center justify-center h-full">
-          <div className="text-red-500">Failed to load chat history</div>
+          <div className="text-red-500">{t('portfolio:chatSidebar.loadFailed')}</div>
         </div>
       </div>
     );
@@ -97,11 +99,11 @@ export function PortfolioChatSidebar() {
   if (chats.length === 0) {
     return (
       <div className="h-full bg-gray-50 border-l border-gray-200 p-4">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Analysis History</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('portfolio:chatSidebar.title')}</h3>
         <div className="flex items-center justify-center h-full">
           <div className="text-gray-500 text-center">
-            <p>No analysis history yet.</p>
-            <p className="text-sm mt-2">Add symbols to your watchlist and trigger analysis.</p>
+            <p>{t('portfolio:chatSidebar.noHistory')}</p>
+            <p className="text-sm mt-2">{t('portfolio:chatSidebar.addSymbolsHint')}</p>
           </div>
         </div>
       </div>
@@ -111,8 +113,8 @@ export function PortfolioChatSidebar() {
   return (
     <div className="h-full bg-gray-50 border-l border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">Analysis History</h3>
-        <p className="text-sm text-gray-500 mt-1">{chats.length} symbols tracked</p>
+        <h3 className="text-lg font-semibold text-gray-900">{t('portfolio:chatSidebar.title')}</h3>
+        <p className="text-sm text-gray-500 mt-1">{t('portfolio:chatSidebar.symbolsTracked', { count: chats.length })}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -121,7 +123,7 @@ export function PortfolioChatSidebar() {
           const symbol = chat.symbol;
           const latestTimestamp = chat.latest_timestamp
             ? new Date(chat.latest_timestamp).toLocaleString()
-            : "Unknown time";
+            : t('portfolio:chatSidebar.unknownTime');
           const firstMessage = chat.messages[0];
           const trend = firstMessage?.metadata?.trend_direction;
 
@@ -152,10 +154,10 @@ export function PortfolioChatSidebar() {
                       </span>
                     )}
                     <span className="px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-800">
-                      {chat.message_count} analyses
+                      {t('portfolio:chatSidebar.analysesCount', { count: chat.message_count })}
                     </span>
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">Last updated: {latestTimestamp}</div>
+                  <div className="text-sm text-gray-500 mt-1">{t('portfolio:chatSidebar.lastUpdated', { time: latestTimestamp })}</div>
                 </div>
                 <svg
                   className={`w-5 h-5 text-gray-400 transition-transform ${
@@ -200,7 +202,7 @@ export function PortfolioChatSidebar() {
                           </div>
                           {message.metadata?.key_levels && message.metadata.key_levels.length > 0 && (
                             <div className="mt-2 text-xs text-gray-500">
-                              <span className="font-medium">Key Levels: </span>
+                              <span className="font-medium">{t('portfolio:chatSidebar.keyLevels')}: </span>
                               {message.metadata.key_levels
                                 .map((level) => `$${level.toFixed(2)}`)
                                 .join(", ")}

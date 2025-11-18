@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { loginWithPassword, authStorage } from "../services/authService";
 import { LoginForm } from "./auth/LoginForm";
 import { RegistrationFlow } from "./auth/RegistrationFlow";
@@ -17,6 +18,7 @@ interface LoginPageProps {
 type Mode = "login" | "register" | "forgot-password";
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
+  const { t } = useTranslation(['auth', 'common']);
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -69,7 +71,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             KlineMatrix
           </h1>
           <p className="text-gray-600">
-            AI-Powered Financial Intelligence Platform
+            {t('auth:login.tagline')}
           </p>
         </div>
 
@@ -102,7 +104,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
         {/* Footer */}
         <p className="text-center text-sm text-gray-500 mt-6">
-          By continuing, you agree to our Terms of Service
+          {t('auth:login.termsAgreement')}
         </p>
       </div>
     </div>

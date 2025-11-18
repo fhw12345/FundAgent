@@ -5,6 +5,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { FeedbackStatus } from "../../types/feedback";
@@ -21,6 +22,7 @@ export function FeedbackDetailView({
   itemId,
   onClose,
 }: FeedbackDetailViewProps) {
+  const { t } = useTranslation(["feedback", "common", "validation"]);
   const [commentContent, setCommentContent] = useState("");
   const [commentError, setCommentError] = useState("");
   const queryClient = useQueryClient();
@@ -102,11 +104,13 @@ export function FeedbackDetailView({
     e.preventDefault();
 
     if (commentContent.length < 1) {
-      setCommentError("Comment cannot be empty");
+      setCommentError(t("validation:feedback.commentEmpty"));
       return;
     }
     if (commentContent.length > 5000) {
-      setCommentError("Comment must be less than 5,000 characters");
+      setCommentError(
+        t("validation:feedback.commentMaxLength", { max: "5,000" }),
+      );
       return;
     }
 
@@ -144,12 +148,12 @@ export function FeedbackDetailView({
         onClick={handleBackdropClick}
       >
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md">
-          <p className="text-red-700 mb-4">Failed to load feedback item.</p>
+          <p className="text-red-700 mb-4">{t("feedback:detail.loadFailed")}</p>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
           >
-            Close
+            {t("common:buttons.close")}
           </button>
         </div>
       </div>
@@ -180,7 +184,7 @@ export function FeedbackDetailView({
               {isAdmin ? (
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-gray-600">
-                    Status:
+                    {t("feedback:detail.status")}
                   </span>
                   <select
                     value={item.status}
@@ -198,7 +202,9 @@ export function FeedbackDetailView({
                     <option value="completed">{STATUS_LABELS.completed}</option>
                   </select>
                   {statusMutation.isPending && (
-                    <span className="text-xs text-blue-600">Updating...</span>
+                    <span className="text-xs text-blue-600">
+                      {t("feedback:detail.updating")}
+                    </span>
                   )}
                 </div>
               ) : (
@@ -208,7 +214,12 @@ export function FeedbackDetailView({
                   {STATUS_LABELS[item.status]}
                 </span>
               )}
-              <span>by {item.authorUsername || "Unknown"}</span>
+              <span>
+                {t("feedback:detail.byAuthor", {
+                  author:
+                    item.authorUsername || t("feedback:detail.unknownAuthor"),
+                })}
+              </span>
               <span>{new Date(item.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
@@ -254,7 +265,10 @@ export function FeedbackDetailView({
                   <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
                 </svg>
                 <span>
-                  {item.hasVoted ? "Voted" : "Vote"} ({item.voteCount})
+                  {item.hasVoted
+                    ? t("feedback:detail.voted")
+                    : t("feedback:detail.vote")}{" "}
+                  ({item.voteCount})
                 </span>
               </button>
             </div>
@@ -262,7 +276,7 @@ export function FeedbackDetailView({
             {/* Description (Markdown) */}
             <div className="mb-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Description
+                {t("feedback:detail.description")}
               </h3>
               <div className="prose prose-sm max-w-none text-gray-700">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -280,14 +294,18 @@ export function FeedbackDetailView({
                     >
                       <img
                         src={imageUrl}
-                        alt={`Attachment ${index + 1}`}
+                        alt={t("feedback:detail.attachmentAlt", {
+                          index: index + 1,
+                        })}
                         className="w-full h-auto cursor-pointer hover:opacity-95 transition-opacity"
                         onClick={() => window.open(imageUrl, "_blank")}
                         loading="lazy"
                       />
                       <div className="px-3 py-2 bg-white border-t border-gray-200">
                         <p className="text-xs text-gray-500">
-                          Attachment {index + 1} • Click to view full size
+                          {t("feedback:detail.attachmentCaption", {
+                            index: index + 1,
+                          })}
                         </p>
                       </div>
                     </div>
@@ -299,12 +317,12 @@ export function FeedbackDetailView({
             {/* Comments Section */}
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Comments ({comments.length})
+                {t("feedback:detail.commentsCount", { count: comments.length })}
               </h3>
 
               {comments.length === 0 ? (
                 <p className="text-gray-500 text-sm italic py-4">
-                  No comments yet. Be the first to comment!
+                  {t("feedback:detail.noComments")}
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -315,7 +333,8 @@ export function FeedbackDetailView({
                     >
                       <div className="flex items-center gap-2 mb-2 text-sm">
                         <span className="font-semibold text-gray-900">
-                          {comment.authorUsername || "Unknown"}
+                          {comment.authorUsername ||
+                            t("feedback:detail.unknownAuthor")}
                         </span>
                         <span className="text-gray-500">•</span>
                         <span className="text-gray-500">
@@ -336,13 +355,13 @@ export function FeedbackDetailView({
             {/* Comment Form */}
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                Add Comment
+                {t("feedback:detail.addComment")}
               </h3>
               <form onSubmit={handleCommentSubmit}>
                 <textarea
                   value={commentContent}
                   onChange={(e) => setCommentContent(e.target.value)}
-                  placeholder="Share your thoughts... (Markdown supported)"
+                  placeholder={t("feedback:detail.commentPlaceholder")}
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                   maxLength={5000}
@@ -352,14 +371,19 @@ export function FeedbackDetailView({
                 )}
                 <div className="mt-2 flex items-center justify-between">
                   <p className="text-sm text-gray-500">
-                    {commentContent.length}/5,000 characters
+                    {t("feedback:form.charactersCount", {
+                      current: commentContent.length,
+                      max: "5,000",
+                    })}
                   </p>
                   <button
                     type="submit"
                     disabled={commentMutation.isPending}
                     className="px-5 py-2.5 text-sm font-semibold bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
-                    {commentMutation.isPending ? "Posting..." : "Post Comment"}
+                    {commentMutation.isPending
+                      ? t("feedback:detail.posting")
+                      : t("feedback:detail.postComment")}
                   </button>
                 </div>
               </form>

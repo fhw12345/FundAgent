@@ -31,6 +31,7 @@ import {
 } from "../../utils/analysisMetadataExtractor";
 import { createToolCall, TOOL_REGISTRY, type ToolName } from "../../constants/toolRegistry";
 import type { ModelSettings } from "../../types/models";
+import i18n from "../../i18n";
 
 // Formatting functions moved to analysisFormatters.ts
 
@@ -211,13 +212,15 @@ export const useAnalysis = (
             );
           },
           // LLM Configuration options
-          modelSettings ? {
-            model: modelSettings.model,
-            thinking_enabled: modelSettings.thinking_enabled,
-            max_tokens: modelSettings.max_tokens,
-            debug_enabled: modelSettings.debug_enabled,
+          {
+            model: modelSettings?.model ?? "qwen-plus",
+            thinking_enabled: modelSettings?.thinking_enabled ?? false,
+            max_tokens: modelSettings?.max_tokens ?? 3000,
+            debug_enabled: modelSettings?.debug_enabled ?? false,
             agent_version: agentMode, // Pass agent mode (v2/v3)
-          } : undefined,
+            // Language configuration - get from i18n
+            language: (i18n.language === "zh-CN" || i18n.language === "en" ? i18n.language : "zh-CN") as "zh-CN" | "en",
+          },
         );
       });
     },

@@ -5,6 +5,7 @@
  */
 
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 interface TooltipData {
   visible: boolean;
@@ -47,6 +48,8 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({
   tooltipData,
   chartContainerRef,
 }) => {
+  const { t } = useTranslation(['market', 'common']);
+
   if (!tooltipData.visible) {
     return null;
   }
@@ -80,19 +83,19 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({
         // Show OHLC format
         <div className="space-y-0.5">
           <div className="flex justify-between">
-            <span className="text-gray-400">Open:</span>
+            <span className="text-gray-400">{t('market:quote.open')}:</span>
             <span>{formatPrice(tooltipData.open ?? 0)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">High:</span>
+            <span className="text-gray-400">{t('market:quote.high')}:</span>
             <span>{formatPrice(tooltipData.high ?? 0)}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-400">Low:</span>
+            <span className="text-gray-400">{t('market:quote.low')}:</span>
             <span>{formatPrice(tooltipData.low ?? 0)}</span>
           </div>
           <div className={`flex justify-between font-semibold ${colorClass}`}>
-            <span className="text-gray-400 font-normal">Close:</span>
+            <span className="text-gray-400 font-normal">{t('market:quote.close')}:</span>
             <span>
               {formatPrice(tooltipData.close ?? 0)} {directionArrow}
             </span>
@@ -105,7 +108,7 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({
 
       {tooltipData.volume !== undefined && (
         <div className="text-gray-400 mt-1 pt-1 border-t border-gray-700">
-          Vol: {formatVolume(tooltipData.volume)}
+          {t('market:quote.volume')}: {formatVolume(tooltipData.volume)}
         </div>
       )}
     </div>

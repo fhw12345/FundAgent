@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronRight } from "lucide-react";
 import type { ToolCall } from "../../types/api";
 
@@ -21,6 +22,7 @@ export function ToolMessageWrapper({
   content,
   className = "",
 }: ToolMessageWrapperProps) {
+  const { t } = useTranslation(['chat', 'common']);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Format timestamp to readable format
@@ -40,7 +42,7 @@ export function ToolMessageWrapper({
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
         aria-expanded={isExpanded}
-        aria-label={`${isExpanded ? "Collapse" : "Expand"} ${toolCall.title}`}
+        aria-label={isExpanded ? t('chat:tools.collapse', { title: toolCall.title }) : t('chat:tools.expand', { title: toolCall.title })}
       >
         {/* Chevron Icon - Explicit expand indicator */}
         <ChevronRight
@@ -50,7 +52,7 @@ export function ToolMessageWrapper({
         />
 
         {/* Tool Icon */}
-        <span className="text-xl flex-shrink-0" aria-label="Tool icon">
+        <span className="text-xl flex-shrink-0" aria-label={t('chat:tools.toolIcon')}>
           {toolCall.icon}
         </span>
 

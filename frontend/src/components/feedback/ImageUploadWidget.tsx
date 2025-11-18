@@ -10,6 +10,7 @@
  */
 
 import { useState, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Upload, X, Loader2 } from "lucide-react";
 import { feedbackApi } from "../../services/feedbackApi";
 
@@ -32,6 +33,7 @@ export function ImageUploadWidget({
   onImagesUploaded,
   maxImages = 5,
 }: ImageUploadWidgetProps) {
+  const { t } = useTranslation(["feedback", "common"]);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [uploadingImages, setUploadingImages] = useState<UploadingImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -39,10 +41,10 @@ export function ImageUploadWidget({
 
   const validateFile = (file: File): string | null => {
     if (!ALLOWED_TYPES.includes(file.type)) {
-      return `Invalid file type. Allowed: PNG, JPEG, GIF, WebP`;
+      return t("feedback:image.invalidType");
     }
     if (file.size > MAX_FILE_SIZE) {
-      return `File too large. Max size: 10MB`;
+      return t("feedback:image.fileTooLarge", { size: 10 });
     }
     return null;
   };
@@ -115,7 +117,7 @@ export function ImageUploadWidget({
     const totalImages =
       uploadedImages.length + uploadingImages.length + files.length;
     if (totalImages > maxImages) {
-      alert(`Maximum ${maxImages} images allowed`);
+      alert(t("feedback:image.maxImages", { max: maxImages }));
       return;
     }
 
@@ -188,11 +190,11 @@ export function ImageUploadWidget({
           />
           <p className="text-sm text-gray-600 font-medium">
             {isDragging
-              ? "Drop images here"
-              : "Click to upload or drag and drop"}
+              ? t("feedback:image.dropHere")
+              : t("feedback:image.clickOrDrop")}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            PNG, JPG, GIF, WebP (max 10MB, up to {maxImages} images)
+            {t("feedback:image.fileTypes", { size: 10, max: maxImages })}
           </p>
           <input
             ref={fileInputRef}
@@ -215,19 +217,19 @@ export function ImageUploadWidget({
             >
               <img
                 src={url}
-                alt={`Uploaded ${index + 1}`}
+                alt={t("feedback:image.uploadedAlt", { index: index + 1 })}
                 className="w-full h-full object-cover"
               />
               <button
                 onClick={() => removeUploadedImage(url)}
                 className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                title="Remove image"
+                title={t("feedback:image.remove")}
               >
                 <X size={14} />
               </button>
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <p className="text-xs text-white truncate">
-                  Image {index + 1}
+                  {t("feedback:image.imageLabel", { index: index + 1 })}
                 </p>
               </div>
             </div>
@@ -246,7 +248,7 @@ export function ImageUploadWidget({
               <div className="w-12 h-12 rounded overflow-hidden border border-gray-300 flex-shrink-0">
                 <img
                   src={uploadingImage.preview}
-                  alt="Uploading"
+                  alt={t("feedback:image.uploadingAlt")}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -263,7 +265,7 @@ export function ImageUploadWidget({
                       onClick={() => retryUpload(uploadingImage)}
                       className="text-xs text-blue-600 hover:underline"
                     >
-                      Retry
+                      {t("feedback:image.retry")}
                     </button>
                   </div>
                 ) : (
@@ -291,7 +293,10 @@ export function ImageUploadWidget({
       {/* Image Count */}
       {uploadedImages.length > 0 && (
         <p className="text-xs text-gray-500 text-center">
-          {uploadedImages.length} / {maxImages} images uploaded
+          {t("feedback:image.imageCount", {
+            count: uploadedImages.length,
+            max: maxImages,
+          })}
         </p>
       )}
     </div>

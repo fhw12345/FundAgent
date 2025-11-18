@@ -4,6 +4,7 @@
  */
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { FeedbackType } from "../../types/feedback";
 import { feedbackApi } from "../../services/feedbackApi";
 import { FeedbackListItem } from "./FeedbackListItem";
@@ -17,6 +18,7 @@ export function FeedbackLeaderboard({
   type,
   onItemClick,
 }: FeedbackLeaderboardProps) {
+  const { t } = useTranslation(["feedback", "common"]);
   const {
     data: items,
     isLoading,
@@ -27,7 +29,10 @@ export function FeedbackLeaderboard({
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  const title = type === "feature" ? "Feature Requests" : "Bug Reports";
+  const title =
+    type === "feature"
+      ? t("feedback:leaderboard.featureRequests")
+      : t("feedback:leaderboard.bugReports");
   const icon = type === "feature" ? "✨" : "🐛";
 
   return (
@@ -40,8 +45,8 @@ export function FeedbackLeaderboard({
         </h2>
         <p className="mt-1 text-sm text-gray-600">
           {type === "feature"
-            ? "Vote for features you'd like to see"
-            : "Help us prioritize bug fixes"}
+            ? t("feedback:leaderboard.featureDescription")
+            : t("feedback:leaderboard.bugDescription")}
         </p>
       </div>
 
@@ -56,7 +61,7 @@ export function FeedbackLeaderboard({
       {error && (
         <div className="py-8 px-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-red-700 text-center">
-            Failed to load feedback. Please try again.
+            {t("feedback:leaderboard.loadFailed")}
           </p>
         </div>
       )}
@@ -66,9 +71,13 @@ export function FeedbackLeaderboard({
         <div className="py-12 text-center">
           <div className="text-6xl mb-4">{icon}</div>
           <p className="text-gray-600">
-            No {type === "feature" ? "feature requests" : "bug reports"} yet.
+            {type === "feature"
+              ? t("feedback:leaderboard.noFeatureRequests")
+              : t("feedback:leaderboard.noBugReports")}
           </p>
-          <p className="text-sm text-gray-500 mt-2">Be the first to submit!</p>
+          <p className="text-sm text-gray-500 mt-2">
+            {t("feedback:leaderboard.beFirst")}
+          </p>
         </div>
       )}
 

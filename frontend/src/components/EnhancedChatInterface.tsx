@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { marketService, TimeInterval } from "../services/market";
 import { useChatManager } from "./chat/useChatManager";
 import { useAnalysis, useButtonAnalysis } from "./chat/useAnalysis";
@@ -14,6 +15,7 @@ import { getPeriodForInterval, calculateDateRange } from "../utils/dateRangeCalc
 import type { ModelSettings } from "../types/models";
 
 export function EnhancedChatInterface() {
+  const { t } = useTranslation(['chat', 'common']);
   const [message, setMessage] = useState("");
   const [currentSymbol, setCurrentSymbol] = useState("");
   const [currentCompanyName, setCurrentCompanyName] = useState("");
@@ -347,13 +349,13 @@ export function EnhancedChatInterface() {
                     onClick={() => setIsMobileSidebarVisible(!isMobileSidebarVisible)}
                     className="px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    {isMobileSidebarVisible ? "← Hide" : "← Chats"}
+                    {isMobileSidebarVisible ? t('chat:mobile.hideSidebar') : t('chat:mobile.showChats')}
                   </button>
                   <button
                     onClick={() => setIsMobileChartVisible(true)}
                     className="ml-auto px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50"
                   >
-                    Chart →
+                    {t('chat:mobile.showChart')}
                   </button>
                 </div>
               )}
@@ -374,7 +376,7 @@ export function EnhancedChatInterface() {
                 {/* Agent Mode Toggle - Only enabled when starting new chat */}
                 <div className="flex-shrink-0 px-4 py-2 border-t border-gray-100 bg-gray-50/50">
                   <div className="flex items-center gap-3 text-sm">
-                    <span className="text-gray-600 font-medium">Mode:</span>
+                    <span className="text-gray-600 font-medium">{t('chat:mode.label')}:</span>
                     <button
                       onClick={() => setAgentMode("v3")}
                       disabled={!!chatId}
@@ -389,11 +391,11 @@ export function EnhancedChatInterface() {
                       }`}
                       title={
                         chatId
-                          ? "Mode locked for this chat"
-                          : "Agent mode (auto tool calling)"
+                          ? t('chat:mode.locked')
+                          : t('chat:mode.agentDescription')
                       }
                     >
-                      🤖 Agent
+                      🤖 {t('chat:mode.agent')}
                     </button>
                     <button
                       onClick={() => setAgentMode("v2")}
@@ -409,15 +411,15 @@ export function EnhancedChatInterface() {
                       }`}
                       title={
                         chatId
-                          ? "Mode locked for this chat"
-                          : "Copilot mode (manual tools)"
+                          ? t('chat:mode.locked')
+                          : t('chat:mode.copilotDescription')
                       }
                     >
-                      👤 Copilot
+                      👤 {t('chat:mode.copilot')}
                     </button>
                     {chatId && (
                       <span className="ml-auto text-xs text-gray-500 italic">
-                        Mode locked for this chat
+                        {t('chat:mode.locked')}
                       </span>
                     )}
                   </div>
@@ -451,7 +453,7 @@ export function EnhancedChatInterface() {
                     onClick={() => setIsMobileChartVisible(false)}
                     className="px-4 py-2 bg-white/95 backdrop-blur-sm border border-gray-300 rounded-lg shadow-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                   >
-                    ← Back to Chat
+                    {t('chat:mobile.backToChat')}
                   </button>
                   <button
                     onClick={() => setIsMobileChartVisible(false)}

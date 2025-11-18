@@ -52,6 +52,11 @@ from ..core.analysis.fibonacci.analyzer import FibonacciAnalyzer
 from ..core.analysis.stochastic_analyzer import StochasticAnalyzer
 from ..core.config import Settings
 from ..core.data.ticker_data_service import TickerDataService
+from ..core.localization import (
+    DEFAULT_LANGUAGE,
+    SupportedLanguage,
+    get_brief_language_instruction,
+)
 from ..core.utils import extract_token_usage_from_messages
 from ..services.alphavantage_response_formatter import AlphaVantageResponseFormatter
 from ..services.tool_cache_wrapper import ToolCacheWrapper
@@ -415,6 +420,7 @@ Summary: {result.analysis_summary}"""
         conversation_history: list[dict[str, str]] | None = None,
         debug: bool = False,
         additional_callbacks: list | None = None,
+        language: SupportedLanguage = DEFAULT_LANGUAGE,
     ) -> dict[str, Any]:
         """
         Invoke ReAct agent with user message and conversation history.
@@ -431,6 +437,7 @@ Summary: {result.analysis_summary}"""
             conversation_history: Previous messages (optional, for new threads)
             debug: If True, log full LLM prompt for debugging
             additional_callbacks: Optional list of additional callbacks (e.g., ToolExecutionCallback)
+            language: Response language ("zh-CN" or "en")
 
         Returns:
             Agent response with messages and final answer
@@ -457,8 +464,12 @@ Summary: {result.analysis_summary}"""
                     # Include assistant messages (both LLM and tool outputs)
                     messages.append(AIMessage(content=msg["content"]))
 
-        # Add current user message
-        messages.append(HumanMessage(content=user_message))
+        # Add language instruction to user message
+        language_instruction = get_brief_language_instruction(language)
+        user_message_with_language = f"{user_message}\n\n{language_instruction}"
+
+        # Add current user message with language instruction
+        messages.append(HumanMessage(content=user_message_with_language))
 
         # Get Langfuse callback handler if enabled
         langfuse_handler = self._get_langfuse_handler()

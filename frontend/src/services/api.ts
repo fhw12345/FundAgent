@@ -210,6 +210,7 @@ export const chatService = {
       role?: string;
       source?: string;
       metadata?: any; // Analysis metadata for overlays
+      tool_call?: any; // Tool invocation metadata for collapsible UI wrapper
       // Agent Configuration
       agent_version?: "v2" | "v3"; // v2: simple chat, v3: ReAct agent with tools (default: v3)
       // LLM Configuration
@@ -217,6 +218,8 @@ export const chatService = {
       thinking_enabled?: boolean;
       max_tokens?: number;
       debug_enabled?: boolean; // Enable debug logging in backend
+      // Language Configuration
+      language?: "zh-CN" | "en"; // Response language (default: zh-CN)
     },
   ): () => void {
     const baseURL =
@@ -245,12 +248,15 @@ export const chatService = {
         role: options?.role ?? "user",
         source: options?.source ?? "user",
         metadata: options?.metadata,
+        tool_call: options?.tool_call,
         // Agent Configuration
         agent_version: options?.agent_version ?? "v3", // Default to v3 (ReAct agent)
         // LLM Configuration
         model: options?.model ?? "qwen-plus",
         thinking_enabled: options?.thinking_enabled ?? false,
         max_tokens: options?.max_tokens ?? 3000,
+        // Language Configuration
+        language: options?.language ?? "zh-CN",
       }),
       signal: controller.signal,
     })

@@ -9,6 +9,7 @@
  */
 
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface ToolExecutionProgressProps {
   toolName: string;
@@ -47,6 +48,7 @@ export function ToolExecutionProgress({
   error,
   durationMs,
 }: ToolExecutionProgressProps) {
+  const { t } = useTranslation(['chat', 'common']);
   // Get status icon and color
   const StatusIcon = {
     running: Loader2,
@@ -133,7 +135,7 @@ export function ToolExecutionProgress({
       {status === "success" && output && (
         <details className="border-t border-gray-200 dark:border-gray-700">
           <summary className="px-4 py-2 cursor-pointer text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            View result preview
+            {t('chat:tools.viewResultPreview')}
           </summary>
           <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono overflow-x-auto">

@@ -4,11 +4,13 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { History, ArrowLeft, Filter, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useTransactionHistory } from "../hooks/useCredits";
 import type { TransactionStatus } from "../types/credits";
 
 export function TransactionHistory() {
+  const { t, i18n } = useTranslation(['chat', 'common']);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<TransactionStatus | undefined>(undefined);
 
@@ -38,7 +40,7 @@ export function TransactionHistory() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString(i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US', {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -60,7 +62,7 @@ export function TransactionHistory() {
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
             <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
-              Transaction History
+              {t('chat:transactions.title')}
             </h1>
           </div>
 
@@ -68,7 +70,7 @@ export function TransactionHistory() {
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 text-sm text-gray-600">
               <Filter size={16} />
-              <span>Filter:</span>
+              <span>{t('common:buttons.filter')}:</span>
             </div>
             <select
               value={statusFilter ?? "all"}
@@ -78,10 +80,10 @@ export function TransactionHistory() {
               }}
               className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white/60 hover:bg-white/80 transition-all text-sm"
             >
-              <option value="all">All Transactions</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="PENDING">Pending</option>
-              <option value="FAILED">Failed</option>
+              <option value="all">{t('chat:transactions.allTransactions')}</option>
+              <option value="COMPLETED">{t('common:status.completed')}</option>
+              <option value="PENDING">{t('common:status.pending')}</option>
+              <option value="FAILED">{t('common:status.failed')}</option>
             </select>
           </div>
         </div>
@@ -109,7 +111,7 @@ export function TransactionHistory() {
         {/* Error State */}
         {isError && (
           <div className="p-6 rounded-xl bg-red-50/80 border border-red-200/50">
-            <p className="text-red-600 font-medium">Failed to load transaction history</p>
+            <p className="text-red-600 font-medium">{t('chat:transactions.loadFailed')}</p>
           </div>
         )}
 
@@ -120,9 +122,9 @@ export function TransactionHistory() {
               {data.transactions.length === 0 ? (
                 <div className="p-12 rounded-xl bg-white/60 border border-gray-200/50 text-center">
                   <History size={48} className="mx-auto mb-3 text-gray-400" />
-                  <p className="text-gray-600 font-medium">No transactions found</p>
+                  <p className="text-gray-600 font-medium">{t('chat:transactions.noTransactions')}</p>
                   <p className="text-sm text-gray-500 mt-1">
-                    {statusFilter ? "Try changing the filter" : "Start a chat to see transactions"}
+                    {statusFilter ? t('chat:transactions.tryChangingFilter') : t('chat:transactions.startChatToSee')}
                   </p>
                 </div>
               ) : (
@@ -146,21 +148,21 @@ export function TransactionHistory() {
 
                         <div className="text-sm space-y-1">
                           <div className="flex items-center gap-4 text-gray-700">
-                            <span className="font-medium">Model:</span>
+                            <span className="font-medium">{t('chat:transactions.model')}:</span>
                             <span className="text-gray-600">{transaction.model}</span>
                           </div>
 
                           {transaction.status === "COMPLETED" && transaction.total_tokens !== null && (
                             <div className="flex items-center gap-4 text-gray-700">
-                              <span className="font-medium">Tokens:</span>
+                              <span className="font-medium">{t('chat:transactions.tokens')}:</span>
                               <span className="text-gray-600">
-                                {transaction.input_tokens} in / {transaction.output_tokens} out = {transaction.total_tokens} total
+                                {transaction.input_tokens} {t('chat:transactions.in')} / {transaction.output_tokens} {t('chat:transactions.out')} = {transaction.total_tokens} {t('chat:transactions.total')}
                               </span>
                             </div>
                           )}
 
                           <div className="flex items-center gap-4 text-gray-700">
-                            <span className="font-medium">Date:</span>
+                            <span className="font-medium">{t('common:labels.date')}:</span>
                             <span className="text-gray-600">{formatDate(transaction.created_at)}</span>
                           </div>
                         </div>
@@ -173,15 +175,15 @@ export function TransactionHistory() {
                             <p className="text-2xl font-bold text-gray-900">
                               {transaction.actual_cost.toFixed(2)}
                             </p>
-                            <p className="text-xs text-gray-500">credits</p>
+                            <p className="text-xs text-gray-500">{t('chat:transactions.creditsUnit')}</p>
                           </>
                         ) : transaction.status === "PENDING" ? (
                           <>
                             <p className="text-lg font-semibold text-orange-600">~{transaction.estimated_cost.toFixed(2)}</p>
-                            <p className="text-xs text-gray-500">estimated</p>
+                            <p className="text-xs text-gray-500">{t('chat:transactions.estimated')}</p>
                           </>
                         ) : (
-                          <p className="text-sm text-gray-500">No charge</p>
+                          <p className="text-sm text-gray-500">{t('chat:transactions.noCharge')}</p>
                         )}
                       </div>
                     </div>
@@ -194,9 +196,9 @@ export function TransactionHistory() {
             {data.pagination.total_pages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 bg-white/60 rounded-xl border border-gray-200/50">
                 <div className="text-sm text-gray-600">
-                  Page {data.pagination.page} of {data.pagination.total_pages}
+                  {t('common:pagination.page')} {data.pagination.page} {t('common:pagination.of')} {data.pagination.total_pages}
                   {" • "}
-                  {data.pagination.total} total transactions
+                  {data.pagination.total} {t('chat:transactions.totalTransactions')}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -204,14 +206,14 @@ export function TransactionHistory() {
                     disabled={page === 1}
                     className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white/60 hover:bg-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium"
                   >
-                    Previous
+                    {t('common:buttons.previous')}
                   </button>
                   <button
                     onClick={() => setPage((p) => Math.min(data.pagination.total_pages, p + 1))}
                     disabled={page === data.pagination.total_pages}
                     className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white/60 hover:bg-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium"
                   >
-                    Next
+                    {t('common:buttons.next')}
                   </button>
                 </div>
               </div>

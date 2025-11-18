@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Coins, TrendingUp, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useUserProfile } from "../../hooks/useCredits";
 
@@ -17,6 +18,7 @@ export function CreditBalance({
   className = "",
   showDetails = false,
 }: CreditBalanceProps) {
+  const { t } = useTranslation(['chat', 'common']);
   const { data: profile, isLoading, isError } = useUserProfile();
   const [isBlurred, setIsBlurred] = useState(false);
 
@@ -49,7 +51,7 @@ export function CreditBalance({
           </div>
           <div className="flex-1">
             <p className="text-xs text-red-600 font-medium">
-              Failed to load credits
+              {t('chat:credits.failedToLoad')}
             </p>
           </div>
         </div>
@@ -90,7 +92,7 @@ export function CreditBalance({
         {/* Balance */}
         <div className="flex-1 min-w-0">
           <p className="text-xs text-gray-600 font-medium mb-0.5">
-            Credit Balance
+            {t('chat:credits.balance')}
           </p>
           <div className="flex items-center gap-2">
             <p className={`text-lg font-bold ${balanceColor} ${isBlurred ? 'blur-sm select-none' : ''} transition-all`}>
@@ -99,7 +101,7 @@ export function CreditBalance({
             <button
               onClick={() => setIsBlurred(!isBlurred)}
               className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-              title={isBlurred ? "Show balance" : "Hide balance"}
+              title={isBlurred ? t('chat:credits.showBalance') : t('chat:credits.hideBalance')}
             >
               {isBlurred ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
@@ -111,16 +113,16 @@ export function CreditBalance({
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-600 flex items-center gap-1">
                   <TrendingUp size={12} />
-                  Total Used
+                  {t('chat:credits.totalUsed')}
                 </span>
                 <span className="font-semibold text-gray-800">
-                  {profile.total_tokens_used.toLocaleString()} tokens
+                  {profile.total_tokens_used.toLocaleString()} {t('chat:credits.tokens')}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Total Spent</span>
+                <span className="text-gray-600">{t('chat:credits.totalSpent')}</span>
                 <span className="font-semibold text-gray-800">
-                  {profile.total_credits_spent.toFixed(1)} credits
+                  {profile.total_credits_spent.toFixed(1)} {t('chat:credits.creditsUnit')}
                 </span>
               </div>
             </div>
@@ -133,7 +135,7 @@ export function CreditBalance({
         <div className="mt-2 px-2 py-1.5 bg-red-50 border border-red-200/50 rounded-lg">
           <p className="text-xs text-red-600 font-medium flex items-center gap-1">
             <AlertCircle size={12} />
-            Low balance - Top up soon
+            {t('chat:credits.lowBalanceWarning')}
           </p>
         </div>
       )}

@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Newspaper, TrendingUp, TrendingDown, ExternalLink } from "lucide-react";
 import { ToolWrapper } from "./ToolWrapper";
 import { alphaVantageApi } from "../services/alphaVantageApi";
@@ -45,6 +46,7 @@ export const NewsSentimentTool: React.FC<NewsSentimentToolProps> = ({
   defaultExpanded = false,
   className = "",
 }) => {
+  const { t } = useTranslation(["market", "common"]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [positive, setPositive] = useState<NewsFeedItem[]>([]);
@@ -142,12 +144,12 @@ export const NewsSentimentTool: React.FC<NewsSentimentToolProps> = ({
   // Badge text for header
   const badgeText =
     positive.length > 0 || negative.length > 0
-      ? `${positive.length} positive, ${negative.length} negative`
+      ? `${t("market:news.positiveBadge", { count: positive.length })}, ${t("market:news.negativeBadge", { count: negative.length })}`
       : undefined;
 
   return (
     <ToolWrapper
-      title={`News Sentiment: ${symbol}`}
+      title={t("market:news.sentimentTitle", { symbol })}
       icon={<Newspaper className="h-5 w-5" />}
       badge={badgeText}
       badgeVariant={positive.length > negative.length ? "success" : "default"}
@@ -158,7 +160,7 @@ export const NewsSentimentTool: React.FC<NewsSentimentToolProps> = ({
       {loading && (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span className="ml-3 text-sm text-gray-600">Loading news...</span>
+          <span className="ml-3 text-sm text-gray-600">{t("market:news.loading")}</span>
         </div>
       )}
 
@@ -178,7 +180,7 @@ export const NewsSentimentTool: React.FC<NewsSentimentToolProps> = ({
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp className="h-4 w-4 text-green-600" />
                 <h4 className="text-sm font-semibold text-green-800">
-                  Positive Sentiment ({positive.length})
+                  {t("market:news.positiveSentiment", { count: positive.length })}
                 </h4>
               </div>
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-3">
@@ -193,7 +195,7 @@ export const NewsSentimentTool: React.FC<NewsSentimentToolProps> = ({
               <div className="flex items-center gap-2 mb-3">
                 <TrendingDown className="h-4 w-4 text-red-600" />
                 <h4 className="text-sm font-semibold text-red-800">
-                  Negative Sentiment ({negative.length})
+                  {t("market:news.negativeSentiment", { count: negative.length })}
                 </h4>
               </div>
               <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-3">
@@ -207,11 +209,11 @@ export const NewsSentimentTool: React.FC<NewsSentimentToolProps> = ({
             <div className="text-center py-8">
               <Newspaper className="h-12 w-12 mx-auto text-gray-400 mb-3" />
               <p className="text-sm text-gray-600">
-                No strongly positive or negative news found for {symbol}
+                {t("market:news.noSentimentNews", { symbol })}
               </p>
               {total > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {total} total articles scanned
+                  {t("market:news.totalScanned", { count: total })}
                 </p>
               )}
             </div>
@@ -220,7 +222,7 @@ export const NewsSentimentTool: React.FC<NewsSentimentToolProps> = ({
           {/* Footer Info */}
           {(positive.length > 0 || negative.length > 0) && (
             <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-200">
-              Showing top {positive.length + negative.length} articles from {total} total
+              {t("market:news.showingArticles", { shown: positive.length + negative.length, total })}
             </div>
           )}
         </div>

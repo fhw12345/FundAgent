@@ -4,11 +4,13 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FeedbackLeaderboard } from "../components/feedback/FeedbackLeaderboard";
 import { SubmitFeedbackForm } from "../components/feedback/SubmitFeedbackForm";
 import { FeedbackDetailView } from "../components/feedback/FeedbackDetailView";
 
 export default function FeedbackPage() {
+  const { t } = useTranslation(['feedback', 'common']);
   const [isSubmitFormOpen, setIsSubmitFormOpen] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
@@ -18,11 +20,10 @@ export default function FeedbackPage() {
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-2">
-            Feedback & Community Roadmap
+            {t('feedback:page.title')}
           </h1>
           <p className="text-gray-600">
-            Shape the future of KlineMatrix by voting on features and reporting
-            bugs
+            {t('feedback:page.description')}
           </p>
         </div>
 
@@ -32,7 +33,7 @@ export default function FeedbackPage() {
             onClick={() => setIsSubmitFormOpen(true)}
             className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-xl hover:scale-105 transition-all duration-200"
           >
-            Submit Feedback
+            {t('feedback:form.submit')}
           </button>
         </div>
 

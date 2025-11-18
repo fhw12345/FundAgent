@@ -741,7 +741,7 @@ async def _stream_with_react_agent(
             # ===== TOOL EXECUTION CALLBACK SETUP =====
             # Create event queue for real-time tool execution streaming
             tool_event_queue = asyncio.Queue()
-            tool_callback = ToolExecutionCallback(tool_event_queue)
+            tool_callback = ToolExecutionCallback(tool_event_queue, request.language)
             agent_task = None
             stream_active = True
 
@@ -780,7 +780,7 @@ async def _stream_with_react_agent(
                             event_type=event["type"],
                             tool_name=event["tool_name"],
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         # No event available - check if agent completed
                         if agent_task and agent_task.done():
                             logger.info("Agent completed, stopping tool event stream")
@@ -812,6 +812,7 @@ async def _stream_with_react_agent(
                             conversation_history=conversation_history,
                             debug=debug,
                             additional_callbacks=[tool_callback],
+                            language=request.language,
                         ),
                         timeout=120.0,  # 2 minutes max for agent response
                     )
@@ -877,11 +878,19 @@ async def _stream_with_react_agent(
             final_answer = result["final_answer"]
             tool_executions = result.get("tool_executions", 0)
             trace_id = result.get("trace_id", "unknown")
-            logger.info("Extracted result fields", answer_len=len(final_answer), trace_id=trace_id)
+            logger.info(
+                "Extracted result fields",
+                answer_len=len(final_answer),
+                trace_id=trace_id,
+            )
 
             # Extract token usage from agent result
             token_usage = extract_token_usage_from_agent_result(result)
-            logger.info("Token usage extracted", input=token_usage["input_tokens"], output=token_usage["output_tokens"])
+            logger.info(
+                "Token usage extracted",
+                input=token_usage["input_tokens"],
+                output=token_usage["output_tokens"],
+            )
             input_tokens = token_usage["input_tokens"]
             output_tokens = token_usage["output_tokens"]
             total_tokens = token_usage["total_tokens"]

@@ -6,12 +6,12 @@
  */
 import React, { memo } from "react";
 import { UseQueryResult, UseMutationResult } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { SymbolSearch } from "../SymbolSearch";
 import { TradingChart } from "../TradingChart";
 import {
   BarChart3,
   TrendingUp,
-  DollarSign,
   Loader2,
   LineChart,
   Activity,
@@ -58,6 +58,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
   isCollapsed,
   onToggleCollapse,
 }) => {
+  const { t } = useTranslation(['market', 'chat', 'common']);
 
   return (
     <div className={`flex flex-col h-full transition-all duration-200 relative ${isCollapsed ? 'w-12' : 'w-full'}`}>
@@ -102,7 +103,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-lg font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
-              Trading Charts
+              {t('market:chart.title')}
             </h3>
           </div>
           {currentSymbol && priceDataQuery.data?.data && priceDataQuery.data.data.length > 0 && (
@@ -127,7 +128,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
             {/* Technical Analysis - Hidden for 1min interval (insufficient data) */}
             {selectedInterval !== "1m" && (
               <div>
-                <div className="text-xs font-medium text-gray-500 mb-1.5">Technical Analysis</div>
+                <div className="text-xs font-medium text-gray-500 mb-1.5">{t('chat:chartPanel.technicalAnalysis')}</div>
                 <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={() => handleQuickAnalysis("fibonacci")}
@@ -135,7 +136,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                     className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                   >
                     {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BarChart3 className="h-3.5 w-3.5" />}
-                    Fibonacci
+                    {t('chat:chartPanel.fibonacci')}
                   </button>
                   <button
                     onClick={() => handleQuickAnalysis("stochastic")}
@@ -143,7 +144,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                     className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                   >
                     {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
-                    Stochastic
+                    {t('chat:chartPanel.stochastic')}
                   </button>
                 </div>
               </div>
@@ -151,7 +152,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
 
             {/* Fundamental Analysis */}
             <div>
-              <div className="text-xs font-medium text-gray-500 mb-1.5">Fundamental Analysis</div>
+              <div className="text-xs font-medium text-gray-500 mb-1.5">{t('chat:chartPanel.fundamentalAnalysis')}</div>
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => handleQuickAnalysis("company_overview")}
@@ -159,7 +160,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
                   {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Building2 className="h-3.5 w-3.5" />}
-                  Overview
+                  {t('chat:chartPanel.overview')}
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("cash_flow")}
@@ -167,7 +168,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
                   {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-                  Cash Flow
+                  {t('chat:chartPanel.cashFlow')}
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("balance_sheet")}
@@ -175,14 +176,14 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
                   {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-                  Balance Sheet
+                  {t('chat:chartPanel.balanceSheet')}
                 </button>
               </div>
             </div>
 
             {/* Market Sentiment */}
             <div>
-              <div className="text-xs font-medium text-gray-500 mb-1.5">Market Sentiment</div>
+              <div className="text-xs font-medium text-gray-500 mb-1.5">{t('chat:chartPanel.marketSentiment')}</div>
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => handleQuickAnalysis("news_sentiment")}
@@ -190,7 +191,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
                   {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Newspaper className="h-3.5 w-3.5" />}
-                  News Sentiment
+                  {t('chat:chartPanel.newsSentiment')}
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("macro")}
@@ -198,7 +199,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
                   {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="h-3.5 w-3.5" />}
-                  Macro
+                  {t('chat:chartPanel.macro')}
                 </button>
                 <button
                   onClick={() => handleQuickAnalysis("market_movers")}
@@ -206,7 +207,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-500 text-white rounded-lg hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs transition-all"
                 >
                   {priceDataQuery.isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUpDown className="h-3.5 w-3.5" />}
-                  Market Movers
+                  {t('chat:chartPanel.marketMovers')}
                 </button>
               </div>
             </div>
@@ -219,10 +220,9 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
           <div className="h-full border rounded-lg flex items-center justify-center text-sm text-gray-500 bg-gray-50">
             <div className="text-center">
               <LineChart className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p>Search for a stock symbol above to view its chart</p>
+              <p>{t('chat:chartPanel.searchPrompt')}</p>
               <p className="text-xs mt-2">
-                Try searching &quot;apple&quot;, &quot;tesla&quot;, or any
-                company name
+                {t('chat:chartPanel.searchHint')}
               </p>
             </div>
           </div>
@@ -231,7 +231,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
           <div className="h-full border rounded-lg flex items-center justify-center text-sm text-gray-500">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-              Loading price data...
+              {t('chat:chartPanel.loadingPriceData')}
             </div>
           </div>
         )}
@@ -272,7 +272,7 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
             {priceDataQuery.isRefetching && (
               <div className="text-xs text-gray-500 mt-1 flex items-center">
                 <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                Updating price data...
+                {t('chat:chartPanel.updatingPriceData')}
               </div>
             )}
           </div>

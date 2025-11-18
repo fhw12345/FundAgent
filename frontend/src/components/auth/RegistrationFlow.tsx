@@ -4,6 +4,7 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   sendVerificationCode,
   registerUser,
@@ -18,6 +19,7 @@ interface RegistrationFlowProps {
 }
 
 export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
+  const { t } = useTranslation(["auth", "validation", "common"]);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [username, setUsername] = useState("");
@@ -35,7 +37,9 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
       await sendVerificationCode(email);
       setRegisterStep("code");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send code");
+      setError(
+        err instanceof Error ? err.message : t("auth:register.failedToSendCode")
+      );
     } finally {
       setLoading(false);
     }
@@ -63,7 +67,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
       // Redirect to platform
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : t("auth:register.failed"));
     } finally {
       setLoading(false);
     }
@@ -88,9 +92,9 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
         <form onSubmit={(e) => void handleSendCode(e)} className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Create account
+              {t("auth:register.title")}
             </h2>
-            <p className="text-gray-600">Enter your email to get started</p>
+            <p className="text-gray-600">{t("auth:register.enterEmailToStart")}</p>
           </div>
 
           <div>
@@ -98,14 +102,14 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               htmlFor="email"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Email address
+              {t("auth:register.email")}
             </label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="your.email@163.com"
+              placeholder={t("auth:register.emailPlaceholder")}
               required
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
@@ -122,7 +126,9 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Sending..." : "Send Verification Code"}
+            {loading
+              ? t("auth:register.sendingCode")
+              : t("auth:register.sendCode")}
           </button>
 
           <div className="text-center">
@@ -131,7 +137,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               onClick={onBack}
               className="text-blue-600 hover:text-blue-800 font-medium text-sm"
             >
-              ← Back to login
+              &larr; {t("auth:register.backToLogin")}
             </button>
           </div>
         </form>
@@ -141,21 +147,20 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
         <form onSubmit={handleVerifyCode} className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Enter code
+              {t("auth:verification.title")}
             </h2>
             <p className="text-gray-600">
-              We sent a verification code to{" "}
+              {t("auth:verification.sentTo")}{" "}
               <span className="font-semibold">{email}</span>
             </p>
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm text-blue-800 font-medium mb-1">
-              📧 Check your email
+              {t("auth:verification.checkEmail")}
             </p>
             <p className="text-xs text-blue-700">
-              We&apos;ve sent a 6-digit verification code to your inbox. Please
-              check your email and enter the code below.
+              {t("auth:verification.checkEmailHint")}
             </p>
           </div>
 
@@ -164,7 +169,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               htmlFor="code"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Verification code
+              {t("auth:verification.code")}
             </label>
             <input
               id="code"
@@ -173,7 +178,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               onChange={(e) =>
                 setCode(e.target.value.replace(/\D/g, "").slice(0, 6))
               }
-              placeholder="000000"
+              placeholder={t("auth:verification.codePlaceholder")}
               required
               maxLength={6}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-center text-2xl font-mono tracking-widest"
@@ -192,7 +197,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               disabled={code.length !== 6}
               className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Continue →
+              {t("auth:verification.continue")} &rarr;
             </button>
 
             <button
@@ -200,7 +205,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               onClick={handleBackToEmail}
               className="w-full text-gray-600 font-medium py-2 hover:text-gray-900 transition-colors"
             >
-              ← Back to email
+              &larr; {t("auth:verification.backToEmail")}
             </button>
           </div>
         </form>
@@ -210,9 +215,9 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
         <form onSubmit={(e) => void handleRegister(e)} className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Create credentials
+              {t("auth:credentials.title")}
             </h2>
-            <p className="text-gray-600">Choose a username and password</p>
+            <p className="text-gray-600">{t("auth:credentials.subtitle")}</p>
           </div>
 
           <div>
@@ -220,20 +225,22 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               htmlFor="username"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Username
+              {t("auth:register.username")}
             </label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="your_username"
+              placeholder={t("auth:register.usernamePlaceholder")}
               required
               minLength={3}
               maxLength={20}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
-            <p className="text-xs text-gray-500 mt-1">3-20 characters</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {t("auth:register.usernameHint")}
+            </p>
           </div>
 
           <div>
@@ -241,7 +248,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               htmlFor="password"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Password
+              {t("auth:register.password")}
             </label>
             <input
               id="password"
@@ -253,7 +260,9 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               minLength={8}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
-            <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {t("auth:register.passwordHint")}
+            </p>
           </div>
 
           {error && (
@@ -268,7 +277,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-semibold py-3 px-4 rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Creating account..." : "Create Account"}
+              {loading ? t("auth:register.submitting") : t("auth:register.submit")}
             </button>
 
             <button
@@ -276,7 +285,7 @@ export function RegistrationFlow({ onSuccess, onBack }: RegistrationFlowProps) {
               onClick={handleBackToCode}
               className="w-full text-gray-600 font-medium py-2 hover:text-gray-900 transition-colors"
             >
-              ← Back
+              &larr; {t("auth:credentials.back")}
             </button>
           </div>
         </form>

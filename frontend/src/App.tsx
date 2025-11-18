@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { HelpCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
 import HealthPage from "./pages/HealthPage";
@@ -9,8 +10,10 @@ import PortfolioDashboard from "./pages/PortfolioDashboard";
 import { CreditBalance } from "./components/credits/CreditBalance";
 import { authStorage, logout } from "./services/authService";
 import HelpModal from "./components/HelpModal";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 
 function App() {
+  const { t } = useTranslation(["common", "auth"]);
   const [activeTab, setActiveTab] = useState<
     "health" | "chat" | "portfolio" | "feedback" | "transactions"
   >("chat");
@@ -83,7 +86,7 @@ function App() {
                     KlineMatrix
                   </h1>
                   <span className="text-xs font-medium text-gray-500 hidden sm:inline">
-                    AI-Powered Financial Intelligence
+                    {t("common:app.subtitle")}
                   </span>
                 </div>
               </div>
@@ -96,7 +99,7 @@ function App() {
                   }}
                   className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100/80 rounded-lg transition-all"
                 >
-                  Logout
+                  {t("common:navigation.logout")}
                 </button>
               </div>
             </div>
@@ -112,7 +115,7 @@ function App() {
                       : "text-gray-700 hover:bg-gray-100/80"
                   }`}
                 >
-                  Health
+                  {t("common:navigation.health")}
                 </button>
               )}
               <button
@@ -123,7 +126,7 @@ function App() {
                     : "text-gray-700 hover:bg-gray-100/80"
                 }`}
               >
-                Platform
+                {t("common:navigation.platform")}
               </button>
               <button
                 onClick={() => setActiveTab("portfolio")}
@@ -133,7 +136,7 @@ function App() {
                     : "text-gray-700 hover:bg-gray-100/80"
                 }`}
               >
-                Portfolio
+                {t("common:navigation.portfolio")}
               </button>
               <button
                 onClick={() => setActiveTab("feedback")}
@@ -143,7 +146,7 @@ function App() {
                     : "text-gray-700 hover:bg-gray-100/80"
                 }`}
               >
-                Feedback
+                {t("common:navigation.feedback")}
               </button>
               <button
                 onClick={() => setActiveTab("transactions")}
@@ -153,11 +156,12 @@ function App() {
                     : "text-gray-700 hover:bg-gray-100/80"
                 }`}
               >
-                Transactions
+                {t("common:navigation.transactions")}
               </button>
               {/* Desktop user info */}
               <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-gray-200">
                 <CreditBalance className="w-56" />
+                <LanguageSwitcher variant="minimal" />
                 <span className="text-sm text-gray-700">👤 {username}</span>
                 <button
                   onClick={() => {
@@ -165,7 +169,7 @@ function App() {
                   }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100/80 rounded-lg transition-all"
                 >
-                  Logout
+                  {t("common:navigation.logout")}
                 </button>
               </div>
             </nav>
@@ -188,7 +192,7 @@ function App() {
       <footer className="bg-white border-t">
         <div className="mx-auto py-3 px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500">
-            KlineMatrix - AI-Powered Financial Intelligence
+            KlineMatrix - {t("common:app.subtitle")}
           </p>
         </div>
       </footer>
