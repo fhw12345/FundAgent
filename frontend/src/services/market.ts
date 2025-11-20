@@ -50,6 +50,20 @@ export interface SymbolInfo {
   current_price?: number;
 }
 
+// Quote types
+export interface QuoteData {
+  symbol: string;
+  price: number;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;
+  latest_trading_day: string;
+  previous_close: number;
+  change: number;
+  change_percent: string;
+}
+
 // Time interval options for charts
 export const TIME_INTERVALS = {
   // Intraday intervals
@@ -123,16 +137,22 @@ export const marketService = {
       );
       return response.data;
     } catch (err: any) {
-      if (
-        err?.response?.data?.detail &&
-        typeof err.response.data.detail === "object"
-      ) {
-        const d = err.response.data.detail;
-        throw {
-          message: d.message || "Price data fetch failed",
-          suggestions: d.suggestions || [],
-          original: err,
-        };
+      const detail = err?.response?.data?.detail;
+      if (detail) {
+        // Handle both object and string error details
+        if (typeof detail === "object") {
+          throw {
+            message: detail.message || "Price data fetch failed",
+            suggestions: detail.suggestions || [],
+            original: err,
+          };
+        } else if (typeof detail === "string") {
+          throw {
+            message: detail,
+            suggestions: [],
+            original: err,
+          };
+        }
       }
       throw err;
     }
@@ -144,6 +164,16 @@ export const marketService = {
   async getSymbolInfo(symbol: string): Promise<SymbolInfo> {
     const response = await apiClient.get<SymbolInfo>(
       `/api/market/info/${symbol}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Get real-time quote for a symbol (GLOBAL_QUOTE)
+   */
+  async getQuote(symbol: string): Promise<QuoteData> {
+    const response = await apiClient.get<QuoteData>(
+      `/api/market/quote/${symbol}`,
     );
     return response.data;
   },

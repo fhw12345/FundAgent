@@ -5,10 +5,11 @@
  * such as symbol search and quick analysis buttons.
  */
 import React, { memo } from "react";
-import { UseQueryResult, UseMutationResult } from "@tanstack/react-query";
+import { UseQueryResult, UseMutationResult, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { SymbolSearch } from "../SymbolSearch";
 import { TradingChart } from "../TradingChart";
+import { marketService } from "../../services/market";
 import {
   BarChart3,
   TrendingUp,
@@ -24,6 +25,14 @@ import {
 } from "lucide-react";
 import { TimeInterval, PriceDataResponse } from "../../services/market";
 import type { FibonacciMetadata } from "../../utils/analysisMetadataExtractor";
+
+// Interval buttons for error state recovery
+const INTERVAL_BUTTONS: { key: TimeInterval; label: string }[] = [
+  { key: "1m", label: "1MIN" },
+  { key: "1d", label: "1D" },
+  { key: "1w", label: "1W" },
+  { key: "1mo", label: "1M" },
+];
 
 interface ChartPanelProps {
   currentSymbol: string;
@@ -59,6 +68,25 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
   onToggleCollapse,
 }) => {
   const { t } = useTranslation(['market', 'chat', 'common']);
+
+  // Fetch real-time quote for header price display
+  const quoteQuery = useQuery({
+    queryKey: ['quote', currentSymbol],
+    queryFn: () => marketService.getQuote(currentSymbol),
+    enabled: !!currentSymbol,
+    staleTime: 60 * 1000, // 1 minute
+    refetchInterval: 60 * 1000, // Refetch every minute
+  });
+
+  // Use last chart bar price (more current for intraday), fallback to quote
+  const chartLastBar = priceDataQuery.data?.data?.length
+    ? priceDataQuery.data.data[priceDataQuery.data.data.length - 1]
+    : null;
+
+  const displayPrice = chartLastBar?.close ?? quoteQuery.data?.price ?? null;
+
+  // Show timestamp from chart data or quote date
+  const priceTimestamp = chartLastBar?.time ?? quoteQuery.data?.latest_trading_day;
 
   return (
     <div className={`flex flex-col h-full transition-all duration-200 relative ${isCollapsed ? 'w-12' : 'w-full'}`}>
@@ -106,14 +134,21 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
               {t('market:chart.title')}
             </h3>
           </div>
-          {currentSymbol && priceDataQuery.data?.data && priceDataQuery.data.data.length > 0 && (
+          {currentSymbol && displayPrice && (
             <div className="flex items-center gap-2">
               <div className="text-right">
                 <div className="text-base font-semibold text-gray-900">{currentSymbol}</div>
                 <div className="text-xs text-gray-500">{currentCompanyName}</div>
               </div>
-              <div className="text-lg font-bold text-green-600">
-                ${priceDataQuery.data?.data[priceDataQuery.data.data.length - 1].close.toFixed(2)}
+              <div className="text-right">
+                <div className="text-lg font-bold text-green-600">
+                  ${displayPrice.toFixed(2)}
+                </div>
+                {priceTimestamp && (
+                  <div className="text-xs text-gray-400">
+                    {priceTimestamp}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -235,22 +270,40 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
             </div>
           </div>
         )}
-        {currentSymbol &&
-          priceDataQuery.isError &&
-          (priceDataQuery.error as any)?.suggestions && (
+        {currentSymbol && priceDataQuery.isError && (
             <div className="p-4 border rounded-lg bg-red-50 text-sm text-red-700">
-              {priceDataQuery.error.message || "Price data unavailable."}
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(priceDataQuery.error as any).suggestions.map((s: any) => (
-                  <button
-                    key={s.symbol}
-                    onClick={() => handleSymbolSelect(s.symbol, s.name)}
-                    className="px-2 py-1 text-xs bg-white border rounded hover:bg-blue-50"
-                  >
-                    {s.symbol} {s.name && `- ${s.name}`}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-3">
+                <span>{priceDataQuery.error?.message || "Price data unavailable."}</span>
+                {/* Interval selector for error recovery */}
+                <div className="flex gap-1 bg-white rounded-md p-1 border">
+                  {INTERVAL_BUTTONS.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => handleIntervalChange(key)}
+                      className={`px-3 py-1 text-xs rounded transition-colors ${
+                        selectedInterval === key
+                          ? "bg-blue-500 text-white"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {(priceDataQuery.error as any)?.suggestions && (
+                <div className="flex flex-wrap gap-2">
+                  {(priceDataQuery.error as any).suggestions.map((s: any) => (
+                    <button
+                      key={s.symbol}
+                      onClick={() => handleSymbolSelect(s.symbol, s.name)}
+                      className="px-2 py-1 text-xs bg-white border rounded hover:bg-blue-50"
+                    >
+                      {s.symbol} {s.name && `- ${s.name}`}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         {currentSymbol && priceDataQuery.data && !priceDataQuery.isError && (

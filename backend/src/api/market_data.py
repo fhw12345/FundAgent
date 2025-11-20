@@ -98,6 +98,21 @@ class MarketStatusResponse(BaseModel):
     current_session: str = Field(
         ..., description="Current market session: pre, regular, post, or closed"
     )
+
+
+class QuoteResponse(BaseModel):
+    """Global quote response."""
+
+    symbol: str = Field(..., description="Stock symbol")
+    price: float = Field(..., description="Current/latest price")
+    open: float = Field(..., description="Open price")
+    high: float = Field(..., description="Day high")
+    low: float = Field(..., description="Day low")
+    volume: int = Field(..., description="Trading volume")
+    latest_trading_day: str = Field(..., description="Latest trading day (YYYY-MM-DD)")
+    previous_close: float = Field(..., description="Previous close price")
+    change: float = Field(..., description="Price change")
+    change_percent: str = Field(..., description="Price change percentage")
     next_open: str | None = Field(
         None, description="Next market open time (ISO format)"
     )
@@ -471,6 +486,64 @@ async def get_symbol_info(
         logger.error("Symbol info fetch failed", symbol=symbol, error=str(e))
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch symbol info: {str(e)}"
+        ) from e
+
+
+@router.get("/quote/{symbol}")
+async def get_quote(
+    symbol: str,
+    user_id: str = Depends(get_current_user_id),
+    service: AlphaVantageMarketDataService = Depends(get_market_service),
+    redis: RedisCache = Depends(get_redis),
+) -> QuoteResponse:
+    """
+    Get real-time quote for a symbol using GLOBAL_QUOTE.
+
+    Returns the latest price, volume, and change information.
+    Note: Uses 15-minute delayed data with premium API key.
+    """
+    try:
+        symbol = symbol.upper().strip()
+        if not symbol:
+            raise ValueError("Symbol is required")
+
+        logger.info("Quote request", symbol=symbol, user_id=user_id)
+
+        # Check cache first
+        cache_key = f"quote:{symbol}"
+        cached_data = await redis.get(cache_key)
+        if cached_data:
+            logger.info("Quote cache hit", symbol=symbol)
+            return QuoteResponse(**cached_data)
+
+        # Fetch from Alpha Vantage
+        quote_data = await service.get_quote(symbol)
+
+        response = QuoteResponse(
+            symbol=quote_data.get("symbol", symbol),
+            price=float(quote_data.get("price", 0)),
+            open=float(quote_data.get("open", 0)),
+            high=float(quote_data.get("high", 0)),
+            low=float(quote_data.get("low", 0)),
+            volume=int(quote_data.get("volume", 0)),
+            latest_trading_day=quote_data.get("latest_trading_day", ""),
+            previous_close=float(quote_data.get("previous_close", 0)),
+            change=float(quote_data.get("change", 0)),
+            change_percent=quote_data.get("change_percent", "0%"),
+        )
+
+        # Cache for 60 seconds (quote data is frequently updated)
+        await redis.set(cache_key, response.model_dump(), ttl=60)
+        logger.info("Quote cached", symbol=symbol, ttl_seconds=60)
+
+        return response
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error("Quote fetch failed", symbol=symbol, error=str(e))
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch quote: {str(e)}"
         ) from e
 
 

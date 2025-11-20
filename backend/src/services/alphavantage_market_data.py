@@ -275,11 +275,14 @@ class AlphaVantageMarketDataService:
             Dict with price, volume, change, etc.
         """
         try:
+            # GLOBAL_QUOTE with entitlement=delayed returns previous day's close during market hours
+            # It will show today's close only after market closes
             response = await self.client.get(
                 self.base_url,
                 params={
                     "function": "GLOBAL_QUOTE",
                     "symbol": symbol,
+                    "entitlement": "delayed",
                     "apikey": self.api_key,
                 },
             )
@@ -292,10 +295,25 @@ class AlphaVantageMarketDataService:
 
             data = response.json()
 
-            if "Global Quote" not in data or not data["Global Quote"]:
+            # Handle both standard and delayed response formats
+            # Standard: "Global Quote"
+            # Delayed: "Global Quote - DATA DELAYED BY 15 MINUTES"
+            quote_key = None
+            for key in data.keys():
+                if key.startswith("Global Quote"):
+                    quote_key = key
+                    break
+
+            if not quote_key or not data[quote_key]:
                 raise ValueError(f"No quote data for symbol: {symbol}")
 
-            quote = data["Global Quote"]
+            quote = data[quote_key]
+
+            logger.info(
+                "Quote API response parsed",
+                symbol=symbol,
+                quote_key=quote_key,
+            )
 
             result = {
                 "symbol": quote.get("01. symbol", symbol),
@@ -348,6 +366,7 @@ class AlphaVantageMarketDataService:
                     "interval": interval,
                     "outputsize": outputsize,
                     "extended_hours": "true",  # Include pre/post market
+                    "entitlement": "delayed",  # 15-minute delayed data (premium)
                     "apikey": self.api_key,
                 },
             )
