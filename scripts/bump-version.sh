@@ -102,50 +102,6 @@ if [[ -n "$CHANGELOG_ENTRY" ]]; then
     echo "✅ Updated $CHANGELOG_FILE"
 fi
 
-# Create version documentation file
-VERSION_DOC="docs/project/versions/$COMPONENT/v$NEW_VERSION.md"
-if [[ ! -f "$VERSION_DOC" ]]; then
-    cat > "$VERSION_DOC" <<EOF
-# $(echo $COMPONENT | sed 's/\b\(.\)/\u\1/g') v$NEW_VERSION
-
-**Release Date**: $(date +%Y-%m-%d)
-**Docker Image**: \`financial-agent/$COMPONENT:$NEW_VERSION\`
-
-## Overview
-
-[Brief description of this release]
-
-## Features Added
-
-- [Feature 1]
-- [Feature 2]
-
-## Bug Fixes
-
-- [Bug fix 1]
-
-## Breaking Changes
-
-None
-
-## Compatibility
-
-| Component | Required Version |
-|-----------|-----------------|
-| [Dependency] | [Version] |
-
-## Known Issues
-
-None
-
-## Migration Guide
-
-[Migration instructions if needed]
-EOF
-    echo "✅ Created $VERSION_DOC"
-    echo "   Please edit this file to add release details"
-fi
-
 # Summary
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -157,8 +113,7 @@ echo "Old version: $CURRENT_VERSION"
 echo "New version: $NEW_VERSION"
 echo ""
 echo "Next steps:"
-echo "1. Review and edit: $VERSION_DOC"
-echo "2. Commit changes: git add . && git commit -m \"chore: bump $COMPONENT to v$NEW_VERSION\""
-echo "3. Tag release: git tag $COMPONENT-v$NEW_VERSION"
-echo "4. Build image: az acr build --image financial-agent/$COMPONENT:$NEW_VERSION ..."
+echo "1. Commit changes: git add . && git commit -m \"chore: bump $COMPONENT to v$NEW_VERSION\""
+echo "2. Tag release: git tag $COMPONENT-v$NEW_VERSION"
+echo "3. Build image: az acr build --image financial-agent/$COMPONENT:$NEW_VERSION ..."
 echo ""

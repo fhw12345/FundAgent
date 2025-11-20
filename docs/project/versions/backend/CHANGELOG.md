@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.1] - 2025-11-16
+## [0.7.1] - 2025-11-19
+
+### Added
+- feat: add OSS presigned download URLs for feedback images
+- feat: dual authentication mode for OSSService (static credentials + STS)
+- Add 15-min delayed intraday data, GLOBAL_QUOTE endpoint, fix error messages
 
 ### Performance
 - Batch chunk streaming: Reduce SSE events by 90% (CHUNK_SIZE=10 chars/event vs 1 char/event)
@@ -19,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix generator early exit bug preventing final answer streaming
 
 ### Bug Fixes
+- Fix feedback images not displaying in private bucket (presigned download URLs)
 - Fix tool progress message injection causing assistant message displacement
 - Add agent completion check in asyncio.TimeoutError handler
 - Ensure streaming completes gracefully when agent finishes
