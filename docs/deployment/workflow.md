@@ -32,7 +32,7 @@ git push origin main
 ```bash
 # Get current version
 BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-FRONTEND_VERSION=$(grep '^version = ' frontend/package.json | sed 's/.*"version": "\(.*\)".*/\1/')
+FRONTEND_VERSION=$(grep '"version":' frontend/package.json | head -1 | sed 's/.*"\(.*\)".*/\1/')
 
 # Build backend
 az acr build --registry financialAgent \
@@ -357,6 +357,91 @@ alias deploy-test='kubectl apply -k .pipeline/k8s/overlays/test/'
 
 # Health check
 alias health='curl -s https://klinematrix.com/api/health | jq .'
+```
+
+## Production Deployment (ACK - Alibaba Cloud)
+
+### Overview
+
+**Environment**: Production (`klinematrix-prod` namespace)
+**Platform**: Alibaba Cloud Container Service for Kubernetes (ACK)
+**Domain**: https://klinecubic.cn
+**Cluster**: `klinecubic-financialagent` (Shanghai/华东2)
+
+### Prerequisites
+
+1. **ACK kubeconfig**: `~/.kube/config-ack-prod`
+2. **Azure CLI**: For ACR image builds
+
+### Step 1: Build Images in ACR
+
+```bash
+# Get current versions
+BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+FRONTEND_VERSION=$(grep '"version":' frontend/package.json | head -1 | sed 's/.*"\(.*\)".*/\1/')
+
+# Build images with prod prefix
+az acr build --registry financialAgent \
+  --image klinecubic/backend:prod-v${BACKEND_VERSION} \
+  --file backend/Dockerfile backend/
+
+az acr build --registry financialAgent \
+  --image klinecubic/frontend:prod-v${FRONTEND_VERSION} \
+  --target production --file frontend/Dockerfile frontend/
+```
+
+### Step 2: Update Kustomization
+
+Edit `.pipeline/k8s/overlays/prod/kustomization.yaml`:
+
+```yaml
+images:
+- name: klinematrix/backend
+  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend
+  newTag: "prod-v${BACKEND_VERSION}"
+- name: klinematrix/frontend
+  newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend
+  newTag: "prod-v${FRONTEND_VERSION}"
+```
+
+### Step 3: Deploy to ACK
+
+**Important**: Use `--load-restrictor=LoadRestrictionsNone` to handle relative paths in kustomization.
+
+```bash
+# Apply kustomization (from project root)
+KUBECONFIG=/Users/allenpan/.kube/config-ack-prod kubectl kustomize \
+  .pipeline/k8s/overlays/prod --load-restrictor=LoadRestrictionsNone | \
+  KUBECONFIG=/Users/allenpan/.kube/config-ack-prod kubectl apply -f -
+
+# Restart deployments to pull new images
+KUBECONFIG=~/.kube/config-ack-prod kubectl rollout restart deployment/backend deployment/frontend -n klinematrix-prod
+
+# Wait for rollout
+KUBECONFIG=~/.kube/config-ack-prod kubectl rollout status deployment/backend -n klinematrix-prod --timeout=120s
+KUBECONFIG=~/.kube/config-ack-prod kubectl rollout status deployment/frontend -n klinematrix-prod --timeout=120s
+```
+
+### Step 4: Verify Production Deployment
+
+```bash
+# Check pod status
+KUBECONFIG=~/.kube/config-ack-prod kubectl get pods -n klinematrix-prod
+
+# Health check (bypass proxy)
+HTTP_PROXY="" HTTPS_PROXY="" http_proxy="" https_proxy="" \
+  curl -s https://klinecubic.cn/api/health | jq .
+
+# Check logs
+KUBECONFIG=~/.kube/config-ack-prod kubectl logs -f deployment/backend -n klinematrix-prod --tail=50
+```
+
+### Production Rollback
+
+```bash
+# Quick rollback
+KUBECONFIG=~/.kube/config-ack-prod kubectl rollout undo deployment/backend -n klinematrix-prod
+KUBECONFIG=~/.kube/config-ack-prod kubectl rollout undo deployment/frontend -n klinematrix-prod
 ```
 
 ## Related Documentation

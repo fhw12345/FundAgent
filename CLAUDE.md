@@ -23,13 +23,15 @@
 
 ## 🌍 Environment Rules
 
-**We have 3 environments with different deployment methods:**
+**Current Active Environments:**
 
-| Environment | Deployment Method | Access | Purpose |
-|-------------|------------------|--------|---------|
-| **Dev/Local** | Docker Compose | `localhost:3000` | Local development on your machine |
-| **Test** | Kubernetes (AKS - Planned) | `https://klinematrix.com` | Cloud testing (Azure suite) |
-| **Prod** | Kubernetes (ACK - Alibaba Cloud) | `https://klinecubic.cn` | Production (ACK suite) |
+| Environment | Deployment Method | Access | Purpose | Status |
+|-------------|------------------|--------|---------|--------|
+| **Dev/Local** | Docker Compose | `localhost:3000` | Local development | ✅ Active |
+| **Production** | Kubernetes (ACK - Alibaba Cloud) | `https://klinecubic.cn` | Production | ✅ Active |
+| **Test** | Kubernetes (AKS - Planned) | `https://klinematrix.com` | Cloud testing | 🚧 Planned |
+
+**Current Workflow**: Dev/Local → Production (no test environment)
 
 ### Dev/Local Environment
 - **How to run**: `make dev` (starts docker-compose)
@@ -44,38 +46,37 @@
 - **Hot reload**: ✅ Works for 90% of changes
 - **When to use**: Daily development, testing features locally
 
-### Test Environment (AKS - Planned)
-- **Platform**: Azure Kubernetes Service (AKS)
-- **Access**: https://klinematrix.com
-- **Namespace**: `klinematrix-test`
-- **Images**: `financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/*`
-- **Status**: Planned - Not yet deployed
-
-### Prod Environment (ACK - Active)
+### Production Environment (ACK - Active)
 - **Platform**: Alibaba Cloud Container Service for Kubernetes (ACK)
 - **Access**: https://klinecubic.cn
 - **Namespace**: `klinematrix-prod`
 - **Cluster**: `klinecubic-financialagent` (Shanghai/华东2)
 - **Images**: `financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/*`
-- **Status**: Active - Production deployment
+- **Status**: ✅ Active - Production deployment
+
+### Test Environment (AKS - Planned, Not Active)
+- **Platform**: Azure Kubernetes Service (AKS)
+- **Access**: https://klinematrix.com (not active)
+- **Namespace**: `klinematrix-test`
+- **Images**: `financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/*`
+- **Status**: 🚧 Planned - Not yet deployed (reserved for future)
 
 ### 🏗️ Hybrid Cloud Architecture
 
-**Shared Services (Azure - Both Environments)**:
+**Shared Services (Azure)**:
 - **Container Registry**: Azure ACR (`financialagent-gxftdbbre4gtegea.azurecr.io`)
 - **Key Vault**: Azure Key Vault (`klinematrix-test-kv`)
 
-**Compute Platforms**:
-- **Test**: Azure AKS (Korea Central) - Planned
-- **Prod**: Alibaba Cloud ACK (Shanghai) - Active
+**Production Compute Platform**:
+- **Alibaba Cloud ACK** (Shanghai) - ✅ Active
 
 **Image Naming Convention**:
 ```
-Test:  financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v*
-Prod:  financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend:prod-v*
+Production: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend:prod-v0.7.1
+            financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend:prod-v0.10.1
 ```
 
-**Golden Rule**: Develop locally with docker-compose, deploy to Prod (ACK) for production verification.
+**Golden Rule**: Develop locally with docker-compose → Test thoroughly → Deploy to Production (ACK).
 
 ## 🧪 Testing & Iteration Rules
 
@@ -188,46 +189,29 @@ source /tmp/webtesting/portfolio-analysis/venv/bin/activate  # Reuse it
 
 ### 3. Bump Version (Required)
 ```bash
-# Every commit must increment at least one version
 ./scripts/bump-version.sh backend patch   # 0.1.0 → 0.1.1
 ./scripts/bump-version.sh frontend minor  # 0.1.0 → 0.2.0
-
-# Pre-commit hook validates version increment
 ```
+**Pre-commit hook enforces version increment.**
 
-### 4. Deploy to Test Environment (Kubernetes)
+### 4. Deploy to Production
+
+**Philosophy**: Every deployment must be:
+- ✅ **Versioned** - Unique tag for every build
+- ✅ **Tested locally** - Works in docker-compose first
+- ✅ **Monitored** - Watch logs for 5-10 minutes post-deploy
+- ✅ **Rollback-ready** - Know the previous working version
+
+**Quick Reference**:
 ```bash
-# Build versioned images in Azure Container Registry
-BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-FRONTEND_VERSION=$(grep '"version":' frontend/package.json | head -1 | sed 's/.*"\(.*\)".*/\1/')
-
-az acr build --registry financialAgent \
-  --image klinematrix/backend:test-v${BACKEND_VERSION} \
-  --file backend/Dockerfile backend/
-
-az acr build --registry financialAgent \
-  --image klinematrix/frontend:test-v${FRONTEND_VERSION} \
-  --target production --file frontend/Dockerfile frontend/
-
-# Update kustomization.yaml, then apply and force restart
-# Edit .pipeline/k8s/overlays/test/kustomization.yaml with new versions
-kubectl apply -k .pipeline/k8s/overlays/test
-kubectl rollout restart deployment/backend deployment/frontend -n klinematrix-test
+# Build images → Update kustomization → Apply → Verify
+# Detailed steps: docs/deployment/k8s-operations.md
 ```
 
-**⚠️ CRITICAL**: Always use `kubectl rollout restart` after `apply -k` - image tag changes alone don't trigger rollouts
+**Key Rule**: Use `--load-restrictor=LoadRestrictionsNone` flag for kustomize (security restriction workaround)
 
-### 5. Verify Test Deployment
-```bash
-# Check deployment status
-kubectl get pods -n klinematrix-test
-
-# Test health endpoint
-curl https://klinematrix.com/api/health
-```
-
-> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for complete procedures (build, deploy, verify, rollback)**
-> 📖 **See [Version Management](docs/project/versions/README.md) for versioning system and workflow**
+> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for detailed K8s operations, build/deploy/verify/rollback procedures**
+> 📖 **See [Version Management](docs/project/versions/README.md) for versioning system**
 
 ## Code Standards
 
@@ -247,41 +231,28 @@ curl https://klinematrix.com/api/health
 ## Quick Reference Commands
 
 ```bash
-# Dev/Local Environment (Docker Compose v2)
-make dev            # Start all services (docker compose up -d)
+# Dev/Local Environment
+make dev            # Start all services
 make test           # Run all tests
-make fmt            # Format code
-make lint           # Check code quality
-docker compose exec frontend npm run lint       # Frontend linting
-docker compose logs -f backend                  # View backend logs
+make fmt && make lint  # Format and check code quality
+docker compose logs -f backend  # View logs
 
-# Test Environment (Kubernetes)
-kubectl get pods -n klinematrix-test                    # Check status
-kubectl logs -f deployment/backend -n klinematrix-test  # View logs
-kubectl delete pod -l app=backend -n klinematrix-test   # Restart with new image
-
-# Build Images (use current versions from pyproject.toml/package.json)
-BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-FRONTEND_VERSION=$(grep '"version":' frontend/package.json | head -1 | sed 's/.*"\(.*\)".*/\1/')
-
-az acr build --registry financialAgent --image klinematrix/backend:test-v${BACKEND_VERSION} --file backend/Dockerfile backend/
-az acr build --registry financialAgent --image klinematrix/frontend:test-v${FRONTEND_VERSION} --target production --file frontend/Dockerfile frontend/
+# Production K8s (ACK)
+export KUBECONFIG=~/.kube/config-ack-prod
+kubectl get pods -n klinematrix-prod           # Check status
+kubectl logs -f deployment/backend -n klinematrix-prod  # View logs
+kubectl rollout restart deployment/backend -n klinematrix-prod  # Restart
 
 # Health Checks
-curl http://localhost:8000/api/health         # Dev/Local Backend
-curl https://klinematrix.com/api/health       # Test (K8s)
+curl http://localhost:8000/api/health          # Dev/Local
+curl -s https://klinecubic.cn/api/health       # Production (may need proxy bypass)
 
 # Langfuse Observability (Dev/Local)
-open http://localhost:3001                    # Langfuse UI (trace visualization)
-open http://localhost:9003                    # MinIO Console (S3 storage)
-docker compose logs langfuse-server --tail=50 # Check Langfuse server logs
-docker compose ps | grep langfuse             # Check Langfuse services status
-
-# Cost Monitoring (prevent unexpected autoscaling)
-kubectl get nodes                          # Should show 2 nodes (not 3-4)
-kubectl top nodes                          # Memory should be <80%
-kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
+open http://localhost:3001                     # UI
+docker compose logs langfuse-server --tail=50  # Logs
 ```
+
+> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for detailed commands and procedures**
 
 ## Important Reminders
 
@@ -289,7 +260,7 @@ kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 
 **🚨 CRITICAL: TEST FIRST, THEN COMMIT**
 - **ALWAYS test changes before committing**
-- Restart pods if needed: `kubectl rollout restart deployment/<service> -n klinematrix-test`
+- Test locally with docker-compose first
 - Check browser console for errors
 - Test the actual user flow (click buttons, check UI updates)
 - **DO NOT commit without testing**
@@ -304,11 +275,14 @@ kubectl get deployments --all-namespaces  # Check for duplicate/old deployments
 - [ ] Check data contracts (Pydantic ↔ TypeScript)
 - [ ] Verify no secrets in code
 
-### 🚀 Before Deploying
-- [ ] Build images in ACR
-- [ ] Restart pods (auto-pulls new images)
+### 🚀 Before Deploying to Production
+- [ ] Test locally with docker-compose
+- [ ] Bump version (backend and/or frontend)
+- [ ] Build images in ACR with prod prefix
+- [ ] Update kustomization.yaml with new versions
+- [ ] Deploy and restart pods
 - [ ] Check pod status (1/1 Running)
-- [ ] Test health endpoints
+- [ ] Test health endpoint (bypass proxy)
 - [ ] Monitor logs for 5-10 minutes
 
 ### 🔍 When Debugging
