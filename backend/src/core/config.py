@@ -84,8 +84,8 @@ class Settings(BaseSettings):
     # Cloud storage (Alibaba OSS)
     oss_access_key: str = ""
     oss_secret_key: str = ""
-    oss_bucket: str = "financial-agent-charts"
-    oss_endpoint: str = "oss-cn-hangzhou.aliyuncs.com"
+    oss_bucket: str = "klinecubic-financialagent-oss"
+    oss_endpoint: str = "oss-cn-shanghai.aliyuncs.com"
 
     # Cache settings
     redis_ttl_seconds: int = 3600  # 1 hour default cache TTL

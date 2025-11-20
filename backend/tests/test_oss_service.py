@@ -43,8 +43,8 @@ class TestOSSServiceInitialization:
             access_key_secret="test_secret",
         )
 
-        assert service.endpoint == "oss-cn-hangzhou.aliyuncs.com"
-        assert service.bucket_name == "financial-agent-feedback"
+        assert service.endpoint == "oss-cn-shanghai.aliyuncs.com"
+        assert service.bucket_name == "klinecubic-financialagent-oss"
 
 
 class TestObjectKeyGeneration:

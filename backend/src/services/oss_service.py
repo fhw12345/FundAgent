@@ -6,6 +6,7 @@ This service handles secure file uploads to OSS with:
 - File type validation (images only)
 - Automatic content-type detection
 - Secure temporary access URLs
+- Support for both static credentials and STS (ECS instance role)
 """
 
 import hashlib
@@ -13,6 +14,7 @@ import re
 from datetime import datetime
 
 import oss2
+from oss2.credentials import EnvironmentVariableCredentialsProvider
 import structlog
 
 logger = structlog.get_logger()
@@ -46,27 +48,44 @@ class OSSService:
         """
         Initialize OSS client.
 
+        Supports two authentication modes:
+        1. Static credentials: Provide access_key_id and access_key_secret
+        2. STS/ECS instance role: Leave credentials empty, uses EnvironmentVariableCredentialsProvider
+
         Args:
-            access_key_id: Alibaba Cloud Access Key ID
-            access_key_secret: Alibaba Cloud Access Key Secret
-            endpoint: OSS endpoint (e.g., "oss-cn-hangzhou.aliyuncs.com")
+            access_key_id: Alibaba Cloud Access Key ID (empty for STS mode)
+            access_key_secret: Alibaba Cloud Access Key Secret (empty for STS mode)
+            endpoint: OSS endpoint (e.g., "oss-cn-shanghai.aliyuncs.com")
             bucket_name: OSS bucket name
         """
         self.endpoint = endpoint
         self.bucket_name = bucket_name
 
-        # Initialize OSS auth and bucket (use HTTPS endpoint)
-        auth = oss2.Auth(access_key_id, access_key_secret)
         # Ensure endpoint uses HTTPS for presigned URLs
         https_endpoint = (
             f"https://{endpoint}" if not endpoint.startswith("http") else endpoint
         )
+
+        # Choose authentication method based on credentials availability
+        if access_key_id and access_key_secret:
+            # Static credentials mode (local development)
+            auth = oss2.Auth(access_key_id, access_key_secret)
+            auth_mode = "static"
+        else:
+            # STS/ECS instance role mode (production on ACK/ECS)
+            # Uses OSS_ACCESS_KEY_ID and OSS_ACCESS_KEY_SECRET env vars
+            # or falls back to ECS instance metadata
+            credentials_provider = EnvironmentVariableCredentialsProvider()
+            auth = oss2.ProviderAuth(credentials_provider)
+            auth_mode = "sts"
+
         self.bucket = oss2.Bucket(auth, https_endpoint, bucket_name)
 
         logger.info(
             "OSS service initialized",
             bucket=bucket_name,
             endpoint=endpoint,
+            auth_mode=auth_mode,
         )
 
     def generate_object_key(
@@ -259,17 +278,17 @@ class OSSService:
 
 
 def get_oss_service(
-    access_key_id: str,
-    access_key_secret: str,
-    endpoint: str = "oss-cn-hangzhou.aliyuncs.com",
-    bucket_name: str = "financial-agent-feedback",
+    access_key_id: str = "",
+    access_key_secret: str = "",
+    endpoint: str = "oss-cn-shanghai.aliyuncs.com",
+    bucket_name: str = "klinecubic-financialagent-oss",
 ) -> OSSService:
     """
     Factory function to create OSS service instance.
 
     Args:
-        access_key_id: Alibaba Cloud Access Key ID
-        access_key_secret: Alibaba Cloud Access Key Secret
+        access_key_id: Alibaba Cloud Access Key ID (empty for STS mode)
+        access_key_secret: Alibaba Cloud Access Key Secret (empty for STS mode)
         endpoint: OSS endpoint
         bucket_name: OSS bucket name
 

@@ -69,6 +69,22 @@ spec:
               name: backend-secrets
               key: alpha-vantage-api-key
 
+        # Alibaba Cloud OSS (for feedback image uploads)
+        - name: OSS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: oss-access-key
+        - name: OSS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: oss-secret-key
+        - name: OSS_ENDPOINT
+          value: "oss-cn-shanghai.aliyuncs.com"
+        - name: OSS_BUCKET
+          value: "klinecubic-financialagent-oss"
+
         # Environment
         - name: ENVIRONMENT
           value: "production"

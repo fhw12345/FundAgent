@@ -82,9 +82,9 @@ spec:
               name: langfuse-secrets
               key: oss-access-key-secret
         - name: OSS_ENDPOINT
-          value: "oss-cn-hangzhou.aliyuncs.com"
+          value: "oss-cn-shanghai.aliyuncs.com"
         - name: OSS_BUCKET
-          value: "financial-agent-feedback"
+          value: "klinecubic-financialagent-oss"
         # Test environment resource limits (10 beta users)
         resources:
           requests:

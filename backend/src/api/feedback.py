@@ -44,6 +44,53 @@ def get_rate_limiter(request: Request) -> RateLimiter:
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 
 
+def _convert_to_presigned_urls(
+    item: FeedbackItem, oss_service: OSSService
+) -> FeedbackItem:
+    """
+    Convert public image URLs to presigned download URLs for private bucket access.
+
+    Args:
+        item: Feedback item with public image URLs
+        oss_service: OSS service for generating presigned URLs
+
+    Returns:
+        Feedback item with presigned image URLs
+    """
+    if not item.image_urls:
+        return item
+
+    presigned_urls = []
+    for url in item.image_urls:
+        # Extract object key from URL
+        # URL format: https://bucket.endpoint/object_key
+        try:
+            # Parse the object key from the URL
+            parts = url.split(f"{oss_service.bucket_name}.{oss_service.endpoint}/")
+            if len(parts) == 2:
+                object_key = parts[1]
+                # Generate presigned download URL (1 hour expiration)
+                presigned_url = oss_service.generate_presigned_download_url(
+                    object_key, expires_in_seconds=3600
+                )
+                presigned_urls.append(presigned_url)
+            else:
+                # Keep original URL if parsing fails
+                presigned_urls.append(url)
+        except Exception as e:
+            logger.warning(
+                "Failed to generate presigned URL",
+                url=url,
+                error=str(e),
+            )
+            presigned_urls.append(url)
+
+    # Create new item with presigned URLs
+    item_dict = item.model_dump()
+    item_dict["image_urls"] = presigned_urls
+    return FeedbackItem(**item_dict)
+
+
 # ===== Image Upload Endpoints =====
 
 
@@ -92,7 +139,7 @@ async def generate_image_upload_url(
 
         # Generate unique object key
         object_key = oss_service.generate_object_key(
-            prefix="feedback",
+            prefix="financial-agent/feedbacks",
             filename=request_data.filename,
             user_id=user_id,
         )
@@ -200,6 +247,7 @@ async def list_feedback_items(
     limit: int = 100,
     user_id: str | None = Depends(get_current_user_id_optional),
     service: FeedbackService = Depends(get_feedback_service),
+    oss_service: OSSService = Depends(get_oss_service_dep),
 ) -> list[FeedbackItem]:
     """
     List feedback items, optionally filtered by type.
@@ -233,6 +281,9 @@ async def list_feedback_items(
             limit=limit,
         )
 
+        # Convert image URLs to presigned download URLs
+        items = [_convert_to_presigned_urls(item, oss_service) for item in items]
+
         logger.info(
             "Feedback items listed",
             type=type,
@@ -257,6 +308,7 @@ async def get_feedback_item(
     item_id: str,
     user_id: str | None = Depends(get_current_user_id_optional),
     service: FeedbackService = Depends(get_feedback_service),
+    oss_service: OSSService = Depends(get_oss_service_dep),
 ) -> FeedbackItem:
     """
     Get detailed view of a feedback item.
@@ -276,6 +328,9 @@ async def get_feedback_item(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Feedback item {item_id} not found",
             )
+
+        # Convert image URLs to presigned download URLs
+        item = _convert_to_presigned_urls(item, oss_service)
 
         logger.info("Feedback item retrieved", item_id=item_id, user_id=user_id)
 

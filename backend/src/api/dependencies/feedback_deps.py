@@ -71,7 +71,7 @@ def get_oss_service_dep() -> OSSService:
         access_key_id=settings.oss_access_key,
         access_key_secret=settings.oss_secret_key,
         endpoint=settings.oss_endpoint,
-        bucket_name="financial-agent-feedback",  # Dedicated bucket for feedback images
+        bucket_name=settings.oss_bucket,
     )
 
 
