@@ -3,7 +3,6 @@ Chat API endpoint for conversational financial analysis.
 Following Factor 11 & 12: Triggerable via API, Stateless Service.
 
 This module contains persistent chat management endpoints using MongoDB.
-Legacy session-based endpoints are in chat_legacy.py.
 """
 
 import asyncio
