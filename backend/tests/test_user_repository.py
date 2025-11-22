@@ -774,5 +774,5 @@ class TestGetActiveUsersWithPortfolios:
         # Verify aggregation pipeline structure
         pipeline = mock_collection.aggregate.call_args[0][0]
         assert len(pipeline) == 4  # lookup, lookup, match, project
-        assert pipeline[0]["$lookup"]["from"] == "holdings"
+        assert pipeline[0]["$lookup"]["from"] == "portfolio_orders"
         assert pipeline[1]["$lookup"]["from"] == "watchlist"

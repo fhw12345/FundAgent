@@ -428,9 +428,10 @@ class TestAlphaVantageMarketDataService:
 
         bars = await service.get_daily_bars("AAPL", outputsize="compact")
 
+        # bars is a DataFrame indexed by date, sorted chronologically
         assert len(bars) == 2
-        assert bars[0]["1. open"] == "150.00"
-        assert "5. volume" in bars[0]
+        assert bars.iloc[0]["Open"] == 148.00  # First row (2024-01-09), Open column
+        assert "Volume" in bars.columns
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient.get")
@@ -456,8 +457,6 @@ class TestAlphaVantageMarketDataService:
         }
         mock_get.return_value = mock_response
 
-        # Should handle rate limit gracefully
-        result = await service.get_quote("AAPL")
-
-        # Check that rate limit message is present
-        assert "Note" in result or "Information" in result
+        # Should raise ValueError when Global Quote is missing (rate limit hit)
+        with pytest.raises(ValueError, match="No quote data for symbol"):
+            await service.get_quote("AAPL")

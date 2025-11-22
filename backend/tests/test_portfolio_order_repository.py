@@ -19,6 +19,26 @@ from src.database.repositories.portfolio_order_repository import PortfolioOrderR
 from src.models.portfolio import PortfolioOrder
 
 
+# ===== Helper Classes =====
+
+
+class AsyncIterator:
+    """Helper class to make a list async-iterable for testing"""
+    def __init__(self, items):
+        self.items = items
+        self.index = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.index >= len(self.items):
+            raise StopAsyncIteration
+        item = self.items[self.index]
+        self.index += 1
+        return item
+
+
 # ===== Fixtures =====
 
 
@@ -31,6 +51,7 @@ def mock_collection():
     collection.find_one = AsyncMock()
     collection.find = Mock()
     collection.update_one = AsyncMock()
+    collection.find_one_and_update = AsyncMock()
     collection.count_documents = AsyncMock()
     return collection
 
@@ -276,11 +297,7 @@ class TestListByUser:
     async def test_list_by_user_no_filters(self, repository, mock_collection):
         """Test listing all orders for a user"""
         # Arrange
-        mock_cursor = Mock()
-        mock_cursor.sort = Mock(return_value=mock_cursor)
-        mock_cursor.skip = Mock(return_value=mock_cursor)
-        mock_cursor.limit = Mock(return_value=mock_cursor)
-        mock_cursor.to_list = AsyncMock(return_value=[
+        order_data = [
             {
                 "order_id": "order_1",
                 "user_id": "user_456",
@@ -327,7 +344,10 @@ class TestListByUser:
                 "failure_reason": None,
                 "created_at": datetime.now(timezone.utc)
             }
-        ])
+        ]
+        mock_cursor = AsyncIterator(order_data)
+        mock_cursor.sort = Mock(return_value=mock_cursor)
+        mock_cursor.limit = Mock(return_value=mock_cursor)
         mock_collection.find.return_value = mock_cursor
 
         # Act
@@ -342,11 +362,9 @@ class TestListByUser:
     async def test_list_by_user_with_status_filter(self, repository, mock_collection):
         """Test listing orders filtered by status"""
         # Arrange
-        mock_cursor = Mock()
+        mock_cursor = AsyncIterator([])
         mock_cursor.sort = Mock(return_value=mock_cursor)
-        mock_cursor.skip = Mock(return_value=mock_cursor)
         mock_cursor.limit = Mock(return_value=mock_cursor)
-        mock_cursor.to_list = AsyncMock(return_value=[])
         mock_collection.find.return_value = mock_cursor
 
         # Act
@@ -366,9 +384,9 @@ class TestListByChat:
     async def test_list_by_chat_success(self, repository, mock_collection):
         """Test listing orders for a specific chat"""
         # Arrange
-        mock_cursor = Mock()
+        mock_cursor = AsyncIterator([])
         mock_cursor.sort = Mock(return_value=mock_cursor)
-        mock_cursor.to_list = AsyncMock(return_value=[])
+        mock_cursor.limit = Mock(return_value=mock_cursor)
         mock_collection.find.return_value = mock_cursor
 
         # Act
@@ -389,42 +407,62 @@ class TestUpdateStatus:
     async def test_update_status_to_filled(self, repository, mock_collection):
         """Test updating order status to filled"""
         # Arrange
-        mock_collection.update_one.return_value = Mock(modified_count=1)
         filled_at = datetime.now(timezone.utc)
+        mock_collection.find_one_and_update.return_value = {
+            "order_id": "order_123",
+            "alpaca_order_id": "alpaca_xyz",
+            "user_id": "user_456",
+            "chat_id": "chat_789",
+            "analysis_id": "analysis_abc",
+            "symbol": "AAPL",
+            "side": "buy",
+            "quantity": 10,
+            "order_type": "market",
+            "time_in_force": "day",
+            "limit_price": None,
+            "stop_price": None,
+            "status": "filled",
+            "filled_qty": 10,
+            "filled_avg_price": 150.50,
+            "submitted_at": datetime.now(timezone.utc),
+            "filled_at": filled_at,
+            "cancelled_at": None,
+            "failed_at": None,
+            "failure_reason": None,
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc)
+        }
 
         # Act
         result = await repository.update_status(
-            order_id="order_123",
+            alpaca_order_id="alpaca_xyz",
             status="filled",
-            filled_quantity=10,
+            filled_qty=10,
             filled_avg_price=150.50,
             filled_at=filled_at
         )
 
         # Assert
-        assert result is True
-        mock_collection.update_one.assert_called_once()
-
-        # Verify update data
-        update_data = mock_collection.update_one.call_args[0][1]["$set"]
-        assert update_data["status"] == "filled"
-        assert update_data["filled_quantity"] == 10
-        assert update_data["filled_avg_price"] == 150.50
+        assert result is not None
+        assert result.status == "filled"
+        assert result.filled_qty == 10
+        assert result.filled_avg_price == 150.50
+        mock_collection.find_one_and_update.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_update_status_nonexistent_order(self, repository, mock_collection):
-        """Test updating non-existent order returns False"""
+        """Test updating non-existent order returns None"""
         # Arrange
-        mock_collection.update_one.return_value = Mock(modified_count=0)
+        mock_collection.find_one_and_update.return_value = None
 
         # Act
         result = await repository.update_status(
-            order_id="nonexistent",
+            alpaca_order_id="nonexistent",
             status="filled"
         )
 
         # Assert
-        assert result is False
+        assert result is None
 
 
 # ===== Count Tests =====

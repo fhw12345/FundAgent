@@ -178,10 +178,10 @@ class TestCreateAccessToken:
         assert payload["username"] == mock_user.username
         assert payload["type"] == "access"
 
-        # Check expiration is approximately 30 minutes from now
+        # Check expiration is approximately ACCESS_TOKEN_EXPIRE_MINUTES from now
         exp_timestamp = payload["exp"]
-        exp_datetime = datetime.fromtimestamp(exp_timestamp)
-        expected_exp = datetime.utcnow() + timedelta(minutes=30)
+        exp_datetime = datetime.utcfromtimestamp(exp_timestamp)
+        expected_exp = datetime.utcnow() + timedelta(minutes=token_service.ACCESS_TOKEN_EXPIRE_MINUTES)
         assert abs((exp_datetime - expected_exp).total_seconds()) < 5  # Within 5 seconds
 
     def test_create_access_token_unique_jti(self, token_service, mock_user, mock_settings):
@@ -376,14 +376,14 @@ class TestRevokeToken:
                 mock_user, token_value
             )
 
-        mock_refresh_token_repo.revoke_by_hash.return_value = True
+            mock_refresh_token_repo.revoke_by_hash.return_value = True
 
-        # Act
-        result = await token_service.revoke_token(refresh_token)
+            # Act
+            result = await token_service.revoke_token(refresh_token)
 
-        # Assert
-        assert result is True
-        mock_refresh_token_repo.revoke_by_hash.assert_called_once()
+            # Assert
+            assert result is True
+            mock_refresh_token_repo.revoke_by_hash.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_revoke_token_not_found(
@@ -457,31 +457,31 @@ class TestRefreshAccessToken:
                 mock_user, token_value
             )
 
-        # Mock database lookup
-        token_hash = token_service._hash_token(token_value)
-        mock_db_token = RefreshToken(
-            token_id="token_id_123",
-            user_id=mock_user.user_id,
-            token_hash=token_hash,
-            expires_at=datetime.utcnow() + timedelta(days=7),
-            user_agent="Mozilla/5.0",
-            ip_address="192.168.1.100",
-            revoked=False,
-            revoked_at=None,
-        )
-        mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
+            # Mock database lookup
+            token_hash = token_service._hash_token(token_value)
+            mock_db_token = RefreshToken(
+                token_id="token_id_123",
+                user_id=mock_user.user_id,
+                token_hash=token_hash,
+                expires_at=datetime.utcnow() + timedelta(days=7),
+                user_agent="Mozilla/5.0",
+                ip_address="192.168.1.100",
+                revoked=False,
+                revoked_at=None,
+            )
+            mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
 
-        # Act
-        result = await token_service.refresh_access_token(refresh_token, rotate=True)
+            # Act
+            result = await token_service.refresh_access_token(refresh_token, rotate=True)
 
-        # Assert
-        assert result.access_token is not None
-        assert result.refresh_token is not None
-        assert result.access_token != refresh_token  # New access token
-        assert result.refresh_token != refresh_token  # New refresh token
+            # Assert
+            assert result.access_token is not None
+            assert result.refresh_token is not None
+            assert result.access_token != refresh_token  # New access token
+            assert result.refresh_token != refresh_token  # New refresh token
 
-        # Verify rotation was called
-        mock_refresh_token_repo.rotate_token_atomic.assert_called_once()
+            # Verify rotation was called
+            mock_refresh_token_repo.rotate_token_atomic.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_refresh_access_token_without_rotation(
@@ -496,32 +496,32 @@ class TestRefreshAccessToken:
                 mock_user, token_value
             )
 
-        token_hash = token_service._hash_token(token_value)
-        mock_db_token = RefreshToken(
-            token_id="token_id_123",
-            user_id=mock_user.user_id,
-            token_hash=token_hash,
-            expires_at=datetime.utcnow() + timedelta(days=7),
-            user_agent=None,
-            ip_address=None,
-            revoked=False,
-            revoked_at=None,
-        )
-        mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
+            token_hash = token_service._hash_token(token_value)
+            mock_db_token = RefreshToken(
+                token_id="token_id_123",
+                user_id=mock_user.user_id,
+                token_hash=token_hash,
+                expires_at=datetime.utcnow() + timedelta(days=7),
+                user_agent=None,
+                ip_address=None,
+                revoked=False,
+                revoked_at=None,
+            )
+            mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
 
-        # Act
-        access_token = await token_service.refresh_access_token(
-            refresh_token, rotate=False
-        )
+            # Act
+            access_token = await token_service.refresh_access_token(
+                refresh_token, rotate=False
+            )
 
-        # Assert
-        assert isinstance(access_token, str)
-        assert access_token != refresh_token
+            # Assert
+            assert isinstance(access_token, str)
+            assert access_token != refresh_token
 
-        # Verify rotation was NOT called
-        mock_refresh_token_repo.rotate_token_atomic.assert_not_called()
-        # But last_used should be updated
-        mock_refresh_token_repo.update_last_used.assert_called_once()
+            # Verify rotation was NOT called
+            mock_refresh_token_repo.rotate_token_atomic.assert_not_called()
+            # But last_used should be updated
+            mock_refresh_token_repo.update_last_used.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_refresh_access_token_invalid_type(
@@ -533,9 +533,9 @@ class TestRefreshAccessToken:
             mock_settings.secret_key = "test_secret_key"
             access_token = token_service._create_access_token(mock_user)
 
-        # Act & Assert
-        with pytest.raises(ValueError, match="Invalid token type"):
-            await token_service.refresh_access_token(access_token)
+            # Act & Assert
+            with pytest.raises(ValueError, match="Invalid token type"):
+                await token_service.refresh_access_token(access_token)
 
     @pytest.mark.asyncio
     async def test_refresh_access_token_revoked(
@@ -550,23 +550,23 @@ class TestRefreshAccessToken:
                 mock_user, token_value
             )
 
-        # Mock database returns revoked token
-        token_hash = token_service._hash_token(token_value)
-        mock_db_token = RefreshToken(
-            token_id="token_id_123",
-            user_id=mock_user.user_id,
-            token_hash=token_hash,
-            expires_at=datetime.utcnow() + timedelta(days=7),
-            user_agent=None,
-            ip_address=None,
-            revoked=True,  # Revoked!
-            revoked_at=datetime.utcnow(),
-        )
-        mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
+            # Mock database returns revoked token
+            token_hash = token_service._hash_token(token_value)
+            mock_db_token = RefreshToken(
+                token_id="token_id_123",
+                user_id=mock_user.user_id,
+                token_hash=token_hash,
+                expires_at=datetime.utcnow() + timedelta(days=7),
+                user_agent=None,
+                ip_address=None,
+                revoked=True,  # Revoked!
+                revoked_at=datetime.utcnow(),
+            )
+            mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
 
-        # Act & Assert
-        with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
-            await token_service.refresh_access_token(refresh_token)
+            # Act & Assert
+            with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
+                await token_service.refresh_access_token(refresh_token)
 
     @pytest.mark.asyncio
     async def test_refresh_access_token_not_in_database(
@@ -581,11 +581,11 @@ class TestRefreshAccessToken:
                 mock_user, token_value
             )
 
-        mock_refresh_token_repo.find_by_hash.return_value = None
+            mock_refresh_token_repo.find_by_hash.return_value = None
 
-        # Act & Assert
-        with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
-            await token_service.refresh_access_token(refresh_token)
+            # Act & Assert
+            with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
+                await token_service.refresh_access_token(refresh_token)
 
     @pytest.mark.asyncio
     async def test_refresh_access_token_expired_jwt(

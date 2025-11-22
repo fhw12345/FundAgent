@@ -2,7 +2,7 @@
 Holding repository for portfolio management.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -269,10 +269,11 @@ class HoldingRepository:
         )
 
         # Update in database
+        now = datetime.now(timezone.utc)
         update_dict = {
             "current_price": current_price,
-            "last_price_update": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "last_price_update": now,
+            "updated_at": now,
             **pl_metrics,  # Unpack market_value, unrealized_pl, unrealized_pl_pct
         }
 
@@ -293,7 +294,7 @@ class HoldingRepository:
             holding_id=holding_id,
             symbol=holding.symbol,
             current_price=current_price,
-            unrealized_pl=unrealized_pl,
+            unrealized_pl=pl_metrics["unrealized_pl"],
         )
 
         return Holding(**result)

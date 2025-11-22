@@ -30,9 +30,14 @@ def mock_user_repo():
     """Mock UserRepository"""
     repo = Mock(spec=UserRepository)
     repo.create = AsyncMock()
-    repo.find_by_email = AsyncMock()
-    repo.find_by_id = AsyncMock()
+    repo.get_by_email = AsyncMock()
+    repo.get_by_username = AsyncMock()
+    repo.get_by_id = AsyncMock()
     repo.update = AsyncMock()
+    repo.update_last_login = AsyncMock()
+    # Mock collection for direct MongoDB operations
+    repo.collection = Mock()
+    repo.collection.update_one = AsyncMock()
     return repo
 
 
@@ -75,47 +80,60 @@ class TestUserRegistration:
     async def test_register_user_success(self, auth_service, mock_user_repo):
         """Test successful user registration"""
         # Arrange
-        mock_user_repo.find_by_email.return_value = None  # Email not exists
+        # Mock email verification
+        auth_service.email_provider.verify_code = AsyncMock(return_value=True)
+
+        # Mock repository checks
+        mock_user_repo.get_by_email.return_value = None  # Email doesn't exist
+        mock_user_repo.get_by_username.return_value = None  # Username doesn't exist
+
         new_user = User(
             user_id="user_456",
             username="newuser",
             email="new@example.com",
             hashed_password="hashed_pass",
             is_active=True,
+            email_verified=True,
             created_at=datetime.now()
         )
         mock_user_repo.create.return_value = new_user
 
-        user_data = UserCreate(
-            username="newuser",
+        # Act
+        user, token = await auth_service.register_user(
             email="new@example.com",
+            code="123456",
+            username="newuser",
             password="SecureP@ssw0rd"
         )
 
-        # Act
-        result = await auth_service.register_user(user_data)
-
         # Assert
-        assert result.username == "newuser"
-        assert result.email == "new@example.com"
-        mock_user_repo.find_by_email.assert_called_once_with("new@example.com")
+        assert user.username == "newuser"
+        assert user.email == "new@example.com"
+        assert token is not None
+        assert isinstance(token, str)
+        auth_service.email_provider.verify_code.assert_called_once_with("new@example.com", "123456")
+        mock_user_repo.get_by_email.assert_called_once_with("new@example.com")
+        mock_user_repo.get_by_username.assert_called_once_with("newuser")
         mock_user_repo.create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_register_user_duplicate_email(self, auth_service, mock_user_repo, sample_user):
         """Test registration with duplicate email"""
         # Arrange
-        mock_user_repo.find_by_email.return_value = sample_user  # Email exists
+        # Mock email verification
+        auth_service.email_provider.verify_code = AsyncMock(return_value=True)
 
-        user_data = UserCreate(
-            username="duplicate",
-            email="test@example.com",
-            password="Password123"
-        )
+        # Mock repository - email exists
+        mock_user_repo.get_by_email.return_value = sample_user  # Email exists
 
         # Act & Assert
         with pytest.raises(ValueError, match="Email already registered"):
-            await auth_service.register_user(user_data)
+            await auth_service.register_user(
+                email="test@example.com",
+                code="123456",
+                username="duplicate",
+                password="Password123"
+            )
 
 
 # ===== Login Tests =====
@@ -129,39 +147,44 @@ class TestLoginWithPassword:
     async def test_login_success(self, mock_verify, auth_service, mock_user_repo, sample_user):
         """Test successful login with correct password"""
         # Arrange
-        mock_user_repo.find_by_email.return_value = sample_user
+        # Add password_hash attribute to sample_user
+        sample_user.password_hash = "$2b$12$hashed_password_here"
+        mock_user_repo.get_by_username.return_value = sample_user
+        mock_user_repo.update_last_login.return_value = sample_user
         mock_verify.return_value = True
 
         # Act
-        user, token = await auth_service.login_with_password("test@example.com", "correct_password")
+        user, token = await auth_service.login_with_password("testuser", "correct_password")
 
         # Assert
-        assert user.email == "test@example.com"
+        assert user.username == "testuser"
         assert token is not None
         assert isinstance(token, str)
-        mock_verify.assert_called_once_with("correct_password", sample_user.hashed_password)
+        mock_verify.assert_called_once_with("correct_password", sample_user.password_hash)
 
     @pytest.mark.asyncio
     async def test_login_user_not_found(self, auth_service, mock_user_repo):
-        """Test login with non-existent email"""
+        """Test login with non-existent username"""
         # Arrange
-        mock_user_repo.find_by_email.return_value = None
+        mock_user_repo.get_by_username.return_value = None
 
         # Act & Assert
-        with pytest.raises(ValueError, match="User not found"):
-            await auth_service.login_with_password("nonexistent@example.com", "password")
+        with pytest.raises(ValueError, match="Invalid username or password"):
+            await auth_service.login_with_password("nonexistent", "password")
 
     @pytest.mark.asyncio
     @patch("src.services.auth_service.verify_password")
     async def test_login_wrong_password(self, mock_verify, auth_service, mock_user_repo, sample_user):
         """Test login with wrong password"""
         # Arrange
-        mock_user_repo.find_by_email.return_value = sample_user
+        # Add password_hash attribute to sample_user
+        sample_user.password_hash = "$2b$12$hashed_password_here"
+        mock_user_repo.get_by_username.return_value = sample_user
         mock_verify.return_value = False
 
         # Act & Assert
-        with pytest.raises(ValueError, match="Invalid password"):
-            await auth_service.login_with_password("test@example.com", "wrong_password")
+        with pytest.raises(ValueError, match="Invalid username or password"):
+            await auth_service.login_with_password("testuser", "wrong_password")
 
 
 # ===== Email Verification Tests =====
@@ -188,7 +211,8 @@ class TestEmailVerification:
         """Test verify email code and login"""
         # Arrange
         auth_service.email_provider.verify_code = AsyncMock(return_value=True)
-        mock_user_repo.find_by_email.return_value = sample_user
+        mock_user_repo.get_by_email.return_value = sample_user
+        mock_user_repo.update_last_login.return_value = sample_user
 
         # Act
         user, token = await auth_service.verify_and_login("email", "test@example.com", code="123456")
@@ -234,7 +258,7 @@ class TestJWTTokens:
         # Verify token structure
         from src.core.config import get_settings
         settings = get_settings()
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[AuthService.ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key, algorithms=[AuthService.ALGORITHM])
         assert payload["sub"] == "user_123"
         assert "exp" in payload
 
@@ -257,7 +281,7 @@ class TestJWTTokens:
 
         expire = datetime.utcnow() - timedelta(hours=1)  # Expired
         payload = {"sub": "user_123", "exp": expire}
-        expired_token = jwt.encode(payload, settings.jwt_secret_key, algorithm=AuthService.ALGORITHM)
+        expired_token = jwt.encode(payload, settings.secret_key, algorithm=AuthService.ALGORITHM)
 
         # Act
         user_id = auth_service.verify_token(expired_token)
@@ -288,28 +312,33 @@ class TestPasswordReset:
     async def test_reset_password_success(self, auth_service, mock_user_repo, sample_user):
         """Test successful password reset"""
         # Arrange
-        mock_user_repo.find_by_email.return_value = sample_user
-        mock_user_repo.update.return_value = sample_user
+        # Mock email verification
+        auth_service.email_provider.verify_code = AsyncMock(return_value=True)
+        mock_user_repo.get_by_email.return_value = sample_user
+        mock_user_repo.update_last_login.return_value = sample_user
 
         # Act
-        result = await auth_service.reset_password("test@example.com", "NewP@ssw0rd123")
+        user, token = await auth_service.reset_password("test@example.com", "123456", "NewP@ssw0rd123")
 
         # Assert
-        assert result.email == "test@example.com"
-        mock_user_repo.update.assert_called_once()
-        # Check that password was updated (hashed_password should be different)
-        update_call = mock_user_repo.update.call_args[0][1]  # Get the update dict
-        assert "hashed_password" in update_call
+        assert user.email == "test@example.com"
+        assert token is not None
+        assert isinstance(token, str)
+        auth_service.email_provider.verify_code.assert_called_once_with("test@example.com", "123456")
+        # Check that collection.update_one was called to update password
+        mock_user_repo.collection.update_one.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_reset_password_user_not_found(self, auth_service, mock_user_repo):
         """Test password reset for non-existent user"""
         # Arrange
-        mock_user_repo.find_by_email.return_value = None
+        # Mock email verification
+        auth_service.email_provider.verify_code = AsyncMock(return_value=True)
+        mock_user_repo.get_by_email.return_value = None
 
         # Act & Assert
-        with pytest.raises(ValueError, match="User not found"):
-            await auth_service.reset_password("nonexistent@example.com", "NewPassword123")
+        with pytest.raises(ValueError, match="No account found with this email address"):
+            await auth_service.reset_password("nonexistent@example.com", "123456", "NewPassword123")
 
 
 # ===== User Retrieval Tests =====
@@ -323,15 +352,15 @@ class TestGetCurrentUser:
         """Test get user with valid token"""
         # Arrange
         token = auth_service.create_access_token("user_123")
-        mock_user_repo.find_by_id.return_value = sample_user
+        mock_user_repo.get_by_id.return_value = sample_user
 
         # Act
         user = await auth_service.get_current_user(token)
 
         # Assert
         assert user is not None
-        assert user.id == "user_123"
-        mock_user_repo.find_by_id.assert_called_once_with("user_123")
+        assert user.user_id == "user_123"
+        mock_user_repo.get_by_id.assert_called_once_with("user_123")
 
     @pytest.mark.asyncio
     async def test_get_current_user_invalid_token(self, auth_service, mock_user_repo):
@@ -341,14 +370,14 @@ class TestGetCurrentUser:
 
         # Assert
         assert user is None
-        mock_user_repo.find_by_id.assert_not_called()
+        mock_user_repo.get_by_id.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_get_current_user_not_found(self, auth_service, mock_user_repo):
         """Test get user when user doesn't exist in DB"""
         # Arrange
         token = auth_service.create_access_token("user_999")
-        mock_user_repo.find_by_id.return_value = None
+        mock_user_repo.get_by_id.return_value = None
 
         # Act
         user = await auth_service.get_current_user(token)
