@@ -11,6 +11,7 @@ from datetime import datetime
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from ..core.config import Settings
 from ..core.financial_analysis import FibonacciAnalyzer
 from ..database.redis import RedisCache
 from ..database.repositories.chat_repository import ChatRepository
@@ -18,6 +19,7 @@ from ..database.repositories.message_repository import MessageRepository
 from ..database.repositories.watchlist_repository import WatchlistRepository
 from ..models.chat import ChatCreate
 from ..models.message import MessageCreate, MessageMetadata
+from .context_window_manager import ContextWindowManager
 
 logger = structlog.get_logger()
 
@@ -32,6 +34,7 @@ class WatchlistAnalyzer:
         chats_collection: AsyncIOMotorCollection,
         redis_cache: RedisCache,
         market_service,  # AlphaVantageMarketDataService for market data
+        settings: Settings,  # Application settings for context management
         agent=None,  # LLM agent for analysis
         trading_service=None,  # Alpaca trading service for order placement
         order_repository=None,  # Repository for persisting orders to MongoDB
@@ -42,11 +45,15 @@ class WatchlistAnalyzer:
         self.chat_repo = ChatRepository(chats_collection)
         self.redis_cache = redis_cache
         self.market_service = market_service
+        self.settings = settings
         self.agent = agent
         self.trading_service = trading_service
         self.order_repository = order_repository
         self.is_running = False
         self._task = None
+
+        # Initialize context window manager for history management
+        self.context_manager = ContextWindowManager(settings)
 
     async def _get_symbol_chat_id(self, symbol: str) -> str:
         """
@@ -135,10 +142,91 @@ POSITION_SIZE: [percentage if BUY/SELL, or N/A if HOLD]
 REASONING: [your analysis]
 """
 
-            logger.info("Invoking agent for analysis", symbol=symbol)
+            # Get symbol-specific chat ID (one chat per symbol) - BEFORE invoking agent
+            chat_id = await self._get_symbol_chat_id(symbol)
 
-            # Invoke agent
-            response = await self.agent.ainvoke(prompt)
+            # Fetch historical messages for context management
+            historical_messages = await self.message_repo.list_by_chat(chat_id)
+
+            # Prepare conversation history for agent
+            conversation_history = []
+
+            if historical_messages:
+                # Calculate total tokens
+                total_tokens = self.context_manager.calculate_context_tokens(
+                    historical_messages
+                )
+
+                # Check if compaction is needed (> 50% of context limit)
+                model = getattr(self.settings, "default_llm_model", "qwen-plus")
+                should_compact = self.context_manager.should_compact(
+                    total_tokens, model=model
+                )
+
+                if should_compact:
+                    logger.info(
+                        "Context compaction triggered",
+                        symbol=symbol,
+                        total_tokens=total_tokens,
+                        message_count=len(historical_messages),
+                    )
+
+                    # Extract HEAD, BODY, TAIL structure
+                    head, body, tail = self.context_manager.extract_context_structure(
+                        historical_messages
+                    )
+
+                    # Summarize BODY using LLM
+                    summary_text = await self.context_manager.summarize_history(
+                        body_messages=body,
+                        symbol=symbol,
+                        llm_service=self.agent,  # Use the agent's LLM for summarization
+                    )
+
+                    # Reconstruct compacted context
+                    compacted_messages = self.context_manager.reconstruct_context(
+                        head=head, summary_text=summary_text, tail=tail
+                    )
+
+                    # Convert to conversation_history format
+                    for msg in compacted_messages:
+                        conversation_history.append(
+                            {"role": msg.role, "content": msg.content}
+                        )
+
+                    logger.info(
+                        "Context compacted successfully",
+                        symbol=symbol,
+                        original_count=len(historical_messages),
+                        compacted_count=len(compacted_messages),
+                        compression_ratio=round(
+                            len(compacted_messages) / len(historical_messages), 3
+                        ),
+                    )
+                else:
+                    # No compaction needed - use full history
+                    for msg in historical_messages:
+                        conversation_history.append(
+                            {"role": msg.role, "content": msg.content}
+                        )
+
+                    logger.info(
+                        "Using full conversation history",
+                        symbol=symbol,
+                        total_tokens=total_tokens,
+                        message_count=len(historical_messages),
+                    )
+
+            logger.info(
+                "Invoking agent for analysis",
+                symbol=symbol,
+                conversation_history_length=len(conversation_history),
+            )
+
+            # Invoke agent with conversation history
+            response = await self.agent.ainvoke(
+                prompt, conversation_history=conversation_history
+            )
 
             logger.info(
                 "Agent analysis complete",
@@ -177,9 +265,6 @@ REASONING: [your analysis]
                 match = re.search(r"(\d+)%", size_line)
                 if match:
                     position_size = int(match.group(1))
-
-            # Get symbol-specific chat ID (one chat per symbol)
-            chat_id = await self._get_symbol_chat_id(symbol)
 
             # Create analysis message
             message_content = f"## 🤖 AI Agent Analysis - {symbol}\n\n"

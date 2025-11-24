@@ -27,8 +27,8 @@ import logging
 import sys
 from pathlib import Path
 
-# Add src to path for local execution
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add parent directory to path for local execution
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import structlog
 
@@ -38,7 +38,12 @@ from src.core.config import get_settings
 from src.core.data.ticker_data_service import TickerDataService
 from src.database.mongodb import MongoDB
 from src.database.redis import RedisCache
+from src.database.repositories.transaction_repository import TransactionRepository
+from src.database.repositories.user_repository import UserRepository
 from src.services.alpaca_data_service import AlpacaDataService
+from src.services.alpaca_trading_service import AlpacaTradingService
+from src.services.alphavantage_market_data import AlphaVantageMarketDataService
+from src.services.credit_service import CreditService
 
 logger = structlog.get_logger()
 
@@ -92,19 +97,25 @@ async def main():
 
         logger.info("Database connections established")
 
+        # Initialize Alpha Vantage market data service (required)
+        logger.info("Initializing Alpha Vantage market data service")
+        market_service = AlphaVantageMarketDataService(settings=settings)
+
         # Initialize services (Alpaca is optional for portfolio analysis)
         alpaca_data_service = None
+        trading_service = None
         if settings.alpaca_api_key and settings.alpaca_secret_key:
             try:
                 alpaca_data_service = AlpacaDataService(settings=settings)
-                logger.info("Alpaca data service initialized")
+                trading_service = AlpacaTradingService(settings=settings)
+                logger.info("Alpaca services initialized (data + trading)")
             except Exception as e:
                 logger.warning(
-                    "Alpaca data service unavailable - continuing without it",
+                    "Alpaca services unavailable - continuing without order placement",
                     error=str(e),
                 )
         else:
-            logger.info("Alpaca API keys not configured - skipping")
+            logger.info("Alpaca API keys not configured - no order placement")
 
         ticker_service = (
             TickerDataService(
@@ -115,21 +126,30 @@ async def main():
             else None
         )
 
-        # Initialize ReAct agent with MCP tools
-        logger.info("Initializing ReAct agent with MCP tools")
+        # Initialize ReAct agent
+        logger.info("Initializing ReAct agent")
         react_agent = FinancialAnalysisReActAgent(
             settings=settings,
             ticker_data_service=ticker_service,
+            market_service=market_service,
         )
-
-        # Load MCP tools (118 tools from Alpha Vantage)
-        await react_agent.initialize_mcp_tools()
 
         logger.info(
             "ReAct agent initialized",
             total_tools=len(react_agent.tools),
-            mcp_enabled=react_agent.mcp_client is not None,
         )
+
+        # Initialize credit service for usage tracking
+        logger.info("Initializing credit service")
+        user_repo = UserRepository(mongodb.get_collection("users"))
+        transaction_repo = TransactionRepository(mongodb.get_collection("transactions"))
+        credit_service = CreditService(
+            user_repo=user_repo,
+            transaction_repo=transaction_repo,
+            mongodb=mongodb,
+            settings=settings,
+        )
+        logger.info("Credit service initialized (portfolio agent usage tracking)")
 
         # Initialize portfolio analysis agent
         portfolio_agent = PortfolioAnalysisAgent(
@@ -137,6 +157,9 @@ async def main():
             redis_cache=redis_cache,
             react_agent=react_agent,
             settings=settings,
+            market_service=market_service,
+            trading_service=trading_service,
+            credit_service=credit_service,
         )
 
         # Run analysis

@@ -44,6 +44,7 @@ dependencies = [
     "opentelemetry-sdk>=1.20.0",        # OpenTelemetry SDK
     "oss2>=2.18.0",                     # Alibaba Cloud OSS SDK
     "slowapi>=0.1.9",                   # Rate limiting for FastAPI
+    "tiktoken>=0.7.0",                  # Token counting for context window management
 ]
 
 [project.optional-dependencies]
