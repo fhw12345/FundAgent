@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     # Security
     secret_key: str = "dev-secret-key-change-in-production"
+    admin_secret: str = "dev-admin-secret-change-in-production"  # For CronJob auth
     allowed_hosts: list[str] = [
         "*"
     ]  # Allow all hosts (override via ALLOWED_HOSTS env var)
@@ -59,6 +60,22 @@ class Settings(BaseSettings):
     # LLM Configuration
     default_llm_model: str = "qwen-plus-latest"  # Default model for agents
     default_llm_temperature: float = 0.7  # Default temperature for LLM calls
+
+    # Context Window Management (Portfolio Agent History)
+    llm_context_limits: dict[str, int] = {
+        "qwen-plus": 100_000,
+        "qwen-plus-latest": 100_000,
+        "qwen-max": 30_000,
+        "qwen-max-latest": 30_000,
+        "qwen-turbo": 8_000,
+        "qwen-turbo-latest": 8_000,
+        "qwen-flash": 8_000,
+        "deepseek-chat": 64_000,
+    }
+    compact_threshold_ratio: float = 0.5  # Trigger compaction at 50% of context limit
+    compact_target_ratio: float = 0.1  # Compress history to 10% of context limit
+    tail_messages_keep: int = 3  # Keep last 3 exchanges in tail
+    summarization_model: str = "qwen-flash"  # Fast, cheap model for summarization
 
     # External APIs - Market Data & Trading
     alpha_vantage_api_key: str = ""  # Alpha Vantage API key (premium: 75 calls/min)

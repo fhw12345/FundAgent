@@ -6,8 +6,28 @@ and provides audit trail linking orders to AI analysis.
 """
 
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel, Field
+
+
+class OrderType(str, Enum):
+    """Order type enum for portfolio orders."""
+
+    MARKET = "market"
+    LIMIT = "limit"
+    STOP = "stop"
+    STOP_LIMIT = "stop_limit"
+    TRAILING_STOP = "trailing_stop"
+
+
+class TimeInForce(str, Enum):
+    """Time in force enum for order duration."""
+
+    DAY = "day"  # Valid until end of trading day
+    GTC = "gtc"  # Good Till Cancelled
+    IOC = "ioc"  # Immediate or Cancel
+    FOK = "fok"  # Fill or Kill
 
 
 class PortfolioOrder(BaseModel):
@@ -44,6 +64,17 @@ class PortfolioOrder(BaseModel):
     order_type: str = Field(..., description="market | limit | stop | stop_limit")
     side: str = Field(..., description="buy | sell")
     quantity: float = Field(..., description="Number of shares")
+
+    # Order parameters (for limit, stop, stop-limit orders)
+    limit_price: float | None = Field(
+        None, description="Limit price (required for limit and stop_limit orders)"
+    )
+    stop_price: float | None = Field(
+        None, description="Stop price (required for stop and stop_limit orders)"
+    )
+    time_in_force: str = Field(
+        "day", description="Time in force: day | gtc | ioc | fok"
+    )
 
     # Execution details
     status: str = Field(
