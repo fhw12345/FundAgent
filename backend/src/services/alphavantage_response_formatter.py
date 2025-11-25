@@ -760,3 +760,422 @@ class AlphaVantageResponseFormatter:
                 )
 
         return "\n".join(output)
+
+    def format_insider_transactions(
+        self,
+        raw_data: dict[str, Any],
+        symbol: str,
+        invoked_at: str,
+    ) -> str:
+        """
+        Format insider transactions for LLM consumption.
+
+        Groups by acquisition vs disposal, shows recent activity trends.
+
+        Args:
+            raw_data: Dict with 'data' list of transaction records
+            symbol: Stock symbol
+            invoked_at: Timestamp when tool was invoked
+
+        Returns:
+            Compressed markdown summary of insider activity
+        """
+        output = [
+            f"# 👔 Insider Transactions: {symbol}",
+            f"*Data Source: Alpha Vantage | Invoked: {invoked_at}*",
+            "",
+        ]
+
+        transactions = raw_data.get("data", [])
+
+        if not transactions:
+            output.append("**No insider transaction data available**")
+            return "\n".join(output)
+
+        # Group by acquisition vs disposal
+        acquisitions = [
+            t for t in transactions if t.get("acquisition_or_disposal") == "A"
+        ]
+        disposals = [t for t in transactions if t.get("acquisition_or_disposal") == "D"]
+
+        # Calculate totals
+        total_acquired_shares = sum(
+            self._safe_float(t.get("shares", "0")) for t in acquisitions
+        )
+        total_disposed_shares = sum(
+            self._safe_float(t.get("shares", "0")) for t in disposals
+        )
+
+        output.extend(
+            [
+                "## Recent Activity Summary",
+                "",
+                f"- **Acquisitions**: {len(acquisitions)} transactions ({total_acquired_shares:,.0f} shares)",
+                f"- **Disposals**: {len(disposals)} transactions ({total_disposed_shares:,.0f} shares)",
+                "",
+            ]
+        )
+
+        # Trend analysis
+        net_shares = total_acquired_shares - total_disposed_shares
+        if net_shares > 0:
+            trend = f"↑ **Bullish** (Net buying: {net_shares:,.0f} shares)"
+        elif net_shares < 0:
+            trend = f"↓ **Bearish** (Net selling: {abs(net_shares):,.0f} shares)"
+        else:
+            trend = "→ **Neutral** (No net change)"
+
+        output.extend([f"**Insider Sentiment**: {trend}", ""])
+
+        # Top acquisitions
+        if acquisitions:
+            output.extend(
+                [
+                    "### Top Acquisitions",
+                    "",
+                    "| Date | Executive | Shares | Price |",
+                    "|------|-----------|--------|-------|",
+                ]
+            )
+
+            for t in acquisitions[:5]:
+                date = t.get("transaction_date", "N/A")
+                exec_name = t.get("executive", "N/A")
+                shares = self._safe_float(t.get("shares", "0"))
+                price = self._safe_float(t.get("share_price", "0"))
+
+                output.append(
+                    f"| {date} | {exec_name[:25]} | {shares:,.0f} | ${price:.2f} |"
+                )
+
+            output.append("")
+
+        # Top disposals
+        if disposals:
+            output.extend(
+                [
+                    "### Top Disposals",
+                    "",
+                    "| Date | Executive | Shares | Price |",
+                    "|------|-----------|--------|-------|",
+                ]
+            )
+
+            for t in disposals[:5]:
+                date = t.get("transaction_date", "N/A")
+                exec_name = t.get("executive", "N/A")
+                shares = self._safe_float(t.get("shares", "0"))
+                price = self._safe_float(t.get("share_price", "0"))
+
+                output.append(
+                    f"| {date} | {exec_name[:25]} | {shares:,.0f} | ${price:.2f} |"
+                )
+
+            output.append("")
+
+        return "\n".join(output)
+
+    def format_etf_profile(
+        self,
+        raw_data: dict[str, Any],
+        symbol: str,
+        invoked_at: str,
+    ) -> str:
+        """
+        Format ETF profile with top holdings and sector allocation.
+
+        Args:
+            raw_data: Dict with ETF profile data
+            symbol: ETF ticker symbol
+            invoked_at: Timestamp when tool was invoked
+
+        Returns:
+            Formatted ETF profile markdown
+        """
+        output = [
+            f"# 📦 ETF Profile: {symbol}",
+            f"*Data Source: Alpha Vantage | Invoked: {invoked_at}*",
+            "",
+        ]
+
+        # Overview
+        net_assets = raw_data.get("net_assets", "N/A")
+        expense_ratio = raw_data.get("net_expense_ratio", "N/A")
+        dividend_yield = raw_data.get("dividend_yield", "N/A")
+        leveraged = raw_data.get("leveraged", "NO")
+
+        # Format net assets
+        if net_assets != "N/A":
+            net_assets_num = self._safe_float(net_assets)
+            net_assets_formatted = self._format_large_number(net_assets_num)
+        else:
+            net_assets_formatted = "N/A"
+
+        output.extend(
+            [
+                "## Overview",
+                "",
+                f"- **Net Assets**: ${net_assets_formatted}",
+                f"- **Expense Ratio**: {expense_ratio}",
+                f"- **Dividend Yield**: {dividend_yield}",
+                f"- **Leveraged**: {leveraged}",
+                "",
+            ]
+        )
+
+        # Top holdings
+        holdings = raw_data.get("holdings", [])
+        if holdings:
+            output.extend(
+                [
+                    f"## Top {min(10, len(holdings))} Holdings",
+                    "",
+                    "| Symbol | Description | Weight |",
+                    "|--------|-------------|--------|",
+                ]
+            )
+
+            for holding in holdings[:10]:
+                symbol_h = holding.get("symbol", "N/A")
+                desc = holding.get("description", "N/A")
+                weight = holding.get("weight", "0")
+                weight_pct = self._safe_float(weight) * 100
+
+                output.append(
+                    f"| {symbol_h} | {desc[:30]} | {weight_pct:.2f}% |"
+                )
+
+            output.append("")
+
+        # Sector allocation
+        sectors = raw_data.get("sectors", [])
+        if sectors:
+            output.extend(
+                [
+                    "## Sector Allocation",
+                    "",
+                    "| Sector | Weight |",
+                    "|--------|--------|",
+                ]
+            )
+
+            for sector in sectors:
+                sector_name = sector.get("sector", "N/A")
+                weight = sector.get("weight", "0")
+                weight_pct = self._safe_float(weight) * 100
+
+                output.append(f"| {sector_name} | {weight_pct:.2f}% |")
+
+            output.append("")
+
+        return "\n".join(output)
+
+    def format_commodity_price(
+        self,
+        df: Any,  # pd.DataFrame
+        commodity: str,
+        interval: str,
+        invoked_at: str,
+    ) -> str:
+        """
+        Format commodity price data with trend analysis.
+
+        Args:
+            df: DataFrame with date index and value column
+            commodity: Commodity name (e.g., "COPPER")
+            interval: Price interval
+            invoked_at: Timestamp when tool was invoked
+
+        Returns:
+            Formatted commodity price markdown with trends
+        """
+        import pandas as pd
+
+        output = [
+            f"# 🔶 {commodity.title()} Prices ({interval.title()})",
+            f"*Data Source: Alpha Vantage | Invoked: {invoked_at}*",
+            "",
+        ]
+
+        if df.empty:
+            output.append("**No price data available**")
+            return "\n".join(output)
+
+        # Current price (most recent)
+        current_price = float(df.iloc[-1]["value"])
+
+        output.extend(
+            [
+                f"## Current Price: ${current_price:,.2f}",
+                "",
+            ]
+        )
+
+        # Calculate trends (if enough data)
+        if len(df) >= 12:
+            price_1m_ago = float(df.iloc[-2]["value"]) if len(df) >= 2 else current_price
+            price_3m_ago = float(df.iloc[-4]["value"]) if len(df) >= 4 else current_price
+            price_12m_ago = float(df.iloc[-13]["value"]) if len(df) >= 13 else current_price
+
+            change_1m = ((current_price - price_1m_ago) / price_1m_ago) * 100
+            change_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100
+            change_12m = ((current_price - price_12m_ago) / price_12m_ago) * 100
+
+            output.extend(
+                [
+                    "## Trend Analysis",
+                    "",
+                    f"- **1-Period Change**: {change_1m:+.1f}% (${price_1m_ago:,.2f} → ${current_price:,.2f})",
+                    f"- **3-Period Change**: {change_3m:+.1f}% (${price_3m_ago:,.2f} → ${current_price:,.2f})",
+                    f"- **12-Period Change**: {change_12m:+.1f}% (${price_12m_ago:,.2f} → ${current_price:,.2f})",
+                    "",
+                ]
+            )
+
+            # Overall trend
+            if change_12m > 10:
+                trend = "↑ **Strong Bullish** (Rising demand)"
+            elif change_12m > 0:
+                trend = "↗ **Bullish** (Moderate growth)"
+            elif change_12m > -10:
+                trend = "↘ **Bearish** (Slight decline)"
+            else:
+                trend = "↓ **Strong Bearish** (Falling demand)"
+
+            output.extend([f"**Overall Trend**: {trend}", ""])
+
+        # Recent price history (last 12 periods)
+        output.extend(
+            [
+                "## Price History (Recent)",
+                "",
+                "| Date | Price | Change |",
+                "|------|-------|--------|",
+            ]
+        )
+
+        recent_df = df.tail(12)
+        for i, (date, row) in enumerate(recent_df.iterrows()):
+            price = float(row["value"])
+            if i > 0:
+                prev_price = float(recent_df.iloc[i - 1]["value"])
+                change_pct = ((price - prev_price) / prev_price) * 100
+                change_str = f"{change_pct:+.1f}%"
+            else:
+                change_str = "-"
+
+            output.append(f"| {date.date()} | ${price:,.2f} | {change_str} |")
+
+        output.append("")
+
+        return "\n".join(output)
+
+    def format_technical_indicator(
+        self,
+        df: Any,  # pd.DataFrame
+        symbol: str,
+        function: str,
+        interval: str,
+        invoked_at: str,
+    ) -> str:
+        """
+        Format technical indicator with current value and signal.
+
+        Args:
+            df: DataFrame with indicator values
+            symbol: Stock symbol
+            function: Indicator name (RSI, MACD, etc.)
+            interval: Time interval
+            invoked_at: Timestamp when tool was invoked
+
+        Returns:
+            Formatted technical indicator markdown
+        """
+        output = [
+            f"# 📉 {function}: {symbol}",
+            f"*{interval.title()} | Data Source: Alpha Vantage | Invoked: {invoked_at}*",
+            "",
+        ]
+
+        if df.empty:
+            output.append("**No indicator data available**")
+            return "\n".join(output)
+
+        # Current value (most recent)
+        last_row = df.iloc[-1]
+
+        # Format current value based on indicator type
+        if len(df.columns) == 1:
+            # Single-value indicators (SMA, EMA, RSI, etc.)
+            col_name = df.columns[0]
+            current_value = float(last_row[col_name])
+
+            output.extend(
+                [
+                    f"## Current {function}: {current_value:.2f}",
+                    "",
+                ]
+            )
+
+            # Add signal interpretation for specific indicators
+            if function == "RSI":
+                if current_value > 70:
+                    signal = "🔴 **Overbought** (Potential reversal down)"
+                elif current_value < 30:
+                    signal = "🟢 **Oversold** (Potential reversal up)"
+                else:
+                    signal = "🟡 **Neutral** (Range-bound)"
+
+                output.extend([f"**Signal**: {signal}", ""])
+
+        else:
+            # Multi-value indicators (MACD, STOCH, BBANDS, etc.)
+            output.extend(["## Current Values", ""])
+
+            for col in df.columns:
+                value = float(last_row[col])
+                output.append(f"- **{col}**: {value:.2f}")
+
+            output.append("")
+
+            # MACD-specific signal
+            if function == "MACD" and "MACD" in df.columns:
+                macd_val = float(last_row.get("MACD", 0))
+                signal_val = float(last_row.get("MACD_Signal", 0))
+
+                if macd_val > signal_val:
+                    signal = "🟢 **Bullish** (MACD above signal)"
+                else:
+                    signal = "🔴 **Bearish** (MACD below signal)"
+
+                output.extend([f"**Signal**: {signal}", ""])
+
+        # Recent values table (last 10 periods)
+        output.extend(
+            [
+                "## Recent Values",
+                "",
+            ]
+        )
+
+        # Build table header
+        header = "| Date |"
+        separator = "|------|"
+        for col in df.columns:
+            header += f" {col} |"
+            separator += "--------|"
+
+        output.extend([header, separator])
+
+        # Add last 10 rows
+        recent_df = df.tail(10)
+        for date, row in recent_df.iterrows():
+            row_str = f"| {date.date() if hasattr(date, 'date') else date} |"
+            for col in df.columns:
+                value = float(row[col])
+                row_str += f" {value:.2f} |"
+            output.append(row_str)
+
+        output.append("")
+
+        return "\n".join(output)

@@ -1602,3 +1602,378 @@ class AlphaVantageMarketDataService:
                 "Commodity prices fetch failed", interval=interval, error=str(e)
             )
             raise
+
+    async def get_insider_transactions(
+        self, symbol: str, limit: int = 50
+    ) -> dict[str, Any]:
+        """
+        Get insider transactions (executive buy/sell activity).
+
+        Returns CSV data from INSIDER_TRANSACTIONS endpoint.
+        Filters to most recent transactions for context efficiency.
+
+        Args:
+            symbol: Stock ticker symbol
+            limit: Maximum number of transactions to return (default: 50)
+
+        Returns:
+            Dict with 'symbol' and 'data' list containing transaction records
+        """
+        try:
+            response = await self.client.get(
+                self.base_url,
+                params={
+                    "function": "INSIDER_TRANSACTIONS",
+                    "symbol": symbol,
+                    "apikey": self.api_key,
+                },
+            )
+
+            if response.status_code != 200:
+                sanitized_text = self._sanitize_text(response.text)
+                raise ValueError(
+                    f"Alpha Vantage API error: {response.status_code} - {sanitized_text}"
+                )
+
+            # Parse CSV response
+            from io import StringIO
+
+            csv_text = response.text.strip()
+
+            if not csv_text or "Error" in csv_text[:100]:
+                sanitized = self._sanitize_text(csv_text[:200])
+                raise ValueError(
+                    f"No insider transaction data for symbol: {symbol}. Response: {sanitized}"
+                )
+
+            # Parse CSV using pandas
+            df = pd.read_csv(
+                StringIO(csv_text),
+                on_bad_lines="skip",
+            )
+
+            if df.empty:
+                logger.warning(
+                    "No insider transactions found", symbol=symbol
+                )
+                return {"symbol": symbol, "data": []}
+
+            # Convert to list of dicts and limit to recent transactions
+            transactions = df.head(limit).to_dict("records")
+
+            logger.info(
+                "Insider transactions fetched",
+                symbol=symbol,
+                total_count=len(df),
+                returned_count=len(transactions),
+            )
+
+            return {"symbol": symbol, "data": transactions}
+
+        except Exception as e:
+            logger.error(
+                "Insider transactions fetch failed", symbol=symbol, error=str(e)
+            )
+            raise
+
+    async def get_etf_profile(self, symbol: str) -> dict[str, Any]:
+        """
+        Get ETF profile with holdings and sector allocation.
+
+        Uses ETF_PROFILE endpoint to return holdings (top constituents)
+        and sector breakdown for exchange-traded funds.
+
+        **Caching**: ETF profiles change infrequently, cached for 24 hours.
+
+        Args:
+            symbol: ETF ticker symbol (e.g., "QQQ", "SOXS", "SPY")
+
+        Returns:
+            Dict with net_assets, holdings, sectors, leveraged flag, etc.
+        """
+        # Check cache first (24h TTL - ETF profiles rarely change)
+        cache_key = f"etf_profile:{symbol}"
+        if self.redis_cache:
+            cached_data = await self.redis_cache.get(cache_key)
+            if cached_data:
+                logger.info("ETF profile cache hit", symbol=symbol)
+                return json.loads(cached_data)
+
+        try:
+            response = await self.client.get(
+                self.base_url,
+                params={
+                    "function": "ETF_PROFILE",
+                    "symbol": symbol,
+                    "apikey": self.api_key,
+                },
+            )
+
+            if response.status_code != 200:
+                sanitized_text = self._sanitize_text(response.text)
+                raise ValueError(
+                    f"Alpha Vantage API error: {response.status_code} - {sanitized_text}"
+                )
+
+            data = response.json()
+
+            if not data or "Error Message" in data:
+                sanitized = self._sanitize_response(data)
+                raise ValueError(
+                    f"No ETF profile data for symbol: {symbol}. Response: {sanitized}"
+                )
+
+            result = {"symbol": symbol, **data}
+
+            # Cache for 24 hours (ETF profiles change infrequently)
+            if self.redis_cache:
+                await self.redis_cache.set(
+                    cache_key, json.dumps(result), ttl=86400  # 24 hours
+                )
+
+            logger.info(
+                "ETF profile fetched and cached",
+                symbol=symbol,
+                holdings_count=len(data.get("holdings", [])),
+                sectors_count=len(data.get("sectors", [])),
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error("ETF profile fetch failed", symbol=symbol, error=str(e))
+            raise
+
+    async def get_commodity_price(
+        self, commodity: str = "COPPER", interval: str = "monthly"
+    ) -> pd.DataFrame:
+        """
+        Get global commodity prices (COPPER, ALUMINUM, WHEAT, etc.).
+
+        Uses commodity-specific endpoints (COPPER, ALUMINUM, etc.).
+        Returns time series of commodity prices.
+
+        Args:
+            commodity: Commodity code (COPPER, ALUMINUM, WHEAT, CORN, etc.)
+            interval: daily, weekly, or monthly (default: monthly)
+
+        Returns:
+            DataFrame with date index and value column
+        """
+        try:
+            # Validate commodity code
+            valid_commodities = [
+                "COPPER",
+                "ALUMINUM",
+                "WHEAT",
+                "CORN",
+                "COTTON",
+                "SUGAR",
+                "COFFEE",
+                "ALL_COMMODITIES",
+            ]
+            commodity_upper = commodity.upper()
+
+            if commodity_upper not in valid_commodities:
+                raise ValueError(
+                    f"Invalid commodity: {commodity}. Use one of: {', '.join(valid_commodities)}"
+                )
+
+            response = await self.client.get(
+                self.base_url,
+                params={
+                    "function": commodity_upper,
+                    "interval": interval,
+                    "apikey": self.api_key,
+                },
+            )
+
+            if response.status_code != 200:
+                sanitized_text = self._sanitize_text(response.text)
+                raise ValueError(
+                    f"Alpha Vantage API error: {response.status_code} - {sanitized_text}"
+                )
+
+            data = response.json()
+
+            if "data" not in data:
+                sanitized = self._sanitize_response(data)
+                raise ValueError(
+                    f"No {commodity} price data available: {sanitized}"
+                )
+
+            # Convert to DataFrame
+            df_data = []
+            for item in data["data"]:
+                df_data.append(
+                    {
+                        "date": pd.to_datetime(item["date"]),
+                        "value": float(item["value"]),
+                    }
+                )
+
+            df = pd.DataFrame(df_data)
+            df.set_index("date", inplace=True)
+            df.sort_index(inplace=True)
+
+            logger.info(
+                "Commodity price fetched",
+                commodity=commodity,
+                interval=interval,
+                data_points=len(df),
+            )
+
+            return df
+
+        except Exception as e:
+            logger.error(
+                "Commodity price fetch failed",
+                commodity=commodity,
+                interval=interval,
+                error=str(e),
+            )
+            raise
+
+    async def get_technical_indicator(
+        self,
+        symbol: str,
+        function: str,
+        interval: str,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """
+        Get technical indicator data (unified method for all indicators).
+
+        Supports: SMA, EMA, VWAP, MACD, STOCH, RSI, ADX, AROON, BBANDS, AD, OBV
+
+        Args:
+            symbol: Stock ticker symbol
+            function: Technical indicator name (uppercase)
+            interval: Time interval (1min, 5min, 15min, 30min, 60min, daily, weekly, monthly)
+            **kwargs: Indicator-specific parameters:
+                - time_period: Period for MA indicators (default: 10)
+                - series_type: close, open, high, low (default: close)
+                - fastperiod, slowperiod, signalperiod: For MACD
+                - fastkperiod, slowkperiod, slowdperiod: For STOCH
+                - nbdevup, nbdevdn, matype: For BBANDS
+
+        Returns:
+            DataFrame with date/timestamp index and indicator values
+        """
+        try:
+            # Validate indicator
+            supported = [
+                "SMA",
+                "EMA",
+                "VWAP",
+                "MACD",
+                "STOCH",
+                "RSI",
+                "ADX",
+                "AROON",
+                "BBANDS",
+                "AD",
+                "OBV",
+            ]
+            function_upper = function.upper()
+
+            if function_upper not in supported:
+                raise ValueError(
+                    f"Unsupported indicator: {function}. Use one of: {', '.join(supported)}"
+                )
+
+            # Build params with defaults
+            params = {
+                "function": function_upper,
+                "symbol": symbol,
+                "interval": interval,
+                "apikey": self.api_key,
+            }
+
+            # Add optional parameters
+            if "time_period" in kwargs:
+                params["time_period"] = kwargs["time_period"]
+            if "series_type" in kwargs:
+                params["series_type"] = kwargs["series_type"]
+
+            # MACD-specific params
+            if function_upper == "MACD":
+                params["fastperiod"] = kwargs.get("fastperiod", 12)
+                params["slowperiod"] = kwargs.get("slowperiod", 26)
+                params["signalperiod"] = kwargs.get("signalperiod", 9)
+
+            # STOCH-specific params
+            if function_upper == "STOCH":
+                params["fastkperiod"] = kwargs.get("fastkperiod", 5)
+                params["slowkperiod"] = kwargs.get("slowkperiod", 3)
+                params["slowdperiod"] = kwargs.get("slowdperiod", 3)
+
+            # BBANDS-specific params
+            if function_upper == "BBANDS":
+                params["nbdevup"] = kwargs.get("nbdevup", 2)
+                params["nbdevdn"] = kwargs.get("nbdevdn", 2)
+
+            response = await self.client.get(self.base_url, params=params)
+
+            if response.status_code != 200:
+                sanitized_text = self._sanitize_text(response.text)
+                raise ValueError(
+                    f"Alpha Vantage API error: {response.status_code} - {sanitized_text}"
+                )
+
+            data = response.json()
+
+            # Find the technical indicator key in response
+            tech_key = None
+            for key in data.keys():
+                if "Technical Analysis" in key or function_upper in key:
+                    tech_key = key
+                    break
+
+            if not tech_key or not data[tech_key]:
+                sanitized = self._sanitize_response(data)
+                raise ValueError(
+                    f"No {function} data for symbol: {symbol}. Response: {sanitized}"
+                )
+
+            time_series = data[tech_key]
+
+            # Convert to DataFrame
+            df_data = []
+            for timestamp, values in time_series.items():
+                row = {"timestamp": pd.to_datetime(timestamp)}
+                # Add all indicator values (handles single and multi-column indicators)
+                for val_key, val in values.items():
+                    # Clean column name (remove numeric prefix like "1. ")
+                    clean_key = val_key.split(". ", 1)[-1] if ". " in val_key else val_key
+                    row[clean_key] = float(val)
+                df_data.append(row)
+
+            df = pd.DataFrame(df_data)
+            df.set_index("timestamp", inplace=True)
+            df.sort_index(inplace=True)
+
+            # Localize intraday timestamps to ET
+            if interval in ["1min", "5min", "15min", "30min", "60min"]:
+                if df.index.tz is None:
+                    df.index = df.index.tz_localize("America/New_York")
+
+            logger.info(
+                "Technical indicator fetched",
+                symbol=symbol,
+                function=function,
+                interval=interval,
+                data_points=len(df),
+            )
+
+            return df
+
+        except Exception as e:
+            logger.error(
+                "Technical indicator fetch failed",
+                symbol=symbol,
+                function=function,
+                interval=interval,
+                error=str(e),
+            )
+            raise
