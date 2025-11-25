@@ -24,6 +24,10 @@ resources:
 - langfuse/ingress.yaml
 - ingress/clusterissuer.yaml
 - ingress/ingress.yaml
+- cronjobs/reconcile-transactions.yaml
+# Deprecated: Migrated to HTTP trigger pattern (see docs/features/portfolio-analysis-cronjob-http.md)
+# - cronjobs/portfolio-analysis.yaml
+- cronjobs/portfolio-analysis-trigger.yaml  # NEW: Lightweight HTTP trigger (5MB vs 1.14GB)
 
 commonLabels:
   app.kubernetes.io/name: klinematrix

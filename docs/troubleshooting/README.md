@@ -5,6 +5,7 @@ This directory contains documentation for bugs, fixes, and common issues encount
 ## Quick Index
 
 ### Common Issues
+- [🚨 Docker Env Reload Issue](docker-env-reload-issue.md) - **CRITICAL**: Containers don't reload env vars on restart
 - [CORS & API Connectivity](cors-api-connectivity.md) - CORS errors, localhost issues, nginx proxy problems
 - [Data Validation](data-validation-issues.md) - Pydantic validation errors, data format mismatches
 - [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems, service selectors
@@ -79,6 +80,9 @@ Add to the appropriate category file:
 ```
 
 ## Issue Categories
+
+### 🚨 Docker Environment Variables (CRITICAL)
+Containers freezing environment variables at creation time, `restart` vs `recreate`, env var debugging
 
 ### CORS & API Connectivity
 Frontend cannot connect to backend, CORS errors, proxy issues

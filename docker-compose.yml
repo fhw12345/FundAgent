@@ -52,6 +52,47 @@ services:
     profiles:
       - tools  # Only run when explicitly requested
 
+  # Portfolio Analysis Cron (Scheduled)
+  # Configurable interval for local testing (default: 1440 minutes = 24 hours)
+  # Production: 8 PM EST (01:00 UTC) daily via K8s CronJob
+  portfolio-cron:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      bash -c "
+        INTERVAL=$${CRON_INTERVAL_MINUTES:-1440};
+        ENABLED=$${CRON_ENABLED:-true};
+
+        echo \"Portfolio Cron Configuration:\";
+        echo \"  Enabled: $$ENABLED\";
+        echo \"  Interval: $$INTERVAL minutes\";
+
+        if [ \"$$ENABLED\" = \"false\" ]; then
+          echo 'Cron disabled. Sleeping indefinitely...';
+          sleep infinity;
+        fi;
+
+        echo \"Starting portfolio analysis loop (runs every $$INTERVAL minutes)...\";
+        while true; do
+          echo \"[$(date)] Running portfolio analysis...\";
+          python scripts/run_portfolio_analysis.py;
+          echo \"[$(date)] Analysis completed. Next run in $$INTERVAL minutes.\";
+          sleep $$((INTERVAL * 60));
+        done
+      "
+    env_file:
+      - ./backend/.env.development
+    environment:
+      - ENVIRONMENT=development
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./backend:/app
+      - backend_deps:/home/app/.local
+    restart: unless-stopped
+
   mongodb:
     image: mongo:7.0
     ports:

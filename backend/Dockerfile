@@ -15,6 +15,7 @@ COPY pyproject.toml .
 
 # Install dependencies
 # hadolint ignore=DL3013
+# Force rebuild: 2025-11-22 - Added tiktoken for context management
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 

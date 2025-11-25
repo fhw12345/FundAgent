@@ -70,6 +70,7 @@ Issue resolution and debugging.
 
 - [Troubleshooting Index](troubleshooting/README.md) - All issues
 - [Deployment Issues](troubleshooting/deployment-issues.md) - K8s problems
+- [Docker Env Reload Issue](troubleshooting/docker-env-reload-issue.md) - 🚨 Critical: Container env vars
 - [Known Bugs](troubleshooting/known-bugs.md) - Current issues
 
 #### Project

@@ -2,6 +2,14 @@
 
 > **RULE**: Only concise, actionable rules here. No details, no repetition. See [docs/](docs/) for comprehensive documentation.
 
+## 🎯 Recent Architecture Changes
+
+**Portfolio Analysis CronJob** (2025-11-23): Migrated from dedicated pod (1.14GB image) to HTTP trigger pattern (5MB curl image).
+- **Old**: CronJob → Dedicated Pod → Python script → Direct DB access
+- **New**: CronJob → curl (5MB) → Backend API → Background Task
+- **Benefits**: No code duplication, auto-updates with backend, 6x faster startup
+- **Details**: [docs/features/portfolio-analysis-cronjob-http.md](docs/features/portfolio-analysis-cronjob-http.md)
+
 ## 🔐 Security Rules
 
 **🚨 NEVER COMMIT SECRETS 🚨** - API keys, passwords, tokens, credentials, connection strings, certificates
@@ -291,6 +299,8 @@ docker compose logs langfuse-server --tail=50  # Logs
 3. Test backend directly (kubectl exec)
 4. Check Redis cache if caching issues
 5. Review External Secrets sync
+6. **Dependencies**: For missing Python packages, install directly first (`docker compose run --rm backend pip install <pkg>`), THEN commit container - don't rebuild entire image
+7. **🚨 Docker env vars**: After changing `.env` files, ALWAYS recreate containers (`docker compose up -d --force-recreate <service>`) - `restart` does NOT reload env vars!
 
 ### 💰 Cost Management
 - **Monitor weekly**: `kubectl get nodes | wc -l` should always return 2
@@ -298,12 +308,49 @@ docker compose logs langfuse-server --tail=50  # Logs
 
 ### 💡 Development Principles
 - **Find the root cause** - Don't fix symptoms, fix the underlying problem
+- **Start simple** - Try the simplest solution first (10 seconds) before complex ones (20+ minutes)
 - **Less code is more** - Simplest solution that works is usually correct
 - **Avoid duplication** - Same logic in multiple places = bug waiting to happen
 - **Don't overcomplicate** - Complex solutions are harder to debug and maintain
 - **Compare environments** - When cloud differs from local, check config/credentials first
 
-**Example**: Database name parsing bug existed in TWO places (config.py + mongodb.py). Fix once, extract to shared utility if needed.
+**Examples**:
+- Database name parsing bug existed in TWO places (config.py + mongodb.py). Fix once, extract to shared utility if needed.
+- Portfolio cron ran every 5min despite `.env` saying disabled - container had stale env vars. **Always recreate after env changes!**
+
+---
+
+## 🚨 Critical Docker Rules
+
+### Environment Variable Management
+
+**NEVER TRUST `docker compose restart` TO RELOAD ENV VARS!**
+
+Docker containers **bake in** environment variables at creation time. Changing `.env` files does NOT affect running containers.
+
+**✅ CORRECT Way to Reload Env Vars:**
+```bash
+# After changing .env files
+docker compose up -d --force-recreate <service-name>
+
+# Or explicit recreation
+docker compose stop <service-name>
+docker compose rm -f <service-name>
+docker compose up -d <service-name>
+```
+
+**❌ WRONG - Does NOT reload env:**
+```bash
+docker compose restart <service-name>  # Only restarts process, keeps old env!
+```
+
+**✅ ALWAYS Verify After Recreation:**
+```bash
+docker compose exec <service> printenv | grep <VAR_PREFIX>
+docker compose logs <service> --tail=20
+```
+
+**See**: [docs/troubleshooting/docker-env-reload-issue.md](docs/troubleshooting/docker-env-reload-issue.md) for detailed incident report.
 
 ## 🎯 Kubernetes Operations Best Practices
 

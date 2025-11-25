@@ -20,6 +20,8 @@ resources:
 - ../../base/redis/secret.yaml
 - ../../base/ingress/clusterissuer.yaml
 - ../../base/ingress/ingress.yaml
+- ../../base/cronjobs/reconcile-transactions.yaml
+- ../../base/cronjobs/portfolio-analysis.yaml
 # Production-specific resources (Alibaba Cloud ACK)
 - namespace.yaml
 - mongodb-statefulset.yaml
@@ -42,6 +44,10 @@ patches:
   target:
     kind: Ingress
     name: klinematrix-ingress
+- path: cronjob-portfolio-analysis-patch.yaml
+  target:
+    kind: CronJob
+    name: portfolio-analysis
 
 # Production image tags (current versions)
 images:
