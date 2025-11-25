@@ -3,26 +3,15 @@
  * Manages watched stock symbols for automated analysis.
  */
 
+import { apiClient } from "./api";
 import { WatchlistItem, WatchlistItemCreate } from "../types/watchlist";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 /**
  * Get all watchlist items for the user.
  */
 export async function getWatchlist(): Promise<WatchlistItem[]> {
-  const response = await fetch(`${API_BASE_URL}/api/watchlist`, {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch watchlist: ${response.statusText}`);
-  }
-
-  return response.json();
+  const response = await apiClient.get<WatchlistItem[]>("/api/watchlist");
+  return response.data;
 }
 
 /**
@@ -31,53 +20,34 @@ export async function getWatchlist(): Promise<WatchlistItem[]> {
 export async function addToWatchlist(
   item: WatchlistItemCreate
 ): Promise<WatchlistItem> {
-  const response = await fetch(`${API_BASE_URL}/api/watchlist`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(item),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || `Failed to add to watchlist: ${response.statusText}`);
-  }
-
-  return response.json();
+  const response = await apiClient.post<WatchlistItem>("/api/watchlist", item);
+  return response.data;
 }
 
 /**
  * Remove a symbol from the watchlist.
  */
 export async function removeFromWatchlist(watchlistId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/watchlist/${watchlistId}`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to remove from watchlist: ${response.statusText}`);
-  }
+  await apiClient.delete(`/api/watchlist/${watchlistId}`);
 }
 
 /**
- * Manually trigger analysis for all watchlist symbols.
+ * Manually trigger complete portfolio analysis (holdings + watchlist + market movers).
+ * Uses the same endpoint as the CronJob for consistency.
  */
-export async function triggerWatchlistAnalysis(): Promise<{ status: string; message: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/watchlist/analyze`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || `Failed to trigger analysis: ${response.statusText}`);
-  }
-
-  return response.json();
+export async function triggerWatchlistAnalysis(): Promise<{
+  status: string;
+  run_id: string;
+  message: string;
+  note?: string;
+}> {
+  const response = await apiClient.post<{
+    status: string;
+    run_id: string;
+    message: string;
+    note?: string;
+  }>(
+    "/api/admin/portfolio/trigger-analysis"
+  );
+  return response.data;
 }
