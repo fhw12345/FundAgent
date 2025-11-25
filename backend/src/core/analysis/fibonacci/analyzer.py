@@ -189,6 +189,8 @@ class FibonacciAnalyzer:
     ) -> pd.DataFrame:
         """Fetch stock data with timeframe-appropriate interval using AlphaVantageMarketDataService."""
         try:
+            from datetime import datetime, timedelta
+
             # Map timeframe to Alpha Vantage interval format
             # For intraday (1m, 1h, 4h, etc.), AlphaVantage returns intraday data
             interval_map = {
@@ -201,13 +203,24 @@ class FibonacciAnalyzer:
             }
             interval = interval_map.get(self.timeframe, "1d")
 
+            # Default to 1 year lookback for daily timeframe if no start_date provided
+            # This limits analysis to recent market conditions and avoids irrelevant historical trends
+            if start_date is None and self.timeframe == "1d":
+                one_year_ago = datetime.now() - timedelta(days=365)
+                start_date = one_year_ago.strftime("%Y-%m-%d")
+                logger.info(
+                    "Defaulting to 1-year lookback for daily Fibonacci analysis",
+                    symbol=self.symbol,
+                    start_date=start_date,
+                )
+
             # Fetch bars from Alpha Vantage via market service
             # Note: For intraday intervals, AlphaVantage returns ~1 day of data automatically
             # with extended_hours=True (includes pre/post market)
             bars = await self.market_service.get_price_bars(
                 symbol=self.symbol,
                 interval=interval,
-                period="6mo",  # Only used for daily/weekly/monthly
+                period="1y",  # Default period (only used if start_date not set)
                 start_date=start_date,
                 end_date=end_date,
             )

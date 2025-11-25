@@ -178,7 +178,9 @@ def get_tool_display_name(
     if tool_name in TOOL_DISPLAY_NAMES:
         return TOOL_DISPLAY_NAMES[tool_name].get(
             language,
-            TOOL_DISPLAY_NAMES[tool_name].get("en", tool_name.replace("_", " ").title()),
+            TOOL_DISPLAY_NAMES[tool_name].get(
+                "en", tool_name.replace("_", " ").title()
+            ),
         )
     # Default: convert snake_case to Title Case
     return tool_name.replace("_", " ").title()

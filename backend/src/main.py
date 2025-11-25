@@ -190,6 +190,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             chats_collection=mongodb.get_collection("chats"),
             redis_cache=redis_cache,
             market_service=market_service,  # Pass Alpha Vantage service for price data
+            settings=settings,  # Pass application settings for context management
             agent=react_agent,  # Pass agent for LLM-based analysis
             trading_service=alpaca_trading_service,  # Pass trading service for order placement
             order_repository=order_repo,  # Pass order repository for MongoDB persistence

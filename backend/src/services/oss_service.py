@@ -14,8 +14,8 @@ import re
 from datetime import datetime
 
 import oss2
-from oss2.credentials import EnvironmentVariableCredentialsProvider
 import structlog
+from oss2.credentials import EnvironmentVariableCredentialsProvider
 
 logger = structlog.get_logger()
 
