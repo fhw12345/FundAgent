@@ -31,6 +31,7 @@ Design Philosophy:
 - Trust the SDK (leverage LangGraph's built-in patterns)
 """
 
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -442,13 +443,15 @@ Summary: {result.analysis_summary}"""
         Returns:
             Agent response with messages and final answer
         """
-        # Generate trace ID and thread ID
+        # Generate trace ID and thread ID with UUID for guaranteed uniqueness
+        # UUID suffix prevents collisions in concurrent execution (e.g., parallel market mover analysis)
         trace_id = f"trace_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-        thread_id = f"thread_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        thread_id = f"thread_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
         logger.info(
             "ReAct agent invocation started",
             trace_id=trace_id,
+            thread_id=thread_id,
             user_message_preview=user_message[:100],
         )
 
