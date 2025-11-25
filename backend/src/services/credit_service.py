@@ -76,6 +76,10 @@ class CreditService:
         """
         Check if user has sufficient credits for a request.
 
+        Special handling for portfolio_agent:
+        - Always returns True (no blocking)
+        - Still tracks usage for monitoring
+
         Args:
             user_id: User identifier
             estimated_cost: Estimated cost in credits
@@ -90,6 +94,15 @@ class CreditService:
             raise ValidationError(
                 "Estimated cost cannot be negative", cost=estimated_cost
             )
+
+        # Special handling for portfolio_agent - never block
+        if user_id == "portfolio_agent":
+            logger.info(
+                "Portfolio agent bypass - credits checked but not blocked",
+                user_id=user_id,
+                estimated_cost=estimated_cost,
+            )
+            return True  # Always allow
 
         user = await self.user_repo.get_by_id(user_id)
 

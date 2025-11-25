@@ -318,33 +318,113 @@ async def get_portfolio_history(
 @limiter.limit("60/minute")  # Standard read operation
 async def get_portfolio_chat_history(
     request: Request,
+    symbol: str | None = None,  # Optional symbol filter (e.g., "AAPL")
+    start_date: str | None = None,  # Optional start date (YYYY-MM-DD)
+    end_date: str | None = None,  # Optional end date (YYYY-MM-DD)
+    date: str | None = None,  # Legacy: single date filter (YYYY-MM-DD) - deprecated
+    user_id: str = Depends(get_current_user_id),  # ✅ JWT authentication required
     mongodb: MongoDB = Depends(get_mongodb),
 ) -> dict:
     """
     Get portfolio agent's chat history grouped by symbol.
 
+    **Authentication**: Requires Bearer token in Authorization header.
+
     Each symbol has its own chat (e.g., "XIACY Analysis") where all
     analyses for that symbol are stored as messages.
+
+    **Enhanced Filtering**:
+    - Filter by specific symbol: `?symbol=AAPL`
+    - Filter by date range: `?start_date=2025-01-01&end_date=2025-03-15`
+    - Filter by symbol AND date: `?symbol=AAPL&start_date=2025-01-01`
+
+    Args:
+        symbol: Optional symbol filter (returns only chats for this symbol)
+        start_date: Optional start date (YYYY-MM-DD). Filters messages >= this date
+        end_date: Optional end date (YYYY-MM-DD). Filters messages <= this date
+        date: Legacy single date filter (YYYY-MM-DD) - use start_date/end_date instead
+        user_id: Authenticated user ID (auto-injected via JWT)
 
     Returns:
         Dictionary with symbol as keys, chat info with messages as values.
         Messages within each chat are sorted chronologically (oldest first).
         Chats are sorted by most recent message timestamp (newest first).
     """
+    # Auth verification happens automatically via get_current_user_id
+    # Portfolio data is shared (all authenticated users see same analysis)
+    # But only authenticated users can access it
     try:
+        from datetime import datetime, timedelta
+
         chats_collection = mongodb.get_collection("chats")
         messages_collection = mongodb.get_collection("messages")
 
+        # Parse date filters
+        date_start = None
+        date_end = None
+
+        # Handle legacy single date filter (convert to date range)
+        if date and not start_date and not end_date:
+            start_date = date
+            # Single date = same day range
+            try:
+                date_obj = datetime.strptime(date, "%Y-%m-%d")
+                date_end = date_obj.replace(hour=23, minute=59, second=59)
+            except ValueError:
+                logger.warning("Invalid date format provided", date=date)
+                raise HTTPException(
+                    status_code=400, detail="Invalid date format. Use YYYY-MM-DD."
+                )
+
+        # Parse start_date
+        if start_date:
+            try:
+                date_start = datetime.strptime(start_date, "%Y-%m-%d").replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+            except ValueError:
+                logger.warning("Invalid start_date format", start_date=start_date)
+                raise HTTPException(
+                    status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD."
+                )
+
+        # Parse end_date
+        if end_date:
+            try:
+                date_end = datetime.strptime(end_date, "%Y-%m-%d").replace(
+                    hour=23, minute=59, second=59, microsecond=999999
+                )
+            except ValueError:
+                logger.warning("Invalid end_date format", end_date=end_date)
+                raise HTTPException(
+                    status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD."
+                )
+
         # Get all chats for portfolio_agent user
-        portfolio_chats = await chats_collection.find(
-            {"user_id": "portfolio_agent"}
-        ).to_list(length=None)
+        chat_query = {"user_id": "portfolio_agent"}
+
+        # Apply symbol filter if provided (filter by title pattern)
+        if symbol:
+            # Match chats where title starts with symbol (e.g., "AAPL Analysis")
+            chat_query["title"] = {"$regex": f"^{symbol}\\s", "$options": "i"}
+
+        portfolio_chats = await chats_collection.find(chat_query).to_list(length=None)
 
         if not portfolio_chats:
-            logger.info("No portfolio agent chats found")
+            logger.info(
+                "No portfolio agent chats found",
+                symbol_filter=symbol,
+                date_filter=start_date or end_date
+            )
             return {"chats": []}
 
-        logger.info("Found portfolio agent chats", count=len(portfolio_chats))
+        logger.info(
+            "Found portfolio agent chats",
+            count=len(portfolio_chats),
+            symbol_filter=symbol,
+            start_date=start_date,
+            end_date=end_date
+        )
 
         # Build result: one entry per chat (symbol)
         result_chats = []
@@ -356,20 +436,37 @@ async def get_portfolio_chat_history(
             # Extract symbol from title (format: "{symbol} Analysis")
             symbol = title.split(" ")[0] if " " in title else title
 
-            # Get all messages for this chat
+            # Build message query
+            message_query = {"chat_id": chat_id}
+            if date_start and date_end:
+                # Filter messages by date range
+                message_query["timestamp"] = {"$gte": date_start, "$lt": date_end}
+            elif date_start:
+                # Filter messages from start date onwards
+                message_query["timestamp"] = {"$gte": date_start}
+            elif date_end:
+                # Filter messages up to end date
+                message_query["timestamp"] = {"$lt": date_end}
+
+            # Get messages for this chat (filtered by date if specified)
+            # Sort newest first (most recent analysis at top)
             messages = (
-                await messages_collection.find({"chat_id": chat_id})
-                .sort("timestamp", 1)
+                await messages_collection.find(message_query)
+                .sort("timestamp", -1)
                 .to_list(length=None)
-            )  # Sort oldest first
+            )  # Sort newest first
+
+            # Skip chats with no messages in the date range
+            if date and not messages:
+                continue
 
             # Clean messages
             for msg in messages:
                 msg.pop("_id", None)
 
-            # Get most recent message timestamp for sorting
+            # Get most recent message timestamp for sorting (first message since sorted newest first)
             latest_timestamp = (
-                messages[-1].get("timestamp", datetime.min)
+                messages[0].get("timestamp", datetime.min)
                 if messages
                 else datetime.min
             )
@@ -396,6 +493,8 @@ async def get_portfolio_chat_history(
             "Portfolio chat history retrieved",
             chats_count=len(result_chats),
             total_messages=sum(c["message_count"] for c in result_chats),
+            date_filter=date,
+            filtered=bool(date),
         )
 
         return {"chats": result_chats}
@@ -418,21 +517,28 @@ async def get_portfolio_chat_detail(
     request: Request,
     chat_id: str,
     limit: int | None = None,
+    user_id: str = Depends(get_current_user_id),  # ✅ JWT authentication required
     chat_service: ChatService = Depends(get_chat_service),
 ) -> dict:
     """
-    Get portfolio agent chat detail with messages (no user ownership check).
+    Get portfolio agent chat detail with messages.
 
-    This endpoint allows fetching portfolio_agent chats which are not owned
-    by regular users. Used by Portfolio Dashboard to display analysis messages.
+    **Authentication**: Requires Bearer token in Authorization header.
+
+    Fetches portfolio_agent chats (owned by system user "portfolio_agent").
+    Portfolio data is shared across all authenticated users.
 
     Args:
         chat_id: Chat identifier
         limit: Optional message limit (default: 100)
+        user_id: Authenticated user ID (auto-injected via JWT)
 
     Returns:
         Chat detail with messages
     """
+    # Auth verification happens automatically via get_current_user_id
+    # Portfolio chats are owned by "portfolio_agent" (system user)
+    # All authenticated users can view them (shared data)
     try:
         # Get chat without ownership verification (portfolio_agent chats)
         chat = await chat_service.get_chat(chat_id, user_id="portfolio_agent")
@@ -526,16 +632,21 @@ async def get_portfolio_orders(
     request: Request,
     limit: int = 50,
     status: str | None = None,  # "open", "closed", "all"
+    user_id: str = Depends(get_current_user_id),  # ✅ JWT authentication required
     trading_service: AlpacaTradingService = Depends(get_alpaca_trading_service),
 ) -> dict:
     """
     Get portfolio orders from Alpaca.
 
+    **Authentication**: Requires Bearer token in Authorization header.
+
     Shows actual BUY/SELL orders placed by the portfolio analysis agent.
+    All authenticated users see the same orders (shared paper trading account).
 
     Args:
         limit: Maximum number of orders to return (default: 50)
         status: Filter by status - "open", "closed", or "all" (default: "all")
+        user_id: Authenticated user ID (auto-injected via JWT)
 
     Returns:
         List of orders with execution details

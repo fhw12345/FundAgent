@@ -228,11 +228,13 @@ Format: Clear, structured summary with key points."""
         # Use LLM to generate summary
         if llm_service:
             try:
-                from ..agent.langchain_llm import get_langchain_llm
+                from ..agent.llm_client import DashScopeClient
 
-                # Use fast, cheap model for summarization
-                llm = get_langchain_llm(model=self.settings.summarization_model)
-                summary = await llm.ainvoke(summarization_prompt)
+                # Use fast, cheap model for summarization (qwen-flash)
+                llm = DashScopeClient(settings=self.settings, model=self.settings.summarization_model)
+
+                # Invoke with simple prompt
+                summary = await llm.chat.ainvoke([{"role": "user", "content": summarization_prompt}])
 
                 summary_text = summary.content if hasattr(summary, 'content') else str(summary)
 
@@ -300,7 +302,7 @@ Key patterns and trends from the historical analyses are preserved in this summa
         Returns:
             Compacted message list
         """
-        # Create summary message
+        # Create summary message (source='llm' because it's AI-generated summary)
         summary_message = Message(
             message_id=f"summary_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
             chat_id="compacted_context",
@@ -310,7 +312,7 @@ Key patterns and trends from the historical analyses are preserved in this summa
 {summary_text}
 
 usage: continued""",
-            source="system",
+            source="llm",
             timestamp=datetime.utcnow().isoformat()
         )
 
