@@ -66,7 +66,10 @@
     "justNow": "刚刚",
     "minutesAgo": "{{count}}分钟前",
     "hoursAgo": "{{count}}小时前",
-    "daysAgo": "{{count}}天前"
+    "daysAgo": "{{count}}天前",
+    "selectDate": "选择日期",
+    "clearDate": "清除日期筛选",
+    "showingChatsFor": "显示日期为"
   },
   "settings": {
     "title": "聊天设置",

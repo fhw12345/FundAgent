@@ -78,7 +78,8 @@
     "maxDrawdown": "最大回撤"
   },
   "transactions": {
-    "title": "交易记录",
+    "title": "最近交易",
+    "subtitle": "最新 {{count}} 笔交易",
     "date": "日期",
     "type": "类型",
     "symbol": "代码",
@@ -95,7 +96,8 @@
     "noTransactions": "暂无交易记录",
     "addTransaction": "添加交易",
     "editTransaction": "编辑交易",
-    "deleteTransaction": "删除交易"
+    "deleteTransaction": "删除交易",
+    "loadFailed": "加载交易记录失败"
   },
   "alerts": {
     "title": "价格提醒",

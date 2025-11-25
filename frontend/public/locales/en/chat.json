@@ -66,7 +66,10 @@
     "justNow": "Just now",
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
-    "daysAgo": "{{count}}d ago"
+    "daysAgo": "{{count}}d ago",
+    "selectDate": "Select date",
+    "clearDate": "Clear date filter",
+    "showingChatsFor": "Showing chats for"
   },
   "settings": {
     "title": "Chat Settings",

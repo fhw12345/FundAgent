@@ -78,7 +78,8 @@
     "maxDrawdown": "Max Drawdown"
   },
   "transactions": {
-    "title": "Transactions",
+    "title": "Recent Transactions",
+    "subtitle": "Latest {{count}} trades",
     "date": "Date",
     "type": "Type",
     "symbol": "Symbol",
@@ -87,15 +88,16 @@
     "total": "Total",
     "fees": "Fees",
     "notes": "Notes",
-    "buy": "Buy",
-    "sell": "Sell",
+    "buy": "BUY",
+    "sell": "SELL",
     "dividend": "Dividend",
     "deposit": "Deposit",
     "withdraw": "Withdraw",
-    "noTransactions": "No transactions",
+    "noTransactions": "No recent transactions",
     "addTransaction": "Add Transaction",
     "editTransaction": "Edit Transaction",
-    "deleteTransaction": "Delete Transaction"
+    "deleteTransaction": "Delete Transaction",
+    "loadFailed": "Failed to load transactions"
   },
   "alerts": {
     "title": "Price Alerts",
