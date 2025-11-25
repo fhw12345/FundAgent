@@ -1,12 +1,12 @@
 /**
  * React Query hook for fetching portfolio agent chat details.
- * Uses the /api/portfolio/chats/{chat_id} endpoint which doesn't require ownership.
+ * Uses the /api/portfolio/chats/{chat_id} endpoint.
+ * Requires authentication (JWT token injected by apiClient).
  */
 
 import { useQuery } from "@tanstack/react-query";
 import type { ChatMessage, Chat } from "../types/api";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { apiClient } from "../services/api";
 
 interface PortfolioChatDetailResponse {
   chat: Chat;
@@ -17,18 +17,12 @@ interface PortfolioChatDetailResponse {
  * Fetch portfolio agent chat detail from API
  */
 async function fetchPortfolioChatDetail(chatId: string): Promise<PortfolioChatDetailResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/portfolio/chats/${chatId}`,
-    {
-      credentials: "include", // Include cookies for authentication
-    }
+  // Use apiClient (axios) for automatic auth token injection
+  const response = await apiClient.get<PortfolioChatDetailResponse>(
+    `/api/portfolio/chats/${chatId}`
   );
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch portfolio chat: ${response.statusText}`);
-  }
-
-  return response.json();
+  return response.data;
 }
 
 /**

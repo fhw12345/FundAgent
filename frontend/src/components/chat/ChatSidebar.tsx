@@ -12,6 +12,8 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  Calendar,
+  X,
 } from "lucide-react";
 import { useChats, useDeleteChat } from "../../hooks/useChats";
 import { usePortfolioChats, useDeletePortfolioChat } from "../../hooks/usePortfolioChats";
@@ -25,6 +27,8 @@ interface ChatSidebarProps {
   onToggleCollapse: () => void;
   filterUserId?: string; // Optional: filter chats by user_id (e.g., "portfolio_agent")
   readOnly?: boolean; // Optional: hide "New Chat" button for read-only mode
+  selectedDate?: string | null; // Optional: selected date for portfolio mode (YYYY-MM-DD)
+  onDateChange?: (date: string | null) => void; // Optional: callback when date changes
 }
 
 export const ChatSidebar = memo(function ChatSidebar({
@@ -35,13 +39,15 @@ export const ChatSidebar = memo(function ChatSidebar({
   onToggleCollapse,
   filterUserId,
   readOnly = false,
+  selectedDate = null,
+  onDateChange,
 }: ChatSidebarProps) {
   const { t } = useTranslation(['chat', 'common']);
   const [showArchived, setShowArchived] = useState(false);
 
   // Fetch chats - use portfolio chats if filterUserId is portfolio_agent
   const regularChatsQuery = useChats(1, 20, showArchived);
-  const portfolioChatsQuery = usePortfolioChats();
+  const portfolioChatsQuery = usePortfolioChats(selectedDate || undefined);
 
   const { data, isLoading, isError, error } = filterUserId === "portfolio_agent"
     ? portfolioChatsQuery
@@ -134,11 +140,46 @@ export const ChatSidebar = memo(function ChatSidebar({
           </button>
         )}
 
+        {/* Date Picker - Portfolio Mode Only */}
+        {filterUserId === "portfolio_agent" && onDateChange && (
+          <div className={`${readOnly ? "" : "mt-2"} relative`}>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 relative">
+                <Calendar
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                />
+                <input
+                  type="date"
+                  value={selectedDate || ""}
+                  onChange={(e) => onDateChange(e.target.value || null)}
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder={t('chat:sidebar.selectDate')}
+                />
+              </div>
+              {selectedDate && (
+                <button
+                  onClick={() => onDateChange(null)}
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                  title={t('chat:sidebar.clearDate')}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            {selectedDate && (
+              <p className="text-xs text-gray-500 mt-1 px-1">
+                {t('chat:sidebar.showingChatsFor')} {new Date(selectedDate).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Archive Toggle */}
         <button
           onClick={() => setShowArchived(!showArchived)}
           className={`
-            w-full ${readOnly ? "" : "mt-2"} px-4 py-2 text-sm font-medium rounded-lg transition-all
+            w-full ${readOnly || (filterUserId === "portfolio_agent" && onDateChange) ? "mt-2" : readOnly ? "" : "mt-2"} px-4 py-2 text-sm font-medium rounded-lg transition-all
             ${
               showArchived
                 ? "bg-blue-100/80 text-blue-700 border border-blue-200"

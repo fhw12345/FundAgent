@@ -4,8 +4,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { apiClient } from "../services/api";
 
 interface Message {
   message_id: string;
@@ -51,16 +50,19 @@ interface PortfolioChatHistoryResponse {
   chats: SymbolChat[];
 }
 
-async function fetchPortfolioChats(): Promise<ChatsResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/portfolio/chat-history`
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch portfolio chats: ${response.statusText}`);
+async function fetchPortfolioChats(date?: string): Promise<ChatsResponse> {
+  // Use apiClient (axios) for automatic auth token injection
+  const params: Record<string, string> = {};
+  if (date) {
+    params.date = date;
   }
 
-  const data: PortfolioChatHistoryResponse = await response.json();
+  const response = await apiClient.get<PortfolioChatHistoryResponse>(
+    "/api/portfolio/chat-history",
+    { params }
+  );
+
+  const data = response.data;
 
   // Transform to chat structure
   const chats: Chat[] = data.chats.map((symbolChat) => ({
@@ -82,10 +84,10 @@ async function fetchPortfolioChats(): Promise<ChatsResponse> {
   };
 }
 
-export function usePortfolioChats() {
+export function usePortfolioChats(date?: string) {
   return useQuery({
-    queryKey: ["portfolio-chats"],
-    queryFn: fetchPortfolioChats,
+    queryKey: ["portfolio-chats", date],
+    queryFn: () => fetchPortfolioChats(date),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 }
@@ -95,18 +97,8 @@ export function usePortfolioChats() {
  * Uses /api/portfolio/chats/{chatId} endpoint.
  */
 async function deletePortfolioChat(chatId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/portfolio/chats/${chatId}`,
-    {
-      method: "DELETE",
-      credentials: "include",
-    }
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || `Failed to delete portfolio chat: ${response.statusText}`);
-  }
+  // Use apiClient (axios) for automatic auth token injection
+  await apiClient.delete(`/api/portfolio/chats/${chatId}`);
 }
 
 /**

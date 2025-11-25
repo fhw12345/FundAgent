@@ -7,11 +7,13 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { usePortfolioSummary, usePortfolioHistory } from "../hooks/usePortfolio";
+import { usePortfolioSummary, usePortfolioHistory, useHoldings } from "../hooks/usePortfolio";
 import { usePortfolioChatDetail } from "../hooks/usePortfolioChatDetail";
-import { usePortfolioOrders } from "../hooks/usePortfolioOrders";
 import { PortfolioChart } from "../components/portfolio/PortfolioChart";
+import { PortfolioSummaryTable } from "../components/portfolio/PortfolioSummaryTable";
 import { WatchlistPanel } from "../components/portfolio/WatchlistPanel";
+import { CronController } from "../components/portfolio/CronController";
+import { RecentTransactions } from "../components/portfolio/RecentTransactions";
 import { MarketMovers } from "../components/MarketMovers";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
 import { ChatMessages } from "../components/chat/ChatMessages";
@@ -34,7 +36,29 @@ export default function PortfolioDashboard() {
 
   // Chat sidebar state
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true); // Start collapsed
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Start open
+  const [selectedDate, setSelectedDate] = useState<string | null>(null); // Date filter for chat history
+
+  // Cron controller state (local visualization only - actual cron controlled by docker-compose .env)
+  const [cronIntervalMinutes, setCronIntervalMinutes] = useState<number>(() => {
+    const saved = localStorage.getItem('portfolio-cron-interval');
+    return saved ? parseInt(saved, 10) : 5; // Default: 5 minutes for testing
+  });
+  const [cronEnabled, setCronEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('portfolio-cron-enabled');
+    return saved ? saved === 'true' : true; // Default: enabled
+  });
+
+  // Persist cron settings to localStorage
+  const handleCronToggle = (enabled: boolean) => {
+    setCronEnabled(enabled);
+    localStorage.setItem('portfolio-cron-enabled', String(enabled));
+  };
+
+  const handleCronIntervalChange = (minutes: number) => {
+    setCronIntervalMinutes(minutes);
+    localStorage.setItem('portfolio-cron-interval', String(minutes));
+  };
 
   const {
     data: summary,
@@ -43,16 +67,16 @@ export default function PortfolioDashboard() {
   } = usePortfolioSummary();
 
   const {
+    data: holdings,
+    isLoading: isLoadingHoldings,
+  } = useHoldings();
+
+  const {
     data: historyData,
     isLoading: isLoadingHistory,
     error: historyError,
     refetch,
   } = usePortfolioHistory(period);
-
-  const {
-    data: ordersData,
-    isLoading: isLoadingOrders,
-  } = usePortfolioOrders(50, "all");
 
   // Transform API data to chart format
   const chartData =
@@ -98,9 +122,24 @@ export default function PortfolioDashboard() {
   return (
     <div className="min-h-screen bg-white">
       <div className="flex h-screen">
+        {/* Left Sidebar - Market Movers & Transactions */}
+        <div className="w-96 border-r border-gray-200 overflow-y-auto bg-gray-50 flex-shrink-0">
+          <div className="p-3 space-y-4">
+            {/* Market Movers */}
+            <MarketMovers
+              onTickerClick={(ticker) => {
+                console.log("Clicked ticker:", ticker);
+              }}
+            />
+
+            {/* Recent Transactions */}
+            <RecentTransactions />
+          </div>
+        </div>
+
         {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-6xl mx-auto px-3 py-6">
             {/* Error Message */}
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -109,15 +148,6 @@ export default function PortfolioDashboard() {
                 </p>
               </div>
             )}
-
-            {/* Market Movers */}
-            <div className="mb-8">
-              <MarketMovers
-                onTickerClick={(ticker) => {
-                  console.log("Clicked ticker:", ticker);
-                }}
-              />
-            </div>
 
         {/* Portfolio Value Header */}
         <div className="mb-6">
@@ -200,134 +230,26 @@ export default function PortfolioDashboard() {
           )}
         </div>
 
-            {/* Order Execution Records */}
-            <div className="mt-8">
-              <div className="bg-white rounded-lg border border-gray-200">
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">{t('portfolio:orders.title')}</h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {t('portfolio:orders.description')}
-                  </p>
-                </div>
-
-                {/* Orders Table */}
-                <div className="overflow-x-auto">
-                  {isLoadingOrders ? (
-                    <div className="h-48 flex items-center justify-center">
-                      <div className="text-gray-500">{t('portfolio:orders.loadingOrders')}</div>
-                    </div>
-                  ) : ordersData && ordersData.orders.length > 0 ? (
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.time')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.symbol')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.side')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.qty')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.status')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.filledQty')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.avgPrice')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('portfolio:orders.analysisId')}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {ordersData.orders.map((order) => (
-                          <tr key={order.order_id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {order.submitted_at
-                                ? new Date(order.submitted_at).toLocaleString("en-US", {
-                                    month: "short",
-                                    day: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })
-                                : "-"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {order.symbol}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  order.side === "buy"
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
-                              >
-                                {order.side.toUpperCase()}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {order.quantity}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  order.status === "filled"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : order.status.includes("partial")
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : order.status === "canceled" || order.status === "rejected"
-                                    ? "bg-gray-100 text-gray-800"
-                                    : "bg-purple-100 text-purple-800"
-                                }`}
-                              >
-                                {order.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {order.filled_qty > 0 ? order.filled_qty : "-"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {order.filled_avg_price
-                                ? `$${order.filled_avg_price.toFixed(2)}`
-                                : "-"}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                              {order.analysis_id ? (
-                                <span className="truncate max-w-xs block" title={order.analysis_id}>
-                                  {order.analysis_id.substring(0, 20)}...
-                                </span>
-                              ) : (
-                                "-"
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="h-48 flex items-center justify-center">
-                      <div className="text-center text-gray-500">
-                        <p>{t('portfolio:orders.noOrders')}</p>
-                        <p className="text-sm mt-2">{t('portfolio:orders.noOrdersHint')}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+            {/* Portfolio Holdings Table */}
+            {summary && holdings && holdings.length > 0 && (
+              <div className="mt-8">
+                <PortfolioSummaryTable holdings={holdings} summary={summary} />
               </div>
-            </div>
+            )}
 
             {/* Watchlist Panel */}
             <div className="mt-8">
               <WatchlistPanel />
+            </div>
+
+            {/* Cron Controller (Local Development) */}
+            <div className="mt-8">
+              <CronController
+                intervalMinutes={cronIntervalMinutes}
+                enabled={cronEnabled}
+                onToggle={handleCronToggle}
+                onIntervalChange={handleCronIntervalChange}
+              />
             </div>
 
             {/* Footer */}
@@ -348,6 +270,8 @@ export default function PortfolioDashboard() {
               onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
               filterUserId="portfolio_agent"
               readOnly={true}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
             />
           </div>
         </div>
