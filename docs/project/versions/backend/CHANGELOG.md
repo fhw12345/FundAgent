@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-11-26
+
+### Added
+- feat(portfolio): Unified portfolio-aware analysis prompt for holistic position management
+  - Single prompt replacing 3 separate prompts (holdings, watchlist, market_movers)
+  - Dynamic portfolio context injection (equity, buying_power, cash, all positions)
+  - SWAP decision type for portfolio rebalancing recommendations
+  - English-only prompt with language instruction placeholder
+  - Position sizing suggestions based on total equity percentage
+
+### Changed
+- Enhanced portfolio analysis with full portfolio context awareness
+- Improved decision recommendations considering liquidity and diversification
+- Value opportunity detection for market panic situations
+
 ## [0.7.1] - 2025-11-19
 
 ### Added
