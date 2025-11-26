@@ -941,9 +941,7 @@ class AlphaVantageResponseFormatter:
                 weight = holding.get("weight", "0")
                 weight_pct = self._safe_float(weight) * 100
 
-                output.append(
-                    f"| {symbol_h} | {desc[:30]} | {weight_pct:.2f}% |"
-                )
+                output.append(f"| {symbol_h} | {desc[:30]} | {weight_pct:.2f}% |")
 
             output.append("")
 
@@ -989,7 +987,6 @@ class AlphaVantageResponseFormatter:
         Returns:
             Formatted commodity price markdown with trends
         """
-        import pandas as pd
 
         output = [
             f"# 🔶 {commodity.title()} Prices ({interval.title()})",
@@ -1013,9 +1010,15 @@ class AlphaVantageResponseFormatter:
 
         # Calculate trends (if enough data)
         if len(df) >= 12:
-            price_1m_ago = float(df.iloc[-2]["value"]) if len(df) >= 2 else current_price
-            price_3m_ago = float(df.iloc[-4]["value"]) if len(df) >= 4 else current_price
-            price_12m_ago = float(df.iloc[-13]["value"]) if len(df) >= 13 else current_price
+            price_1m_ago = (
+                float(df.iloc[-2]["value"]) if len(df) >= 2 else current_price
+            )
+            price_3m_ago = (
+                float(df.iloc[-4]["value"]) if len(df) >= 4 else current_price
+            )
+            price_12m_ago = (
+                float(df.iloc[-13]["value"]) if len(df) >= 13 else current_price
+            )
 
             change_1m = ((current_price - price_1m_ago) / price_1m_ago) * 100
             change_3m = ((current_price - price_3m_ago) / price_3m_ago) * 100

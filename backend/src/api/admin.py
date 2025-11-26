@@ -22,7 +22,12 @@ from ..services.alphavantage_market_data import AlphaVantageMarketDataService
 from ..services.credit_service import CreditService
 from ..services.database_stats_service import DatabaseStatsService
 from ..services.kubernetes_metrics_service import KubernetesMetricsService
-from .dependencies.auth import get_current_user, get_mongodb, get_redis_cache, require_admin
+from .dependencies.auth import (
+    get_current_user,
+    get_mongodb,
+    get_redis_cache,
+    require_admin,
+)
 from .schemas.admin_models import DatabaseStats, HealthResponse, SystemMetrics
 
 logger = structlog.get_logger()
@@ -265,9 +270,7 @@ async def run_portfolio_analysis_background(
         # Initialize credit service for usage tracking
         logger.info("Initializing credit service")
         user_repo = UserRepository(mongodb.get_collection("users"))
-        transaction_repo = TransactionRepository(
-            mongodb.get_collection("transactions")
-        )
+        transaction_repo = TransactionRepository(mongodb.get_collection("transactions"))
         credit_service = CreditService(
             user_repo=user_repo,
             transaction_repo=transaction_repo,
@@ -298,9 +301,7 @@ async def run_portfolio_analysis_background(
             users_analyzed=result.get("users_analyzed", 0),
             portfolios_analyzed=result.get("portfolios_analyzed", 0),
             errors_count=len(result.get("errors", [])),
-            duration_seconds=result.get("metrics", {}).get(
-                "total_duration_seconds", 0
-            ),
+            duration_seconds=result.get("metrics", {}).get("total_duration_seconds", 0),
         )
 
         # Print summary (appears in pod logs)

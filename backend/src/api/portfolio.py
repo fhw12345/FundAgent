@@ -354,7 +354,7 @@ async def get_portfolio_chat_history(
     # Portfolio data is shared (all authenticated users see same analysis)
     # But only authenticated users can access it
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         chats_collection = mongodb.get_collection("chats")
         messages_collection = mongodb.get_collection("messages")
@@ -414,7 +414,7 @@ async def get_portfolio_chat_history(
             logger.info(
                 "No portfolio agent chats found",
                 symbol_filter=symbol,
-                date_filter=start_date or end_date
+                date_filter=start_date or end_date,
             )
             return {"chats": []}
 
@@ -423,7 +423,7 @@ async def get_portfolio_chat_history(
             count=len(portfolio_chats),
             symbol_filter=symbol,
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
         )
 
         # Build result: one entry per chat (symbol)
@@ -466,9 +466,7 @@ async def get_portfolio_chat_history(
 
             # Get most recent message timestamp for sorting (first message since sorted newest first)
             latest_timestamp = (
-                messages[0].get("timestamp", datetime.min)
-                if messages
-                else datetime.min
+                messages[0].get("timestamp", datetime.min) if messages else datetime.min
             )
 
             result_chats.append(

@@ -11,7 +11,7 @@ from datetime import datetime
 
 import structlog
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, OrderType, QueryOrderStatus, TimeInForce
+from alpaca.trading.enums import OrderSide, TimeInForce
 from alpaca.trading.requests import (
     GetPortfolioHistoryRequest,
     LimitOrderRequest,

@@ -318,7 +318,9 @@ Top Matches: {', '.join(formatted[:3])}
             data = await service.get_etf_profile(symbol)
 
             if not data:
-                return f"No ETF profile data available for {symbol} (verify it's an ETF)"
+                return (
+                    f"No ETF profile data available for {symbol} (verify it's an ETF)"
+                )
 
             return formatter.format_etf_profile(
                 raw_data=data,
@@ -352,7 +354,9 @@ Top Matches: {', '.join(formatted[:3])}
             massive electricity requirements for GPU clusters and data centers.
         """
         try:
-            df = await service.get_commodity_price(commodity="COPPER", interval=interval)
+            df = await service.get_commodity_price(
+                commodity="COPPER", interval=interval
+            )
 
             if df.empty:
                 return f"No copper price data available for interval: {interval}"
@@ -364,7 +368,9 @@ Top Matches: {', '.join(formatted[:3])}
                 invoked_at=datetime.now(UTC).isoformat(),
             )
         except Exception as e:
-            logger.error("Copper commodity tool failed", interval=interval, error=str(e))
+            logger.error(
+                "Copper commodity tool failed", interval=interval, error=str(e)
+            )
             return f"Copper commodity error: {str(e)}"
 
     @tool
@@ -424,7 +430,7 @@ Top Matches: {', '.join(formatted[:3])}
                 "Trend indicator tool failed",
                 symbol=symbol,
                 indicator=indicator,
-                error=str(e)
+                error=str(e),
             )
             return f"Trend indicator error for {symbol} ({indicator}): {str(e)}"
 
@@ -485,7 +491,7 @@ Top Matches: {', '.join(formatted[:3])}
                 "Momentum indicator tool failed",
                 symbol=symbol,
                 indicator=indicator,
-                error=str(e)
+                error=str(e),
             )
             return f"Momentum indicator error for {symbol} ({indicator}): {str(e)}"
 
@@ -533,7 +539,9 @@ Top Matches: {', '.join(formatted[:3])}
                 symbol=symbol,
                 function=indicator_upper,
                 interval=interval,
-                time_period=time_period if indicator_upper not in ["AD", "OBV"] else None,
+                time_period=(
+                    time_period if indicator_upper not in ["AD", "OBV"] else None
+                ),
                 series_type="close" if indicator_upper not in ["AD", "OBV"] else None,
             )
 
@@ -552,7 +560,7 @@ Top Matches: {', '.join(formatted[:3])}
                 "Volume indicator tool failed",
                 symbol=symbol,
                 indicator=indicator,
-                error=str(e)
+                error=str(e),
             )
             return f"Volume indicator error for {symbol} ({indicator}): {str(e)}"
 

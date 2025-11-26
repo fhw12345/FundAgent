@@ -9,7 +9,9 @@ from pymongo.errors import DuplicateKeyError
 from ..database.mongodb import MongoDB
 from ..database.repositories.watchlist_repository import WatchlistRepository
 from ..models.watchlist import WatchlistItem, WatchlistItemCreate
+from ..services.alphavantage_market_data import AlphaVantageMarketDataService
 from .dependencies.auth import get_current_user_id, get_mongodb, require_admin
+from .dependencies.portfolio_deps import get_market_service
 from .dependencies.rate_limit import limiter
 
 logger = structlog.get_logger()
@@ -25,24 +27,82 @@ async def add_to_watchlist(
     _: None = Depends(require_admin),  # Admin only
     user_id: str = Depends(get_current_user_id),  # JWT authentication required
     mongodb: MongoDB = Depends(get_mongodb),
+    market_service: AlphaVantageMarketDataService = Depends(get_market_service),
 ) -> WatchlistItem:
     """
     Add a symbol to watchlist for automated analysis.
 
     **Admin only** - Requires admin privileges to manage watchlist.
 
+    **Symbol Validation** - Verifies symbol exists in market via AlphaVantage API.
+
     Args:
         item: Watchlist item creation data
         user_id: Authenticated user ID (from JWT)
         mongodb: MongoDB instance
+        market_service: Market data service for symbol validation
 
     Returns:
         Created watchlist item
 
     Raises:
-        HTTPException: 403 if not admin, 409 if symbol already in watchlist
+        HTTPException: 400 if symbol not found, 403 if not admin, 409 if symbol already in watchlist
     """
     try:
+        # Validate symbol exists in market using AlphaVantage SYMBOL_SEARCH
+        symbol_upper = item.symbol.upper()
+        logger.info(
+            "Validating symbol before adding to watchlist",
+            user_id=user_id,
+            symbol=symbol_upper,
+        )
+
+        try:
+            search_results = await market_service.search_symbols(symbol_upper, limit=5)
+
+            # Check if exact match exists (case-insensitive)
+            exact_match = None
+            for result in search_results:
+                if result.get("symbol", "").upper() == symbol_upper:
+                    exact_match = result
+                    break
+
+            if not exact_match:
+                logger.warning(
+                    "Symbol validation failed - not found in market",
+                    user_id=user_id,
+                    symbol=symbol_upper,
+                    search_results_count=len(search_results),
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Symbol '{symbol_upper}' not found in market. Please verify the ticker symbol.",
+                )
+
+            # Log successful validation with company name
+            company_name = exact_match.get("name", "Unknown")
+            logger.info(
+                "Symbol validated successfully",
+                user_id=user_id,
+                symbol=symbol_upper,
+                company_name=company_name,
+            )
+
+        except HTTPException:
+            raise  # Re-raise 400 validation errors
+        except Exception as validation_error:
+            # Log validation service error but don't block (fail open)
+            logger.warning(
+                "Symbol validation service unavailable - allowing symbol anyway",
+                user_id=user_id,
+                symbol=symbol_upper,
+                error=str(validation_error),
+                error_type=type(validation_error).__name__,
+            )
+            # Continue without validation if service is down
+
+        # Create watchlist item (use uppercase symbol)
+        item.symbol = symbol_upper
         watchlist_collection = mongodb.get_collection("watchlist")
         watchlist_repo = WatchlistRepository(watchlist_collection)
 
@@ -59,8 +119,11 @@ async def add_to_watchlist(
 
     except DuplicateKeyError:
         raise HTTPException(
-            status_code=409, detail=f"Symbol {item.symbol} is already in your watchlist"
+            status_code=409,
+            detail=f"Symbol {item.symbol.upper()} is already in your watchlist",
         )
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions (validation errors, auth errors)
     except Exception as e:
         logger.error(
             "Failed to add watchlist item",

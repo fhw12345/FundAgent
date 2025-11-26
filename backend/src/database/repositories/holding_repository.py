@@ -2,7 +2,7 @@
 Holding repository for portfolio management.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -269,7 +269,7 @@ class HoldingRepository:
         )
 
         # Update in database
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         update_dict = {
             "current_price": current_price,
             "last_price_update": now,

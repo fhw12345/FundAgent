@@ -31,6 +31,7 @@ Design Philosophy:
 - Trust the SDK (leverage LangGraph's built-in patterns)
 """
 
+import asyncio
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -446,7 +447,9 @@ Summary: {result.analysis_summary}"""
         # Generate trace ID and thread ID with UUID for guaranteed uniqueness
         # UUID suffix prevents collisions in concurrent execution (e.g., parallel market mover analysis)
         trace_id = f"trace_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-        thread_id = f"thread_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        thread_id = (
+            f"thread_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        )
 
         logger.info(
             "ReAct agent invocation started",
@@ -516,8 +519,67 @@ Summary: {result.analysis_summary}"""
             )
 
         try:
-            # Run ReAct loop (auto-loop handles tool calling)
-            result = await self.agent.ainvoke({"messages": messages}, config=config)
+            # Retry configuration for DashScope API (SSL errors, timeouts)
+            max_retries = 3
+            base_delay = 2.0  # seconds
+            max_delay = 30.0  # seconds
+
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    # Run ReAct loop (auto-loop handles tool calling)
+                    result = await self.agent.ainvoke(
+                        {"messages": messages}, config=config
+                    )
+                    # Success - break out of retry loop
+                    break
+                except Exception as e:
+                    last_exception = e
+                    # Check if this is a retryable error (SSL, connection, timeout)
+                    error_str = str(e).lower()
+                    is_retryable = any(
+                        keyword in error_str
+                        for keyword in [
+                            "ssl",
+                            "certificate",
+                            "connection",
+                            "timeout",
+                            "max retries",
+                            "eof occurred",
+                        ]
+                    )
+
+                    if not is_retryable or attempt == max_retries - 1:
+                        # Non-retryable error or last attempt - raise immediately
+                        logger.error(
+                            "ReAct agent invocation failed (non-retryable or max retries reached)",
+                            trace_id=trace_id,
+                            attempt=attempt + 1,
+                            max_retries=max_retries,
+                            error=str(e),
+                            error_type=type(e).__name__,
+                            is_retryable=is_retryable,
+                        )
+                        raise
+
+                    # Calculate exponential backoff delay
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    logger.warning(
+                        "ReAct agent invocation failed - retrying with exponential backoff",
+                        trace_id=trace_id,
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        retry_delay_seconds=delay,
+                    )
+
+                    # Wait before retrying
+                    await asyncio.sleep(delay)
+
+            # If we exhausted all retries, raise the last exception
+            if last_exception:
+                raise last_exception
 
             # Extract final answer (last message)
             final_message = result["messages"][-1]

@@ -1653,9 +1653,7 @@ class AlphaVantageMarketDataService:
             )
 
             if df.empty:
-                logger.warning(
-                    "No insider transactions found", symbol=symbol
-                )
+                logger.warning("No insider transactions found", symbol=symbol)
                 return {"symbol": symbol, "data": []}
 
             # Convert to list of dicts and limit to recent transactions
@@ -1798,9 +1796,7 @@ class AlphaVantageMarketDataService:
 
             if "data" not in data:
                 sanitized = self._sanitize_response(data)
-                raise ValueError(
-                    f"No {commodity} price data available: {sanitized}"
-                )
+                raise ValueError(f"No {commodity} price data available: {sanitized}")
 
             # Convert to DataFrame
             df_data = []
@@ -1945,7 +1941,9 @@ class AlphaVantageMarketDataService:
                 # Add all indicator values (handles single and multi-column indicators)
                 for val_key, val in values.items():
                     # Clean column name (remove numeric prefix like "1. ")
-                    clean_key = val_key.split(". ", 1)[-1] if ". " in val_key else val_key
+                    clean_key = (
+                        val_key.split(". ", 1)[-1] if ". " in val_key else val_key
+                    )
                     row[clean_key] = float(val)
                 df_data.append(row)
 

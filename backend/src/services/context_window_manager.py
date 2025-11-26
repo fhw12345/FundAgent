@@ -16,7 +16,7 @@ import structlog
 import tiktoken
 
 from ..core.config import Settings
-from ..models.message import Message, MessageCreate
+from ..models.message import Message
 
 logger = structlog.get_logger()
 
@@ -41,7 +41,9 @@ class ContextWindowManager:
         try:
             self.tokenizer = tiktoken.get_encoding("cl100k_base")
         except Exception as e:
-            logger.warning("Failed to load tiktoken, using character approximation", error=str(e))
+            logger.warning(
+                "Failed to load tiktoken, using character approximation", error=str(e)
+            )
             self.tokenizer = None
 
     def estimate_tokens(self, text: str) -> int:
@@ -88,11 +90,7 @@ class ContextWindowManager:
         """
         return sum(self.calculate_message_tokens(msg) for msg in messages)
 
-    def should_compact(
-        self,
-        total_tokens: int,
-        model: str = "qwen-plus"
-    ) -> bool:
+    def should_compact(self, total_tokens: int, model: str = "qwen-plus") -> bool:
         """
         Check if context should be compacted.
 
@@ -114,14 +112,13 @@ class ContextWindowManager:
                 total_tokens=total_tokens,
                 threshold=threshold,
                 model=model,
-                utilization_pct=round((total_tokens / limit) * 100, 1)
+                utilization_pct=round((total_tokens / limit) * 100, 1),
             )
 
         return should_compact
 
     def extract_context_structure(
-        self,
-        messages: list[Message]
+        self, messages: list[Message]
     ) -> tuple[list[Message], list[Message], list[Message]]:
         """
         Extract HEAD, BODY, and TAIL from message history.
@@ -153,14 +150,14 @@ class ContextWindowManager:
         tail = messages[tail_start_idx:]
 
         # BODY: Everything between HEAD and TAIL
-        body = messages[len(head):tail_start_idx]
+        body = messages[len(head) : tail_start_idx]
 
         logger.debug(
             "Extracted context structure",
             head_count=len(head),
             body_count=len(body),
             tail_count=len(tail),
-            total=len(messages)
+            total=len(messages),
         )
 
         return head, body, tail
@@ -170,7 +167,7 @@ class ContextWindowManager:
         body_messages: list[Message],
         symbol: str | None = None,
         date_range: tuple[datetime, datetime] | None = None,
-        llm_service: Any = None  # Type hint as Any to avoid circular import
+        llm_service: Any = None,  # Type hint as Any to avoid circular import
     ) -> str:
         """
         Summarize message history using LLM.
@@ -197,15 +194,19 @@ class ContextWindowManager:
             context_info.append(f"Symbol: {symbol}")
         if date_range:
             start, end = date_range
-            context_info.append(f"Date Range: {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}")
+            context_info.append(
+                f"Date Range: {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
+            )
 
         context_str = " | ".join(context_info) if context_info else "All analyses"
 
         # Extract message content
-        history_text = "\n\n".join([
-            f"[{msg.role}] ({msg.timestamp if hasattr(msg, 'timestamp') else 'unknown'})\n{msg.content}"
-            for msg in body_messages
-        ])
+        history_text = "\n\n".join(
+            [
+                f"[{msg.role}] ({msg.timestamp if hasattr(msg, 'timestamp') else 'unknown'})\n{msg.content}"
+                for msg in body_messages
+            ]
+        )
 
         summarization_prompt = f"""Summarize the following portfolio analysis history.
 
@@ -231,25 +232,35 @@ Format: Clear, structured summary with key points."""
                 from ..agent.llm_client import DashScopeClient
 
                 # Use fast, cheap model for summarization (qwen-flash)
-                llm = DashScopeClient(settings=self.settings, model=self.settings.summarization_model)
+                llm = DashScopeClient(
+                    settings=self.settings, model=self.settings.summarization_model
+                )
 
                 # Invoke with simple prompt
-                summary = await llm.chat.ainvoke([{"role": "user", "content": summarization_prompt}])
+                summary = await llm.chat.ainvoke(
+                    [{"role": "user", "content": summarization_prompt}]
+                )
 
-                summary_text = summary.content if hasattr(summary, 'content') else str(summary)
+                summary_text = (
+                    summary.content if hasattr(summary, "content") else str(summary)
+                )
 
                 logger.info(
                     "History summarized",
                     original_tokens=current_tokens,
                     summary_tokens=self.estimate_tokens(summary_text),
-                    compression_ratio=round(self.estimate_tokens(summary_text) / current_tokens, 3),
-                    symbol=symbol
+                    compression_ratio=round(
+                        self.estimate_tokens(summary_text) / current_tokens, 3
+                    ),
+                    symbol=symbol,
                 )
 
                 return summary_text
 
             except Exception as e:
-                logger.error("Summarization failed", error=str(e), error_type=type(e).__name__)
+                logger.error(
+                    "Summarization failed", error=str(e), error_type=type(e).__name__
+                )
                 # Fallback: Simple extraction of key points
                 return self._fallback_summary(body_messages, symbol, date_range)
         else:
@@ -260,7 +271,7 @@ Format: Clear, structured summary with key points."""
         self,
         messages: list[Message],
         symbol: str | None = None,
-        date_range: tuple[datetime, datetime] | None = None
+        date_range: tuple[datetime, datetime] | None = None,
     ) -> str:
         """
         Fallback summarization without LLM.
@@ -278,7 +289,9 @@ Format: Clear, structured summary with key points."""
         date_str = ""
         if date_range:
             start, end = date_range
-            date_str = f" from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
+            date_str = (
+                f" from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
+            )
 
         return f"""Summary of {count} portfolio analyses{context}{date_str}.
 
@@ -286,10 +299,7 @@ Note: This is a simplified summary. Full analysis history has been compressed to
 Key patterns and trends from the historical analyses are preserved in this summary."""
 
     def reconstruct_context(
-        self,
-        head: list[Message],
-        summary_text: str,
-        tail: list[Message]
+        self, head: list[Message], summary_text: str, tail: list[Message]
     ) -> list[Message]:
         """
         Reconstruct compacted context: HEAD + [Summary Message] + TAIL.
@@ -313,7 +323,7 @@ Key patterns and trends from the historical analyses are preserved in this summa
 
 usage: continued""",
             source="llm",
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
 
         # Reconstruct: HEAD + Summary + TAIL
@@ -323,7 +333,7 @@ usage: continued""",
             "Context reconstructed",
             original_structure=f"{len(head)} head + body + {len(tail)} tail",
             compacted_structure=f"{len(head)} head + 1 summary + {len(tail)} tail",
-            total_messages=len(compacted)
+            total_messages=len(compacted),
         )
 
         return compacted
