@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2025-11-27
+
+### Fixed
+- **Symbol Search Input Sync**: Search input now correctly syncs when switching between chats (Bug #2)
+  - Made SymbolSearch a controlled component with `value` prop
+  - Input automatically updates to show current chat's symbol
+- **Font Size Balance**: Reduced chat message font size for better visual consistency (Bug #9)
+  - Changed paragraph and list text from `text-base` to `text-sm`
+  - Improves readability and balances with chart panel
+- **Help Button Position**: Moved help button from bottom-right to bottom-left (Bug #10)
+  - Reduces content obstruction, especially on smaller screens
+- **Market Movers Styling**: Removed non-functional hyperlink styling from stock symbols (Bug #11)
+  - Symbols now display as plain text to avoid false affordance
+  - Fixes user confusion about clickable elements
+
 ## [0.10.1] - 2025-11-16
 
 ### UX Improvements

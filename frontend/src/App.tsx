@@ -200,7 +200,7 @@ function App() {
       {/* Floating Help Button */}
       <button
         onClick={() => setIsHelpModalOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-110 transition-all duration-200 flex items-center justify-center z-40 group"
+        className="fixed bottom-6 left-6 w-14 h-14 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-110 transition-all duration-200 flex items-center justify-center z-40 group"
         aria-label="Open help modal"
       >
         <HelpCircle className="w-7 h-7 group-hover:rotate-12 transition-transform duration-200" />

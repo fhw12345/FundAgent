@@ -113,7 +113,7 @@ export const MarketMovers: React.FC<MarketMoversProps> = ({
           {/* Ticker */}
           <button
             onClick={() => handleTickerClick(mover.ticker)}
-            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline"
+            className="font-semibold text-gray-900"
           >
             {mover.ticker}
           </button>
