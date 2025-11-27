@@ -15,27 +15,17 @@ export const useChatManager = () => {
 
   const createWelcomeMessage = useCallback((): ChatMessage => ({
     role: "assistant",
-    content: `# ${t("welcome.title")}
+    content: `${t("welcome.title")}
 
----
-
-### ${t("welcome.firstTime")}
-
+${t("welcome.firstTime")}
 ${t("welcome.firstTimeHint")}
 
----
-
-### ${t("welcome.modesTitle")}
-
+${t("welcome.modesTitle")}
 ${t("welcome.agentMode")}
-
 ${t("welcome.copilotMode")}
-
 ${t("welcome.portfolioMode")}
 
----
-
-> ${t("welcome.proTip")}`,
+💡 ${t("welcome.proTip")}`,
     timestamp: new Date().toISOString(),
   }), [t]);
 

@@ -112,7 +112,7 @@ const MessageBubble = React.memo<{ msg: ChatMessage; t: (key: string, options?: 
                   </h3>
                 ),
                 p: ({ children }) => (
-                  <p className="mb-3 last:mb-0 leading-relaxed text-base">
+                  <p className="mb-3 last:mb-0 leading-relaxed text-sm">
                     {children}
                   </p>
                 ),
@@ -127,7 +127,7 @@ const MessageBubble = React.memo<{ msg: ChatMessage; t: (key: string, options?: 
                   </ol>
                 ),
                 li: ({ children }) => (
-                  <li className="text-base leading-relaxed">{children}</li>
+                  <li className="text-sm leading-relaxed">{children}</li>
                 ),
                 strong: ({ children }) => (
                   <strong className="font-semibold text-gray-900">
@@ -325,6 +325,15 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+      {/* Chat ID Display - Debug info */}
+      {chatId && (
+        <div className="flex justify-center mb-2">
+          <div className="px-3 py-1 text-xs font-mono text-gray-500 bg-gray-100 rounded-md border border-gray-200">
+            {chatId}
+          </div>
+        </div>
+      )}
+
       {/* Load More Button - Shows at top when chat has older messages */}
       {chatId && hasMore && onLoadMore && (
         <div className="flex justify-center mb-4">

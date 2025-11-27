@@ -213,7 +213,7 @@
   "welcome": {
     "title": "🎯 欢迎使用金融智能助手！",
     "firstTime": "✨ **首次使用？**",
-    "firstTimeHint": "点击右下角的 **❓** 按钮查看快速交互指南！",
+    "firstTimeHint": "点击左下角的 **❓** 按钮查看快速交互指南！",
     "modesTitle": "🚀 **三种强大模式供您探索：**",
     "agentMode": "🤖 **代理模式** — 让AI自动分析并提供洞察",
     "copilotMode": "💬 **助手模式** — 您来控制，AI来指导",
