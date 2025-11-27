@@ -105,3 +105,4 @@ dump.rdb
 
 # Docker volumes
 *_data/
+.claude/
