@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2025-11-27
+
+### Fixed
+- **Watchlist Symbol Validation**: Enhanced validation with multi-layer fallback strategies
+  - Primary: Exact symbol match in SYMBOL_SEARCH results
+  - Fallback 1: High-confidence match (score >= 0.9)
+  - Fallback 2: GLOBAL_QUOTE API direct validation
+  - Added debug logging for troubleshooting validation failures
+  - Fixes Bug #4: TSLA, AAPL, and other valid symbols now successfully validate
+
 ## [0.8.0] - 2025-11-26
 
 ### Added

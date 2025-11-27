@@ -60,12 +60,62 @@ async def add_to_watchlist(
         try:
             search_results = await market_service.search_symbols(symbol_upper, limit=5)
 
+            # Debug: Log search results for troubleshooting
+            logger.debug(
+                "Symbol search results",
+                symbol=symbol_upper,
+                results=[
+                    {
+                        "symbol": r.get("symbol"),
+                        "name": r.get("name"),
+                        "match_score": r.get("match_score"),
+                    }
+                    for r in search_results[:3]
+                ],
+            )
+
             # Check if exact match exists (case-insensitive)
             exact_match = None
             for result in search_results:
                 if result.get("symbol", "").upper() == symbol_upper:
                     exact_match = result
                     break
+
+            # Fallback: Accept high-confidence match (score >= 0.9)
+            if not exact_match and search_results:
+                first_result = search_results[0]
+                match_score = first_result.get("match_score", 0.0)
+                if match_score >= 0.9:
+                    logger.info(
+                        "Using high-confidence match as fallback",
+                        user_id=user_id,
+                        requested=symbol_upper,
+                        matched=first_result.get("symbol"),
+                        score=match_score,
+                    )
+                    exact_match = first_result
+
+            # Final fallback: Try GLOBAL_QUOTE for direct validation
+            if not exact_match:
+                try:
+                    quote = await market_service.get_quote(symbol_upper)
+                    if quote and quote.get("price"):
+                        logger.info(
+                            "Symbol validated via GLOBAL_QUOTE fallback",
+                            user_id=user_id,
+                            symbol=symbol_upper,
+                            price=quote.get("price"),
+                        )
+                        exact_match = {
+                            "symbol": symbol_upper,
+                            "name": "Verified via real-time quote",
+                        }
+                except Exception as quote_error:
+                    logger.debug(
+                        "GLOBAL_QUOTE fallback failed",
+                        symbol=symbol_upper,
+                        error=str(quote_error),
+                    )
 
             if not exact_match:
                 logger.warning(
