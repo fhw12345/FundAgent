@@ -72,9 +72,10 @@ export function EnhancedChatInterface() {
   });
 
   // Auto-sync UI state to MongoDB (debounced)
-  useUIStateSync({
+  const { flushUIState } = useUIStateSync({
     activeChatId: chatId,
     currentSymbol,
+    currentCompanyName,
     selectedInterval,
     selectedDateRange,
   });
@@ -154,7 +155,7 @@ export function EnhancedChatInterface() {
     retry: false,
   });
 
-  const handleSymbolSelect = useCallback((symbol: string, name: string) => {
+  const handleSymbolSelect = useCallback(async (symbol: string, name: string) => {
     setCurrentSymbol(symbol);
     setCurrentCompanyName(name);
 
@@ -162,7 +163,19 @@ export function EnhancedChatInterface() {
     const dateRange = calculateDateRange({ start: "", end: "" }, selectedInterval);
     setDateRangeStart(dateRange.start);
     setDateRangeEnd(dateRange.end);
-  }, [selectedInterval]);
+
+    // Auto-create chat if this is a new chat (no chatId yet)
+    if (!chatId) {
+      try {
+        const { chatService } = await import("../services/api");
+        const result = await chatService.createChat();
+        setChatId(result.chat_id);
+        console.log("✅ Chat auto-created on symbol selection:", result.chat_id);
+      } catch (error) {
+        console.error("❌ Failed to auto-create chat:", error);
+      }
+    }
+  }, [selectedInterval, chatId, setChatId]);
 
   const handleIntervalChange = useCallback((interval: TimeInterval) => {
     setSelectedInterval(interval);
@@ -208,9 +221,13 @@ export function EnhancedChatInterface() {
       console.log("⏭️ Skipping message submit: request already in progress");
       return;
     }
+
+    // Flush UI state immediately before sending message (to save any pending symbol selection)
+    flushUIState();
+
     chatMutation.mutate(message); // All user messages go to LLM
     setMessage("");
-  }, [message, chatMutation]);
+  }, [message, chatMutation, flushUIState]);
 
   const isRestoringRef = useRef(false);
 

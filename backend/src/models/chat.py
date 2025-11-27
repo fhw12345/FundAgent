@@ -17,6 +17,9 @@ class UIState(BaseModel):
     current_symbol: str | None = Field(
         default=None, description="Currently selected symbol"
     )
+    current_company_name: str | None = Field(
+        default=None, description="Company name for currently selected symbol"
+    )
     current_interval: str = Field(
         default="1d", description="Current timeframe (1h, 1d, 1w, 1mo)"
     )

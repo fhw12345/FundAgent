@@ -121,6 +121,7 @@ export interface ErrorResponse {
 
 export interface UIState {
   current_symbol?: string | null;
+  current_company_name?: string | null;
   current_interval?: string;
   current_date_range?: {
     start?: string | null;

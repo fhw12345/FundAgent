@@ -70,6 +70,7 @@ export function useChatRestoration(callbacks: ChatRestoreCallbacks) {
         // Restore UI state from chat.ui_state (with default empty state)
         const uiState = chatDetail.chat.ui_state || {
           current_symbol: null,
+          current_company_name: null,
           current_interval: "1d",
           current_date_range: { start: null, end: null },
           active_overlays: {},
@@ -78,18 +79,20 @@ export function useChatRestoration(callbacks: ChatRestoreCallbacks) {
         console.log("🔄 Restoring chat UI state:", {
           chatId,
           symbol: uiState.current_symbol,
+          companyName: uiState.current_company_name,
           interval: uiState.current_interval,
           dateRange: uiState.current_date_range,
           overlays: uiState.active_overlays,
         });
 
-        // Always set symbol (even if empty) to clear old state
+        // Always set symbol and company name (even if empty) to clear old state
         setCurrentSymbol(uiState.current_symbol || "");
-        setCurrentCompanyName(uiState.current_symbol || "");
+        setCurrentCompanyName(uiState.current_company_name || "");
 
         console.log(
           "✅ Symbol restored to search bar:",
           uiState.current_symbol,
+          uiState.current_company_name,
         );
 
         // Always set interval with fallback

@@ -73,6 +73,35 @@ async def get_or_create_chat(
 # ===== Persistent Chat Management Endpoints =====
 
 
+@router.post("/chats")
+async def create_empty_chat(
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service),
+) -> dict[str, str]:
+    """
+    Create an empty chat for the user (triggered by symbol selection).
+
+    **Authentication**: Requires Bearer token in Authorization header.
+
+    **Response:**
+    ```json
+    {
+      "chat_id": "chat_abc123"
+    }
+    ```
+    """
+    try:
+        logger.info("Creating empty chat", user_id=user_id)
+        chat = await chat_service.create_chat(user_id, title="New Chat")
+        logger.info("Empty chat created", chat_id=chat.chat_id, user_id=user_id)
+        return {"chat_id": chat.chat_id}
+    except Exception as e:
+        logger.error("Failed to create empty chat", user_id=user_id, error=str(e))
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create chat: {str(e)}"
+        ) from e
+
+
 @router.get("/chats", response_model=ChatListResponse)
 async def list_user_chats(
     page: int = 1,

@@ -20,6 +20,8 @@ interface SymbolSearchProps {
   placeholder?: string;
   className?: string;
   autoFocus?: boolean;
+  value?: string; // Controlled component: current symbol value
+  companyName?: string; // Company name for formatted display
 }
 
 export const SymbolSearch: React.FC<SymbolSearchProps> = ({
@@ -27,9 +29,11 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
   placeholder,
   className = "",
   autoFocus = false,
+  value = "", // Default to empty string
+  companyName = "", // Default to empty string
 }) => {
   const { t } = useTranslation(["market", "common"]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(value);
   const [results, setResults] = useState<SymbolSearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,6 +45,13 @@ export const SymbolSearch: React.FC<SymbolSearchProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sync internal query state with external value prop
+  useEffect(() => {
+    // Format display value: "SYMBOL - Company Name" or just "SYMBOL" if no company name
+    const displayValue = value && companyName ? `${value} - ${companyName}` : value;
+    setQuery(displayValue);
+  }, [value, companyName]);
 
   // Debounced search function
   const debouncedSearch = useCallback(

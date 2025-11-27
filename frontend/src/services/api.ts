@@ -124,6 +124,14 @@ export const chatService = {
   },
 
   /**
+   * Create an empty chat (triggered by symbol selection)
+   */
+  async createChat(): Promise<{ chat_id: string }> {
+    const response = await api.post<{ chat_id: string }>("/api/chat/chats");
+    return response.data;
+  },
+
+  /**
    * Get chat detail with messages for state restoration
    */
   async getChatDetail(

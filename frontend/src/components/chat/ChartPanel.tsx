@@ -155,7 +155,12 @@ const ChartPanelComponent: React.FC<ChartPanelProps> = ({
         </div>
 
         {/* Symbol Search */}
-        <SymbolSearch onSymbolSelect={handleSymbolSelect} className="mb-3" />
+        <SymbolSearch
+          onSymbolSelect={handleSymbolSelect}
+          value={currentSymbol}
+          companyName={currentCompanyName}
+          className="mb-3"
+        />
 
         {/* Analysis Buttons - Only show when symbol selected */}
         {currentSymbol && (
