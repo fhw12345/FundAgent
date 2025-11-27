@@ -109,7 +109,9 @@ class QuoteResponse(BaseModel):
     high: float = Field(..., description="Day high")
     low: float = Field(..., description="Day low")
     volume: int = Field(..., description="Trading volume")
-    latest_trading_day: str = Field(..., description="Latest trading day (YYYY-MM-DD)")
+    latest_trading_day: str = Field(
+        default="", description="Latest trading day (YYYY-MM-DD)"
+    )
     previous_close: float = Field(..., description="Previous close price")
     change: float = Field(..., description="Price change")
     change_percent: str = Field(..., description="Price change percentage")
