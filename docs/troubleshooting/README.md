@@ -11,6 +11,7 @@ This directory contains documentation for bugs, fixes, and common issues encount
 - [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems, service selectors
 - [External Secrets Sync](external-secrets-sync.md) - Secrets not updating from Azure Key Vault, force-sync procedures
 - [MongoDB Cosmos DB](mongodb-cosmos-db.md) - Throughput modes, indexes, unique constraints with NULL values
+- [SLS Logging Issues](sls-logging-issues.md) - Application logs not appearing in Alibaba Cloud SLS, loongcollector troubleshooting
 - [Git History Rewrite](git-history-rewrite.md) - Team awareness for git history rewrites, recovery steps
 - [Technical Analysis Limitations](technical-analysis-limitations.md) - Intraday analysis not available, insufficient data errors
 - [Transaction Reconciliation Fix](transaction-reconciliation-datetime-fix.md) - Datetime deprecation fix
@@ -98,6 +99,9 @@ Azure Key Vault secret updates not syncing, force-sync procedures, secret rotati
 
 ### MongoDB Cosmos DB
 Azure Cosmos DB limitations, throughput modes, index configuration, unique constraints with NULL values
+
+### SLS Logging
+Alibaba Cloud SLS log collection issues, AliyunLogConfig CRD troubleshooting, loongcollector container matching
 
 ## Historical Reference
 

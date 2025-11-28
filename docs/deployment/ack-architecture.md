@@ -487,6 +487,7 @@ kubectl delete secret klinecubic-tls -n klinematrix-prod
 
 - [Deployment Workflow](workflow.md) - Step-by-step deployment procedures
 - [Infrastructure Setup](infrastructure.md) - Cloud resource provisioning
+- [SLS Logging Setup](sls-logging.md) - Application log collection to Alibaba Cloud SLS
 - [Kubernetes Operations](../troubleshooting/kubernetes-issues.md) - Common K8s issues and solutions
 - [Environment Configuration](../CLAUDE.md) - Environment variables and settings
 
@@ -499,5 +500,5 @@ kubectl delete secret klinecubic-tls -n klinematrix-prod
 - **High Availability**: Single-node for cost optimization, multi-node planned for HA
 - **Monitoring**: Integrated with Alibaba Cloud monitoring + Langfuse for LLM observability
 
-**Last Updated:** 2025-11-18
-**Production Version:** Backend v0.7.0, Frontend v0.10.0
+**Last Updated:** 2025-11-28
+**Production Version:** Backend v0.8.2, Frontend v0.11.0

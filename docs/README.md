@@ -8,8 +8,8 @@ AI-Enhanced Financial Analysis Platform documentation hub.
 
 | Component | Version | Environment | URL |
 |-----------|---------|-------------|-----|
-| Backend | v0.7.0 | Prod (ACK) | https://klinecubic.cn |
-| Frontend | v0.10.0 | Prod (ACK) | https://klinecubic.cn |
+| Backend | v0.8.2 | Prod (ACK) | https://klinecubic.cn |
+| Frontend | v0.11.0 | Prod (ACK) | https://klinecubic.cn |
 | Test | Planned | AKS | https://klinematrix.com |
 | Local Dev | Docker | Compose | http://localhost:3000 |
 
@@ -43,6 +43,7 @@ Cloud infrastructure and deployment procedures.
 - [ACK Architecture](deployment/ack-architecture.md) - Alibaba Cloud production
 - [Cloud Setup](deployment/cloud-setup.md) - Azure/Alibaba hybrid setup
 - [Infrastructure](deployment/infrastructure.md) - K8s resources, networking
+- [SLS Logging](deployment/sls-logging.md) - Application log collection to Alibaba Cloud SLS
 - [Cost Optimization](deployment/cost-optimization.md) - Resource management
 
 #### Development
