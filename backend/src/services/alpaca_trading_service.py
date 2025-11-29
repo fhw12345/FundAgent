@@ -29,9 +29,9 @@ from ..models.portfolio import (
 
 logger = structlog.get_logger()
 
-# Order validation constants
-MAX_ORDER_SIZE = 1000  # Maximum shares per order (paper trading limit)
-MAX_ORDER_VALUE = 100000  # Maximum order value in USD (paper trading safety)
+# Order validation constants (paper trading - no artificial limits)
+# Note: Alpaca paper trading has no share limits, only real-world liquidity constraints
+MAX_ORDER_VALUE = 500000  # Maximum order value in USD (safety limit for paper trading)
 
 
 class AlpacaTradingService:
@@ -137,12 +137,7 @@ class AlpacaTradingService:
         if quantity <= 0:
             raise ValueError(f"Order quantity must be positive: {quantity}")
 
-        if quantity > MAX_ORDER_SIZE:
-            raise ValueError(
-                f"Order size exceeds maximum limit: {quantity} > {MAX_ORDER_SIZE} shares"
-            )
-
-        # Validate order value (if price is known)
+        # Validate order value (if price is known) - safety limit for paper trading
         estimated_price = limit_price or stop_price
         if estimated_price:
             order_value = quantity * estimated_price

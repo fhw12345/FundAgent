@@ -172,8 +172,29 @@ Secrets in `klinematrix-prod` namespace (Alibaba ACK):
 
 | K8s Secret Name | Keys | Source |
 |-----------------|------|--------|
-| `backend-secrets` | `jwt-secret`<br>`dashscope-api-key`<br>`mongodb-url`<br>`alpaca-api-key`<br>`alpaca-secret-key`<br>`alpha-vantage-api-key` | Manual kubectl |
+| `backend-secrets` | `jwt-secret`<br>`dashscope-api-key`<br>`mongodb-url`<br>`alpaca-api-key`<br>`alpaca-secret-key`<br>`alpha-vantage-api-key`<br>`oss-access-key`<br>`oss-secret-key`<br>`admin-secret`<br>`tencent-secret-id`<br>`tencent-secret-key`<br>`langfuse-public-key`<br>`langfuse-secret-key` | Manual kubectl |
+| `langfuse-secrets` | `postgres-password`<br>`clickhouse-password`<br>`nextauth-secret`<br>`salt`<br>`oss-access-key-id`<br>`oss-access-key-secret` | Manual kubectl |
 | `redis-auth` | `password` | Base kustomize |
+
+### Langfuse API Keys (Backend Integration)
+
+After deploying Langfuse, generate API keys from the Langfuse UI:
+1. Access https://monitor.klinecubic.cn
+2. Create account (first user becomes admin)
+3. Navigate to Settings -> API Keys
+4. Create new API key pair
+5. Add to backend-secrets:
+
+```bash
+export KUBECONFIG=~/.kube/config-ack-prod
+# Encode keys
+PUBLIC_KEY_B64=$(echo -n 'pk-lf-YOUR-PUBLIC-KEY' | base64)
+SECRET_KEY_B64=$(echo -n 'sk-lf-YOUR-SECRET-KEY' | base64)
+
+# Patch secret
+kubectl patch secret backend-secrets -n klinematrix-prod --type='json' \
+  -p="[{\"op\": \"add\", \"path\": \"/data/langfuse-public-key\", \"value\": \"$PUBLIC_KEY_B64\"},{\"op\": \"add\", \"path\": \"/data/langfuse-secret-key\", \"value\": \"$SECRET_KEY_B64\"}]"
+```
 
 ## Future Improvements
 

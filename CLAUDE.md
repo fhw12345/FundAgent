@@ -4,10 +4,12 @@
 
 ## 🎯 Recent Architecture Changes
 
-**Portfolio Analysis CronJob** (2025-11-23): Migrated from dedicated pod (1.14GB image) to HTTP trigger pattern (5MB curl image).
+**Portfolio Analysis CronJob** (2025-11-27 - Deployed): Migrated from dedicated pod (1.14GB image) to HTTP trigger pattern (5MB curl image).
 - **Old**: CronJob → Dedicated Pod → Python script → Direct DB access
 - **New**: CronJob → curl (5MB) → Backend API → Background Task
-- **Benefits**: No code duplication, auto-updates with backend, 6x faster startup
+- **Schedule**: `30 14 * * *` (9:30 AM ET / US market open)
+- **Image**: ACR-hosted curl (`klinecubic/curl:8.5.0`) - Docker Hub blocked in China
+- **Admin UI**: CronController component (admin-only, manual trigger button)
 - **Details**: [docs/features/portfolio-analysis-cronjob-http.md](docs/features/portfolio-analysis-cronjob-http.md)
 
 ## 🔐 Security Rules
