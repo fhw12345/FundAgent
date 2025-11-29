@@ -71,8 +71,9 @@ export function EnhancedChatInterface() {
     setChatId,
   });
 
-  // Auto-sync UI state to MongoDB (debounced)
-  const { flushUIState } = useUIStateSync({
+  // Auto-sync UI state to MongoDB (debounced) - for chat restoration on page reload
+  // Note: Symbol is now passed directly in chat request (current_symbol), so no need to flush before send
+  useUIStateSync({
     activeChatId: chatId,
     currentSymbol,
     currentCompanyName,
@@ -222,12 +223,11 @@ export function EnhancedChatInterface() {
       return;
     }
 
-    // Flush UI state immediately before sending message (to save any pending symbol selection)
-    flushUIState();
-
+    // Symbol is now passed directly in chat request (current_symbol field)
+    // No need to flush UI state - eliminates race condition
     chatMutation.mutate(message); // All user messages go to LLM
     setMessage("");
-  }, [message, chatMutation, flushUIState]);
+  }, [message, chatMutation]);
 
   const isRestoringRef = useRef(false);
 

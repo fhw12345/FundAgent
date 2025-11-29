@@ -37,7 +37,7 @@ import i18n from "../../i18n";
 
 // Chat hook - streams LLM responses in real-time
 export const useAnalysis = (
-  _currentSymbol: string | null,
+  currentSymbol: string | null, // Used for symbol context injection (takes priority over DB)
   _selectedDateRange: { start: string; end: string },
   setMessages: (updater: (prevMessages: any[]) => any[]) => void,
   _setSelectedDateRange: (range: { start: string; end: string }) => void,
@@ -220,6 +220,8 @@ export const useAnalysis = (
             agent_version: agentMode, // Pass agent mode (v2/v3)
             // Language configuration - get from i18n
             language: (i18n.language === "zh-CN" || i18n.language === "en" ? i18n.language : "zh-CN") as "zh-CN" | "en",
+            // Symbol context - takes priority over DB ui_state, eliminates race condition
+            current_symbol: currentSymbol || undefined,
           },
         );
       });

@@ -18,6 +18,7 @@ import { MarketMovers } from "../components/MarketMovers";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
 import { ChatMessages } from "../components/chat/ChatMessages";
 import { formatPL, getPLColor } from "../services/portfolioApi";
+import { authStorage } from "../services/authService";
 
 type Period = "1D" | "1M" | "1Y" | "All";
 
@@ -39,26 +40,9 @@ export default function PortfolioDashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Start open
   const [selectedDate, setSelectedDate] = useState<string | null>(null); // Date filter for chat history
 
-  // Cron controller state (local visualization only - actual cron controlled by docker-compose .env)
-  const [cronIntervalMinutes, setCronIntervalMinutes] = useState<number>(() => {
-    const saved = localStorage.getItem('portfolio-cron-interval');
-    return saved ? parseInt(saved, 10) : 5; // Default: 5 minutes for testing
-  });
-  const [cronEnabled, setCronEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem('portfolio-cron-enabled');
-    return saved ? saved === 'true' : true; // Default: enabled
-  });
-
-  // Persist cron settings to localStorage
-  const handleCronToggle = (enabled: boolean) => {
-    setCronEnabled(enabled);
-    localStorage.setItem('portfolio-cron-enabled', String(enabled));
-  };
-
-  const handleCronIntervalChange = (minutes: number) => {
-    setCronIntervalMinutes(minutes);
-    localStorage.setItem('portfolio-cron-interval', String(minutes));
-  };
+  // Admin check - only admin (allenpan) can see cron controller
+  const currentUser = authStorage.getUser();
+  const isAdmin = currentUser?.is_admin || currentUser?.username === "allenpan";
 
   const {
     data: summary,
@@ -242,15 +226,12 @@ export default function PortfolioDashboard() {
               <WatchlistPanel />
             </div>
 
-            {/* Cron Controller (Local Development) */}
-            <div className="mt-8">
-              <CronController
-                intervalMinutes={cronIntervalMinutes}
-                enabled={cronEnabled}
-                onToggle={handleCronToggle}
-                onIntervalChange={handleCronIntervalChange}
-              />
-            </div>
+            {/* Cron Controller (Admin Only) - Global System CronJob */}
+            {isAdmin && (
+              <div className="mt-8">
+                <CronController />
+              </div>
+            )}
 
             {/* Footer */}
             <div className="mt-8 text-center text-xs text-gray-400">

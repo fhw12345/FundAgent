@@ -228,6 +228,8 @@ export const chatService = {
       debug_enabled?: boolean; // Enable debug logging in backend
       // Language Configuration
       language?: "zh-CN" | "en"; // Response language (default: zh-CN)
+      // Symbol Context (takes priority over DB ui_state, eliminates race condition)
+      current_symbol?: string;
     },
   ): () => void {
     const baseURL =
@@ -265,6 +267,8 @@ export const chatService = {
         max_tokens: options?.max_tokens ?? 3000,
         // Language Configuration
         language: options?.language ?? "zh-CN",
+        // Symbol Context (priority over DB ui_state)
+        current_symbol: options?.current_symbol,
       }),
       signal: controller.signal,
     })

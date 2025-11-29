@@ -64,6 +64,7 @@ export interface ChatMessage {
 export interface ChatRequest {
   message: string;
   session_id?: string;
+  current_symbol?: string; // Symbol from UI, takes priority over DB ui_state
 }
 
 export interface ChatResponse {
