@@ -3,13 +3,14 @@ kind: Ingress
 metadata:
   name: langfuse-ingress
   annotations:
+    # Use same cert-manager as main ingress
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Increase timeouts for Langfuse API
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 spec:
-  ingressClassName: nginx
   tls:
   - hosts:
     - monitor.klinecubic.cn

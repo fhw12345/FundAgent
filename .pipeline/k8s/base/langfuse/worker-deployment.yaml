@@ -17,23 +17,25 @@ spec:
         component: observability
     spec:
       serviceAccountName: klinematrix-sa
+      imagePullSecrets:
+      - name: acr-secret
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
       containers:
       - name: langfuse-worker
-        image: langfuse/langfuse-worker:3
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/langfuse-worker:3
         imagePullPolicy: IfNotPresent
         env:
-        # Database
-        - name: POLARDB_PASSWORD
+        # Database - PostgreSQL (in-cluster)
+        - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: langfuse-secrets
-              key: polardb-password
+              key: postgres-password
         - name: DATABASE_URL
-          value: "postgresql://km_admin:$(POLARDB_PASSWORD)@aliyun-polardb-klinematrix.rwlb.rds.aliyuncs.com:5432/langfuse"
+          value: "postgresql://langfuse:$(POSTGRES_PASSWORD)@langfuse-postgres:5432/langfuse"
 
         # ClickHouse
         - name: CLICKHOUSE_URL
@@ -59,12 +61,13 @@ spec:
         # S3/OSS Event Uploads
         # SECURITY NOTE: Using HTTP instead of HTTPS due to boto3 chunked encoding incompatibility with OSS
         # Alibaba Cloud OSS does not support AWS SDK's aws-chunked encoding when using HTTPS
-        # Since AKS (Azure) cannot use OSS internal endpoint (different cloud), HTTP is required
         # Traces are primarily stored in ClickHouse (encrypted at rest); OSS is backup storage
         - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
-          value: "langfuse-events-prod"
+          value: "klinecubic-financialagent-oss"
+        - name: LANGFUSE_S3_EVENT_UPLOAD_PREFIX
+          value: "langfuse-events"
         - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
-          value: "cn-hangzhou"
+          value: "cn-shanghai"
         - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -76,13 +79,13 @@ spec:
               name: langfuse-secrets
               key: oss-access-key-secret
         - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
-          value: "http://oss-cn-hangzhou.aliyuncs.com"  # HTTP required (boto3 chunked encoding issue)
+          value: "http://oss-cn-shanghai.aliyuncs.com"  # HTTP required (boto3 chunked encoding issue)
         - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
           value: "false"
 
         # Auth (must match server)
         - name: NEXTAUTH_URL
-          value: "https://monitor.klinematrix.com"
+          value: "https://monitor.klinecubic.cn"
         - name: NEXTAUTH_SECRET
           valueFrom:
             secretKeyRef:
@@ -111,11 +114,11 @@ spec:
           mountPath: /tmp
         resources:
           requests:
-            memory: "2Gi"  # Higher request to prefer userpool2 (high memory node)
-            cpu: "100m"    # Increased from 50m due to high CPU usage
+            memory: "256Mi"
+            cpu: "50m"
           limits:
-            memory: "3Gi"  # Allow headroom for worker operations
-            cpu: "500m"    # Increased from 200m for processing headroom
+            memory: "512Mi"
+            cpu: "300m"
       volumes:
       - name: tmp
         emptyDir: {}

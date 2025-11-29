@@ -1,87 +1,89 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: langfuse-clickhouse
+  name: langfuse-postgres
   labels:
-    app: langfuse-clickhouse
-    component: analytics
+    app: langfuse-postgres
+    component: database
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: langfuse-clickhouse
+      app: langfuse-postgres
   template:
     metadata:
       labels:
-        app: langfuse-clickhouse
-        component: analytics
+        app: langfuse-postgres
+        component: database
     spec:
       serviceAccountName: klinematrix-sa
       imagePullSecrets:
       - name: acr-secret
       securityContext:
         runAsNonRoot: true
-        runAsUser: 101  # ClickHouse user
-        fsGroup: 101
+        runAsUser: 999  # postgres user
+        fsGroup: 999
       containers:
-      - name: clickhouse
-        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/clickhouse:24.1-alpine
+      - name: postgres
+        image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/postgres:15-alpine
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8123
-          name: http
-        - containerPort: 9000
-          name: native
+        - containerPort: 5432
+          name: postgres
         env:
-        - name: CLICKHOUSE_DB
+        - name: POSTGRES_DB
           value: "langfuse"
-        - name: CLICKHOUSE_USER
+        - name: POSTGRES_USER
           value: "langfuse"
-        - name: CLICKHOUSE_PASSWORD
+        - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
               name: langfuse-secrets
-              key: clickhouse-password
-        - name: CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT
-          value: "1"
+              key: postgres-password
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false  # ClickHouse needs write access
+          readOnlyRootFilesystem: false  # PostgreSQL needs write access
           runAsNonRoot: true
-          runAsUser: 101
+          runAsUser: 999
           capabilities:
             drop:
               - ALL
         volumeMounts:
         - name: data
-          mountPath: /var/lib/clickhouse
+          mountPath: /var/lib/postgresql/data
         - name: tmp
           mountPath: /tmp
-        - name: logs
-          mountPath: /var/log/clickhouse-server
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "50m"
+            memory: "256Mi"
+            cpu: "100m"
           limits:
-            memory: "1Gi"
-            cpu: "300m"
+            memory: "512Mi"
+            cpu: "500m"
         livenessProbe:
-          httpGet:
-            path: /ping
-            port: 8123
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - langfuse
+            - -d
+            - langfuse
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
-          httpGet:
-            path: /ping
-            port: 8123
-          initialDelaySeconds: 10
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - langfuse
+            - -d
+            - langfuse
+          initialDelaySeconds: 5
           periodSeconds: 5
       volumes:
       - name: tmp
-        emptyDir: {}
-      - name: logs
         emptyDir: {}
       # Using emptyDir for data - WARNING: Data lost on pod restart
       # TODO: Switch to PVC when budget available

@@ -6,7 +6,6 @@ metadata:
     app: langfuse-clickhouse
 spec:
   type: ClusterIP
-  clusterIP: None  # Headless service for StatefulSet
   ports:
   - port: 8123
     targetPort: 8123
