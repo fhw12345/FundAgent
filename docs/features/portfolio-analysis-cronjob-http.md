@@ -1,7 +1,7 @@
 # Portfolio Analysis CronJob - HTTP Trigger Architecture
 
 **Date**: 2025-11-23
-**Status**: ✅ Implemented
+**Status**: ✅ Deployed to Production (2025-11-27)
 **Migration**: From dedicated pod to HTTP trigger pattern
 
 ## Problem Statement
@@ -40,7 +40,7 @@ Portfolio Analysis (same process)
 
 ⚠️ **Resource sharing** - Analysis runs in backend pod (shares CPU/memory with API)
 ⚠️ **Long-running task** - Uses FastAPI background tasks (10-15 minutes)
-✅ **Mitigation** - Analysis runs at 8 PM EST (low traffic time)
+✅ **Mitigation** - Analysis runs at 9:30 AM ET (US market open)
 
 ## Implementation
 
@@ -101,14 +101,15 @@ kind: CronJob
 metadata:
   name: portfolio-analysis-trigger
 spec:
-  schedule: "0 1 * * *"  # 8 PM EST daily
+  schedule: "30 14 * * *"  # 9:30 AM ET / 2:30 PM UTC (US market open)
   jobTemplate:
     spec:
       template:
         spec:
           containers:
           - name: trigger
-            image: curlimages/curl:8.5.0  # 5MB image!
+            # Using ACR mirror since Docker Hub is blocked in China
+            image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/curl:8.5.0
             command:
             - sh
             - -c
@@ -122,10 +123,15 @@ spec:
 ```
 
 **Key differences from old CronJob:**
-- **Image**: `curlimages/curl:8.5.0` (5MB) vs `klinematrix/backend:prod` (1.14GB)
+- **Image**: ACR-hosted curl (5MB) vs `klinematrix/backend:prod` (1.14GB)
 - **Resources**: 16Mi RAM vs 512Mi-1Gi RAM
 - **Startup**: 1-2s vs 5-10s
 - **No Python** - Just a simple HTTP call
+
+> **Note**: Docker Hub images (`curlimages/curl`) cannot be pulled directly in ACK (China). Import to ACR first:
+> ```bash
+> az acr import --name financialAgent --source docker.io/curlimages/curl:8.5.0 --image klinecubic/curl:8.5.0
+> ```
 
 ## Configuration
 
@@ -137,19 +143,28 @@ spec:
 ADMIN_SECRET=dev-admin-secret-change-in-production
 ```
 
-### Production
+### Production (ACK)
 
 **Kubernetes Secret**: `backend-secrets`
 
 ```bash
-# Add admin-secret key to Azure Key Vault
-az keyvault secret set \
-  --vault-name klinematrix-test-kv \
-  --name admin-secret \
-  --value "$(openssl rand -base64 32)"
+# Generate and add admin-secret directly to K8s secret (ACK doesn't have External Secrets Operator)
+ADMIN_SECRET="cronjob-admin-secret-$(openssl rand -hex 16)"
+KUBECONFIG=~/.kube/config-ack-prod kubectl patch secret backend-secrets -n klinematrix-prod \
+  --type='json' \
+  -p="[{\"op\": \"add\", \"path\": \"/data/admin-secret\", \"value\": \"$(echo -n "$ADMIN_SECRET" | base64)\"}]"
 ```
 
-**External Secrets**: Auto-synced to `backend-secrets/admin-secret`
+**Backend Deployment**: Must include `ADMIN_SECRET` env var in `backend-prod-patch.yaml`:
+```yaml
+- name: ADMIN_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: backend-secrets
+      key: admin-secret
+```
+
+> **Important**: After adding the secret, restart backend deployment to load the new env var.
 
 ## Testing
 
@@ -183,23 +198,23 @@ kubectl logs -l app=backend --tail=100 -n klinematrix-prod | grep -i portfolio
 
 ## Migration Steps
 
-### Phase 1: Add HTTP Endpoint (✅ Complete)
+### Phase 1: Add HTTP Endpoint (✅ Complete - 2025-11-23)
 1. ✅ Added admin endpoint to `backend/src/api/admin.py`
 2. ✅ Updated `require_admin()` to support `X-Admin-Secret` header
 3. ✅ Added `admin_secret` to settings
 4. ✅ Tested locally with docker-compose
 
-### Phase 2: Deploy New CronJob (Pending)
-1. ⏳ Create `admin-secret` in Azure Key Vault
-2. ⏳ Deploy new CronJob with curl image
-3. ⏳ Verify trigger works in production
-4. ⏳ Monitor for one successful run
+### Phase 2: Deploy New CronJob (✅ Complete - 2025-11-27)
+1. ✅ Created `admin-secret` in `backend-secrets` (kubectl patch)
+2. ✅ Added `ADMIN_SECRET` env var to backend deployment
+3. ✅ Imported curl image to ACR (Docker Hub blocked in China)
+4. ✅ Deployed `portfolio-analysis-trigger` CronJob
+5. ✅ Verified manual trigger works: HTTP 202, background task runs
 
-### Phase 3: Remove Old CronJob (Pending)
-1. ⏳ Suspend old portfolio-analysis CronJob
-2. ⏳ Wait 24 hours (ensure new one works)
-3. ⏳ Delete old CronJob definition
-4. ⏳ Remove old CronJob YAML files
+### Phase 3: Remove Old CronJob (✅ Complete - 2025-11-27)
+1. ✅ Deleted old `portfolio-analysis` CronJob from cluster
+2. ✅ Updated `kustomization.yaml` to reference new trigger YAML
+3. ✅ Old CronJob YAML kept in repo for reference (commented out in base kustomization)
 
 ## Monitoring
 
@@ -229,24 +244,24 @@ kubectl logs -l app=backend -n klinematrix-prod | grep portfolio
 | Background task fails | No "completed" log | Check backend logs for errors |
 | Long-running timeout | Task interrupted | Increase backend pod resources |
 
+## Admin UI Integration (✅ Implemented - 2025-11-27)
+
+The Portfolio Dashboard now includes a **CronController** component visible only to admin users:
+
+**File**: `frontend/src/components/portfolio/CronController.tsx`
+
+**Features**:
+- Displays global CronJob schedule (Daily at 9:30 AM ET)
+- Shows system-wide status indicator
+- Manual trigger button for testing
+- Admin-only visibility (checks `is_admin` or `username === "allenpan"`)
+
+**Screenshot**: The component shows:
+- Schedule: `30 14 * * *` (UTC)
+- System-Wide Job warning (runs for ALL users)
+- "Trigger Analysis Now" button
+
 ## Future Enhancements
-
-### Admin UI Integration
-
-Add manual trigger button in admin panel:
-
-```typescript
-// frontend/src/pages/AdminPage.tsx
-const triggerPortfolioAnalysis = async () => {
-  const response = await fetch('/api/admin/portfolio/trigger-analysis', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${adminToken}`,
-    },
-  });
-  // Show toast: "Analysis started in background"
-};
-```
 
 ### Status API
 

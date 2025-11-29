@@ -6,8 +6,8 @@ metadata:
     app: portfolio-analysis
     component: worker
 spec:
-  # Run daily at 8 PM EST (01:00 UTC)
-  schedule: "0 1 * * *"
+  # Run daily at 9:30 AM ET / 2:30 PM UTC (market open)
+  schedule: "30 14 * * *"
   # Keep last 7 successful and 3 failed jobs for debugging
   successfulJobsHistoryLimit: 7
   failedJobsHistoryLimit: 3

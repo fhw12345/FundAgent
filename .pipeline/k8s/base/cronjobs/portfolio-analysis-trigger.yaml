@@ -6,8 +6,8 @@ metadata:
     app: portfolio-analysis
     component: trigger
 spec:
-  # Run daily at 8 PM EST (01:00 UTC)
-  schedule: "0 1 * * *"
+  # Run daily at 9:30 AM ET / 2:30 PM UTC (US market open)
+  schedule: "30 14 * * *"
   # Keep last 7 successful and 3 failed jobs for debugging
   successfulJobsHistoryLimit: 7
   failedJobsHistoryLimit: 3
@@ -36,7 +36,8 @@ spec:
           containers:
           - name: trigger
             # Minimal curl image (5MB vs 1.14GB backend image)
-            image: curlimages/curl:8.5.0
+            # Using ACR mirror since Docker Hub is blocked in China
+            image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/curl:8.5.0
             imagePullPolicy: IfNotPresent
             command:
             - sh

@@ -21,7 +21,9 @@ resources:
 - ../../base/ingress/clusterissuer.yaml
 - ../../base/ingress/ingress.yaml
 - ../../base/cronjobs/reconcile-transactions.yaml
-- ../../base/cronjobs/portfolio-analysis.yaml
+# Use HTTP trigger pattern for portfolio analysis (5MB curl vs 1.14GB backend image)
+# See docs/features/portfolio-analysis-cronjob-http.md for details
+- ../../base/cronjobs/portfolio-analysis-trigger.yaml
 # Production-specific resources (Alibaba Cloud ACK)
 - namespace.yaml
 - mongodb-statefulset.yaml
@@ -29,6 +31,16 @@ resources:
 # Note: secrets.yaml references External Secrets Operator (not installed in ACK)
 # Secrets are managed manually via kubectl in production
 - rbac.yaml
+# Langfuse observability stack (ClickHouse on 16GB node for memory-intensive workloads)
+# NOTE: langfuse-secrets must be created manually via kubectl (see docs/deployment/secrets-architecture.md)
+- ../../base/langfuse/postgres-statefulset.yaml
+- ../../base/langfuse/postgres-service.yaml
+- ../../base/langfuse/clickhouse-statefulset.yaml
+- ../../base/langfuse/clickhouse-service.yaml
+- ../../base/langfuse/server-deployment.yaml
+- ../../base/langfuse/server-service.yaml
+- ../../base/langfuse/worker-deployment.yaml
+- ../../base/langfuse/ingress.yaml
 
 # Production environment overrides
 patches:
@@ -44,19 +56,32 @@ patches:
   target:
     kind: Ingress
     name: klinematrix-ingress
-- path: cronjob-portfolio-analysis-patch.yaml
+- path: cronjob-portfolio-trigger-patch.yaml
   target:
     kind: CronJob
-    name: portfolio-analysis
+    name: portfolio-analysis-trigger
+# Langfuse production patches (OSS bucket, node affinity, domain)
+- path: langfuse-server-prod-patch.yaml
+  target:
+    kind: Deployment
+    name: langfuse-server
+- path: langfuse-worker-prod-patch.yaml
+  target:
+    kind: Deployment
+    name: langfuse-worker
+- path: langfuse-clickhouse-prod-patch.yaml
+  target:
+    kind: Deployment
+    name: langfuse-clickhouse
 
 # Production image tags (current versions)
 images:
 - name: klinematrix/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend
-  newTag: "prod-v0.8.0"
+  newTag: "prod-v0.8.3"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend
-  newTag: "prod-v0.11.0"
+  newTag: "prod-v0.11.2"
 
 # Resource allocation for production
 replicas:
