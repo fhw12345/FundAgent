@@ -79,7 +79,7 @@
   },
   "transactions": {
     "title": "最近交易",
-    "subtitle": "最新 {{count}} 笔交易",
+    "subtitle": "共 {{count}} 笔交易",
     "date": "日期",
     "type": "类型",
     "symbol": "代码",
@@ -97,7 +97,12 @@
     "addTransaction": "添加交易",
     "editTransaction": "编辑交易",
     "deleteTransaction": "删除交易",
-    "loadFailed": "加载交易记录失败"
+    "loadFailed": "加载交易记录失败",
+    "filterAll": "全部",
+    "filterSuccess": "成功",
+    "filterFailed": "失败",
+    "showAll": "显示全部 ({{total}})",
+    "showLess": "收起"
   },
   "alerts": {
     "title": "价格提醒",

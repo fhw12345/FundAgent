@@ -51,10 +51,12 @@ class PortfolioOrderRepository:
         )
 
         # Unique index on Alpaca order ID (prevent duplicates)
+        # sparse=True allows multiple documents with null alpaca_order_id (failed orders)
         await self.collection.create_index(
             [("alpaca_order_id", 1)],
             name="idx_alpaca_order",
             unique=True,
+            sparse=True,
         )
 
         # Index for filtering by status
@@ -103,6 +105,36 @@ class PortfolioOrderRepository:
         )
 
         return order
+
+    async def create_many(self, orders: list[PortfolioOrder]) -> int:
+        """
+        Batch insert multiple portfolio orders.
+
+        Uses insert_many() for efficient bulk insertion, reducing
+        database round trips from N to 1.
+
+        Args:
+            orders: List of portfolio orders to store
+
+        Returns:
+            Number of orders inserted
+
+        Raises:
+            BulkWriteError: If any order fails (e.g., duplicate alpaca_order_id)
+        """
+        if not orders:
+            return 0
+
+        order_dicts = [o.model_dump() for o in orders]
+        result = await self.collection.insert_many(order_dicts)
+
+        logger.info(
+            "Portfolio orders batch created",
+            count=len(result.inserted_ids),
+            symbols=[o.symbol for o in orders],
+        )
+
+        return len(result.inserted_ids)
 
     async def get(self, order_id: str) -> PortfolioOrder | None:
         """

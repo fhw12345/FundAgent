@@ -51,7 +51,10 @@ class PortfolioOrder(BaseModel):
     )
 
     # Alpaca native ID (CRITICAL for status tracking)
-    alpaca_order_id: str = Field(..., description="Alpaca's native order ID (UUID)")
+    # None for failed orders that never reached Alpaca
+    alpaca_order_id: str | None = Field(
+        None, description="Alpaca's native order ID (UUID), None if order failed"
+    )
 
     # Audit trail (CRITICAL - links order to analysis)
     analysis_id: str = Field(
@@ -79,10 +82,13 @@ class PortfolioOrder(BaseModel):
     # Execution details
     status: str = Field(
         ...,
-        description="new | filled | partially_filled | canceled | rejected",
+        description="new | filled | partially_filled | canceled | rejected | failed",
     )
     filled_qty: float = Field(0.0, description="Shares filled")
     filled_avg_price: float | None = Field(None, description="Average fill price")
+    error_message: str | None = Field(
+        None, description="Error message for failed orders (raw API error)"
+    )
 
     # Timestamps
     created_at: datetime = Field(..., description="Order placement time")

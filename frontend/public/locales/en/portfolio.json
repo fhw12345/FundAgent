@@ -79,7 +79,7 @@
   },
   "transactions": {
     "title": "Recent Transactions",
-    "subtitle": "Latest {{count}} trades",
+    "subtitle": "{{count}} total transactions",
     "date": "Date",
     "type": "Type",
     "symbol": "Symbol",
@@ -97,7 +97,12 @@
     "addTransaction": "Add Transaction",
     "editTransaction": "Edit Transaction",
     "deleteTransaction": "Delete Transaction",
-    "loadFailed": "Failed to load transactions"
+    "loadFailed": "Failed to load transactions",
+    "filterAll": "All",
+    "filterSuccess": "Success",
+    "filterFailed": "Failed",
+    "showAll": "Show all ({{total}})",
+    "showLess": "Show less"
   },
   "alerts": {
     "title": "Price Alerts",
