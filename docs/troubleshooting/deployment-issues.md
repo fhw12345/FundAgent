@@ -472,3 +472,140 @@ kubectl patch serviceaccount klinematrix-sa -n klinematrix-test \
 - Document workload identity configuration in deployment guide
 
 ---
+
+## Issue: Docker Hub Images Fail to Pull in ACK (China)
+
+### Symptoms
+```bash
+kubectl describe pod -l app=portfolio-analysis -n klinematrix-prod
+# Warning  Failed  kubelet  Failed to pull image "curlimages/curl:8.5.0":
+#   dial tcp 98.159.108.71:443: i/o timeout
+```
+
+### Root Cause
+Docker Hub (docker.io/registry-1.docker.io) is blocked or extremely slow in mainland China.
+
+### Solution
+
+**Import image to Azure ACR:**
+```bash
+# Import from Docker Hub to ACR (runs on Azure, not blocked)
+az acr import --name financialAgent \
+  --source docker.io/curlimages/curl:8.5.0 \
+  --image klinecubic/curl:8.5.0
+
+# Verify import
+az acr repository show-tags --name financialAgent --repository klinecubic/curl
+```
+
+**Update K8s YAML to use ACR:**
+```yaml
+# Before (fails in China)
+image: curlimages/curl:8.5.0
+
+# After (works in ACK)
+image: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/curl:8.5.0
+```
+
+### Prevention
+- Never use Docker Hub images directly in ACK manifests
+- Pre-import all third-party images to ACR
+- Document ACR paths in YAML comments
+
+---
+
+## Issue: MongoDB Index Conflict (Existing Index With Same Name)
+
+### Symptoms
+```bash
+docker compose logs backend
+# pymongo.errors.OperationFailure: An existing index has the same name as the requested index.
+# When index options are different, you must drop the existing index to recreate it.
+```
+
+### Root Cause
+Trying to recreate an existing index with modified options (e.g., adding `sparse=True` to an existing index).
+
+### Diagnosis
+```bash
+# List existing indexes
+docker compose exec mongodb mongosh financial_agent --eval 'db.portfolio_orders.getIndexes()'
+
+# Check for the conflicting index
+# Look for the index name in the error message (e.g., "idx_alpaca_order")
+```
+
+### Solution
+Drop the existing index and let the application recreate it:
+```bash
+# Drop the conflicting index
+docker compose exec mongodb mongosh financial_agent --eval 'db.portfolio_orders.dropIndex("idx_alpaca_order")'
+
+# Restart backend to recreate index with new options
+docker compose restart backend
+```
+
+### When to Use Sparse Index
+Use `sparse=True` when:
+- The indexed field can be NULL/None
+- The index is UNIQUE
+- Multiple documents may have NULL values for that field
+
+Example: `alpaca_order_id` is NULL for failed orders (no Alpaca ID assigned), but must be unique for successful orders.
+
+```python
+# In repository ensure_indexes():
+await self.collection.create_index(
+    [("alpaca_order_id", 1)],
+    name="idx_alpaca_order",
+    unique=True,
+    sparse=True,  # Allows multiple NULL values
+)
+```
+
+### Prevention
+- When modifying index options, add migration code to drop and recreate
+- Document index changes in changelog
+- Test index changes locally before deploying
+
+---
+
+## Issue: ACR Build Uses Wrong Dockerfile Target
+
+### Symptoms
+```bash
+# Pod fails with vite/node errors instead of nginx
+kubectl logs frontend-xxx -n klinematrix-prod
+# > financial-agent-frontend@0.11.1 dev
+# > vite
+# Error: EROFS: read-only file system
+```
+
+### Root Cause
+Multi-stage Dockerfile defaults to last stage. Without `--target`, ACR may build the wrong stage.
+
+### Diagnosis
+Check the ACR build log for `runtime-dependency`:
+```
+# Wrong (dev mode)
+runtime-dependency: library/node:20-alpine
+
+# Correct (prod mode)
+runtime-dependency: library/nginx:alpine
+```
+
+### Solution
+Always specify target in ACR build:
+```bash
+az acr build --registry financialAgent \
+  --image klinecubic/frontend:prod-v0.11.1 \
+  --target production \                       # <-- Critical!
+  --file frontend/Dockerfile frontend/
+```
+
+### Prevention
+- Add `--target production` to all ACR build commands
+- Document target stage in Dockerfile comments
+- Verify runtime-dependency in build output before deploying
+
+---

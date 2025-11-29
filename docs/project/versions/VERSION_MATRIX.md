@@ -6,8 +6,8 @@ This document tracks compatibility between Financial Agent components across dif
 
 | Component | Version | Status | Released |
 |-----------|---------|--------|----------|
-| Backend | 0.5.4 | ✅ Current | 2025-10-15 |
-| Frontend | 0.8.4 | ✅ Current | 2025-10-15 |
+| Backend | 0.8.3 | ✅ Current | 2025-11-28 |
+| Frontend | 0.11.0 | ✅ Current | 2025-11-27 |
 
 ## Compatibility Table
 
@@ -15,54 +15,74 @@ This document tracks compatibility between Financial Agent components across dif
 
 | Backend | Frontend | Compatible | Notes |
 |---------|----------|------------|-------|
-| 0.4.2 | 0.4.4 | ✅ Yes | Performance fixes - render loop, request spam, startup crash |
-| 0.4.2 | 0.4.3 | ✅ Yes | Render loop fix + backend optimizations |
-| 0.4.1 | 0.4.3 | ✅ Yes | Frontend performance fixes work with v0.4.1 backend |
+| 0.8.3 | 0.11.0 | ✅ Yes | Portfolio analysis with structured output, order optimization |
+| 0.8.2 | 0.11.0 | ✅ Yes | Auto-inject selected symbol from UI |
+| 0.8.1 | 0.10.1 | ✅ Yes | Watchlist symbol validation fixes |
+| 0.8.0 | 0.10.0 | ✅ Yes | Portfolio-aware analysis, tool execution progress |
+| 0.7.1 | 0.10.1 | ✅ Yes | OSS presigned URLs, batch streaming |
+| 0.7.0 | 0.10.0 | ✅ Yes | Real-time tool execution streaming |
+| 0.6.2 | 0.8.15 | ✅ Yes | Market movers caching, API URL standardization |
+| 0.5.x | 0.8.x | ✅ Yes | Admin dashboard, agent mode toggle |
+| 0.4.x | 0.7.x | ✅ Yes | Dual-token JWT auth, chat delete |
 | 0.4.1 | 0.4.1 | ✅ Yes | Bug fixes - MongoDB URL parsing, API URL fallback |
-| 0.4.0 | 0.4.0 | ⚠️ Partial | Works but has critical bugs (see 0.4.1 fixes) |
-| 0.4.0 | 0.3.0 | ❌ No | Auth endpoints missing in 0.3.0 |
 | 0.1.0 | 0.1.0 | ✅ Yes | Initial release - full compatibility |
 
 ### Component ↔ Infrastructure
 
 | Component | MongoDB | Redis | Kubernetes | Python | Node.js |
 |-----------|---------|-------|------------|--------|---------|
-| Backend 0.4.1 | 7.0+ (Cosmos DB) | 7.2+ | 1.28+ | 3.12+ | N/A |
-| Frontend 0.4.1 | N/A | N/A | 1.28+ | N/A | 18+ |
-| Backend 0.1.0 | 7.0+ | 7.2+ | 1.28+ | 3.12+ | N/A |
-| Frontend 0.1.0 | N/A | N/A | 1.28+ | N/A | 18+ |
+| Backend 0.8.x | 7.0+ | 7.2+ | 1.28+ (ACK/AKS) | 3.12+ | N/A |
+| Frontend 0.11.x | N/A | N/A | 1.28+ (ACK/AKS) | N/A | 18+ |
+| Backend 0.7.x | 7.0+ | 7.2+ | 1.28+ | 3.12+ | N/A |
+| Frontend 0.10.x | N/A | N/A | 1.28+ | N/A | 18+ |
 
 ### External Services
 
-| Component | Tencent Cloud SES | Alibaba DashScope |
-|-----------|-------------------|-------------------|
-| Backend 0.4.1 | Required (email) | Required (LLM) |
-| Backend 0.1.0 | N/A | Optional |
+| Component | Tencent Cloud SES | Alibaba DashScope | Alpha Vantage | Alpaca |
+|-----------|-------------------|-------------------|---------------|--------|
+| Backend 0.8.x | Required (email) | Required (LLM) | Required (market data) | Required (trading) |
+| Backend 0.7.x | Required (email) | Required (LLM) | Required (market data) | Optional |
+| Backend 0.5.x | Required (email) | Required (LLM) | N/A (yfinance) | N/A |
+| Backend 0.4.x | Required (email) | Required (LLM) | N/A | N/A |
 
 ## API Contract Versions
 
-### v0.4.x Contracts
+### v0.8.x Contracts
 
-**Authentication Endpoints** (NEW in 0.4.0):
+**Portfolio Endpoints** (NEW in 0.8.x):
+- `GET /api/portfolio/summary` - Portfolio summary with holdings
+- `GET /api/portfolio/holdings` - Current holdings list
+- `GET /api/portfolio/transactions` - Transaction history with filtering
+- `GET /api/portfolio/orders` - Order execution records
+- `GET /api/portfolio/watchlist` - Watchlist symbols
+- `POST /api/portfolio/watchlist` - Add symbol to watchlist
+- `DELETE /api/portfolio/watchlist/{symbol}` - Remove from watchlist
+- `POST /api/portfolio/analyze` - Trigger portfolio analysis
+- `GET /api/portfolio/chat-history` - Analysis chat history
+
+**Chat Endpoints** (Enhanced in 0.7.x):
+- `POST /api/chat/message` - Send message with tool execution streaming
+- `GET /api/chat/chats` - List user's chats
+- `GET /api/chat/chats/{chat_id}/messages` - Get chat messages
+- `DELETE /api/chat/chats/{chat_id}` - Delete chat
+
+**Authentication Endpoints**:
 - `POST /api/auth/send-code` - Send verification code via email
-- `POST /api/auth/verify-code` - Verify code and login (creates user if new)
+- `POST /api/auth/verify-code` - Verify code and login
 - `POST /api/auth/register` - Register with email verification
 - `POST /api/auth/login` - Login with username/password
-- `POST /api/auth/reset-password` - Reset password with email verification
-- `GET /api/auth/me?token={token}` - Get current user
+- `POST /api/auth/refresh` - Refresh access token
+- `GET /api/auth/me` - Get current user
 
 **Market & Analysis Endpoints**:
 - `GET /api/health` - Health check
-- `GET /api/market/search?q={query}` - Symbol search
-- `GET /api/market/price/{symbol}?interval={interval}&period={period}` - Price data
+- `GET /api/market/search?q={query}` - Symbol search (Alpha Vantage)
+- `GET /api/market/price/{symbol}` - Price data with interval/period
+- `GET /api/market/movers` - Top gainers/losers (cached)
 - `POST /api/analysis/fibonacci` - Fibonacci analysis
-- `GET /api/analysis/fundamentals/{symbol}` - Fundamental analysis
 - `POST /api/analysis/stochastic` - Stochastic oscillator
-
-**Data Types**:
-- Interval: `"1d" | "1h" | "5m"`
-- Period: `"1mo" | "3mo" | "6mo" | "1y" | "2y"`
-- Auth Type: `"email" | "phone"`
+- `POST /api/analysis/macro` - Macro sentiment analysis
+- `POST /api/analysis/news-sentiment` - News sentiment
 
 ### v0.1.0 Contracts
 
@@ -150,5 +170,5 @@ If you discover an incompatible version combination:
 
 ---
 
-**Last Updated**: 2025-10-15
-**Current Stable**: Backend v0.5.4 + Frontend v0.8.4
+**Last Updated**: 2025-11-28
+**Current Stable**: Backend v0.8.3 + Frontend v0.11.0

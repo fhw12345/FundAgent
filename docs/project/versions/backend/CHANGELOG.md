@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2025-11-29
+
+### Added
+- feat(portfolio): Failed order persistence with error tracking
+  - Added `error_message` field to `PortfolioOrder` model for storing raw API error messages
+  - Failed orders now saved to MongoDB with status="failed" and error details
+  - Batch persistence using `create_many()` for failed orders
+- feat(api): New `/api/portfolio/transactions` endpoint with filtering and pagination
+  - Supports `limit`, `offset` pagination parameters
+  - Supports `status` filter: "success" | "failed" | all
+  - Returns `has_more` flag for UI "Show All" functionality
+  - Query handles both plain status ("filled") and enum format ("OrderStatus.FILLED")
+
+### Fixed
+- fix(db): MongoDB sparse index for nullable `alpaca_order_id` field
+  - Added `sparse=True` to allow multiple NULL values (failed orders have no Alpaca ID)
+  - Fixes duplicate key error when persisting multiple failed orders
+
+## [0.8.3] - 2025-11-28
+
+### Added
+- feat(portfolio): Structured output and order aggregation for portfolio analysis
+  - Two-phase analysis with aggregation hook: Phase 1 (symbol analysis) → Phase 2 (order optimization) → Phase 3 (execution)
+  - New Pydantic models: `TradingDecision`, `OptimizedOrder`, `OrderExecutionPlan`, `SymbolAnalysisResult`
+  - `ainvoke_structured()` method in ReAct agent for reliable structured output extraction
+  - Order optimizer module (`order_optimizer.py`) extracted from portfolio analysis agent
+  - SELLs execute before BUYs to maximize buying power
+  - Proportional scaling (Option A) when insufficient funds for all BUY orders
+  - Eliminates unreliable regex parsing of LLM text responses
+
+### Changed
+- Refactored `portfolio_analysis_agent.py` to use structured output instead of regex parsing
+- Extracted order aggregation/execution logic to separate `OrderOptimizer` class
+
 ## [0.8.2] - 2025-11-27
 
 ### Added

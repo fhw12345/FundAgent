@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2025-11-29
+
+### Added
+- feat(portfolio): Enhanced RecentTransactions component
+  - Status filter dropdown (All/Success/Failed)
+  - "Show All" / "Show Less" toggle with scrollable container (max 100 items)
+  - Visual distinction for failed orders (red background, alert icon)
+  - Error message display for failed orders in styled red box
+  - Uses new `/api/portfolio/transactions` endpoint with filtering
+
+### Changed
+- Migrated from `/api/portfolio/orders` to `/api/portfolio/transactions` endpoint
+- Added i18n translation keys: `filterAll`, `filterSuccess`, `filterFailed`, `showAll`, `showLess`
+
 ## [0.11.0] - 2025-11-27
 
 ### Fixed

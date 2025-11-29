@@ -8,7 +8,7 @@ AI-Enhanced Financial Analysis Platform documentation hub.
 
 | Component | Version | Environment | URL |
 |-----------|---------|-------------|-----|
-| Backend | v0.8.2 | Prod (ACK) | https://klinecubic.cn |
+| Backend | v0.8.3 | Prod (ACK) | https://klinecubic.cn |
 | Frontend | v0.11.0 | Prod (ACK) | https://klinecubic.cn |
 | Test | Planned | AKS | https://klinematrix.com |
 | Local Dev | Docker | Compose | http://localhost:3000 |
