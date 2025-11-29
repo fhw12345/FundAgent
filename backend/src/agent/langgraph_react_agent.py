@@ -642,3 +642,108 @@ Summary: {result.analysis_summary}"""
                 "output_tokens": 0,
                 "total_tokens": 0,
             }
+
+    async def ainvoke_structured(
+        self,
+        prompt: str,
+        schema: type,
+        context: str | None = None,
+    ):
+        """
+        Invoke LLM with structured output using with_structured_output().
+
+        This method uses the LLM directly (not the ReAct agent) to extract
+        structured data from text. Useful for extracting trading decisions
+        from analysis text.
+
+        Args:
+            prompt: The prompt/question to ask the LLM
+            schema: Pydantic model class for structured output
+            context: Optional context text (e.g., analysis results)
+
+        Returns:
+            Instance of the schema Pydantic model
+
+        Raises:
+            Exception: If LLM fails to produce valid structured output
+        """
+        logger.info(
+            "Structured output invocation started",
+            schema=schema.__name__,
+            prompt_preview=prompt[:100],
+            has_context=context is not None,
+        )
+
+        try:
+            # Create structured LLM
+            structured_llm = self.llm.with_structured_output(schema)
+
+            # Build full message
+            full_prompt = prompt
+            if context:
+                full_prompt = f"{context}\n\n---\n\n{prompt}"
+
+            # Invoke with retry logic (same as ainvoke)
+            max_retries = 3
+            base_delay = 2.0
+            max_delay = 30.0
+
+            last_exception = None
+            for attempt in range(max_retries):
+                try:
+                    result = await structured_llm.ainvoke(full_prompt)
+                    break
+                except Exception as e:
+                    last_exception = e
+                    error_str = str(e).lower()
+                    is_retryable = any(
+                        keyword in error_str
+                        for keyword in [
+                            "ssl",
+                            "certificate",
+                            "connection",
+                            "timeout",
+                            "max retries",
+                            "eof occurred",
+                        ]
+                    )
+
+                    if not is_retryable or attempt == max_retries - 1:
+                        logger.error(
+                            "Structured output invocation failed",
+                            schema=schema.__name__,
+                            attempt=attempt + 1,
+                            error=str(e),
+                            error_type=type(e).__name__,
+                        )
+                        raise
+
+                    delay = min(base_delay * (2**attempt), max_delay)
+                    logger.warning(
+                        "Structured output failed - retrying",
+                        schema=schema.__name__,
+                        attempt=attempt + 1,
+                        retry_delay=delay,
+                        error=str(e),
+                    )
+                    await asyncio.sleep(delay)
+
+            if last_exception and not result:
+                raise last_exception
+
+            logger.info(
+                "Structured output invocation completed",
+                schema=schema.__name__,
+                result_type=type(result).__name__,
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error(
+                "Structured output invocation failed",
+                schema=schema.__name__,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise

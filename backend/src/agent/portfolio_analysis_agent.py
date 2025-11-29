@@ -21,9 +21,15 @@ from ..database.repositories.user_repository import UserRepository
 from ..database.repositories.watchlist_repository import WatchlistRepository
 from ..models.chat import ChatCreate
 from ..models.message import MessageCreate, MessageMetadata
+from ..models.trading_decision import (
+    SymbolAnalysisResult,
+    TradingAction,
+    TradingDecision,
+)
 from ..services.context_window_manager import ContextWindowManager
 from ..services.credit_service import CreditService
 from .langgraph_react_agent import FinancialAnalysisReActAgent
+from .order_optimizer import OrderOptimizer
 
 logger = structlog.get_logger()
 
@@ -83,6 +89,14 @@ class PortfolioAnalysisAgent:
 
         # Context window manager for sliding window + summary
         self.context_manager = ContextWindowManager(settings)
+
+        # Order optimizer for Phase 2/3 (aggregation and execution)
+        self.order_optimizer = OrderOptimizer(
+            react_agent=react_agent,
+            trading_service=trading_service,
+            order_repo=self.order_repo,
+            message_repo=self.message_repo,
+        )
 
     async def analyze_all_portfolios(self, dry_run: bool = False) -> dict[str, Any]:
         """
@@ -184,7 +198,11 @@ class PortfolioAnalysisAgent:
         self, user_id: str, dry_run: bool = False
     ) -> dict[str, Any]:
         """
-        Run analysis for single user's portfolio.
+        Run analysis for single user's portfolio with two-phase aggregation.
+
+        Phase 1: Analyze individual symbols (concurrent, collects SymbolAnalysisResult)
+        Phase 2: Aggregation hook optimizes all decisions into OrderExecutionPlan
+        Phase 3: Execute orders (SELLs first, then scaled BUYs)
 
         Analyzes:
         1. Holdings (buy/sell/hold recommendations)
@@ -193,22 +211,28 @@ class PortfolioAnalysisAgent:
 
         Args:
             user_id: User identifier
-            dry_run: If True, don't write results to DB
+            dry_run: If True, don't write results to DB or execute orders
 
         Returns:
             Analysis result summary
         """
         logger.info("Analyzing user portfolio", user_id=user_id, dry_run=dry_run)
 
-        analysis_results = {
+        result_summary = {
             "user_id": user_id,
             "portfolios_count": 0,
             "holdings_analyzed": 0,
             "watchlist_analyzed": 0,
             "market_movers_analyzed": 0,
             "total_symbols_analyzed": 0,
+            "orders_executed": 0,
+            "orders_failed": 0,
+            "orders_skipped": 0,
             "errors": [],
         }
+
+        # Collect all SymbolAnalysisResult for aggregation
+        all_analysis_results: list[SymbolAnalysisResult] = []
 
         try:
             # 1. Get user's positions from Alpaca (single source of truth)
@@ -282,7 +306,7 @@ class PortfolioAnalysisAgent:
                         error=str(e),
                         error_type=type(e).__name__,
                     )
-                    analysis_results["errors"].append(
+                    result_summary["errors"].append(
                         {"type": "market_movers", "error": str(e)}
                     )
 
@@ -329,6 +353,10 @@ class PortfolioAnalysisAgent:
             # (Holdings get analyzed first with actual position data)
             analyzed_symbols: set[str] = set()
 
+            # ================================================================
+            # PHASE 1: Analyze all symbols and collect SymbolAnalysisResult
+            # ================================================================
+
             # 4. Analyze positions (Alpaca holdings) - BATCH PROCESSING
             if positions:
                 if dry_run:
@@ -338,7 +366,7 @@ class PortfolioAnalysisAgent:
                             symbol=position.symbol,
                             quantity=position.quantity,
                         )
-                        analysis_results["holdings_analyzed"] += 1
+                        result_summary["holdings_analyzed"] += 1
                         analyzed_symbols.add(position.symbol)
                 else:
                     # Batch process holdings (5 concurrent max to avoid rate limits)
@@ -367,16 +395,16 @@ class PortfolioAnalysisAgent:
                                     symbol=symbol,
                                     error=str(result),
                                 )
-                                analysis_results["errors"].append(
+                                result_summary["errors"].append(
                                     {"type": "holding", "symbol": symbol}
                                 )
-                            elif result:
-                                analysis_results["holdings_analyzed"] += 1
-                                analyzed_symbols.add(
-                                    symbol
-                                )  # Track successful analysis
+                            elif result is not None:
+                                # Collect SymbolAnalysisResult for aggregation
+                                all_analysis_results.append(result)
+                                result_summary["holdings_analyzed"] += 1
+                                analyzed_symbols.add(symbol)
                             else:
-                                analysis_results["errors"].append(
+                                result_summary["errors"].append(
                                     {"type": "holding", "symbol": symbol}
                                 )
 
@@ -407,7 +435,7 @@ class PortfolioAnalysisAgent:
                             "Dry run - would analyze watchlist item",
                             symbol=watchlist_item.symbol,
                         )
-                        analysis_results["watchlist_analyzed"] += 1
+                        result_summary["watchlist_analyzed"] += 1
                         analyzed_symbols.add(watchlist_item.symbol)
                 else:
                     # Batch process watchlist (5 concurrent max)
@@ -435,17 +463,17 @@ class PortfolioAnalysisAgent:
                                     symbol=watchlist_item.symbol,
                                     error=str(result),
                                 )
-                                analysis_results["errors"].append(
+                                result_summary["errors"].append(
                                     {
                                         "type": "watchlist",
                                         "symbol": watchlist_item.symbol,
                                     }
                                 )
-                            elif result:
-                                analysis_results["watchlist_analyzed"] += 1
-                                analyzed_symbols.add(
-                                    watchlist_item.symbol
-                                )  # Track successful analysis
+                            elif result is not None:
+                                # Collect SymbolAnalysisResult for aggregation
+                                all_analysis_results.append(result)
+                                result_summary["watchlist_analyzed"] += 1
+                                analyzed_symbols.add(watchlist_item.symbol)
                                 # Update last_analyzed_at timestamp
                                 await self.watchlist_repo.update_last_analyzed(
                                     watchlist_item.watchlist_id,
@@ -453,7 +481,7 @@ class PortfolioAnalysisAgent:
                                     datetime.utcnow(),
                                 )
                             else:
-                                analysis_results["errors"].append(
+                                result_summary["errors"].append(
                                     {
                                         "type": "watchlist",
                                         "symbol": watchlist_item.symbol,
@@ -488,7 +516,7 @@ class PortfolioAnalysisAgent:
                         logger.info(
                             "Dry run - would analyze market mover", symbol=symbol
                         )
-                        analysis_results["market_movers_analyzed"] += 1
+                        result_summary["market_movers_analyzed"] += 1
                         analyzed_symbols.add(symbol)
                 else:
                     # Batch process market movers (5 concurrent max)
@@ -516,34 +544,93 @@ class PortfolioAnalysisAgent:
                                     symbol=symbol,
                                     error=str(result),
                                 )
-                                analysis_results["errors"].append(
+                                result_summary["errors"].append(
                                     {"type": "market_mover", "symbol": symbol}
                                 )
-                            elif result:
-                                analysis_results["market_movers_analyzed"] += 1
-                                analyzed_symbols.add(
-                                    symbol
-                                )  # Track successful analysis
+                            elif result is not None:
+                                # Collect SymbolAnalysisResult for aggregation
+                                all_analysis_results.append(result)
+                                result_summary["market_movers_analyzed"] += 1
+                                analyzed_symbols.add(symbol)
                             else:
-                                analysis_results["errors"].append(
+                                result_summary["errors"].append(
                                     {"type": "market_mover", "symbol": symbol}
                                 )
 
             # Calculate total
-            analysis_results["total_symbols_analyzed"] = (
-                analysis_results["holdings_analyzed"]
-                + analysis_results["watchlist_analyzed"]
-                + analysis_results["market_movers_analyzed"]
+            result_summary["total_symbols_analyzed"] = (
+                result_summary["holdings_analyzed"]
+                + result_summary["watchlist_analyzed"]
+                + result_summary["market_movers_analyzed"]
             )
+
+            logger.info(
+                "Phase 1 complete: Symbol analysis finished",
+                user_id=user_id,
+                total_analyzed=result_summary["total_symbols_analyzed"],
+                holdings=result_summary["holdings_analyzed"],
+                watchlist=result_summary["watchlist_analyzed"],
+                market_movers=result_summary["market_movers_analyzed"],
+                analysis_results_count=len(all_analysis_results),
+            )
+
+            # ================================================================
+            # PHASE 2: Aggregation Hook - Optimize all decisions
+            # ================================================================
+            if not dry_run and all_analysis_results and portfolio_context:
+                logger.info(
+                    "Phase 2: Starting order aggregation and optimization",
+                    analysis_results_count=len(all_analysis_results),
+                )
+
+                execution_plan = await self.order_optimizer.optimize_trading_decisions(
+                    analysis_results=all_analysis_results,
+                    portfolio_context=portfolio_context,
+                    user_id=user_id,
+                )
+
+                # ================================================================
+                # PHASE 3: Execute Optimized Orders (SELLs first, then BUYs)
+                # ================================================================
+                if execution_plan and execution_plan.orders:
+                    logger.info(
+                        "Phase 3: Executing optimized order plan",
+                        orders_count=len(execution_plan.orders),
+                        scaling_applied=execution_plan.scaling_applied,
+                    )
+
+                    execution_result = await self.order_optimizer.execute_order_plan(
+                        plan=execution_plan,
+                        user_id=user_id,
+                        analysis_results=all_analysis_results,
+                    )
+
+                    result_summary["orders_executed"] = execution_result.get(
+                        "executed", 0
+                    )
+                    result_summary["orders_failed"] = execution_result.get("failed", 0)
+                    result_summary["orders_skipped"] = execution_result.get(
+                        "skipped", 0
+                    )
+
+                    logger.info(
+                        "Phase 3 complete: Order execution finished",
+                        executed=result_summary["orders_executed"],
+                        failed=result_summary["orders_failed"],
+                        skipped=result_summary["orders_skipped"],
+                    )
+                else:
+                    logger.info("Phase 2/3: No actionable orders after optimization")
 
             logger.info(
                 "User portfolio analysis completed",
                 user_id=user_id,
-                total_analyzed=analysis_results["total_symbols_analyzed"],
-                holdings=analysis_results["holdings_analyzed"],
-                watchlist=analysis_results["watchlist_analyzed"],
-                market_movers=analysis_results["market_movers_analyzed"],
-                errors=len(analysis_results["errors"]),
+                total_analyzed=result_summary["total_symbols_analyzed"],
+                holdings=result_summary["holdings_analyzed"],
+                watchlist=result_summary["watchlist_analyzed"],
+                market_movers=result_summary["market_movers_analyzed"],
+                orders_executed=result_summary["orders_executed"],
+                errors=len(result_summary["errors"]),
             )
 
         except Exception as e:
@@ -554,9 +641,9 @@ class PortfolioAnalysisAgent:
                 error_type=type(e).__name__,
                 exc_info=True,
             )
-            analysis_results["errors"].append({"type": "general", "error": str(e)})
+            result_summary["errors"].append({"type": "general", "error": str(e)})
 
-        return analysis_results
+        return result_summary
 
     async def _analyze_symbol(
         self,
@@ -565,9 +652,11 @@ class PortfolioAnalysisAgent:
         analysis_type: str,
         holding_quantity: int | None = None,
         portfolio_context: dict[str, Any] | None = None,
-    ) -> bool:
+    ) -> SymbolAnalysisResult | None:
         """
-        Analyze a single symbol using the ReAct agent with full portfolio context.
+        Analyze a single symbol using two-phase approach:
+        Phase 1: ReAct agent with tools for comprehensive analysis
+        Phase 2: Structured output extraction for trading decision
 
         Args:
             symbol: Stock symbol to analyze
@@ -577,7 +666,8 @@ class PortfolioAnalysisAgent:
             portfolio_context: Portfolio context (equity, buying power, all positions)
 
         Returns:
-            True if analysis succeeded, False otherwise
+            SymbolAnalysisResult with analysis text and structured decision,
+            or None if analysis failed
         """
         try:
             # Generate analysis_id for tracking
@@ -627,13 +717,18 @@ class PortfolioAnalysisAgent:
             # Context about current symbol
             symbol_context = ""
             if analysis_type == "holding" and holding_quantity:
-                symbol_context = f"This is your current holding of {holding_quantity} shares."
+                symbol_context = (
+                    f"This is your current holding of {holding_quantity} shares."
+                )
             elif analysis_type == "watchlist":
-                symbol_context = f"This is a symbol on your watchlist."
+                symbol_context = "This is a symbol on your watchlist."
             else:  # market_mover
-                symbol_context = f"This is a top market mover today (gainer/loser/active)."
+                symbol_context = (
+                    "This is a top market mover today (gainer/loser/active)."
+                )
 
             # Unified portfolio-aware analysis prompt (English only)
+            # Note: Decision extraction will be done via structured output in Phase 2
             prompt = f"""# Portfolio Optimization Analysis
 
 Please analyze {symbol} from a holistic portfolio perspective, focusing on optimal position sizing and portfolio rebalancing.
@@ -667,34 +762,34 @@ Please conduct comprehensive technical and fundamental analysis, with special fo
    - **SELL**: Sell all or part of the position
    - **HOLD**: Maintain current position unchanged
    - **SWAP**: Sell another position to buy this symbol
-     (If SWAP, specify which symbol to sell from in SWAP_FROM field)
 
-5. **Position Sizing**
-   - If BUY/SELL, suggest percentage of total equity (e.g., 5%, 10%)
-   - Consider current liquidity, risk diversification, and position concentration
-   - Justify the sizing based on conviction level and portfolio balance
+5. **Position Sizing Rules** (IMPORTANT)
 
-## Output Format
+   For **BUY** decisions:
+   - position_size_percent = percentage of BUYING POWER to spend
+   - Example: 10% means spend 10% of available buying power on this stock
 
-Please follow this exact format:
+   For **SELL** decisions:
+   - position_size_percent = percentage of CURRENT HOLDING to sell
+   - Example: 50% means sell half of current shares; 100% means sell all
 
-DECISION: [BUY/SELL/HOLD/SWAP]
-POSITION_SIZE: [percentage of total equity, e.g., 5%, or N/A if HOLD]
-SWAP_FROM: [symbol to sell if SWAP, or N/A if not SWAP]
-REASONING: [Detailed analysis reasoning]
+   For **SWAP** decisions:
+   - position_size_percent = percentage of swap_from_symbol holding to sell
+   - The proceeds will be used to buy this symbol
 
-In your reasoning, please clearly explain:
+   Consider: liquidity, risk diversification, position concentration, and conviction level.
+
+In your analysis, please clearly explain:
 - Key technical and fundamental findings
 - Whether value opportunity exists (panic-driven mispricing)
 - How this action optimizes overall portfolio allocation
-- Risk assessment and conviction level
+- Risk assessment and conviction level (1-10 scale)
 
 LANGUAGE REQUIREMENT:
 You MUST respond in Simplified Chinese (简体中文).
 - All explanations, analysis, and recommendations must be in Chinese
-- Technical terms can include English in parentheses for clarity (e.g., 市盈率 (P/E Ratio))
+- Technical terms can include English in parentheses for clarity
 - Numbers, stock symbols, and dates can remain in standard format
-- Regardless of conversation history language, your output MUST be in Chinese
 """
 
             # Apply context window management (sliding window + summary)
@@ -808,42 +903,56 @@ You MUST respond in Simplified Chinese (简体中文).
                     output_tokens=output_tokens,
                 )
 
-            # Extract decision, position size, and swap info
-            import re
+            # Phase 2: Extract structured trading decision using with_structured_output
+            # This replaces unreliable regex parsing with guaranteed Pydantic model
+            decision_prompt = f"""Based on the following analysis of {symbol}, extract the trading decision.
 
-            decision = "HOLD"
-            position_size = None
-            swap_from = None
+The analysis recommends a specific action (BUY/SELL/HOLD/SWAP) with position sizing.
 
-            if "DECISION:" in response_text:
-                decision_line = [
-                    line for line in response_text.split("\n") if "DECISION:" in line
-                ][0]
-                if "SWAP" in decision_line.upper():
-                    decision = "SWAP"
-                elif "BUY" in decision_line.upper():
-                    decision = "BUY"
-                elif "SELL" in decision_line.upper():
-                    decision = "SELL"
+**Position Size Rules:**
+- For BUY: position_size_percent = % of BUYING POWER to spend
+- For SELL: position_size_percent = % of CURRENT HOLDING to sell
+- For HOLD: position_size_percent should be null/None
 
-            if "POSITION_SIZE:" in response_text:
-                size_line = [
-                    line
-                    for line in response_text.split("\n")
-                    if "POSITION_SIZE:" in line
-                ][0]
-                match = re.search(r"(\d+)%", size_line)
-                if match:
-                    position_size = int(match.group(1))
+Extract the decision, confidence (1-10), and a brief reasoning summary (max 500 chars).
+"""
+            try:
+                trading_decision = await self.react_agent.ainvoke_structured(
+                    prompt=decision_prompt,
+                    schema=TradingDecision,
+                    context=response_text,
+                )
+                # Ensure symbol is set correctly
+                trading_decision.symbol = symbol
 
-            if "SWAP_FROM:" in response_text:
-                swap_line = [
-                    line for line in response_text.split("\n") if "SWAP_FROM:" in line
-                ][0]
-                # Extract symbol after SWAP_FROM: (format: "SWAP_FROM: AAPL" or "SWAP_FROM: N/A")
-                swap_match = re.search(r"SWAP_FROM:\s*([A-Z]+)", swap_line)
-                if swap_match:
-                    swap_from = swap_match.group(1)
+                logger.info(
+                    "Phase 2: Structured decision extracted",
+                    symbol=symbol,
+                    decision=trading_decision.decision.value,
+                    position_size=trading_decision.position_size_percent,
+                    confidence=trading_decision.confidence,
+                )
+            except Exception as e:
+                logger.error(
+                    "Phase 2: Failed to extract structured decision - using HOLD fallback",
+                    symbol=symbol,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                # Fallback to HOLD if structured extraction fails
+                trading_decision = TradingDecision(
+                    symbol=symbol,
+                    decision=TradingAction.HOLD,
+                    position_size_percent=None,
+                    swap_from_symbol=None,
+                    confidence=1,
+                    reasoning_summary=f"Structured extraction failed: {str(e)[:200]}",
+                )
+
+            # Extract for backward compatibility (used in message content below)
+            decision = trading_decision.decision.value
+            position_size = trading_decision.position_size_percent
+            swap_from = trading_decision.swap_from_symbol
 
             # Create analysis message
             # Note: chat_id already retrieved earlier for context management
@@ -925,87 +1034,20 @@ You MUST respond in Simplified Chinese (简体中文).
                 analysis_type=analysis_type,
                 decision=decision,
                 position_size=position_size,
+                confidence=trading_decision.confidence,
             )
 
-            # Place order if decision is BUY or SELL
-            if decision in ["BUY", "SELL"] and position_size and self.trading_service:
-                try:
-                    # Calculate quantity based on position_size percentage and portfolio value
-                    account_summary = await self.trading_service.get_account_summary(
-                        user_id
-                    )
-                    portfolio_value = account_summary.equity
-
-                    # Get current stock price
-                    try:
-                        quote = await self.market_service.get_quote(symbol)
-                        stock_price = quote.get("price", 0)
-                    except Exception:
-                        # Fallback: use Alpaca's latest trade
-                        latest_trade = self.trading_service.client.get_latest_trade(
-                            symbol
-                        )
-                        stock_price = float(latest_trade.price)
-
-                    # Calculate shares: (portfolio_value * position_size%) / stock_price
-                    dollar_amount = portfolio_value * (position_size / 100)
-                    quantity = (
-                        int(dollar_amount / stock_price) if stock_price > 0 else 1
-                    )
-
-                    # Minimum 1 share, maximum 10% of portfolio
-                    quantity = max(
-                        1, min(quantity, int(portfolio_value * 0.1 / stock_price))
-                    )
-
-                    logger.info(
-                        "Placing order via Alpaca",
-                        symbol=symbol,
-                        side=decision.lower(),
-                        quantity=quantity,
-                        position_size_pct=position_size,
-                        dollar_amount=dollar_amount,
-                        stock_price=stock_price,
-                        analysis_type=analysis_type,
-                    )
-
-                    order = await self.trading_service.place_market_order(
-                        symbol=symbol,
-                        quantity=quantity,
-                        side=decision.lower(),
-                        analysis_id=analysis_id,
-                        chat_id=chat_id,
-                        user_id=user_id,
-                        message_id=message.message_id if message else None,
-                    )
-
-                    # Persist order to MongoDB
-                    await self.order_repo.create(order)
-
-                    logger.info(
-                        "Order placed and persisted",
-                        symbol=symbol,
-                        order_id=order.alpaca_order_id,
-                    )
-
-                    # Update message metadata with order_id
-                    if message:
-                        metadata.order_placed = True
-                        metadata.order_id = order.alpaca_order_id
-                        await self.message_repo.update_metadata(
-                            message.message_id, metadata
-                        )
-
-                except Exception as e:
-                    logger.error(
-                        "Failed to place order",
-                        symbol=symbol,
-                        error=str(e),
-                        error_type=type(e).__name__,
-                    )
-                    # Don't fail analysis if order placement fails
-
-            return True
+            # Return SymbolAnalysisResult instead of placing order immediately
+            # Orders will be aggregated and executed later via _optimize_trading_decisions
+            return SymbolAnalysisResult(
+                symbol=symbol,
+                analysis_type=analysis_type,
+                analysis_text=response_text,
+                decision=trading_decision,
+                analysis_id=analysis_id,
+                chat_id=chat_id,
+                message_id=message.message_id if message else None,
+            )
 
         except Exception as e:
             logger.error(
@@ -1016,7 +1058,7 @@ You MUST respond in Simplified Chinese (简体中文).
                 error_type=type(e).__name__,
                 exc_info=True,
             )
-            return False
+            return None
 
     async def _get_symbol_chat_id(
         self, symbol: str, user_id: str = "portfolio_agent"

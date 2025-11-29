@@ -76,6 +76,11 @@ class ChatRequest(BaseModel):
         "zh-CN",
         description="Response language: 'zh-CN' (Simplified Chinese) or 'en' (English)",
     )
+    # Symbol Context (passed from frontend to avoid race condition with UI state sync)
+    current_symbol: str | None = Field(
+        None,
+        description="Current symbol selected in UI (e.g., 'AAPL'). Takes priority over DB ui_state.",
+    )
 
 
 class UpdateUIStateRequest(BaseModel):

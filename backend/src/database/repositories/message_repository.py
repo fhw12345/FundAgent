@@ -322,3 +322,41 @@ class MessageRepository:
 
         logger.warning("Message not found for metadata update", message_id=message_id)
         return None
+
+    async def update_metadata_batch(
+        self, updates: list[tuple[str, MessageMetadata]]
+    ) -> int:
+        """
+        Batch update message metadata.
+
+        Uses bulk_write() for efficient bulk updates, reducing
+        database round trips from N to 1.
+
+        Args:
+            updates: List of (message_id, metadata) tuples
+
+        Returns:
+            Number of messages modified
+        """
+        if not updates:
+            return 0
+
+        from pymongo import UpdateOne
+
+        operations = [
+            UpdateOne(
+                {"message_id": msg_id},
+                {"$set": {"metadata": meta.model_dump(exclude_none=True)}},
+            )
+            for msg_id, meta in updates
+        ]
+
+        result = await self.collection.bulk_write(operations)
+
+        logger.info(
+            "Message metadata batch updated",
+            matched=result.matched_count,
+            modified=result.modified_count,
+        )
+
+        return result.modified_count

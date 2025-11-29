@@ -102,9 +102,14 @@ async def _get_active_symbol_instruction(
     chat_id: str,
     user_id: str,
     chat_service: ChatService,
+    request_symbol: str | None = None,
 ) -> str:
     """
-    Extract active symbol from chat ui_state and build instruction string.
+    Get active symbol and build instruction string.
+
+    Priority order:
+    1. request_symbol (from chat request body) - eliminates race condition
+    2. chat.ui_state.current_symbol (from DB) - fallback for restoration
 
     This is a shared helper used by both v2 (Simple Agent) and v3 (ReAct Agent).
     Returns an instruction string to append to the user message (not a system message).
@@ -113,11 +118,27 @@ async def _get_active_symbol_instruction(
         chat_id: Chat identifier
         user_id: User identifier
         chat_service: Service to fetch chat data
+        request_symbol: Symbol passed directly in request (takes priority)
 
     Returns:
         Symbol context instruction string (empty if no symbol)
     """
-    # Extract active symbol from chat ui_state
+    # Priority 1: Use request symbol (avoids race condition with UI state sync)
+    if request_symbol:
+        logger.info(
+            "Using symbol from request (priority)",
+            chat_id=chat_id,
+            symbol=request_symbol,
+        )
+        # Also update DB ui_state for future restoration
+        from ..models.chat import UIState
+
+        await chat_service.update_ui_state(
+            chat_id, user_id, UIState(current_symbol=request_symbol)
+        )
+        return _build_symbol_context_instruction(request_symbol)
+
+    # Priority 2: Fallback to DB ui_state
     chat = await chat_service.get_chat(chat_id, user_id)
     current_symbol = None
     if chat and chat.ui_state:
@@ -125,7 +146,7 @@ async def _get_active_symbol_instruction(
 
     if current_symbol:
         logger.info(
-            "Active symbol detected",
+            "Using symbol from DB ui_state (fallback)",
             chat_id=chat_id,
             symbol=current_symbol,
         )
@@ -574,15 +595,21 @@ async def _stream_with_simple_agent(
 
             # ===== SYMBOL CONTEXT INJECTION =====
             # Get active symbol instruction to append to user message
+            # Priority: request.current_symbol > DB ui_state
             symbol_instruction = await _get_active_symbol_instruction(
                 chat_id=chat_id,
                 user_id=user_id,
                 chat_service=chat_service,
+                request_symbol=request.current_symbol,
             )
 
             # Note: For v2, we need to add symbol to the LAST message in conversation_history
             # (which is the current user message we already saved to DB)
-            if symbol_instruction and conversation_history and conversation_history[-1]["role"] == "user":
+            if (
+                symbol_instruction
+                and conversation_history
+                and conversation_history[-1]["role"] == "user"
+            ):
                 conversation_history[-1]["content"] += symbol_instruction
                 logger.info(
                     "Symbol context appended to user message (v2)",
@@ -838,10 +865,12 @@ async def _stream_with_react_agent(
 
             # ===== SYMBOL CONTEXT INJECTION =====
             # Get active symbol instruction to append to user message
+            # Priority: request.current_symbol > DB ui_state
             symbol_instruction = await _get_active_symbol_instruction(
                 chat_id=chat_id,
                 user_id=user_id,
                 chat_service=chat_service,
+                request_symbol=request.current_symbol,
             )
 
             # Append symbol context to user message (similar to language instruction)
