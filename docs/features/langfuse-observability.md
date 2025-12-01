@@ -1,23 +1,31 @@
-# Langfuse Observability Troubleshooting
+# Langfuse Observability
 
-> **Last Updated**: 2025-10-20 | **Status**: Production Ready
+> **Last Updated**: 2025-11-29 | **Status**: Production Deployed
 
 ## Overview
 
-Langfuse provides LLM observability for the financial agent, tracking agent executions, tool calls, and LLM interactions. This guide covers setup, common issues, and debugging workflows discovered during production deployment.
+Langfuse provides LLM observability for the financial agent, tracking agent executions, tool calls, and LLM interactions. This guide covers setup, deployment, and debugging workflows.
 
-## Version Compatibility ⚠️
+## Deployment Status
 
-**Current Setup**: Langfuse Python SDK v3.8.1 + Langfuse Server v3.120.0 ✅ **VERIFIED WORKING**
+| Environment | URL | Status |
+|-------------|-----|--------|
+| **Production (ACK)** | https://monitor.klinecubic.cn | ✅ DEPLOYED |
+| **Local Dev** | http://localhost:3001 | ✅ AVAILABLE |
 
-| Component | Version | Status |
-|-----------|---------|--------|
-| **Langfuse Python SDK** | v3.8.1 | ✅ VERIFIED (2025-10-23) |
-| **Langfuse Server** | v3.120.0 | ✅ VERIFIED (2025-10-23) |
-| **ClickHouse** | v24.1-alpine | ✅ REQUIRED (analytics/OLAP) |
-| **PostgreSQL** | v15-alpine | ✅ REQUIRED (metadata storage) |
-| **MinIO** | latest | ✅ REQUIRED (S3-compatible blob storage) |
-| **Redis** | v7.2-alpine | ✅ REQUIRED (queue management) |
+## Version Compatibility
+
+**Current Production Setup**: Langfuse Python SDK v3.10.1 + Langfuse Server v3.135.0 ✅ **VERIFIED WORKING**
+
+| Component | Version | Environment | Status |
+|-----------|---------|-------------|--------|
+| **Langfuse Python SDK** | v3.10.1 | All | ✅ VERIFIED (2025-11-29) |
+| **Langfuse Server** | v3.135.0 | Production | ✅ VERIFIED (2025-11-29) |
+| **ClickHouse** | v24.1-alpine | All | ✅ REQUIRED (analytics/OLAP) |
+| **PostgreSQL** | v15-alpine | All | ✅ REQUIRED (metadata storage) |
+| **Alibaba OSS** | - | Production | ✅ REQUIRED (event backup) |
+| **MinIO** | latest | Local Dev | ✅ REQUIRED (S3-compatible) |
+| **Redis** | v7.2-alpine | All | ✅ REQUIRED (queue management) |
 
 ### Architecture (v3.x)
 
@@ -45,7 +53,30 @@ Langfuse Server v3.x Architecture:
 - **ClickHouse**: High-performance analytics queries
 - **MinIO**: Event blob storage (mandatory, cannot be disabled)
 
-## Access Points (Local Development)
+## Access Points
+
+### Production (ACK - Alibaba Cloud)
+
+**Langfuse UI** - https://monitor.klinecubic.cn
+- View LLM traces and observations
+- Analyze agent execution flow
+- Query trace data
+- Monitor token usage and costs
+- First user to sign up becomes admin
+
+**Backend Integration**: Traces are automatically sent from https://klinecubic.cn
+
+**Infrastructure**:
+- PostgreSQL: In-cluster (`langfuse-postgres:5432`)
+- ClickHouse: In-cluster (`langfuse-clickhouse:8123`)
+- Redis: Shared with backend (`redis-service:6379`)
+- OSS: `klinecubic-financialagent-oss` bucket, prefix `langfuse-events/`
+
+**Secrets Required** (see [secrets-architecture.md](../deployment/secrets-architecture.md)):
+- `langfuse-secrets`: postgres-password, clickhouse-password, nextauth-secret, salt, oss-access-key-id, oss-access-key-secret
+- `backend-secrets`: langfuse-public-key, langfuse-secret-key
+
+### Local Development
 
 **Langfuse UI** - http://localhost:3001
 - View LLM traces and observations
@@ -248,60 +279,67 @@ SELECT COUNT(*) FROM traces WHERE name = 'test_verification';
 Should return: `1`
 
 3. **Check Langfuse portal**:
-- Navigate to http://localhost:3000 (dev) or https://langfuse.klinematrix.com (test)
-- Select project: "klinematrix" → "financial-agent"
+- Navigate to http://localhost:3001 (dev) or https://monitor.klinecubic.cn (prod)
+- Select your project
 - Should see trace in dashboard
 
 ## Architecture Notes
 
-### Current Setup (v0.5.4)
+### Production Architecture (v3.x)
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Backend (FastAPI)                          │
+│  Backend (FastAPI) - klinecubic.cn          │
 │  ┌──────────────────────────────────────┐  │
 │  │  LangGraph Agent                     │  │
 │  │  ├─ @observe(reasoning_node)         │  │
-│  │  ├─ @observe(fibonacci_tool_node)    │  │
-│  │  ├─ @observe(stochastic_tool_node)   │  │
+│  │  ├─ @observe(tool_execution)         │  │
 │  │  └─ @observe(synthesis_node)         │  │
 │  └──────────────────────────────────────┘  │
 │              │                              │
-│              │ Langfuse SDK v2.60.10       │
-│              │ (Native API mode)           │
+│              │ Langfuse SDK v3.10.1        │
+│              │ (OTLP + Native API)         │
 │              ▼                              │
 └─────────────────────────────────────────────┘
               │
-              │ HTTP POST
-              │ /api/public/ingestion
+              │ HTTP POST (in-cluster)
+              │ http://langfuse-server:3000
               ▼
 ┌─────────────────────────────────────────────┐
-│  Langfuse Server v2.95.9                    │
+│  Langfuse Server v3.135.0                   │
+│  monitor.klinecubic.cn                      │
 │  ┌──────────────────────────────────────┐  │
 │  │  Ingestion API                       │  │
-│  │  └─ /api/public/ingestion            │  │
+│  │  ├─ /v1/traces (OTLP)               │  │
+│  │  └─ /api/public/ingestion (native)  │  │
 │  └──────────────────────────────────────┘  │
 │              │                              │
 │              ▼                              │
+│  ┌────────────┐  ┌───────────────────────┐ │
+│  │ PostgreSQL │  │ ClickHouse            │ │
+│  │ (metadata) │  │ (analytics/traces)    │ │
+│  └────────────┘  └───────────────────────┘ │
+│              │                              │
+│              ▼                              │
 │  ┌──────────────────────────────────────┐  │
-│  │  PostgreSQL Database                 │  │
-│  │  ├─ traces                           │  │
-│  │  ├─ observations                     │  │
-│  │  └─ events                           │  │
+│  │  Alibaba OSS (event backup)          │  │
+│  │  klinecubic-financialagent-oss       │  │
+│  │  /langfuse-events/                   │  │
 │  └──────────────────────────────────────┘  │
 └─────────────────────────────────────────────┘
 ```
 
-### What v3.x Would Try (INCOMPATIBLE)
+### K8s Resources (Production)
 
-```
-Backend → OpenTelemetry SDK → OTLP Exporter
-                               │
-                               ▼
-                     /v1/traces (404 NOT FOUND)
-                               │
-                               ✗ No OTLP endpoint in server v2.x
-```
+| Resource | Type | Purpose |
+|----------|------|---------|
+| `langfuse-server` | Deployment | Web UI + API |
+| `langfuse-worker` | Deployment | Background processing |
+| `langfuse-postgres` | Deployment | Metadata storage |
+| `langfuse-clickhouse` | Deployment | Analytics OLAP |
+| `langfuse-ingress` | Ingress | TLS termination |
+
+**Note**: Uses emptyDir for storage (data loss on pod restart). Consider PVC when budget allows.
 
 ## Related Documentation
 

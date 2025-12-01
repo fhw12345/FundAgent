@@ -444,8 +444,31 @@ KUBECONFIG=~/.kube/config-ack-prod kubectl rollout undo deployment/backend -n kl
 KUBECONFIG=~/.kube/config-ack-prod kubectl rollout undo deployment/frontend -n klinematrix-prod
 ```
 
+## Langfuse Observability Stack (Production)
+
+Langfuse is deployed as part of the production kustomization. See [langfuse-observability.md](../features/langfuse-observability.md) for full details.
+
+### Quick Commands
+
+```bash
+# Check Langfuse pods
+KUBECONFIG=~/.kube/config-ack-prod kubectl get pods -n klinematrix-prod -l component=observability
+
+# View Langfuse server logs
+KUBECONFIG=~/.kube/config-ack-prod kubectl logs -f deployment/langfuse-server -n klinematrix-prod
+
+# Test health endpoint
+HTTP_PROXY="" HTTPS_PROXY="" curl -s https://monitor.klinecubic.cn/api/public/health
+```
+
+### Access
+
+- **UI**: https://monitor.klinecubic.cn
+- **API**: Internal `http://langfuse-server:3000` (backend uses this)
+
 ## Related Documentation
 
 - [Resource Inventory](RESOURCE_INVENTORY.md) - All Azure and K8s resources
 - [Migration Guide](MIGRATION_DEV_TO_TEST.md) - How we got to test environment
 - [Infrastructure](infrastructure.md) - Architecture overview
+- [Langfuse Observability](../features/langfuse-observability.md) - LLM tracing setup

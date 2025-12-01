@@ -4,6 +4,13 @@
 
 ## 🎯 Recent Architecture Changes
 
+**Langfuse Observability** (2025-11-29 - Deployed): LLM tracing deployed to production ACK.
+- **URL**: https://monitor.klinecubic.cn
+- **Stack**: Langfuse Server v3.135.0 + PostgreSQL + ClickHouse + Alibaba OSS
+- **Backend Integration**: Automatic trace capture via `@observe` decorators
+- **Secrets**: `langfuse-secrets` (infra) + `backend-secrets` (API keys)
+- **Details**: [docs/features/langfuse-observability.md](docs/features/langfuse-observability.md)
+
 **Portfolio Analysis CronJob** (2025-11-27 - Deployed): Migrated from dedicated pod (1.14GB image) to HTTP trigger pattern (5MB curl image).
 - **Old**: CronJob → Dedicated Pod → Python script → Direct DB access
 - **New**: CronJob → curl (5MB) → Backend API → Background Task
@@ -59,6 +66,7 @@
 ### Production Environment (ACK - Active)
 - **Platform**: Alibaba Cloud Container Service for Kubernetes (ACK)
 - **Access**: https://klinecubic.cn
+- **Langfuse**: https://monitor.klinecubic.cn (LLM trace visualization)
 - **Namespace**: `klinematrix-prod`
 - **Cluster**: `klinecubic-financialagent` (Shanghai/华东2)
 - **Images**: `financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/*`
