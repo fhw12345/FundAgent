@@ -2,7 +2,7 @@
 Context Window Manager for Portfolio Agent.
 
 Implements sliding window + summary approach for managing long conversation histories.
-When context exceeds threshold (50%), compacts history by:
+When context exceeds threshold (75%), compacts history down to 25% by:
 - Keeping HEAD (system prompt, tools)
 - Keeping FILES (portfolio positions, watchlist)
 - Compressing BODY (old analyses) → LLM-generated summary
@@ -99,7 +99,7 @@ class ContextWindowManager:
             model: LLM model name to get limit for
 
         Returns:
-            True if tokens exceed threshold (50% of limit)
+            True if tokens exceed threshold (75% of limit)
         """
         limit = self.context_limits.get(model, 100_000)  # Default to 100K
         threshold = int(limit * self.compact_threshold)
@@ -212,7 +212,7 @@ class ContextWindowManager:
 
 Context: {context_str}
 Original length: {current_tokens} tokens
-Target length: ~{target_tokens} tokens (10% compression)
+Target length: ~{target_tokens} tokens (25% of original)
 
 Focus on:
 1. Key trends and patterns observed across analyses

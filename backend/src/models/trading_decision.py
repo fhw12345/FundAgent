@@ -127,6 +127,10 @@ class OptimizedOrder(BaseModel):
         default=None,
         description="If order should be skipped, reason why (e.g., 'insufficient_funds')",
     )
+    is_cover: bool = Field(
+        default=False,
+        description="True if this is a BUY order to cover a short position",
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -246,14 +250,66 @@ class SymbolAnalysisResult(BaseModel):
     """
     Complete result from analyzing a single symbol.
 
-    Contains both the full analysis text and the structured decision.
-    Used internally to track analysis progress.
+    Phase 1 output: Pure research analysis without trading decisions.
+    Decisions are made holistically in Phase 2.
     """
 
     symbol: str
-    analysis_type: str  # "holding", "watchlist", "market_mover"
+    analysis_type: str  # "holding", "watchlist"
     analysis_text: str  # Full text response from ReAct agent
-    decision: TradingDecision  # Structured decision extracted
     analysis_id: str  # Unique ID for tracking
     chat_id: str  # Chat where analysis message was stored
     message_id: str | None = None  # Message ID if stored
+
+
+class PortfolioDecisionList(BaseModel):
+    """
+    Phase 2: Batch trading decisions from Portfolio Agent.
+
+    After all symbol analyses complete, the Portfolio Agent reviews everything
+    holistically and outputs decisions for all symbols at once.
+    """
+
+    decisions: list[TradingDecision] = Field(
+        description="List of trading decisions for all analyzed symbols"
+    )
+    portfolio_assessment: str = Field(
+        max_length=1000,
+        description="Overall portfolio assessment and optimization reasoning",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "decisions": [
+                        {
+                            "symbol": "AAPL",
+                            "decision": "HOLD",
+                            "position_size_percent": None,
+                            "swap_from_symbol": None,
+                            "confidence": 7,
+                            "reasoning_summary": "Position already optimal, maintaining exposure",
+                        },
+                        {
+                            "symbol": "TSLA",
+                            "decision": "SELL",
+                            "position_size_percent": 30,
+                            "swap_from_symbol": None,
+                            "confidence": 8,
+                            "reasoning_summary": "Taking profits to rebalance, reducing concentration",
+                        },
+                        {
+                            "symbol": "NVDA",
+                            "decision": "BUY",
+                            "position_size_percent": 15,
+                            "swap_from_symbol": None,
+                            "confidence": 8,
+                            "reasoning_summary": "Adding AI exposure with available buying power",
+                        },
+                    ],
+                    "portfolio_assessment": "Rebalancing to reduce TSLA concentration (was 35% of portfolio) and add diversification via NVDA. SELL proceeds fund BUY with remaining buying power.",
+                }
+            ]
+        }
+    }

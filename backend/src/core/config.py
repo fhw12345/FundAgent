@@ -72,8 +72,8 @@ class Settings(BaseSettings):
         "qwen-flash": 8_000,
         "deepseek-chat": 64_000,
     }
-    compact_threshold_ratio: float = 0.5  # Trigger compaction at 50% of context limit
-    compact_target_ratio: float = 0.1  # Compress history to 10% of context limit
+    compact_threshold_ratio: float = 0.75  # Trigger compaction at 75% of context limit
+    compact_target_ratio: float = 0.25  # Compress history to 25% of context limit
     tail_messages_keep: int = 3  # Keep last 3 exchanges in tail
     summarization_model: str = "qwen-flash"  # Fast, cheap model for summarization
 

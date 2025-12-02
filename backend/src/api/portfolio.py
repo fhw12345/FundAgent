@@ -810,7 +810,9 @@ async def get_portfolio_transactions(
                     "status": order_dict.get("status"),
                     "filled_qty": order_dict.get("filled_qty", 0),
                     "filled_avg_price": order_dict.get("filled_avg_price"),
-                    "error_message": order_dict.get("error_message"),  # For failed orders
+                    "error_message": order_dict.get(
+                        "error_message"
+                    ),  # For failed orders
                     "analysis_id": order_dict.get("analysis_id"),
                     "created_at": (
                         order_dict["created_at"].isoformat()

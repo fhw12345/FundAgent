@@ -23,7 +23,6 @@ from ..models.chat import ChatCreate
 from ..models.message import MessageCreate, MessageMetadata
 from ..models.trading_decision import (
     SymbolAnalysisResult,
-    TradingAction,
     TradingDecision,
 )
 from ..services.context_window_manager import ContextWindowManager
@@ -198,16 +197,16 @@ class PortfolioAnalysisAgent:
         self, user_id: str, dry_run: bool = False
     ) -> dict[str, Any]:
         """
-        Run analysis for single user's portfolio with two-phase aggregation.
+        Run portfolio analysis with Research → Decide → Execute flow.
 
-        Phase 1: Analyze individual symbols (concurrent, collects SymbolAnalysisResult)
-        Phase 2: Aggregation hook optimizes all decisions into OrderExecutionPlan
-        Phase 3: Execute orders (SELLs first, then scaled BUYs)
+        Phase 1: Independent symbol research (concurrent, pure analysis)
+        Phase 2: Portfolio Agent makes holistic decisions for all symbols
+        Phase 3: Execute orders (SELLs first for liquidity, then BUYs)
 
         Analyzes:
-        1. Holdings (buy/sell/hold recommendations)
+        1. Holdings (current positions)
         2. Watchlist symbols
-        3. Top market movers (3 gainers, 3 losers, 3 most active)
+        (Market movers removed - were informational only, not actionable)
 
         Args:
             user_id: User identifier
@@ -223,15 +222,15 @@ class PortfolioAnalysisAgent:
             "portfolios_count": 0,
             "holdings_analyzed": 0,
             "watchlist_analyzed": 0,
-            "market_movers_analyzed": 0,
             "total_symbols_analyzed": 0,
+            "decisions_made": 0,
             "orders_executed": 0,
             "orders_failed": 0,
             "orders_skipped": 0,
             "errors": [],
         }
 
-        # Collect all SymbolAnalysisResult for aggregation
+        # Collect all SymbolAnalysisResult for Phase 2 decision making
         all_analysis_results: list[SymbolAnalysisResult] = []
 
         try:
@@ -264,62 +263,13 @@ class PortfolioAnalysisAgent:
                 watchlist_count=len(watchlist_items),
             )
 
-            # 3. Get top market movers (top 3 each category)
-            market_movers_symbols = []
-            if self.market_service:
-                try:
-                    movers_data = await self.market_service.get_top_gainers_losers()
-                    # Extract top 3 from each category
-                    top_gainers = movers_data.get("top_gainers", [])[:3]
-                    top_losers = movers_data.get("top_losers", [])[:3]
-                    most_active = movers_data.get("most_actively_traded", [])[:3]
-
-                    # Extract symbols from market movers
-                    market_movers_symbols = (
-                        [
-                            item.get("ticker")
-                            for item in top_gainers
-                            if item.get("ticker")
-                        ]
-                        + [
-                            item.get("ticker")
-                            for item in top_losers
-                            if item.get("ticker")
-                        ]
-                        + [
-                            item.get("ticker")
-                            for item in most_active
-                            if item.get("ticker")
-                        ]
-                    )
-
-                    logger.info(
-                        "Retrieved market movers",
-                        gainers=len(top_gainers),
-                        losers=len(top_losers),
-                        active=len(most_active),
-                        total_symbols=len(market_movers_symbols),
-                    )
-                except Exception as e:
-                    logger.error(
-                        "Failed to get market movers",
-                        error=str(e),
-                        error_type=type(e).__name__,
-                    )
-                    result_summary["errors"].append(
-                        {"type": "market_movers", "error": str(e)}
-                    )
-
-            # Build portfolio context for unified prompt
+            # 3. Build portfolio context (used in Phase 2 for decisions)
             portfolio_context = None
             if self.trading_service:
                 try:
-                    # Get account summary
                     account_summary = await self.trading_service.get_account_summary(
                         user_id
                     )
-
-                    # Build portfolio context dict
                     portfolio_context = {
                         "total_equity": float(account_summary.equity),
                         "buying_power": float(account_summary.buying_power),
@@ -334,7 +284,6 @@ class PortfolioAnalysisAgent:
                             for pos in positions
                         ],
                     }
-
                     logger.info(
                         "Portfolio context built",
                         equity=portfolio_context["total_equity"],
@@ -343,45 +292,38 @@ class PortfolioAnalysisAgent:
                     )
                 except Exception as e:
                     logger.warning(
-                        "Failed to build portfolio context - analysis will proceed without context",
+                        "Failed to build portfolio context",
                         error=str(e),
                         error_type=type(e).__name__,
                     )
 
-            # Deduplication: Track analyzed symbols to avoid duplicate analysis
-            # Priority: Holdings > Watchlist > Market Movers
-            # (Holdings get analyzed first with actual position data)
+            # Track analyzed symbols to avoid duplicates (Holdings > Watchlist)
             analyzed_symbols: set[str] = set()
 
             # ================================================================
-            # PHASE 1: Analyze all symbols and collect SymbolAnalysisResult
+            # PHASE 1: Independent Symbol Research (NO portfolio context)
             # ================================================================
 
-            # 4. Analyze positions (Alpaca holdings) - BATCH PROCESSING
+            # 4. Analyze holdings - BATCH PROCESSING
             if positions:
                 if dry_run:
                     for position in positions:
                         logger.info(
-                            "Dry run - would analyze position",
+                            "Dry run - would research holding",
                             symbol=position.symbol,
-                            quantity=position.quantity,
                         )
                         result_summary["holdings_analyzed"] += 1
                         analyzed_symbols.add(position.symbol)
                 else:
-                    # Batch process holdings (5 concurrent max to avoid rate limits)
                     holdings_tasks = [
                         self._analyze_symbol(
                             symbol=position.symbol,
                             user_id=user_id,
                             analysis_type="holding",
-                            holding_quantity=int(position.quantity),
-                            portfolio_context=portfolio_context,
                         )
                         for position in positions
                     ]
 
-                    # Process in batches of 5
                     batch_size = 5
                     for i in range(0, len(holdings_tasks), batch_size):
                         batch = holdings_tasks[i : i + batch_size]
@@ -391,7 +333,7 @@ class PortfolioAnalysisAgent:
                             symbol = positions[i + idx].symbol
                             if isinstance(result, Exception):
                                 logger.error(
-                                    "Failed to analyze holding",
+                                    "Failed to research holding",
                                     symbol=symbol,
                                     error=str(result),
                                 )
@@ -399,7 +341,6 @@ class PortfolioAnalysisAgent:
                                     {"type": "holding", "symbol": symbol}
                                 )
                             elif result is not None:
-                                # Collect SymbolAnalysisResult for aggregation
                                 all_analysis_results.append(result)
                                 result_summary["holdings_analyzed"] += 1
                                 analyzed_symbols.add(symbol)
@@ -408,9 +349,8 @@ class PortfolioAnalysisAgent:
                                     {"type": "holding", "symbol": symbol}
                                 )
 
-            # 5. Analyze watchlist items - BATCH PROCESSING (with deduplication)
+            # 5. Analyze watchlist - BATCH PROCESSING (with deduplication)
             if watchlist_items:
-                # Filter out symbols already analyzed as holdings
                 unique_watchlist_items = [
                     item
                     for item in watchlist_items
@@ -422,34 +362,26 @@ class PortfolioAnalysisAgent:
                     logger.info(
                         "Skipping watchlist items already analyzed as holdings",
                         skipped_count=skipped_count,
-                        skipped_symbols=[
-                            item.symbol
-                            for item in watchlist_items
-                            if item.symbol in analyzed_symbols
-                        ],
                     )
 
                 if dry_run:
                     for watchlist_item in unique_watchlist_items:
                         logger.info(
-                            "Dry run - would analyze watchlist item",
+                            "Dry run - would research watchlist item",
                             symbol=watchlist_item.symbol,
                         )
                         result_summary["watchlist_analyzed"] += 1
                         analyzed_symbols.add(watchlist_item.symbol)
                 else:
-                    # Batch process watchlist (5 concurrent max)
                     watchlist_tasks = [
                         self._analyze_symbol(
                             symbol=watchlist_item.symbol,
                             user_id=user_id,
                             analysis_type="watchlist",
-                            portfolio_context=portfolio_context,
                         )
                         for watchlist_item in unique_watchlist_items
                     ]
 
-                    # Process in batches of 5
                     batch_size = 5
                     for i in range(0, len(watchlist_tasks), batch_size):
                         batch = watchlist_tasks[i : i + batch_size]
@@ -459,7 +391,7 @@ class PortfolioAnalysisAgent:
                             watchlist_item = unique_watchlist_items[i + idx]
                             if isinstance(result, Exception):
                                 logger.error(
-                                    "Failed to analyze watchlist item",
+                                    "Failed to research watchlist item",
                                     symbol=watchlist_item.symbol,
                                     error=str(result),
                                 )
@@ -470,11 +402,9 @@ class PortfolioAnalysisAgent:
                                     }
                                 )
                             elif result is not None:
-                                # Collect SymbolAnalysisResult for aggregation
                                 all_analysis_results.append(result)
                                 result_summary["watchlist_analyzed"] += 1
                                 analyzed_symbols.add(watchlist_item.symbol)
-                                # Update last_analyzed_at timestamp
                                 await self.watchlist_repo.update_last_analyzed(
                                     watchlist_item.watchlist_id,
                                     user_id,
@@ -488,139 +418,91 @@ class PortfolioAnalysisAgent:
                                     }
                                 )
 
-            # 6. Analyze market movers - BATCH PROCESSING (with deduplication)
-            if market_movers_symbols:
-                # Filter out symbols already analyzed as holdings or watchlist
-                unique_mover_symbols = [
-                    symbol
-                    for symbol in market_movers_symbols
-                    if symbol not in analyzed_symbols
-                ]
-
-                if len(unique_mover_symbols) < len(market_movers_symbols):
-                    skipped_count = len(market_movers_symbols) - len(
-                        unique_mover_symbols
-                    )
-                    logger.info(
-                        "Skipping market movers already analyzed as holdings/watchlist",
-                        skipped_count=skipped_count,
-                        skipped_symbols=[
-                            symbol
-                            for symbol in market_movers_symbols
-                            if symbol in analyzed_symbols
-                        ],
-                    )
-
-                if dry_run:
-                    for symbol in unique_mover_symbols:
-                        logger.info(
-                            "Dry run - would analyze market mover", symbol=symbol
-                        )
-                        result_summary["market_movers_analyzed"] += 1
-                        analyzed_symbols.add(symbol)
-                else:
-                    # Batch process market movers (5 concurrent max)
-                    movers_tasks = [
-                        self._analyze_symbol(
-                            symbol=symbol,
-                            user_id=user_id,
-                            analysis_type="market_mover",
-                            portfolio_context=portfolio_context,
-                        )
-                        for symbol in unique_mover_symbols
-                    ]
-
-                    # Process in batches of 5
-                    batch_size = 5
-                    for i in range(0, len(movers_tasks), batch_size):
-                        batch = movers_tasks[i : i + batch_size]
-                        results = await asyncio.gather(*batch, return_exceptions=True)
-
-                        for idx, result in enumerate(results):
-                            symbol = unique_mover_symbols[i + idx]
-                            if isinstance(result, Exception):
-                                logger.error(
-                                    "Failed to analyze market mover",
-                                    symbol=symbol,
-                                    error=str(result),
-                                )
-                                result_summary["errors"].append(
-                                    {"type": "market_mover", "symbol": symbol}
-                                )
-                            elif result is not None:
-                                # Collect SymbolAnalysisResult for aggregation
-                                all_analysis_results.append(result)
-                                result_summary["market_movers_analyzed"] += 1
-                                analyzed_symbols.add(symbol)
-                            else:
-                                result_summary["errors"].append(
-                                    {"type": "market_mover", "symbol": symbol}
-                                )
-
             # Calculate total
             result_summary["total_symbols_analyzed"] = (
                 result_summary["holdings_analyzed"]
                 + result_summary["watchlist_analyzed"]
-                + result_summary["market_movers_analyzed"]
             )
 
             logger.info(
-                "Phase 1 complete: Symbol analysis finished",
+                "Phase 1 complete: Symbol research finished",
                 user_id=user_id,
                 total_analyzed=result_summary["total_symbols_analyzed"],
                 holdings=result_summary["holdings_analyzed"],
                 watchlist=result_summary["watchlist_analyzed"],
-                market_movers=result_summary["market_movers_analyzed"],
                 analysis_results_count=len(all_analysis_results),
             )
 
             # ================================================================
-            # PHASE 2: Aggregation Hook - Optimize all decisions
+            # PHASE 2: Portfolio Agent Decision (single holistic call)
             # ================================================================
             if not dry_run and all_analysis_results and portfolio_context:
                 logger.info(
-                    "Phase 2: Starting order aggregation and optimization",
-                    analysis_results_count=len(all_analysis_results),
+                    "Phase 2: Portfolio Agent making holistic decisions",
+                    symbols_count=len(all_analysis_results),
                 )
 
-                execution_plan = await self.order_optimizer.optimize_trading_decisions(
-                    analysis_results=all_analysis_results,
+                # Get decisions from Portfolio Agent
+                trading_decisions = await self._make_portfolio_decisions(
+                    symbol_analyses=all_analysis_results,
                     portfolio_context=portfolio_context,
                     user_id=user_id,
                 )
 
+                result_summary["decisions_made"] = len(trading_decisions)
+
                 # ================================================================
-                # PHASE 3: Execute Optimized Orders (SELLs first, then BUYs)
+                # PHASE 3: Order Execution (SELLs first for liquidity, then BUYs)
                 # ================================================================
-                if execution_plan and execution_plan.orders:
+                if trading_decisions:
                     logger.info(
-                        "Phase 3: Executing optimized order plan",
-                        orders_count=len(execution_plan.orders),
-                        scaling_applied=execution_plan.scaling_applied,
+                        "Phase 3: Converting decisions to execution plan",
+                        decisions_count=len(trading_decisions),
                     )
 
-                    execution_result = await self.order_optimizer.execute_order_plan(
-                        plan=execution_plan,
-                        user_id=user_id,
+                    # Convert TradingDecisions to OrderExecutionPlan via optimizer
+                    execution_plan = await self.order_optimizer.optimize_trading_decisions(
                         analysis_results=all_analysis_results,
+                        portfolio_context=portfolio_context,
+                        user_id=user_id,
+                        trading_decisions=trading_decisions,  # Pass pre-made decisions
                     )
 
-                    result_summary["orders_executed"] = execution_result.get(
-                        "executed", 0
-                    )
-                    result_summary["orders_failed"] = execution_result.get("failed", 0)
-                    result_summary["orders_skipped"] = execution_result.get(
-                        "skipped", 0
-                    )
+                    if execution_plan and execution_plan.orders:
+                        logger.info(
+                            "Phase 3: Executing orders",
+                            orders_count=len(execution_plan.orders),
+                            scaling_applied=execution_plan.scaling_applied,
+                        )
 
-                    logger.info(
-                        "Phase 3 complete: Order execution finished",
-                        executed=result_summary["orders_executed"],
-                        failed=result_summary["orders_failed"],
-                        skipped=result_summary["orders_skipped"],
-                    )
+                        execution_result = (
+                            await self.order_optimizer.execute_order_plan(
+                                plan=execution_plan,
+                                user_id=user_id,
+                                analysis_results=all_analysis_results,
+                            )
+                        )
+
+                        result_summary["orders_executed"] = execution_result.get(
+                            "executed", 0
+                        )
+                        result_summary["orders_failed"] = execution_result.get(
+                            "failed", 0
+                        )
+                        result_summary["orders_skipped"] = execution_result.get(
+                            "skipped", 0
+                        )
+
+                        logger.info(
+                            "Phase 3 complete: Order execution finished",
+                            executed=result_summary["orders_executed"],
+                            failed=result_summary["orders_failed"],
+                            skipped=result_summary["orders_skipped"],
+                        )
+                    else:
+                        logger.info("Phase 3: No actionable orders after optimization")
                 else:
-                    logger.info("Phase 2/3: No actionable orders after optimization")
+                    logger.info("Phase 2: No trading decisions made")
 
             logger.info(
                 "User portfolio analysis completed",
@@ -628,7 +510,7 @@ class PortfolioAnalysisAgent:
                 total_analyzed=result_summary["total_symbols_analyzed"],
                 holdings=result_summary["holdings_analyzed"],
                 watchlist=result_summary["watchlist_analyzed"],
-                market_movers=result_summary["market_movers_analyzed"],
+                decisions_made=result_summary["decisions_made"],
                 orders_executed=result_summary["orders_executed"],
                 errors=len(result_summary["errors"]),
             )
@@ -650,24 +532,20 @@ class PortfolioAnalysisAgent:
         symbol: str,
         user_id: str,
         analysis_type: str,
-        holding_quantity: int | None = None,
-        portfolio_context: dict[str, Any] | None = None,
     ) -> SymbolAnalysisResult | None:
         """
-        Analyze a single symbol using two-phase approach:
-        Phase 1: ReAct agent with tools for comprehensive analysis
-        Phase 2: Structured output extraction for trading decision
+        Phase 1: Independent symbol research using ReAct agent with tools.
+
+        Pure research without portfolio context or trading decisions.
+        Decisions are made holistically in Phase 2 after all analyses complete.
 
         Args:
             symbol: Stock symbol to analyze
             user_id: User ID (use "portfolio_agent" for system analysis)
-            analysis_type: Type of analysis (holding, watchlist, market_mover)
-            holding_quantity: Current holding quantity (for holdings only)
-            portfolio_context: Portfolio context (equity, buying power, all positions)
+            analysis_type: Type of analysis (holding, watchlist)
 
         Returns:
-            SymbolAnalysisResult with analysis text and structured decision,
-            or None if analysis failed
+            SymbolAnalysisResult with analysis text, or None if failed
         """
         try:
             # Generate analysis_id for tracking
@@ -675,125 +553,55 @@ class PortfolioAnalysisAgent:
             analysis_id = f"{symbol}_{analysis_type}_{timestamp}"
 
             logger.info(
-                "Analyzing symbol",
+                "Phase 1: Starting symbol research",
                 symbol=symbol,
                 user_id=user_id,
                 analysis_type=analysis_type,
                 analysis_id=analysis_id,
             )
 
-            # Get symbol-specific chat ID BEFORE building prompt (needed for context retrieval)
+            # Get symbol-specific chat ID for context retrieval
             chat_id = await self._get_symbol_chat_id(symbol, user_id)
 
             # Fetch historical messages for context management (sliding window + summary)
             historical_messages = await self.message_repo.get_by_chat(chat_id)
 
-            # Build portfolio context summary for unified prompt
-            portfolio_summary = ""
-            if portfolio_context:
-                total_equity = portfolio_context.get("total_equity", 0)
-                buying_power = portfolio_context.get("buying_power", 0)
-                cash = portfolio_context.get("cash", 0)
-                positions = portfolio_context.get("positions", [])
+            # Pure research prompt - NO portfolio context, NO trading decisions
+            # Decisions will be made in Phase 2 with full portfolio visibility
+            prompt = f"""# Symbol Research: {symbol}
 
-                portfolio_summary = f"""
-## Current Portfolio Status
+Conduct comprehensive technical and fundamental research for {symbol}.
 
-**Account Summary:**
-- Total Equity: ${total_equity:,.2f}
-- Buying Power: ${buying_power:,.2f}
-- Cash: ${cash:,.2f}
-
-**Current Positions:**
-"""
-                if positions:
-                    for pos in positions:
-                        portfolio_summary += f"""- {pos['symbol']}: {pos['quantity']} shares, ${pos['market_value']:,.2f} (P/L: {pos['unrealized_pl_percent']:.2f}%)\n"""
-                else:
-                    portfolio_summary += "- No positions\n"
-
-                portfolio_summary += "\n"
-
-            # Context about current symbol
-            symbol_context = ""
-            if analysis_type == "holding" and holding_quantity:
-                symbol_context = (
-                    f"This is your current holding of {holding_quantity} shares."
-                )
-            elif analysis_type == "watchlist":
-                symbol_context = "This is a symbol on your watchlist."
-            else:  # market_mover
-                symbol_context = (
-                    "This is a top market mover today (gainer/loser/active)."
-                )
-
-            # Unified portfolio-aware analysis prompt (English only)
-            # Note: Decision extraction will be done via structured output in Phase 2
-            prompt = f"""# Portfolio Optimization Analysis
-
-Please analyze {symbol} from a holistic portfolio perspective, focusing on optimal position sizing and portfolio rebalancing.
-
-{portfolio_summary}
-## Symbol to Analyze
-**{symbol}** - {symbol_context}
-
-## Analysis Requirements
-
-Please conduct comprehensive technical and fundamental analysis, with special focus on:
+## Research Requirements
 
 1. **Technical Analysis**
-   - Fibonacci retracement levels, trend analysis, technical indicators
-   - Support and resistance levels, momentum indicators
+   - Fibonacci retracement levels and trend analysis
+   - Support and resistance levels
+   - Momentum indicators (RSI, MACD, Stochastic)
+   - Recent price action and volume patterns
 
 2. **Fundamental Analysis**
-   - Company financials, earnings quality, revenue growth
-   - News sentiment, industry trends, competitive position
+   - Company overview and business model
+   - Financial health (revenue, earnings, cash flow)
+   - News sentiment and recent developments
+   - Industry trends and competitive position
 
-3. **Value Opportunity Detection**
-   - Is market panic creating a misprice relative to intrinsic value?
-   - Does current price offer opportunity for greater future returns?
-   - Are fundamentals strong despite negative market sentiment?
+3. **Value Assessment**
+   - Current valuation metrics (P/E, P/B, etc.)
+   - Growth prospects and catalysts
+   - Risk factors and concerns
+   - Short-term vs long-term outlook
 
-4. **Portfolio Optimization Decision**
-
-   Please recommend ONE of the following actions:
-
-   - **BUY**: Buy new position or add to existing holding
-   - **SELL**: Sell all or part of the position
-   - **HOLD**: Maintain current position unchanged
-   - **SWAP**: Sell another position to buy this symbol
-
-5. **Position Sizing Rules** (IMPORTANT)
-
-   For **BUY** decisions:
-   - position_size_percent = percentage of BUYING POWER to spend
-   - Example: 10% means spend 10% of available buying power on this stock
-
-   For **SELL** decisions:
-   - position_size_percent = percentage of CURRENT HOLDING to sell
-   - Example: 50% means sell half of current shares; 100% means sell all
-
-   For **SWAP** decisions:
-   - position_size_percent = percentage of swap_from_symbol holding to sell
-   - The proceeds will be used to buy this symbol
-
-   Consider: liquidity, risk diversification, position concentration, and conviction level.
-
-In your analysis, please clearly explain:
-- Key technical and fundamental findings
-- Whether value opportunity exists (panic-driven mispricing)
-- How this action optimizes overall portfolio allocation
-- Risk assessment and conviction level (1-10 scale)
+**IMPORTANT**: Provide factual research and analysis only.
+Do NOT make buy/sell/hold recommendations - decisions will be made separately
+by the Portfolio Agent after reviewing all symbol analyses together.
 
 LANGUAGE REQUIREMENT:
-You MUST respond in Simplified Chinese (简体中文).
-- All explanations, analysis, and recommendations must be in Chinese
-- Technical terms can include English in parentheses for clarity
-- Numbers, stock symbols, and dates can remain in standard format
+Respond in Simplified Chinese (简体中文).
+Technical terms can include English in parentheses for clarity.
 """
 
             # Apply context window management (sliding window + summary)
-            # This provides historical context automatically
             conversation_history = []
             if historical_messages:
                 total_tokens = self.context_manager.calculate_context_tokens(
@@ -809,19 +617,14 @@ You MUST respond in Simplified Chinese (简体中文).
                         message_count=len(historical_messages),
                     )
 
-                    # Extract HEAD, BODY, TAIL
                     head, body, tail = self.context_manager.extract_context_structure(
                         historical_messages
                     )
-
-                    # Summarize BODY
                     summary_text = await self.context_manager.summarize_history(
                         body_messages=body,
                         symbol=symbol,
                         llm_service=self.react_agent,
                     )
-
-                    # Reconstruct compacted context
                     compacted_messages = self.context_manager.reconstruct_context(
                         head=head,
                         summary_text=summary_text,
@@ -846,8 +649,8 @@ You MUST respond in Simplified Chinese (简体中文).
                             {"role": msg.role, "content": msg.content}
                         )
 
-            # Add current prompt to conversation
-            conversation_history.append({"role": "user", "content": prompt})
+            # NOTE: Do NOT add prompt to conversation_history here!
+            # ainvoke() will add it with language instruction - adding here causes duplicate
 
             # Create pending transaction for credit tracking (if enabled)
             transaction = None
@@ -855,27 +658,25 @@ You MUST respond in Simplified Chinese (简体中文).
                 try:
                     transaction = await self.credit_service.create_pending_transaction(
                         user_id="portfolio_agent",
-                        chat_id=(
-                            chat_id if "chat_id" in locals() else analysis_id
-                        ),  # Use analysis_id temporarily
-                        estimated_cost=10.0,  # Estimated cost for portfolio analysis
+                        chat_id=chat_id,
+                        estimated_cost=10.0,
                         model=self.settings.dashscope_model,
                     )
                     logger.info(
-                        "Created pending transaction for portfolio analysis",
+                        "Created pending transaction",
                         transaction_id=transaction.transaction_id,
                         symbol=symbol,
                     )
                 except Exception as e:
                     logger.warning(
-                        "Failed to create pending transaction - continuing without credit tracking",
+                        "Failed to create pending transaction",
                         error=str(e),
                         symbol=symbol,
                     )
 
-            # Invoke agent with conversation history (sliding window + summary applied)
+            # Invoke ReAct agent for research (tools enabled)
             logger.info(
-                "Invoking agent for analysis",
+                "Invoking agent for symbol research",
                 symbol=symbol,
                 conversation_history_length=len(conversation_history),
             )
@@ -889,89 +690,20 @@ You MUST respond in Simplified Chinese (简体中文).
             else:
                 response_text = str(response)
 
-            # Extract token usage from response (LangGraph format)
+            # Extract token usage
             input_tokens = 0
             output_tokens = 0
             if isinstance(response, dict):
                 usage = response.get("usage", {})
                 input_tokens = usage.get("input_tokens", 0)
                 output_tokens = usage.get("output_tokens", 0)
-                logger.info(
-                    "Token usage extracted",
-                    symbol=symbol,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                )
 
-            # Phase 2: Extract structured trading decision using with_structured_output
-            # This replaces unreliable regex parsing with guaranteed Pydantic model
-            decision_prompt = f"""Based on the following analysis of {symbol}, extract the trading decision.
-
-The analysis recommends a specific action (BUY/SELL/HOLD/SWAP) with position sizing.
-
-**Position Size Rules:**
-- For BUY: position_size_percent = % of BUYING POWER to spend
-- For SELL: position_size_percent = % of CURRENT HOLDING to sell
-- For HOLD: position_size_percent should be null/None
-
-Extract the decision, confidence (1-10), and a brief reasoning summary (max 500 chars).
-"""
-            try:
-                trading_decision = await self.react_agent.ainvoke_structured(
-                    prompt=decision_prompt,
-                    schema=TradingDecision,
-                    context=response_text,
-                )
-                # Ensure symbol is set correctly
-                trading_decision.symbol = symbol
-
-                logger.info(
-                    "Phase 2: Structured decision extracted",
-                    symbol=symbol,
-                    decision=trading_decision.decision.value,
-                    position_size=trading_decision.position_size_percent,
-                    confidence=trading_decision.confidence,
-                )
-            except Exception as e:
-                logger.error(
-                    "Phase 2: Failed to extract structured decision - using HOLD fallback",
-                    symbol=symbol,
-                    error=str(e),
-                    error_type=type(e).__name__,
-                )
-                # Fallback to HOLD if structured extraction fails
-                trading_decision = TradingDecision(
-                    symbol=symbol,
-                    decision=TradingAction.HOLD,
-                    position_size_percent=None,
-                    swap_from_symbol=None,
-                    confidence=1,
-                    reasoning_summary=f"Structured extraction failed: {str(e)[:200]}",
-                )
-
-            # Extract for backward compatibility (used in message content below)
-            decision = trading_decision.decision.value
-            position_size = trading_decision.position_size_percent
-            swap_from = trading_decision.swap_from_symbol
-
-            # Create analysis message
-            # Note: chat_id already retrieved earlier for context management
-            emoji_map = {
-                "holding": "💼",
-                "watchlist": "👀",
-                "market_mover": "📈",
-            }
+            # Create analysis message (pure research, no decision)
+            emoji_map = {"holding": "💼", "watchlist": "👀"}
             emoji = emoji_map.get(analysis_type, "📊")
 
-            message_content = f"## {emoji} Portfolio Agent Analysis - {symbol}\n\n"
+            message_content = f"## {emoji} Symbol Research - {symbol}\n\n"
             message_content += f"**Type:** {analysis_type.replace('_', ' ').title()}\n"
-            message_content += f"**Decision:** {decision}\n"
-            if position_size:
-                message_content += f"**Position Size:** {position_size}%\n"
-            if swap_from:
-                message_content += f"**Swap From:** {swap_from}\n"
-            if holding_quantity:
-                message_content += f"**Current Holding:** {holding_quantity} shares\n"
             message_content += f"**Analysis ID:** {analysis_id}\n\n"
             message_content += f"{response_text}\n"
 
@@ -979,9 +711,6 @@ Extract the decision, confidence (1-10), and a brief reasoning summary (max 500 
                 symbol=symbol,
                 interval="1d",
                 analysis_id=analysis_id,
-                trend_direction=(
-                    decision.lower() if decision in ["BUY", "SELL"] else None
-                ),
             )
 
             message_create = MessageCreate(
@@ -993,34 +722,17 @@ Extract the decision, confidence (1-10), and a brief reasoning summary (max 500 
             )
             message = await self.message_repo.create(message_create)
 
-            # Complete transaction with actual token usage (if credit tracking enabled)
+            # Complete transaction with actual token usage
             if self.credit_service and transaction:
                 try:
-                    updated_transaction, updated_user = (
-                        await self.credit_service.complete_transaction_with_deduction(
-                            transaction_id=transaction.transaction_id,
-                            message_id=message.message_id,
-                            input_tokens=input_tokens,
-                            output_tokens=output_tokens,
-                            model=self.settings.dashscope_model,
-                            thinking_enabled=False,  # Portfolio agent doesn't use thinking mode
-                        )
+                    await self.credit_service.complete_transaction_with_deduction(
+                        transaction_id=transaction.transaction_id,
+                        message_id=message.message_id,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        model=self.settings.dashscope_model,
+                        thinking_enabled=False,
                     )
-
-                    if updated_transaction and updated_user:
-                        logger.info(
-                            "Transaction completed for portfolio analysis",
-                            transaction_id=updated_transaction.transaction_id,
-                            actual_cost=updated_transaction.actual_cost,
-                            remaining_credits=updated_user.credits,
-                            input_tokens=input_tokens,
-                            output_tokens=output_tokens,
-                        )
-                    else:
-                        logger.warning(
-                            "Failed to complete transaction for portfolio analysis",
-                            transaction_id=transaction.transaction_id,
-                        )
                 except Exception as e:
                     logger.error(
                         "Error completing transaction",
@@ -1029,21 +741,18 @@ Extract the decision, confidence (1-10), and a brief reasoning summary (max 500 
                     )
 
             logger.info(
-                "Symbol analysis completed",
+                "Phase 1: Symbol research completed",
                 symbol=symbol,
                 analysis_type=analysis_type,
-                decision=decision,
-                position_size=position_size,
-                confidence=trading_decision.confidence,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
             )
 
-            # Return SymbolAnalysisResult instead of placing order immediately
-            # Orders will be aggregated and executed later via _optimize_trading_decisions
+            # Return research result (no decision - that comes in Phase 2)
             return SymbolAnalysisResult(
                 symbol=symbol,
                 analysis_type=analysis_type,
                 analysis_text=response_text,
-                decision=trading_decision,
                 analysis_id=analysis_id,
                 chat_id=chat_id,
                 message_id=message.message_id if message else None,
@@ -1051,7 +760,7 @@ Extract the decision, confidence (1-10), and a brief reasoning summary (max 500 
 
         except Exception as e:
             logger.error(
-                "Symbol analysis failed",
+                "Symbol research failed",
                 symbol=symbol,
                 analysis_type=analysis_type,
                 error=str(e),
@@ -1059,6 +768,136 @@ Extract the decision, confidence (1-10), and a brief reasoning summary (max 500 
                 exc_info=True,
             )
             return None
+
+    async def _make_portfolio_decisions(
+        self,
+        symbol_analyses: list[SymbolAnalysisResult],
+        portfolio_context: dict[str, Any],
+        user_id: str,
+    ) -> list[TradingDecision]:
+        """
+        Phase 2: Make all trading decisions in a single holistic call.
+
+        After all symbol research completes, the Portfolio Agent reviews
+        everything together and makes decisions for all symbols at once.
+
+        Args:
+            symbol_analyses: List of SymbolAnalysisResult from Phase 1
+            portfolio_context: Portfolio state (equity, buying_power, positions)
+            user_id: User ID for tracking
+
+        Returns:
+            List of TradingDecision for all analyzed symbols
+        """
+        if not symbol_analyses:
+            logger.info("No symbol analyses to process for decisions")
+            return []
+
+        logger.info(
+            "Phase 2: Making portfolio decisions",
+            symbols_count=len(symbol_analyses),
+            user_id=user_id,
+        )
+
+        # Build portfolio state summary
+        total_equity = portfolio_context.get("total_equity", 0)
+        buying_power = portfolio_context.get("buying_power", 0)
+        cash = portfolio_context.get("cash", 0)
+        positions = portfolio_context.get("positions", [])
+
+        # Format positions table
+        positions_table = "| Symbol | Shares | Market Value | P/L % |\n"
+        positions_table += "|--------|--------|--------------|-------|\n"
+        if positions:
+            for pos in positions:
+                positions_table += f"| {pos['symbol']} | {pos['quantity']} | ${pos['market_value']:,.2f} | {pos['unrealized_pl_percent']:.2f}% |\n"
+        else:
+            positions_table += "| (No positions) | - | - | - |\n"
+
+        # Format all symbol analyses
+        analyses_section = ""
+        for result in symbol_analyses:
+            analyses_section += (
+                f"\n### {result.symbol} ({result.analysis_type.title()})\n"
+            )
+            analyses_section += f"{result.analysis_text}\n"
+            analyses_section += "---\n"
+
+        # Build the holistic decision prompt
+        decision_prompt = f"""# Portfolio Trading Decisions
+
+You are a Portfolio Manager. Review ALL the symbol research below and make trading decisions
+considering the overall portfolio optimization, diversification, and risk management.
+
+## Current Portfolio State
+
+**Account Summary:**
+- Total Equity: ${total_equity:,.2f}
+- Buying Power: ${buying_power:,.2f}
+- Cash: ${cash:,.2f}
+
+**Current Holdings:**
+{positions_table}
+
+## Symbol Research Results
+{analyses_section}
+
+## Decision Rules
+
+For EACH analyzed symbol, decide ONE action:
+
+- **BUY**: Add new position or increase existing
+  - position_size_percent = % of BUYING POWER to spend
+  - Example: 10% means spend 10% of ${buying_power:,.2f} = ${buying_power * 0.1:,.2f}
+
+- **SELL**: Reduce or exit position (MUST be a current holding)
+  - position_size_percent = % of CURRENT HOLDING to sell
+  - Example: 50% of 100 shares = sell 50 shares
+  - SELLs execute FIRST to gain liquidity for BUYs
+
+- **HOLD**: No action needed
+  - position_size_percent should be null
+
+## Important Considerations
+
+1. **Liquidity First**: SELL orders execute before BUYs to free up buying power
+2. **Diversification**: Avoid over-concentration in any single position
+3. **Risk Management**: Consider correlation between positions
+4. **Position Sizing**: Use confidence level to scale position sizes
+5. **Holdings vs Watchlist**: Holdings can be SELL/HOLD; Watchlist can be BUY/HOLD
+
+Provide a decision for EVERY symbol in the research above.
+Include short reasoning (1-2 sentences) for each decision.
+"""
+
+        try:
+            # Import the schema here to avoid circular imports
+            from ..models.trading_decision import PortfolioDecisionList
+
+            # Single structured call for all decisions
+            decision_result = await self.react_agent.ainvoke_structured(
+                prompt=decision_prompt,
+                schema=PortfolioDecisionList,
+                context=None,  # Context is embedded in prompt
+            )
+
+            logger.info(
+                "Phase 2: Portfolio decisions completed",
+                decisions_count=len(decision_result.decisions),
+                assessment_preview=decision_result.portfolio_assessment[:100],
+            )
+
+            return decision_result.decisions
+
+        except Exception as e:
+            logger.error(
+                "Phase 2: Failed to make portfolio decisions",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            # Return empty list on failure - no orders will be executed
+            return []
 
     async def _get_symbol_chat_id(
         self, symbol: str, user_id: str = "portfolio_agent"

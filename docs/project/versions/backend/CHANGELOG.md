@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2025-12-02
+
+### Added
+- feat(portfolio): Short position handling in order optimizer
+  - Added `is_cover` field to `OptimizedOrder` model to identify cover orders
+  - Automatic detection of short positions (negative quantity)
+  - SELL decisions on short positions converted to BUY-to-cover orders
+  - Cover orders execute with highest priority (risk reduction first)
+  - Clear logging for short position conversions
+
+### Changed
+- refactor(portfolio): 3-phase architecture for portfolio analysis
+  - Phase 1: Pure symbol research (concurrent, independent)
+  - Phase 2: Single holistic decision call via `PortfolioDecisionList`
+  - Phase 3: Programmatic order optimization (no additional LLM call)
+  - Reduced LLM calls from N+1 to N+1 (research) + 1 (decision)
+  - `SymbolAnalysisResult` no longer contains `decision` field
+  - Added `PortfolioDecisionList` model for batch decisions
+- refactor(config): Adjusted context window thresholds
+  - `compact_threshold_ratio`: 0.5 → 0.75 (trigger at 75% instead of 50%)
+  - `compact_target_ratio`: 0.1 → 0.25 (compress to 25% instead of 10%)
+
 ## [0.8.4] - 2025-11-29
 
 ### Added
