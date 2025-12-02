@@ -49,6 +49,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     mongodb = MongoDB()
     redis_cache = RedisCache()
 
+    # Initialize service variables before try block to ensure they're defined
+    # in the finally block even if an early exception occurs
+    market_service = None
+
     try:
         await mongodb.connect(settings.mongodb_url)
         await redis_cache.connect(settings.redis_url)
@@ -136,7 +140,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         react_agent = None
         alpaca_trading_service = None
-        market_service = None
         try:
             # Create agent instance (will be cached as singleton in dependency injection)
             alpaca_trading_service = AlpacaTradingService(settings=settings)
