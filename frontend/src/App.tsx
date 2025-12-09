@@ -194,6 +194,16 @@ function App() {
           <p className="text-center text-sm text-gray-500">
             KlineMatrix - {t("common:app.subtitle")}
           </p>
+          <p className="text-center text-sm text-gray-400 mt-2">
+            <a
+              href="https://beian.miit.gov.cn/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-gray-600 transition-colors"
+            >
+              苏ICP备2025219095号-1
+            </a>
+          </p>
         </div>
       </footer>
 
