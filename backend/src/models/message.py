@@ -69,9 +69,13 @@ class MessageMetadata(BaseModel):
         default=None, description="Whether agent executed a tool in this response"
     )
 
-    # Portfolio tracking (NEW - for order placement and analysis workflow)
+    # Portfolio tracking (for order placement and analysis workflow)
     analysis_id: str | None = Field(
         default=None, description="Analysis workflow ID this message belongs to"
+    )
+    analysis_type: str | None = Field(
+        default=None,
+        description="Type of analysis: 'individual' (Phase 1 symbol research) or 'portfolio' (Phase 2/3 portfolio decisions)",
     )
     order_placed: bool | None = Field(
         default=None, description="Whether this message placed an order"
@@ -86,6 +90,16 @@ class MessageMetadata(BaseModel):
     tool_summary: dict[str, Any] | None = Field(
         default=None,
         description="Summary: {tool_name: {cache_hit, duration_ms, cost}}",
+    )
+
+    # Context compaction
+    is_summary: bool = Field(
+        default=False,
+        description="True if this message is a compacted summary of older messages",
+    )
+    summarized_message_count: int | None = Field(
+        default=None,
+        description="Number of messages that were summarized into this message",
     )
 
     # Extensible - any additional data

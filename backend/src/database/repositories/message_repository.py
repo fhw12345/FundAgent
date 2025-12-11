@@ -360,3 +360,56 @@ class MessageRepository:
         )
 
         return result.modified_count
+
+    async def delete_old_messages_keep_recent(
+        self,
+        chat_id: str,
+        keep_count: int,
+        exclude_summaries: bool = True,
+    ) -> int:
+        """
+        Delete old messages from a chat, keeping the most recent N messages.
+
+        Used during context compaction to clean up old analysis history
+        after a summary has been persisted.
+
+        Args:
+            chat_id: Chat identifier
+            keep_count: Number of recent messages to keep
+            exclude_summaries: If True, never delete summary messages (is_summary=True)
+
+        Returns:
+            Number of messages deleted
+        """
+        # First, get the message_ids of recent messages to keep
+        keep_query = {"chat_id": chat_id}
+
+        cursor = (
+            self.collection.find(keep_query, {"message_id": 1})
+            .sort("timestamp", -1)  # Newest first
+            .limit(keep_count)
+        )
+
+        keep_message_ids = [doc["message_id"] async for doc in cursor]
+
+        # Build delete query: delete messages NOT in keep list
+        delete_query: dict = {
+            "chat_id": chat_id,
+            "message_id": {"$nin": keep_message_ids},
+        }
+
+        # Optionally exclude summary messages from deletion
+        if exclude_summaries:
+            delete_query["metadata.is_summary"] = {"$ne": True}
+
+        result = await self.collection.delete_many(delete_query)
+        deleted_count: int = result.deleted_count
+
+        logger.info(
+            "Old messages deleted during compaction",
+            chat_id=chat_id,
+            deleted_count=deleted_count,
+            kept_count=len(keep_message_ids),
+        )
+
+        return deleted_count
