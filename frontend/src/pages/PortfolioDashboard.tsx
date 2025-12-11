@@ -39,6 +39,8 @@ export default function PortfolioDashboard() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Start open
   const [selectedDate, setSelectedDate] = useState<string | null>(null); // Date filter for chat history
+  const [messageSortOrder, setMessageSortOrder] = useState<"newest" | "oldest">("newest"); // Sort order for messages in modal
+  const [analysisType, setAnalysisType] = useState<string>(""); // Analysis type filter ("individual" or "portfolio")
 
   // Admin check - only admin (allenpan) can see cron controller
   const currentUser = authStorage.getUser();
@@ -253,13 +255,17 @@ export default function PortfolioDashboard() {
               readOnly={true}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
+              messageSortOrder={messageSortOrder}
+              onMessageSortOrderChange={setMessageSortOrder}
+              analysisType={analysisType}
+              onAnalysisTypeChange={setAnalysisType}
             />
           </div>
         </div>
       </div>
 
       {/* Chat Messages Modal - Show when a chat is selected */}
-      {activeChatId && !isSidebarCollapsed && <ChatMessagesModal chatId={activeChatId} onClose={() => setActiveChatId(null)} />}
+      {activeChatId && !isSidebarCollapsed && <ChatMessagesModal chatId={activeChatId} onClose={() => setActiveChatId(null)} sortOrder={messageSortOrder} />}
 
       {/* Analysis Modal (legacy - now replaced by sidebar) */}
       {selectedSymbol && (
@@ -355,7 +361,7 @@ export default function PortfolioDashboard() {
 }
 
 // Separate component to handle chat messages modal with data fetching
-function ChatMessagesModal({ chatId, onClose }: { chatId: string; onClose: () => void }) {
+function ChatMessagesModal({ chatId, onClose, sortOrder }: { chatId: string; onClose: () => void; sortOrder: "newest" | "oldest" }) {
   const { t } = useTranslation(['portfolio', 'common']);
   const { data: chatDetail, isLoading } = usePortfolioChatDetail(chatId);
 
@@ -383,7 +389,7 @@ function ChatMessagesModal({ chatId, onClose }: { chatId: string; onClose: () =>
               <div className="text-gray-500">{t('portfolio:modal.loadingMessages')}</div>
             </div>
           ) : chatDetail?.messages ? (
-            <ChatMessages messages={chatDetail.messages} isAnalysisPending={false} chatId={chatId} />
+            <ChatMessages messages={chatDetail.messages} isAnalysisPending={false} chatId={chatId} sortOrder={sortOrder} />
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-gray-500">{t('portfolio:modal.noMessages')}</div>

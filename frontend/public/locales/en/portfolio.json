@@ -199,6 +199,16 @@
     "unknownTime": "Unknown time",
     "analysesCount": "{{count}} analyses",
     "lastUpdated": "Last updated: {{time}}",
-    "keyLevels": "Key Levels"
+    "keyLevels": "Key Levels",
+    "messageOrder": "Messages",
+    "newestOnTop": "Latest on top"
+  },
+  "filters": {
+    "symbol": "Filter by Symbol",
+    "allSymbols": "All Symbols",
+    "analysisType": "Analysis Type",
+    "allTypes": "All Types",
+    "individual": "Individual Analysis",
+    "portfolio": "Portfolio Decisions"
   }
 }

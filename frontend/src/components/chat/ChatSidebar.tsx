@@ -3,7 +3,7 @@
  * Displays list of user's chats with create new chat button.
  */
 
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Plus,
@@ -11,13 +11,13 @@ import {
   Loader2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight,
   Calendar,
   X,
 } from "lucide-react";
 import { useChats, useDeleteChat } from "../../hooks/useChats";
 import { usePortfolioChats, useDeletePortfolioChat } from "../../hooks/usePortfolioChats";
 import { ChatListItem } from "./ChatListItem";
+import { AnalysisTypeFilter } from "../portfolio/AnalysisTypeFilter";
 
 interface ChatSidebarProps {
   activeChatId: string | null;
@@ -29,6 +29,10 @@ interface ChatSidebarProps {
   readOnly?: boolean; // Optional: hide "New Chat" button for read-only mode
   selectedDate?: string | null; // Optional: selected date for portfolio mode (YYYY-MM-DD)
   onDateChange?: (date: string | null) => void; // Optional: callback when date changes
+  messageSortOrder?: "newest" | "oldest"; // Optional: controlled sort order for messages
+  onMessageSortOrderChange?: (order: "newest" | "oldest") => void; // Optional: callback when sort changes
+  analysisType?: string; // Optional: filter by analysis type ("individual" or "portfolio")
+  onAnalysisTypeChange?: (type: string) => void; // Optional: callback when analysis type changes
 }
 
 export const ChatSidebar = memo(function ChatSidebar({
@@ -41,25 +45,37 @@ export const ChatSidebar = memo(function ChatSidebar({
   readOnly = false,
   selectedDate = null,
   onDateChange,
+  messageSortOrder,
+  onMessageSortOrderChange,
+  analysisType,
+  onAnalysisTypeChange,
 }: ChatSidebarProps) {
-  const { t } = useTranslation(['chat', 'common']);
+  const { t } = useTranslation(['chat', 'common', 'portfolio']);
   const [showArchived, setShowArchived] = useState(false);
+  // Use controlled sort order if provided, otherwise use internal state
+  const [internalSortOrder, setInternalSortOrder] = useState<"newest" | "oldest">("newest");
+  const sortOrder = messageSortOrder ?? internalSortOrder;
+  const setSortOrder = onMessageSortOrderChange ?? setInternalSortOrder;
 
   // Fetch chats - use portfolio chats if filterUserId is portfolio_agent
+  const isPortfolioMode = filterUserId === "portfolio_agent";
   const regularChatsQuery = useChats(1, 20, showArchived);
-  const portfolioChatsQuery = usePortfolioChats(selectedDate || undefined);
+  const portfolioChatsQuery = usePortfolioChats(selectedDate || undefined, analysisType || undefined);
 
-  const { data, isLoading, isError, error } = filterUserId === "portfolio_agent"
+  const { data, isLoading, isError, error } = isPortfolioMode
     ? portfolioChatsQuery
     : regularChatsQuery;
+
+  // Chats are always sorted by API (newest first) - no client-side sorting needed
+  const sortedChats = useMemo(() => {
+    return data?.chats ?? [];
+  }, [data?.chats]);
 
   // Delete mutations - use portfolio delete for portfolio chats
   const { mutate: deleteRegularChat } = useDeleteChat();
   const { mutate: deletePortfolioChat } = useDeletePortfolioChat();
 
-  const deleteChat = filterUserId === "portfolio_agent"
-    ? deletePortfolioChat
-    : deleteRegularChat;
+  const deleteChat = isPortfolioMode ? deletePortfolioChat : deleteRegularChat;
 
   const handleDeleteChat = (chatId: string) => {
     if (
@@ -126,7 +142,7 @@ export const ChatSidebar = memo(function ChatSidebar({
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-200/50">
         <h2 className="text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent mb-3">
-          {filterUserId === "portfolio_agent" ? t('chat:sidebar.analysisHistory') : t('chat:sidebar.title')}
+          {isPortfolioMode ? t('chat:sidebar.analysisHistory') : t('chat:sidebar.title')}
         </h2>
 
         {/* New Chat Button - Hidden in readOnly mode */}
@@ -141,7 +157,7 @@ export const ChatSidebar = memo(function ChatSidebar({
         )}
 
         {/* Date Picker - Portfolio Mode Only */}
-        {filterUserId === "portfolio_agent" && onDateChange && (
+        {isPortfolioMode && onDateChange && (
           <div className={`${readOnly ? "" : "mt-2"} relative`}>
             <div className="flex items-center gap-2">
               <div className="flex-1 relative">
@@ -175,11 +191,38 @@ export const ChatSidebar = memo(function ChatSidebar({
           </div>
         )}
 
+        {/* Analysis Type Filter - Portfolio Mode Only */}
+        {isPortfolioMode && onAnalysisTypeChange && (
+          <div className="mt-2">
+            <AnalysisTypeFilter
+              selectedType={analysisType || ""}
+              onTypeChange={onAnalysisTypeChange}
+            />
+          </div>
+        )}
+
+        {/* Message Sort Toggle - Portfolio Mode Only */}
+        {isPortfolioMode && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-sm text-gray-500">{t('portfolio:chatSidebar.messageOrder')}:</span>
+            <button
+              onClick={() => setSortOrder(sortOrder === "newest" ? "oldest" : "newest")}
+              className={`text-sm font-medium transition-colors ${
+                sortOrder === "newest"
+                  ? "text-blue-600"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              {t('portfolio:chatSidebar.newestOnTop')}
+            </button>
+          </div>
+        )}
+
         {/* Archive Toggle */}
         <button
           onClick={() => setShowArchived(!showArchived)}
           className={`
-            w-full ${readOnly || (filterUserId === "portfolio_agent" && onDateChange) ? "mt-2" : readOnly ? "" : "mt-2"} px-4 py-2 text-sm font-medium rounded-lg transition-all
+            w-full ${readOnly || (isPortfolioMode && onDateChange) ? "mt-2" : readOnly ? "" : "mt-2"} px-4 py-2 text-sm font-medium rounded-lg transition-all
             ${
               showArchived
                 ? "bg-blue-100/80 text-blue-700 border border-blue-200"
@@ -224,7 +267,7 @@ export const ChatSidebar = memo(function ChatSidebar({
           </div>
         )}
 
-        {data?.chats.map((chat) => (
+        {sortedChats.map((chat) => (
           <ChatListItem
             key={chat.chat_id}
             chat={chat}

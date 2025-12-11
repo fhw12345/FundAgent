@@ -22,6 +22,7 @@ interface ChatMessagesProps {
   onLoadMore?: () => Promise<void>;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  sortOrder?: "newest" | "oldest"; // Optional: sort messages by timestamp
 }
 
 const formatTimestamp = (timestamp: string) => {
@@ -233,6 +234,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   onLoadMore,
   hasMore = false,
   isLoadingMore = false,
+  sortOrder = "oldest", // Default to oldest first (chronological) for chat messages
 }) => {
   const { t } = useTranslation(['chat', 'common']);
   const lastUserMessageRef = useRef<HTMLDivElement>(null);
@@ -314,14 +316,26 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
     }
   }, [messages]);
 
-  // Memoize filtered messages to avoid re-computing on every render
+  // Memoize filtered and sorted messages to avoid re-computing on every render
   const visibleMessages = useMemo(() => {
-    return messages.filter(msg =>
+    const filtered = messages.filter(msg =>
       // Skip empty assistant messages (streaming placeholders)
       // BUT keep tool progress messages even if they have empty content
       msg.role !== "assistant" || msg.content.trim() || msg.tool_progress
     );
-  }, [messages]);
+
+    // Sort messages based on sortOrder prop
+    if (sortOrder === "newest") {
+      // Newest first: reverse chronological order
+      return [...filtered].sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        return timeB - timeA; // Descending (newest first)
+      });
+    }
+    // Default: oldest first (chronological order) - no sorting needed as messages come in order
+    return filtered;
+  }, [messages, sortOrder]);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">

@@ -199,6 +199,16 @@
     "unknownTime": "未知时间",
     "analysesCount": "{{count}} 条分析",
     "lastUpdated": "最后更新：{{time}}",
-    "keyLevels": "关键价位"
+    "keyLevels": "关键价位",
+    "messageOrder": "消息排序",
+    "newestOnTop": "最新在前"
+  },
+  "filters": {
+    "symbol": "按股票筛选",
+    "allSymbols": "全部股票",
+    "analysisType": "分析类型",
+    "allTypes": "全部类型",
+    "individual": "个股分析",
+    "portfolio": "组合决策"
   }
 }

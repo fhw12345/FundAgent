@@ -50,11 +50,14 @@ interface PortfolioChatHistoryResponse {
   chats: SymbolChat[];
 }
 
-async function fetchPortfolioChats(date?: string): Promise<ChatsResponse> {
+async function fetchPortfolioChats(date?: string, analysisType?: string): Promise<ChatsResponse> {
   // Use apiClient (axios) for automatic auth token injection
   const params: Record<string, string> = {};
   if (date) {
     params.date = date;
+  }
+  if (analysisType) {
+    params.analysis_type = analysisType;
   }
 
   const response = await apiClient.get<PortfolioChatHistoryResponse>(
@@ -84,10 +87,10 @@ async function fetchPortfolioChats(date?: string): Promise<ChatsResponse> {
   };
 }
 
-export function usePortfolioChats(date?: string) {
+export function usePortfolioChats(date?: string, analysisType?: string) {
   return useQuery({
-    queryKey: ["portfolio-chats", date],
-    queryFn: () => fetchPortfolioChats(date),
+    queryKey: ["portfolio-chats", date, analysisType],
+    queryFn: () => fetchPortfolioChats(date, analysisType),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 }
