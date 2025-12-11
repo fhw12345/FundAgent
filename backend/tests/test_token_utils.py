@@ -9,13 +9,10 @@ Tests token usage extraction from:
 
 from unittest.mock import Mock
 
-import pytest
-
 from src.core.utils.token_utils import (
     extract_token_usage_from_agent_result,
     extract_token_usage_from_messages,
 )
-
 
 # ===== Extract Token Usage from Messages Tests =====
 

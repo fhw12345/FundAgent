@@ -21,9 +21,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from src.core.config import get_settings
-from src.database.mongodb import MongoDB
-from src.database.repositories.user_repository import UserRepository
-from src.models.user import UserCreate
 
 
 async def create_portfolio_agent_user():
@@ -38,7 +35,7 @@ async def create_portfolio_agent_user():
     # Check if portfolio_agent already exists
     existing_user = await users_collection.find_one({"username": "portfolio_agent"})
     if existing_user:
-        print(f"✅ Portfolio agent user already exists:")
+        print("✅ Portfolio agent user already exists:")
         print(f"   user_id: {existing_user['user_id']}")
         print(f"   username: {existing_user['username']}")
         print(f"   email: {existing_user.get('email')}")
@@ -64,12 +61,12 @@ async def create_portfolio_agent_user():
 
     result = await users_collection.insert_one(user_dict)
 
-    print(f"✅ Created portfolio_agent system user:")
-    print(f"   user_id: portfolio_agent")
-    print(f"   username: portfolio_agent")
-    print(f"   email: portfolio_agent@system.internal")
-    print(f"   credits: 1,000,000")
-    print(f"   is_admin: False")
+    print("✅ Created portfolio_agent system user:")
+    print("   user_id: portfolio_agent")
+    print("   username: portfolio_agent")
+    print("   email: portfolio_agent@system.internal")
+    print("   credits: 1,000,000")
+    print("   is_admin: False")
     print(f"   _id: {result.inserted_id}")
 
     # Verify

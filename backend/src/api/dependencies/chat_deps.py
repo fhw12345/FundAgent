@@ -12,6 +12,7 @@ from ...database.mongodb import MongoDB
 from ...database.redis import RedisCache
 from ...database.repositories.chat_repository import ChatRepository
 from ...database.repositories.message_repository import MessageRepository
+from ...services.alphavantage_market_data import AlphaVantageMarketDataService
 from ...services.chat_service import ChatService
 from .auth import get_current_user_id, get_mongodb  # Import shared auth
 
@@ -69,7 +70,7 @@ def get_chat_agent(
     return ChatAgent(settings=settings)
 
 
-def get_market_service() -> "AlphaVantageMarketDataService":
+def get_market_service() -> AlphaVantageMarketDataService:
     """Get AlphaVantage market service instance from app state."""
     from ...main import app
     from ...services.alphavantage_market_data import AlphaVantageMarketDataService
@@ -80,7 +81,7 @@ def get_market_service() -> "AlphaVantageMarketDataService":
 
 def get_ticker_data_service(
     redis_cache: RedisCache = Depends(get_redis),
-    market_service: "AlphaVantageMarketDataService" = Depends(get_market_service),
+    market_service: AlphaVantageMarketDataService = Depends(get_market_service),
 ) -> TickerDataService:
     """Get ticker data service instance with AlphaVantage."""
     return TickerDataService(

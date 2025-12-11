@@ -1,6 +1,5 @@
 """Tests for chat symbol context injection feature."""
 
-import pytest
 
 from src.api.chat import _build_symbol_context_instruction
 

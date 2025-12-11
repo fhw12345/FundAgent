@@ -10,7 +10,6 @@ Tests language code normalization, instruction templates, and tool name translat
 - DEFAULT_LANGUAGE and LANGUAGE_NAMES constants
 """
 
-import pytest
 
 from src.core.localization import (
     DEFAULT_LANGUAGE,
@@ -22,7 +21,6 @@ from src.core.localization import (
     get_tool_display_name,
     normalize_language_code,
 )
-
 
 # ===== Constants Tests =====
 

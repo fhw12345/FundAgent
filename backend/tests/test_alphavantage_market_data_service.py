@@ -12,8 +12,6 @@ Tests Alpha Vantage API integration including:
 - Utility functions (market session detection, date validation)
 """
 
-import json
-from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pandas as pd
@@ -25,7 +23,6 @@ from src.services.alphavantage_market_data import (
     get_market_session,
     validate_date_range,
 )
-
 
 # ===== Fixtures =====
 

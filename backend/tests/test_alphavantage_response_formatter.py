@@ -9,8 +9,9 @@ Tests all 5 formatter methods and utility functions for:
 - Market Movers
 """
 
-import pytest
 from datetime import UTC, datetime
+
+import pytest
 
 from src.services.alphavantage_response_formatter import AlphaVantageResponseFormatter
 

@@ -8,14 +8,12 @@ Tests macro market sentiment analysis including:
 - Confidence level calculation
 """
 
-from datetime import datetime
 from unittest.mock import AsyncMock, Mock
 
 import pandas as pd
 import pytest
 
 from src.core.analysis.macro_analyzer import MacroAnalyzer
-
 
 # ===== Fixtures =====
 

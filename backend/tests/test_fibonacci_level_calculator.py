@@ -13,7 +13,6 @@ import pytest
 
 from src.core.analysis.fibonacci.level_calculator import LevelCalculator
 
-
 # ===== Fixtures =====
 
 

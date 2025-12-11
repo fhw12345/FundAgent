@@ -12,7 +12,6 @@ import pytest
 
 from src.services.password import hash_password, verify_password
 
-
 # ===== Hash Password Tests =====
 
 

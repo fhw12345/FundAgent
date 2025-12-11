@@ -8,15 +8,15 @@ Tests cover:
 - Upload/download operations
 """
 
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
 
 from src.services.oss_service import (
-    OSSService,
-    get_oss_service,
     ALLOWED_IMAGE_TYPES,
     MAX_FILE_SIZE,
+    OSSService,
+    get_oss_service,
 )
 
 

@@ -24,7 +24,6 @@ from src.core.model_config import (
     get_model_config,
 )
 
-
 # ===== ModelPricing Dataclass Tests =====
 
 

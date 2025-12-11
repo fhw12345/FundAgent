@@ -20,7 +20,6 @@ from src.models.refresh_token import RefreshToken
 from src.models.user import User
 from src.services.token_service import TokenService
 
-
 # ===== Fixtures =====
 
 

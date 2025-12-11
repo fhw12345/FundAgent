@@ -80,10 +80,10 @@ async def init_portfolio_agent_user():
     )
 
     print("\n✅ Portfolio agent user created successfully!")
-    print(f"   User ID: portfolio_agent")
-    print(f"   Initial credits: 10000.0")
-    print(f"   Purpose: Automated portfolio analysis with credit tracking")
-    print(f"   Blocking: Disabled (credit check bypassed)\n")
+    print("   User ID: portfolio_agent")
+    print("   Initial credits: 10000.0")
+    print("   Purpose: Automated portfolio analysis with credit tracking")
+    print("   Blocking: Disabled (credit check bypassed)\n")
 
     # Close connection
     client.close()

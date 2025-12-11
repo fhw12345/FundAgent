@@ -36,13 +36,13 @@ async def create_message_timestamp_index():
         )
 
         print(f"✅ Index created: {index_name}")
-        print(f"   Collection: messages")
-        print(f"   Fields: timestamp (desc), chat_id (asc)")
-        print(f"   Optimizes: Date-range queries on chat messages")
+        print("   Collection: messages")
+        print("   Fields: timestamp (desc), chat_id (asc)")
+        print("   Optimizes: Date-range queries on chat messages")
 
         # Verify index exists
         indexes = await messages_collection.list_indexes().to_list(length=None)
-        print(f"\n📋 All indexes on 'messages' collection:")
+        print("\n📋 All indexes on 'messages' collection:")
         for idx in indexes:
             print(f"   - {idx['name']}: {idx['key']}")
 

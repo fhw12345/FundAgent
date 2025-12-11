@@ -12,14 +12,13 @@ Tests chat data access operations including:
 - Index creation for optimal performance
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from src.database.repositories.chat_repository import ChatRepository
 from src.models.chat import Chat, ChatCreate, ChatUpdate, UIState
-
 
 # ===== Fixtures =====
 
@@ -59,9 +58,9 @@ def sample_chat():
             active_overlays={"fibonacci": {"enabled": True}},
         ),
         last_message_preview="Based on the Fibonacci levels, AAPL shows...",
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
-        last_message_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_message_at=datetime.now(UTC),
     )
 
 
@@ -163,7 +162,7 @@ class TestGet:
     async def test_get_existing_chat(self, repository, mock_collection):
         """Test retrieving existing chat"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one.return_value = {
             "_id": "mongo_id",
             "chat_id": "chat_abc123",
@@ -215,7 +214,7 @@ class TestListByUser:
     async def test_list_by_user_default_params(self, repository, mock_collection):
         """Test listing chats with default parameters"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async def mock_async_iter():
             chats = [
@@ -335,7 +334,7 @@ class TestUpdate:
     async def test_update_title_only(self, repository, mock_collection):
         """Test updating only the title"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one_and_update.return_value = {
             "_id": "mongo_id",
             "chat_id": "chat_123",
@@ -373,7 +372,7 @@ class TestUpdate:
     async def test_update_archive_status(self, repository, mock_collection):
         """Test archiving a chat"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one_and_update.return_value = {
             "_id": "mongo_id",
             "chat_id": "chat_123",
@@ -405,7 +404,7 @@ class TestUpdate:
     async def test_update_ui_state_via_update(self, repository, mock_collection):
         """Test updating UI state through general update method"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         new_ui_state = UIState(
             current_symbol="GOOGL",
             current_interval="1h",
@@ -457,7 +456,7 @@ class TestUpdateUIState:
     async def test_update_ui_state_success(self, repository, mock_collection):
         """Test updating UI state"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         new_ui_state = UIState(
             current_symbol="TSLA",
             current_interval="15m",
@@ -500,7 +499,7 @@ class TestUpdateLastMessageAt:
     async def test_update_last_message_at_success(self, repository, mock_collection):
         """Test updating last message timestamp"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one_and_update.return_value = {
             "_id": "mongo_id",
             "chat_id": "chat_123",
@@ -557,7 +556,7 @@ class TestFindBySymbol:
     async def test_find_by_symbol_success(self, repository, mock_collection):
         """Test finding active chat by symbol"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one.return_value = {
             "_id": "mongo_id",
             "chat_id": "chat_aapl",

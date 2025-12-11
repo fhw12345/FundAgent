@@ -16,7 +16,6 @@ from src.core.analysis.fibonacci.config import (
     TimeframeConfigs,
 )
 
-
 # ===== Fibonacci Constants Tests =====
 
 

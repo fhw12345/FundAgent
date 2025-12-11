@@ -6,8 +6,9 @@ Reads credentials from environment variables.
 """
 
 import os
-import oss2
 import sys
+
+import oss2
 
 # OSS Configuration from environment
 ACCESS_KEY_ID = os.getenv("OSS_ACCESS_KEY", "")
@@ -41,7 +42,7 @@ def main():
             # Verify access
             bucket = oss2.Bucket(auth, ENDPOINT, BUCKET_NAME)
             bucket.get_bucket_info()
-            print(f"✅ Successfully verified access to bucket")
+            print("✅ Successfully verified access to bucket")
 
         else:
             print(f"❌ Bucket '{BUCKET_NAME}' does not exist. Creating...")
@@ -65,7 +66,7 @@ def main():
                 max_age_seconds=3600
             )
             bucket.put_bucket_cors(oss2.models.BucketCors([rule]))
-            print(f"✅ CORS rules configured for browser uploads")
+            print("✅ CORS rules configured for browser uploads")
 
         # Show bucket details
         bucket = oss2.Bucket(auth, ENDPOINT, BUCKET_NAME)
@@ -82,10 +83,10 @@ def main():
         return 0
 
     except oss2.exceptions.NoSuchBucket:
-        print(f"❌ Bucket does not exist and couldn't be created")
+        print("❌ Bucket does not exist and couldn't be created")
         return 1
     except oss2.exceptions.AccessDenied:
-        print(f"❌ Access denied. Check credentials.")
+        print("❌ Access denied. Check credentials.")
         return 1
     except Exception as e:
         print(f"❌ Error: {e}")

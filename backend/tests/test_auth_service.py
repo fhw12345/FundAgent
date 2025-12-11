@@ -16,11 +16,9 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from jose import jwt
 
-from src.core.config import Settings
 from src.database.repositories.user_repository import UserRepository
-from src.models.user import User, UserCreate
+from src.models.user import User
 from src.services.auth_service import AuthService
-
 
 # ===== Fixtures =====
 

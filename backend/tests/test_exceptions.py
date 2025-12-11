@@ -8,7 +8,6 @@ Tests exception mapping, status codes, and error serialization including:
 - External service errors (503): ExternalServiceError with service context
 """
 
-import pytest
 
 from src.core.exceptions import (
     AppError,
@@ -22,7 +21,6 @@ from src.core.exceptions import (
     RateLimitError,
     ValidationError,
 )
-
 
 # ===== Base AppError Tests =====
 

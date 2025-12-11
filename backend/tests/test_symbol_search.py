@@ -17,7 +17,6 @@ from src.services.market.symbol_search import (
     should_replace_duplicate,
 )
 
-
 # ===== Match Confidence Calculation Tests =====
 
 

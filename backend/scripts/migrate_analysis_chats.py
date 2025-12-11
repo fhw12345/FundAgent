@@ -8,12 +8,14 @@ not individual users, so they appear ONLY in the portfolio analysis sidebar.
 
 import os
 import sys
+
 from pymongo import MongoClient
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.core.config import get_settings
+
 
 def migrate_analysis_chats():
     """Migrate all user analysis chats to portfolio_agent user_id."""
@@ -59,7 +61,7 @@ def migrate_analysis_chats():
         {"$set": {"user_id": "portfolio_agent"}}
     )
 
-    print(f"\n✅ Migration complete!")
+    print("\n✅ Migration complete!")
     print(f"   Updated {result.modified_count} chats")
 
     # Verify migration

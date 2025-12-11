@@ -8,7 +8,6 @@ Tests caching key generation and TTL strategies for:
 - API cost tracking
 """
 
-import pytest
 
 from src.core.utils.cache_utils import (
     INTERVAL_TTL_MAP,
@@ -17,7 +16,6 @@ from src.core.utils.cache_utils import (
     get_api_cost,
     get_tool_ttl,
 )
-
 
 # ===== Cache Key Generation Tests =====
 

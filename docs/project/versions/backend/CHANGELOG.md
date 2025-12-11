@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2025-12-10
+
+### Added
+- feat(compaction): Persist summary messages and delete old messages during context compaction
+  - Added `is_summary` and `summarized_message_count` fields to `MessageMetadata`
+  - Added `delete_old_messages_keep_recent()` method to `MessageRepository`
+  - Compaction now persists summary to DB and cleans up old messages (keeps last N = `tail_messages_keep`)
+  - Summary messages marked with `is_summary: true` are never deleted
+- fix(portfolio): initialize OptimizedOrder priority to valid value to prevent ValidationError
+
+
 ## [0.8.5] - 2025-12-02
 
 ### Added

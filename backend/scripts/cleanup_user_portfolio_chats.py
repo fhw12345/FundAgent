@@ -14,8 +14,8 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir / "src"))
 
+
 from motor.motor_asyncio import AsyncIOMotorClient
-from datetime import datetime
 
 
 async def cleanup_user_portfolio_chats(dry_run: bool = True):

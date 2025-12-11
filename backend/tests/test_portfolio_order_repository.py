@@ -9,15 +9,16 @@ Tests portfolio order data access operations including:
 - Counting orders
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from pymongo.errors import DuplicateKeyError
 
-from src.database.repositories.portfolio_order_repository import PortfolioOrderRepository
+from src.database.repositories.portfolio_order_repository import (
+    PortfolioOrderRepository,
+)
 from src.models.portfolio import PortfolioOrder
-
 
 # ===== Helper Classes =====
 
@@ -86,7 +87,7 @@ def sample_order():
         cancelled_at=None,
         failed_at=None,
         failure_reason=None,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC)
     )
 
 
@@ -177,12 +178,12 @@ class TestGet:
             "status": "filled",
             "filled_quantity": 10,
             "filled_avg_price": 150.50,
-            "submitted_at": datetime.now(timezone.utc),
-            "filled_at": datetime.now(timezone.utc),
+            "submitted_at": datetime.now(UTC),
+            "filled_at": datetime.now(UTC),
             "cancelled_at": None,
             "failed_at": None,
             "failure_reason": None,
-            "created_at": datetime.now(timezone.utc)
+            "created_at": datetime.now(UTC)
         }
 
         # Act
@@ -230,12 +231,12 @@ class TestGetByAlpacaId:
             "status": "filled",
             "filled_quantity": 10,
             "filled_avg_price": 150.50,
-            "submitted_at": datetime.now(timezone.utc),
-            "filled_at": datetime.now(timezone.utc),
+            "submitted_at": datetime.now(UTC),
+            "filled_at": datetime.now(UTC),
             "cancelled_at": None,
             "failed_at": None,
             "failure_reason": None,
-            "created_at": datetime.now(timezone.utc)
+            "created_at": datetime.now(UTC)
         }
 
         # Act
@@ -270,12 +271,12 @@ class TestGetByAnalysisId:
             "status": "filled",
             "filled_quantity": 10,
             "filled_avg_price": 150.50,
-            "submitted_at": datetime.now(timezone.utc),
-            "filled_at": datetime.now(timezone.utc),
+            "submitted_at": datetime.now(UTC),
+            "filled_at": datetime.now(UTC),
             "cancelled_at": None,
             "failed_at": None,
             "failure_reason": None,
-            "created_at": datetime.now(timezone.utc)
+            "created_at": datetime.now(UTC)
         }
 
         # Act
@@ -314,12 +315,12 @@ class TestListByUser:
                 "status": "filled",
                 "filled_quantity": 10,
                 "filled_avg_price": 150.50,
-                "submitted_at": datetime.now(timezone.utc),
-                "filled_at": datetime.now(timezone.utc),
+                "submitted_at": datetime.now(UTC),
+                "filled_at": datetime.now(UTC),
                 "cancelled_at": None,
                 "failed_at": None,
                 "failure_reason": None,
-                "created_at": datetime.now(timezone.utc)
+                "created_at": datetime.now(UTC)
             },
             {
                 "order_id": "order_2",
@@ -342,7 +343,7 @@ class TestListByUser:
                 "cancelled_at": None,
                 "failed_at": None,
                 "failure_reason": None,
-                "created_at": datetime.now(timezone.utc)
+                "created_at": datetime.now(UTC)
             }
         ]
         mock_cursor = AsyncIterator(order_data)
@@ -407,7 +408,7 @@ class TestUpdateStatus:
     async def test_update_status_to_filled(self, repository, mock_collection):
         """Test updating order status to filled"""
         # Arrange
-        filled_at = datetime.now(timezone.utc)
+        filled_at = datetime.now(UTC)
         mock_collection.find_one_and_update.return_value = {
             "order_id": "order_123",
             "alpaca_order_id": "alpaca_xyz",
@@ -424,13 +425,13 @@ class TestUpdateStatus:
             "status": "filled",
             "filled_qty": 10,
             "filled_avg_price": 150.50,
-            "submitted_at": datetime.now(timezone.utc),
+            "submitted_at": datetime.now(UTC),
             "filled_at": filled_at,
             "cancelled_at": None,
             "failed_at": None,
             "failure_reason": None,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc)
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC)
         }
 
         # Act

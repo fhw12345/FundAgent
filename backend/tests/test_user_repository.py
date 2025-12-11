@@ -11,16 +11,13 @@ Tests user data access operations including:
 - Portfolio user queries
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock
-from uuid import UUID
 
 import pytest
-from pymongo.errors import DuplicateKeyError
 
 from src.database.repositories.user_repository import UserRepository
 from src.models.user import User, UserCreate
-
 
 # ===== Fixtures =====
 
@@ -56,8 +53,8 @@ def sample_user():
         password_hash="$2b$12$hashed_password_here",
         email_verified=True,
         is_admin=False,
-        created_at=datetime.now(timezone.utc),
-        last_login=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        last_login=datetime.now(UTC),
         feedbackVotes=["item_1", "item_2"],
         credits=1000.0,
         total_tokens_used=0,
@@ -220,8 +217,8 @@ class TestGetByID:
             "password_hash": "$2b$12$hashed",
             "email_verified": True,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc),
-            "last_login": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
+            "last_login": datetime.now(UTC),
             "feedbackVotes": [],
             "credits": 1000.0,
             "total_tokens_used": 0,
@@ -267,7 +264,7 @@ class TestGetByIDs:
                     "password_hash": None,
                     "email_verified": False,
                     "is_admin": False,
-                    "created_at": datetime.now(timezone.utc),
+                    "created_at": datetime.now(UTC),
                     "last_login": None,
                     "feedbackVotes": [],
                     "credits": 1000.0,
@@ -282,7 +279,7 @@ class TestGetByIDs:
                     "password_hash": None,
                     "email_verified": False,
                     "is_admin": False,
-                    "created_at": datetime.now(timezone.utc),
+                    "created_at": datetime.now(UTC),
                     "last_login": None,
                     "feedbackVotes": [],
                     "credits": 1000.0,
@@ -336,7 +333,7 @@ class TestGetByEmail:
             "password_hash": "$2b$12$hash",
             "email_verified": True,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
             "feedbackVotes": [],
             "credits": 1000.0,
@@ -381,7 +378,7 @@ class TestGetByPhone:
             "password_hash": None,
             "email_verified": False,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
             "feedbackVotes": [],
             "credits": 1000.0,
@@ -415,7 +412,7 @@ class TestGetByUsername:
             "password_hash": "$2b$12$hash",
             "email_verified": True,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
             "feedbackVotes": [],
             "credits": 1000.0,
@@ -442,7 +439,7 @@ class TestUpdateLastLogin:
     async def test_update_last_login_success(self, repository, mock_collection):
         """Test updating last login timestamp"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one_and_update.return_value = {
             "_id": "mongo_id",
             "user_id": "user_123",
@@ -629,7 +626,7 @@ class TestDeductCredits:
             "password_hash": "$2b$12$hash",
             "email_verified": True,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
             "feedbackVotes": [],
             "credits": 900.0,  # 1000 - 100
@@ -690,7 +687,7 @@ class TestAdjustCredits:
             "password_hash": "$2b$12$hash",
             "email_verified": True,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
             "feedbackVotes": [],
             "credits": 1200.0,  # 1000 + 200
@@ -720,7 +717,7 @@ class TestAdjustCredits:
             "password_hash": "$2b$12$hash",
             "email_verified": True,
             "is_admin": False,
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
             "last_login": None,
             "feedbackVotes": [],
             "credits": 950.0,  # 1000 - 50

@@ -12,7 +12,7 @@ Tests portfolio holding data access operations including:
 - Index creation for optimal performance
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -20,7 +20,6 @@ from pymongo.errors import DuplicateKeyError
 
 from src.database.repositories.holding_repository import HoldingRepository
 from src.models.holding import Holding, HoldingCreate, HoldingUpdate
-
 
 # ===== Fixtures =====
 
@@ -59,9 +58,9 @@ def sample_holding():
         market_value=15525.00,
         unrealized_pl=475.00,
         unrealized_pl_pct=3.16,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
-        last_price_update=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        last_price_update=datetime.now(UTC),
     )
 
 
@@ -184,7 +183,7 @@ class TestGet:
     async def test_get_existing_holding(self, repository, mock_collection):
         """Test retrieving existing holding"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one.return_value = {
             "_id": "mongo_id",
             "holding_id": "holding_abc123",
@@ -234,7 +233,7 @@ class TestGetBySymbol:
     async def test_get_by_symbol_success(self, repository, mock_collection):
         """Test retrieving holding by user and symbol"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_collection.find_one.return_value = {
             "_id": "mongo_id",
             "holding_id": "holding_googl",
@@ -304,7 +303,7 @@ class TestListByUser:
     ):
         """Test listing multiple holdings for a user"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         async def mock_async_iter():
             holdings = [
@@ -441,7 +440,7 @@ class TestUpdate:
     async def test_update_quantity_only(self, repository, mock_collection):
         """Test updating only quantity"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Mock get() call to return current holding
         current_holding = Holding(
@@ -498,7 +497,7 @@ class TestUpdate:
     async def test_update_avg_price_only(self, repository, mock_collection):
         """Test updating only average price"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Mock get() call
         current_holding = Holding(
@@ -571,7 +570,7 @@ class TestUpdatePrice:
     async def test_update_price_success(self, repository, mock_collection):
         """Test updating price and recalculating P/L"""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Mock get() call
         current_holding = Holding(

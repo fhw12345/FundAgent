@@ -8,12 +8,13 @@ Tests cover:
 """
 
 import pytest
+
 from src.models.feedback import (
-    FeedbackItemCreate,
-    FeedbackItem,
-    FeedbackItemInDB,
     FeedbackImageUploadRequest,
     FeedbackImageUploadResponse,
+    FeedbackItem,
+    FeedbackItemCreate,
+    FeedbackItemInDB,
 )
 
 

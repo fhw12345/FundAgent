@@ -4,7 +4,6 @@ Unit tests for financial analysis module exports.
 Tests that the core financial analysis module properly exports all analyzer components.
 """
 
-import pytest
 
 from src.core import financial_analysis
 
