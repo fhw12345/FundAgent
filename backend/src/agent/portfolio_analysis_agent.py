@@ -23,7 +23,6 @@ from ..models.chat import ChatCreate
 from ..models.message import MessageCreate, MessageMetadata
 from ..models.trading_decision import (
     SymbolAnalysisResult,
-    TradingDecision,
 )
 from ..services.context_window_manager import ContextWindowManager
 from ..services.credit_service import CreditService
@@ -301,6 +300,40 @@ class PortfolioAnalysisAgent:
             analyzed_symbols: set[str] = set()
 
             # ================================================================
+            # DEV MODE: Filter symbols if dev_analysis_symbols is set
+            # ================================================================
+            dev_symbols_str = self.settings.dev_analysis_symbols
+            if dev_symbols_str and self.settings.is_development:
+                # Parse comma-separated symbols from env var
+                dev_symbols_set = set(
+                    s.strip().upper() for s in dev_symbols_str.split(",") if s.strip()
+                )
+                logger.info(
+                    "DEV MODE: Limiting analysis to specific symbols",
+                    dev_symbols=list(dev_symbols_set),
+                )
+                # Filter positions
+                if positions:
+                    original_count = len(positions)
+                    positions = [p for p in positions if p.symbol.upper() in dev_symbols_set]
+                    logger.info(
+                        "DEV MODE: Filtered positions",
+                        original=original_count,
+                        filtered=len(positions),
+                    )
+                # Filter watchlist items
+                if watchlist_items:
+                    original_count = len(watchlist_items)
+                    watchlist_items = [
+                        w for w in watchlist_items if w.symbol.upper() in dev_symbols_set
+                    ]
+                    logger.info(
+                        "DEV MODE: Filtered watchlist",
+                        original=original_count,
+                        filtered=len(watchlist_items),
+                    )
+
+            # ================================================================
             # PHASE 1: Independent Symbol Research (NO portfolio context)
             # ================================================================
 
@@ -442,14 +475,26 @@ class PortfolioAnalysisAgent:
                     symbols_count=len(all_analysis_results),
                 )
 
-                # Get decisions from Portfolio Agent
-                trading_decisions = await self._make_portfolio_decisions(
+                # Get decisions from Portfolio Agent (returns PortfolioDecisionList)
+                decision_result = await self._make_portfolio_decisions(
                     symbol_analyses=all_analysis_results,
                     portfolio_context=portfolio_context,
                     user_id=user_id,
                 )
 
+                # Extract trading decisions for Phase 3
+                trading_decisions = (
+                    decision_result.decisions if decision_result else []
+                )
                 result_summary["decisions_made"] = len(trading_decisions)
+
+                # Store Phase 2 portfolio decision as a chat message for history
+                if decision_result:
+                    await self._store_portfolio_decision_message(
+                        decision_result=decision_result,
+                        symbol_analyses=all_analysis_results,
+                        portfolio_context=portfolio_context,
+                    )
 
                 # ================================================================
                 # PHASE 3: Order Execution (SELLs first for liquidity, then BUYs)
@@ -699,11 +744,13 @@ Technical terms can include English in parentheses for clarity.
                 output_tokens = usage.get("output_tokens", 0)
 
             # Create analysis message (pure research, no decision)
-            emoji_map = {"holding": "💼", "watchlist": "👀"}
-            emoji = emoji_map.get(analysis_type, "📊")
+            # Note: analysis_type param is source ("holding"/"watchlist"), but we store
+            # "individual" for filtering purposes (vs "portfolio" for Phase 2 decisions)
+            source_emoji_map = {"holding": "💼", "watchlist": "👀"}
+            source_emoji = source_emoji_map.get(analysis_type, "📊")
 
-            message_content = f"## {emoji} Symbol Research - {symbol}\n\n"
-            message_content += f"**Type:** {analysis_type.replace('_', ' ').title()}\n"
+            message_content = f"## {source_emoji} Symbol Research - {symbol}\n\n"
+            message_content += f"**Source:** {analysis_type.replace('_', ' ').title()}\n"
             message_content += f"**Analysis ID:** {analysis_id}\n\n"
             message_content += f"{response_text}\n"
 
@@ -711,6 +758,7 @@ Technical terms can include English in parentheses for clarity.
                 symbol=symbol,
                 interval="1d",
                 analysis_id=analysis_id,
+                analysis_type="individual",  # Phase 1 = individual symbol research
             )
 
             message_create = MessageCreate(
@@ -774,7 +822,7 @@ Technical terms can include English in parentheses for clarity.
         symbol_analyses: list[SymbolAnalysisResult],
         portfolio_context: dict[str, Any],
         user_id: str,
-    ) -> list[TradingDecision]:
+    ) -> "PortfolioDecisionList | None":
         """
         Phase 2: Make all trading decisions in a single holistic call.
 
@@ -787,11 +835,11 @@ Technical terms can include English in parentheses for clarity.
             user_id: User ID for tracking
 
         Returns:
-            List of TradingDecision for all analyzed symbols
+            PortfolioDecisionList with decisions and portfolio_assessment, or None on failure
         """
         if not symbol_analyses:
             logger.info("No symbol analyses to process for decisions")
-            return []
+            return None
 
         logger.info(
             "Phase 2: Making portfolio decisions",
@@ -887,7 +935,7 @@ Include short reasoning (1-2 sentences) for each decision.
                 assessment_preview=decision_result.portfolio_assessment[:100],
             )
 
-            return decision_result.decisions
+            return decision_result  # Return full PortfolioDecisionList
 
         except Exception as e:
             logger.error(
@@ -896,8 +944,8 @@ Include short reasoning (1-2 sentences) for each decision.
                 error_type=type(e).__name__,
                 exc_info=True,
             )
-            # Return empty list on failure - no orders will be executed
-            return []
+            # Return None on failure - no orders will be executed
+            return None
 
     async def _get_symbol_chat_id(
         self, symbol: str, user_id: str = "portfolio_agent"
@@ -948,6 +996,148 @@ Include short reasoning (1-2 sentences) for each decision.
             chat_id=chat.chat_id,
         )
         return chat.chat_id
+
+    async def _get_portfolio_decisions_chat_id(self) -> str:
+        """
+        Get or create the "Portfolio Decisions" chat for Phase 2 decision messages.
+
+        Unlike symbol-specific chats, this is a single chat that aggregates all
+        portfolio-level trading decisions made by the agent.
+
+        Returns:
+            Chat ID for "Portfolio Decisions" chat
+        """
+        owner_id = "portfolio_agent"
+        chat_title = "Portfolio Decisions"
+
+        # Try to find existing Portfolio Decisions chat
+        chats = await self.chat_repo.list_by_user(owner_id)
+        for chat in chats:
+            if chat.title == chat_title:
+                logger.info(
+                    "Found existing Portfolio Decisions chat",
+                    owner=owner_id,
+                    chat_id=chat.chat_id,
+                )
+                return chat.chat_id
+
+        # Create new Portfolio Decisions chat
+        chat_create = ChatCreate(
+            title=chat_title,
+            user_id=owner_id,
+        )
+        chat = await self.chat_repo.create(chat_create)
+        logger.info(
+            "Created new Portfolio Decisions chat",
+            owner=owner_id,
+            chat_id=chat.chat_id,
+        )
+        return chat.chat_id
+
+    async def _store_portfolio_decision_message(
+        self,
+        decision_result: "PortfolioDecisionList",
+        symbol_analyses: list[SymbolAnalysisResult],
+        portfolio_context: dict[str, Any],
+    ) -> None:
+        """
+        Store Phase 2 portfolio decision as a chat message for history viewing.
+
+        This creates a formatted markdown message with all trading decisions and
+        the portfolio assessment, stored with analysis_type="portfolio" for filtering.
+
+        Args:
+            decision_result: PortfolioDecisionList from Phase 2
+            symbol_analyses: List of Phase 1 symbol analyses
+            portfolio_context: Portfolio state (equity, buying_power, positions)
+        """
+        from ..models.trading_decision import PortfolioDecisionList
+
+        try:
+            # Get the Portfolio Decisions chat
+            chat_id = await self._get_portfolio_decisions_chat_id()
+
+            # Build analysis ID for this portfolio decision batch
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            symbols_str = "_".join(sorted([a.symbol for a in symbol_analyses[:3]]))
+            if len(symbol_analyses) > 3:
+                symbols_str += f"_+{len(symbol_analyses) - 3}more"
+            analysis_id = f"portfolio_{symbols_str}_{timestamp}"
+
+            # Format the message content as markdown
+            message_content = "## 📊 Portfolio Trading Decisions\n\n"
+            message_content += (
+                f"**Date:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
+            )
+            message_content += f"**Symbols Analyzed:** {len(symbol_analyses)}\n"
+            message_content += (
+                f"**Decisions Made:** {len(decision_result.decisions)}\n\n"
+            )
+
+            # Portfolio assessment
+            message_content += "### Portfolio Assessment\n\n"
+            message_content += f"{decision_result.portfolio_assessment}\n\n"
+
+            # Individual decisions table
+            message_content += "### Trading Decisions\n\n"
+            message_content += "| Symbol | Decision | Size % | Confidence | Reasoning |\n"
+            message_content += "|--------|----------|--------|------------|----------|\n"
+
+            for decision in decision_result.decisions:
+                size_str = (
+                    f"{decision.position_size_percent}%"
+                    if decision.position_size_percent
+                    else "-"
+                )
+                # Truncate reasoning for table display
+                reasoning = decision.reasoning_summary
+                if len(reasoning) > 80:
+                    reasoning = reasoning[:77] + "..."
+                message_content += (
+                    f"| {decision.symbol} | {decision.decision.value} | {size_str} | "
+                    f"{decision.confidence}/10 | {reasoning} |\n"
+                )
+
+            # Create metadata for filtering
+            analyzed_symbols = [a.symbol for a in symbol_analyses]
+            metadata = MessageMetadata(
+                symbol=None,  # Portfolio-level, not symbol-specific
+                analysis_id=analysis_id,
+                analysis_type="portfolio",  # Phase 2 = portfolio decision
+                raw_data={
+                    "decisions_count": len(decision_result.decisions),
+                    "symbols_analyzed": analyzed_symbols,
+                    "total_equity": portfolio_context.get("total_equity", 0),
+                    "buying_power": portfolio_context.get("buying_power", 0),
+                },
+            )
+
+            # Create and store the message
+            message_create = MessageCreate(
+                chat_id=chat_id,
+                role="assistant",
+                content=message_content,
+                source="llm",
+                metadata=metadata,
+            )
+            message = await self.message_repo.create(message_create)
+
+            logger.info(
+                "Phase 2: Portfolio decision message stored",
+                chat_id=chat_id,
+                message_id=message.message_id,
+                analysis_id=analysis_id,
+                decisions_count=len(decision_result.decisions),
+            )
+
+        except Exception as e:
+            logger.error(
+                "Failed to store portfolio decision message",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            # Don't raise - decision was made even if storage failed
 
     async def _store_execution_record(self, execution_data: dict[str, Any]) -> None:
         """

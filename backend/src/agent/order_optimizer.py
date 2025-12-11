@@ -197,7 +197,7 @@ class OrderOptimizer:
                         estimated_cost=estimated_cost,
                         original_size_percent=decision.position_size_percent,
                         adjusted_size_percent=None,
-                        priority=0,  # Will be set later (highest priority)
+                        priority=1,  # Placeholder - will be reassigned before adding to orders
                         skip_reason=None,
                         is_cover=True,
                     )
@@ -236,7 +236,7 @@ class OrderOptimizer:
                         estimated_cost=estimated_proceeds,
                         original_size_percent=decision.position_size_percent,
                         adjusted_size_percent=None,
-                        priority=0,  # Will be set later
+                        priority=1,  # Placeholder - will be reassigned before adding to orders
                         skip_reason=None,
                         is_cover=False,
                     )

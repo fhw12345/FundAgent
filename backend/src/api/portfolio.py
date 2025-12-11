@@ -323,6 +323,9 @@ async def get_portfolio_chat_history(
     start_date: str | None = None,  # Optional start date (YYYY-MM-DD)
     end_date: str | None = None,  # Optional end date (YYYY-MM-DD)
     date: str | None = None,  # Legacy: single date filter (YYYY-MM-DD) - deprecated
+    analysis_type: (
+        str | None
+    ) = None,  # Optional: "individual" (symbol research), "portfolio" (decisions), or None for all
     user_id: str = Depends(get_current_user_id),  # ✅ JWT authentication required
     mongodb: MongoDB = Depends(get_mongodb),
 ) -> dict:
@@ -338,12 +341,14 @@ async def get_portfolio_chat_history(
     - Filter by specific symbol: `?symbol=AAPL`
     - Filter by date range: `?start_date=2025-01-01&end_date=2025-03-15`
     - Filter by symbol AND date: `?symbol=AAPL&start_date=2025-01-01`
+    - Filter by analysis type: `?analysis_type=individual` or `?analysis_type=portfolio`
 
     Args:
         symbol: Optional symbol filter (returns only chats for this symbol)
         start_date: Optional start date (YYYY-MM-DD). Filters messages >= this date
         end_date: Optional end date (YYYY-MM-DD). Filters messages <= this date
         date: Legacy single date filter (YYYY-MM-DD) - use start_date/end_date instead
+        analysis_type: Optional type filter - "individual" (Phase 1 symbol research) or "portfolio" (Phase 2 decisions)
         user_id: Authenticated user ID (auto-injected via JWT)
 
     Returns:
@@ -405,9 +410,14 @@ async def get_portfolio_chat_history(
         chat_query = {"user_id": "portfolio_agent"}
 
         # Apply symbol filter if provided (filter by title pattern)
+        # Note: We always include "Portfolio Decisions" chat and filter by message metadata
         if symbol:
             # Match chats where title starts with symbol (e.g., "AAPL Analysis")
-            chat_query["title"] = {"$regex": f"^{symbol}\\s", "$options": "i"}
+            # OR the "Portfolio Decisions" chat (filtered at message level)
+            chat_query["$or"] = [
+                {"title": {"$regex": f"^{symbol}\\s", "$options": "i"}},
+                {"title": "Portfolio Decisions"},
+            ]
 
         portfolio_chats = await chats_collection.find(chat_query).to_list(length=None)
 
@@ -433,12 +443,18 @@ async def get_portfolio_chat_history(
         for chat in portfolio_chats:
             chat_id = chat["chat_id"]
             title = chat.get("title", "Unknown")
+            is_portfolio_decisions_chat = title == "Portfolio Decisions"
 
             # Extract symbol from title (format: "{symbol} Analysis")
-            symbol = title.split(" ")[0] if " " in title else title
+            # For "Portfolio Decisions" chat, symbol is None (aggregated across symbols)
+            chat_symbol = (
+                None
+                if is_portfolio_decisions_chat
+                else (title.split(" ")[0] if " " in title else title)
+            )
 
             # Build message query
-            message_query = {"chat_id": chat_id}
+            message_query: dict = {"chat_id": chat_id}
             if date_start and date_end:
                 # Filter messages by date range
                 message_query["timestamp"] = {"$gte": date_start, "$lt": date_end}
@@ -449,7 +465,26 @@ async def get_portfolio_chat_history(
                 # Filter messages up to end date
                 message_query["timestamp"] = {"$lt": date_end}
 
-            # Get messages for this chat (filtered by date if specified)
+            # Filter by analysis_type if specified
+            # For backward compatibility: "individual" also matches messages with null/missing analysis_type
+            # (all messages created before this feature are individual symbol analyses)
+            if analysis_type:
+                if analysis_type == "individual":
+                    # Match "individual" OR null/missing (backward compatibility)
+                    message_query["$or"] = [
+                        {"metadata.analysis_type": "individual"},
+                        {"metadata.analysis_type": None},
+                        {"metadata.analysis_type": {"$exists": False}},
+                    ]
+                else:
+                    # For "portfolio", exact match only
+                    message_query["metadata.analysis_type"] = analysis_type
+
+            # For Portfolio Decisions chat with symbol filter, filter by symbols_analyzed
+            if is_portfolio_decisions_chat and symbol:
+                message_query["metadata.raw_data.symbols_analyzed"] = symbol
+
+            # Get messages for this chat (filtered by date and analysis_type if specified)
             # Sort newest first (most recent analysis at top)
             messages = (
                 await messages_collection.find(message_query)
@@ -457,8 +492,8 @@ async def get_portfolio_chat_history(
                 .to_list(length=None)
             )  # Sort newest first
 
-            # Skip chats with no messages in the date range
-            if date and not messages:
+            # Skip chats with no messages matching the filters
+            if (date or analysis_type) and not messages:
                 continue
 
             # Clean messages
@@ -473,7 +508,7 @@ async def get_portfolio_chat_history(
             result_chats.append(
                 {
                     "chat_id": chat_id,
-                    "symbol": symbol,
+                    "symbol": chat_symbol,  # None for "Portfolio Decisions" chat
                     "title": title,
                     "message_count": len(messages),
                     "messages": messages,
@@ -493,7 +528,8 @@ async def get_portfolio_chat_history(
             chats_count=len(result_chats),
             total_messages=sum(c["message_count"] for c in result_chats),
             date_filter=date,
-            filtered=bool(date),
+            analysis_type_filter=analysis_type,
+            filtered=bool(date or analysis_type),
         )
 
         return {"chats": result_chats}

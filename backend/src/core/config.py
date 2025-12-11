@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     # Development mode settings
     dev_bypass_email_verification: bool = False  # Skip actual email sending in dev mode
     dev_bypass_verification_code: str = "888888"  # Fixed code for dev bypass (6-digit)
+    dev_analysis_symbols: str = ""  # Comma-separated symbols to analyze in dev mode (empty = all)
 
     # Cloud storage (Alibaba OSS)
     oss_access_key: str = ""

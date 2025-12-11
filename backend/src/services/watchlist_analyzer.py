@@ -146,7 +146,7 @@ REASONING: [your analysis]
             chat_id = await self._get_symbol_chat_id(symbol)
 
             # Fetch historical messages for context management
-            historical_messages = await self.message_repo.list_by_chat(chat_id)
+            historical_messages = await self.message_repo.get_by_chat(chat_id)
 
             # Prepare conversation history for agent
             conversation_history = []
@@ -182,6 +182,40 @@ REASONING: [your analysis]
                         symbol=symbol,
                         llm_service=self.agent,  # Use the agent's LLM for summarization
                     )
+
+                    # Persist summary message to database
+                    if summary_text and body:
+                        summary_metadata = MessageMetadata(
+                            symbol=symbol,
+                            is_summary=True,
+                            summarized_message_count=len(body),
+                        )
+                        summary_message_create = MessageCreate(
+                            chat_id=chat_id,
+                            role="assistant",
+                            content=f"## 📋 Analysis History Summary\n\n{summary_text}",
+                            source="llm",
+                            metadata=summary_metadata,
+                        )
+                        await self.message_repo.create(summary_message_create)
+
+                        # Delete old messages, keeping last N (tail_messages_keep)
+                        keep_count = self.settings.tail_messages_keep
+                        deleted_count = (
+                            await self.message_repo.delete_old_messages_keep_recent(
+                                chat_id=chat_id,
+                                keep_count=keep_count,
+                                exclude_summaries=True,
+                            )
+                        )
+
+                        logger.info(
+                            "Compaction persisted and old messages deleted",
+                            symbol=symbol,
+                            summarized_count=len(body),
+                            deleted_count=deleted_count,
+                            kept_count=keep_count,
+                        )
 
                     # Reconstruct compacted context
                     compacted_messages = self.context_manager.reconstruct_context(
