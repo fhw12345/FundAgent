@@ -1,0 +1,4 @@
+# HarshJudge
+# Ignore large evidence files in CI
+scenarios/*/runs/*/evidence/*.png
+scenarios/*/runs/*/evidence/*.html

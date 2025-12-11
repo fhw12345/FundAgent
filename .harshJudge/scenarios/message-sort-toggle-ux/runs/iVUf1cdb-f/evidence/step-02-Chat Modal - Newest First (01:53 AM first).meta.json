@@ -1,0 +1,14 @@
+{
+  "runId": "iVUf1cdb-f",
+  "step": 2,
+  "type": "screenshot",
+  "name": "Chat Modal - Newest First (01:53 AM first)",
+  "capturedAt": "2025-12-11T02:15:59.910Z",
+  "fileSize": 919479,
+  "metadata": {
+    "sortOrder": "newest first",
+    "firstMessageTime": "01:53 AM",
+    "secondMessageTime": "04:06 PM",
+    "toggleState": "highlighted blue"
+  }
+}

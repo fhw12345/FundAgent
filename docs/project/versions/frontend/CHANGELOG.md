@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4] - 2025-12-11
+
+### Added
+- feat(portfolio): Analysis Type Filter for Portfolio Chat History
+  - Dropdown filter with 3 options: All Types, Individual Analysis, Portfolio Decisions
+  - Filters chat history between Phase 1 (individual symbol research) and Phase 2 (portfolio decisions)
+  - Created `AnalysisTypeFilter` component with i18n support (EN/ZH-CN)
+  - Integrated filter into `ChatSidebar` component for portfolio mode
+  - Added i18n keys: `allTypes`, `individual`, `portfolio` in portfolio.json
+
+## [0.11.3] - 2025-12-10
+
+### Added
+- feat(portfolio): Sort toggle for analysis history in Portfolio Chat Sidebar
+  - Toggle button to switch between "Newest First" and "Oldest First"
+  - Messages sorted using `useMemo` for performance
+  - Default: Newest first (most recent analyses at top)
+  - Added i18n keys: `sortBy`, `newestFirst`, `oldestFirst` (EN/ZH-CN)
+- feat(ui): Add ICP registration footer (苏ICP备2025219095号-1) for China compliance
+
 ## [0.11.1] - 2025-11-29
 
 ### Added

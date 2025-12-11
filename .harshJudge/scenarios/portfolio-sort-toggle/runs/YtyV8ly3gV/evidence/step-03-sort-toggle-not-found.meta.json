@@ -1,0 +1,12 @@
+{
+  "runId": "YtyV8ly3gV",
+  "step": 3,
+  "type": "custom",
+  "name": "sort-toggle-not-found",
+  "capturedAt": "2025-12-10T16:07:51.062Z",
+  "fileSize": 443,
+  "metadata": {
+    "status": "failed",
+    "issue": "Feature not implemented in active UI"
+  }
+}

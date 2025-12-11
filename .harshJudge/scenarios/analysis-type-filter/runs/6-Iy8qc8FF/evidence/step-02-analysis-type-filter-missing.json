@@ -1,0 +1,12 @@
+FAILURE: Analysis Type Filter dropdown is NOT present in the UI.
+
+Investigation findings:
+1. The PortfolioDashboard.tsx uses ChatSidebar component (line 247-259)
+2. ChatSidebar supports filterUserId for portfolio mode but does NOT have analysisType filter prop
+3. The AnalysisTypeFilter.tsx component does NOT exist
+4. The PortfolioChatSidebar.tsx that was supposed to contain the filter does NOT exist
+
+Root cause: The frontend Analysis Type Filter was never fully integrated into the UI.
+
+The backend API supports the filter via ?analysis_type=individual|portfolio parameter,
+but the frontend component to select this filter was never added to the ChatSidebar.

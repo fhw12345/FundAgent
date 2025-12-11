@@ -1,0 +1,9 @@
+{
+  "runId": "YtyV8ly3gV",
+  "status": "fail",
+  "duration": 180000,
+  "completedAt": "2025-12-10T16:08:07.227Z",
+  "failedStep": 3,
+  "errorMessage": "Sort toggle button not found in UI. Root cause: PortfolioDashboard.tsx uses ChatSidebar component (which has NO sort feature) instead of PortfolioChatSidebar component (which HAS the sort toggle feature but is UNUSED). The sort toggle code exists in PortfolioChatSidebar.tsx at lines 208-231, but this component is never imported or used.",
+  "evidenceCount": 3
+}

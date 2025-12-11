@@ -1,0 +1,12 @@
+{
+  "runId": "GwVJnunfmP",
+  "step": 5,
+  "type": "screenshot",
+  "name": "sort-toggle-back-to-newest",
+  "capturedAt": "2025-12-11T01:17:09.261Z",
+  "fileSize": 593218,
+  "metadata": {
+    "status": "passed",
+    "note": "Sort toggled back to 'Newest First' (最新优先), Portfolio Decisions back at top"
+  }
+}

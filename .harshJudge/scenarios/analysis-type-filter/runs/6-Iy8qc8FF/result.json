@@ -1,0 +1,9 @@
+{
+  "runId": "6-Iy8qc8FF",
+  "status": "fail",
+  "duration": 180000,
+  "completedAt": "2025-12-11T04:56:19.655Z",
+  "failedStep": 2,
+  "errorMessage": "Analysis Type Filter dropdown is NOT present in the UI. The frontend component (AnalysisTypeFilter.tsx) was never created and integrated into ChatSidebar. Backend API supports the filter but frontend UI is missing.",
+  "evidenceCount": 3
+}
