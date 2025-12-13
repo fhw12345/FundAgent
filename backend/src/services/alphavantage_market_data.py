@@ -340,6 +340,110 @@ class AlphaVantageMarketDataService:
             logger.error("Quote fetch failed", symbol=symbol, error=str(e))
             raise
 
+    async def get_market_status(self, region: str = "United States") -> dict[str, Any]:
+        """
+        Get global market open/close status from Alpha Vantage MARKET_STATUS API.
+
+        Supports multiple regions for extensibility (US, Hong Kong, China, etc.).
+
+        Args:
+            region: Market region to query. Supported values:
+                - "United States" (default)
+                - "Hong Kong"
+                - "Mainland China"
+                - "Japan"
+                - "United Kingdom"
+                - "Germany"
+                - And more...
+
+        Returns:
+            Dict with market status info:
+                - region: Market region name
+                - current_status: "open" or "closed"
+                - local_open: Local market open time (HH:MM)
+                - local_close: Local market close time (HH:MM)
+                - primary_exchanges: Exchange names
+                - notes: Additional notes (e.g., lunch breaks)
+                - local_time: Current local time for that market
+                - utc_time: Current UTC time
+        """
+        # Region to timezone mapping for computing local time
+        region_timezones = {
+            "United States": "America/New_York",
+            "Hong Kong": "Asia/Hong_Kong",
+            "Mainland China": "Asia/Shanghai",
+            "Japan": "Asia/Tokyo",
+            "United Kingdom": "Europe/London",
+            "Germany": "Europe/Berlin",
+            "France": "Europe/Paris",
+            "Canada": "America/Toronto",
+            "India": "Asia/Kolkata",
+            "Brazil": "America/Sao_Paulo",
+            "Mexico": "America/Mexico_City",
+            "South Africa": "Africa/Johannesburg",
+            "Spain": "Europe/Madrid",
+            "Portugal": "Europe/Lisbon",
+        }
+
+        try:
+            response = await self.client.get(
+                self.base_url,
+                params={
+                    "function": "MARKET_STATUS",
+                    "apikey": self.api_key,
+                },
+            )
+
+            if response.status_code != 200:
+                sanitized_text = self._sanitize_text(response.text)
+                raise ValueError(
+                    f"Alpha Vantage API error: {response.status_code} - {sanitized_text}"
+                )
+
+            data = response.json()
+            markets = data.get("markets", [])
+
+            # Find the requested region
+            market_info = None
+            for market in markets:
+                if (
+                    market.get("region") == region
+                    and market.get("market_type") == "Equity"
+                ):
+                    market_info = market
+                    break
+
+            if not market_info:
+                raise ValueError(f"Market region not found: {region}")
+
+            # Get current times
+            utc_now = pd.Timestamp.now(tz="UTC")
+            timezone = region_timezones.get(region, "UTC")
+            local_now = utc_now.tz_convert(timezone)
+
+            result = {
+                "region": region,
+                "current_status": market_info.get("current_status", "unknown"),
+                "local_open": market_info.get("local_open", ""),
+                "local_close": market_info.get("local_close", ""),
+                "primary_exchanges": market_info.get("primary_exchanges", ""),
+                "notes": market_info.get("notes", ""),
+                "local_time": local_now.strftime("%Y-%m-%d %H:%M %Z"),
+                "utc_time": utc_now.strftime("%Y-%m-%d %H:%M UTC"),
+            }
+
+            logger.info(
+                "Market status fetched",
+                region=region,
+                status=result["current_status"],
+            )
+
+            return result
+
+        except Exception as e:
+            logger.error("Market status fetch failed", region=region, error=str(e))
+            raise
+
     async def get_intraday_bars(
         self,
         symbol: str,

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2025-12-13
+
+### Added
+- feat: add get_stock_quote tool with market status API support
+
+
 ## [0.8.6] - 2025-12-10
 
 ### Added
