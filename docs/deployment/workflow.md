@@ -327,12 +327,41 @@ kubectl apply -k .pipeline/k8s/overlays/test/
 git checkout main
 ```
 
+## Deployment Strategy
+
+### Backend: Recreate Strategy
+
+The backend deployment uses `strategy: Recreate` instead of `RollingUpdate`. This decision was made because:
+
+**Why Recreate:**
+- **Memory-constrained cluster**: ACK production has 3 nodes with ~2GB memory each at 78-86% utilization
+- **RollingUpdate requires 2x resources**: Needs to run both old and new pods simultaneously during transition
+- **Scheduling failures**: Rolling updates would fail with "Insufficient memory" when cluster is near capacity
+- **Brief downtime is acceptable**: Backend downtime of ~10-30 seconds is acceptable for this internal application
+
+**How Recreate Works:**
+```
+RollingUpdate:                    Recreate:
+1. Start new pod                  1. Terminate old pod
+2. Wait for ready                 2. Start new pod
+3. Terminate old pod              3. Wait for ready
+❌ Needs 2x resources             ✅ Only 1x resources
+```
+
+**Trade-off:**
+| Strategy | Downtime | Resource Requirement |
+|----------|----------|---------------------|
+| RollingUpdate | Zero | 2x pod resources |
+| Recreate | ~10-30 seconds | 1x pod resources |
+
+For production systems requiring zero downtime, add more memory to nodes or use the 16GB node for backend with node affinity.
+
 ## Best Practices
 
 1. **Always test locally first** with Docker Compose before building images
 2. **Bump version** for every commit (enforced by pre-commit hook)
 3. **Use versioned tags** (e.g., `test-v${BACKEND_VERSION}`) for test stability
-4. **Deploy during low-traffic periods** when possible (pod restart causes ~5-10s downtime)
+4. **Deploy during low-traffic periods** when possible (Recreate strategy causes ~10-30s downtime)
 5. **Monitor logs after deployment** for 5-10 minutes
 6. **Update kustomization tags** after building new images
 7. **Document issues** if rollback needed

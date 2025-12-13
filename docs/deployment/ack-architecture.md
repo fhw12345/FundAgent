@@ -335,6 +335,33 @@ rules:
 
 ---
 
+## 🚀 Deployment Strategy
+
+### Backend: Recreate Strategy
+
+The backend uses `strategy: Recreate` instead of `RollingUpdate` due to memory constraints:
+
+```yaml
+spec:
+  strategy:
+    type: Recreate  # Terminates old pod before starting new one
+```
+
+**Cluster Resource Context:**
+- **3 nodes** with ~2.3GB memory each (78-86% utilized)
+- **1 node** with 16GB memory (for Langfuse/MongoDB)
+- Backend requests 512Mi memory
+
+**Why Recreate:**
+| Strategy | Behavior | Downtime | Resource Need |
+|----------|----------|----------|---------------|
+| RollingUpdate | New pod starts → Old pod stops | Zero | 2x pod memory |
+| Recreate | Old pod stops → New pod starts | ~10-30s | 1x pod memory |
+
+RollingUpdate would fail with "Insufficient memory" when both pods need to run simultaneously.
+
+---
+
 ## 🚀 Deployment Workflow
 
 ### 1. Build Images in ACR
@@ -500,5 +527,5 @@ kubectl delete secret klinecubic-tls -n klinematrix-prod
 - **High Availability**: Single-node for cost optimization, multi-node planned for HA
 - **Monitoring**: Integrated with Alibaba Cloud monitoring + Langfuse for LLM observability
 
-**Last Updated:** 2025-11-28
-**Production Version:** Backend v0.8.2, Frontend v0.11.0
+**Last Updated:** 2025-12-13
+**Production Version:** Backend v0.8.7, Frontend v0.11.4

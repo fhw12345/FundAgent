@@ -7,6 +7,11 @@ metadata:
     component: api
 spec:
   replicas: 1
+  # Use Recreate strategy to avoid resource contention during rolling updates
+  # on memory-constrained nodes (3x 2GB nodes). Brief downtime (~10-30s) is
+  # acceptable for this internal application vs requiring 2x pod resources.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: backend
