@@ -20,9 +20,11 @@ This document describes deployment workflows for the Financial Agent platform.
 **Domain**: https://klinematrix.com (not active)
 **Status**: 🚧 Planned
 
-## Current Deployment Method: GitHub Actions CI/CD
+## Current Deployment Method: GitHub Actions CI/CD (Primary)
 
-**Status**: ✅ Implemented
+**Status**: ✅ Active & Verified
+
+> **Recommended**: Use CI/CD for all deployments. Manual deployment is only for emergencies.
 
 ### CI/CD Architecture
 
@@ -37,7 +39,10 @@ This document describes deployment workflows for the Financial Agent platform.
 ├─────────────────────────────────────────────────────────────────────┤
 │  1. branch-policy    → Validate users/{name}/{feature} format       │
 │  2. unit-tests       → pytest (backend) + npm test (frontend)       │
-│  3. ai-summary       → Gemini writes PR description (parallel)      │
+│     - MongoDB + Redis services for integration tests                │
+│     - Backend: ruff + black checks                                  │
+│     - Frontend: ESLint + TypeScript checks                          │
+│  3. ai-summary       → Placeholder (CodeRabbit/Copilot optional)    │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -48,10 +53,14 @@ This document describes deployment workflows for the Financial Agent platform.
 ┌─────────────────────────────────────────────────────────────────────┐
 │  .github/workflows/deploy.yml                                       │
 ├─────────────────────────────────────────────────────────────────────┤
-│  1. detect-changes   → Determine which components changed           │
-│  2. build-backend    → Build & push to Azure ACR (if changed)       │
-│  3. build-frontend   → Build & push to Azure ACR (if changed)       │
-│  4. deploy           → kubectl apply to ACK cluster                 │
+│  1. detect-changes   → Git diff to detect backend/frontend changes  │
+│  2. build-backend    → Docker buildx → Azure ACR (if changed)       │
+│  3. build-frontend   → Docker buildx → Azure ACR (if changed)       │
+│  4. deploy-to-ack    → kustomize build | kubectl apply              │
+│     - Setup Kustomize 5.3.0                                         │
+│     - Update image tags in kustomization.yaml                       │
+│     - Apply with --load-restrictor=LoadRestrictionsNone             │
+│     - Rollout restart → Wait for ready → Health check               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -70,17 +79,26 @@ make fmt && make lint && make test
 # 4. Push and create PR
 git push -u origin users/YOUR_NAME/feature-name
 # → Open PR on GitHub
-# → AI writes description automatically
-# → Wait for "Unit Tests" to pass
+# → Wait for "Unit Tests" to pass (required)
 # → Get 1 review approval
-# → Merge → Auto-deploys to production
+# → Merge → Auto-deploys to production ACK
+```
+
+### Manual Deploy Trigger
+
+You can also trigger deployment manually via GitHub Actions UI:
+
+```
+GitHub → Actions → "Deploy to Production" → Run workflow
+  ├── deploy_backend: true/false
+  └── deploy_frontend: true/false
 ```
 
 ### Branch Protection Rules
 
 | Rule | Setting |
 |------|---------|
-| Direct push to main | ❌ Blocked (except admin `allenpan`) |
+| Direct push to main | ❌ Blocked (except admin bypass) |
 | PR required | ✅ Yes |
 | Required reviews | 1 approving review |
 | Required checks | "Unit Tests" must pass |
@@ -90,14 +108,32 @@ git push -u origin users/YOUR_NAME/feature-name
 
 | Secret | Description |
 |--------|-------------|
-| `GEMINI_API_KEY` | Google Gemini API key for AI PR summaries |
 | `AZURE_ACR_USERNAME` | Azure Container Registry username |
 | `AZURE_ACR_PASSWORD` | Azure Container Registry password |
-| `ACK_KUBECONFIG` | Base64-encoded kubeconfig for Alibaba ACK |
+| `ACK_KUBECONFIG` | Base64-encoded kubeconfig for Alibaba ACK cluster |
+
+### CI/CD Image Naming
+
+Images are tagged with version from `pyproject.toml` / `package.json`:
+
+```
+Backend:  financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend:prod-v0.8.8
+Frontend: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend:prod-v0.11.4
+
+Additional tags pushed:
+  - prod-{git-sha}   (for traceability)
+  - prod-latest      (for convenience)
+```
 
 ---
 
-## Manual Deployment Workflow (Fallback)
+## Manual Deployment Workflow (Emergency Fallback)
+
+> ⚠️ **Use CI/CD instead!** Manual deployment should only be used when:
+> - GitHub Actions is down
+> - ACK_KUBECONFIG secret needs rotation
+> - Debugging CI/CD pipeline issues
+> - Emergency hotfix bypassing PR process
 
 ### Step 1: Make Code Changes
 

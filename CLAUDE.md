@@ -4,6 +4,12 @@
 
 ## 🎯 Recent Architecture Changes
 
+**GitHub Actions CI/CD** (2025-12-15 - Active): Automated deployment pipeline.
+- **PR Workflow**: `users/{name}/{feature}` branch → PR → Unit Tests → Review → Merge
+- **Deploy Workflow**: Push to main → Build images → Deploy to ACK (automatic)
+- **Manual Trigger**: GitHub Actions UI → "Deploy to Production" → Run workflow
+- **Details**: [docs/deployment/workflow.md](docs/deployment/workflow.md)
+
 **Langfuse Observability** (2025-11-29 - Deployed): LLM tracing deployed to production ACK.
 - **URL**: https://monitor.klinecubic.cn
 - **Stack**: Langfuse Server v3.135.0 + PostgreSQL + ClickHouse + Alibaba OSS
@@ -45,10 +51,10 @@
 | Environment | Deployment Method | Access | Purpose | Status |
 |-------------|------------------|--------|---------|--------|
 | **Dev/Local** | Docker Compose | `localhost:3000` | Local development | ✅ Active |
-| **Production** | Kubernetes (ACK - Alibaba Cloud) | `https://klinecubic.cn` | Production | ✅ Active |
+| **Production** | GitHub Actions CI/CD → ACK | `https://klinecubic.cn` | Production | ✅ Active |
 | **Test** | Kubernetes (AKS - Planned) | `https://klinematrix.com` | Cloud testing | 🚧 Planned |
 
-**Current Workflow**: Dev/Local → Production (no test environment)
+**Current Workflow**: Dev/Local → PR to main → CI/CD auto-deploys to Production
 
 ### Dev/Local Environment
 - **How to run**: `make dev` (starts docker-compose)
@@ -94,7 +100,7 @@ Production: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend:prod-v
             financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend:prod-v0.10.1
 ```
 
-**Golden Rule**: Develop locally with docker-compose → Test thoroughly → Deploy to Production (ACK).
+**Golden Rule**: Develop locally → Create PR → CI/CD auto-deploys to Production after merge.
 
 ## 🧪 Testing & Iteration Rules
 
@@ -179,12 +185,11 @@ git add . && git commit -m "feat(scope): description"
 
 ### Deploy to Production
 
-```bash
-# Build → Update kustomization.yaml → Apply → Verify
-# Use: --load-restrictor=LoadRestrictionsNone for kustomize
-```
+**CI/CD (Recommended)**: Merge PR to main → GitHub Actions auto-deploys
 
-> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for K8s operations**
+**Manual Trigger**: GitHub → Actions → "Deploy to Production" → Run workflow
+
+> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for details**
 > 📖 **See [Version Management](docs/project/versions/README.md) for versioning
 
 ## Code Standards
