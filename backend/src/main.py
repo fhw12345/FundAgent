@@ -1,6 +1,8 @@
 """
 FastAPI application entry point for Financial Agent Backend.
 Following Factor 11/12: Triggerable & Stateless design.
+
+CI/CD: GitHub Actions automated deployment enabled.
 """
 
 import logging
