@@ -17,12 +17,9 @@ from .yfinance_utils import (
     get_valid_alpaca_timeframes,
     get_valid_alphavantage_intervals,
     get_valid_frontend_intervals,
-    get_valid_yfinance_intervals,
     map_frontend_to_alpaca,
     map_frontend_to_alphavantage,
     map_timeframe_to_yfinance_interval,
-    map_yfinance_to_alpaca,
-    map_yfinance_to_alphavantage,
 )
 
 __all__ = [
@@ -30,10 +27,7 @@ __all__ = [
     "map_timeframe_to_yfinance_interval",
     "map_frontend_to_alphavantage",
     "map_frontend_to_alpaca",
-    "map_yfinance_to_alphavantage",
-    "map_yfinance_to_alpaca",
     "get_valid_frontend_intervals",
-    "get_valid_yfinance_intervals",
     "get_valid_alphavantage_intervals",
     "get_valid_alpaca_timeframes",
     # Cache utilities

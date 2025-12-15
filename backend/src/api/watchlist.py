@@ -167,11 +167,11 @@ async def add_to_watchlist(
 
         return watchlist_item
 
-    except DuplicateKeyError:
+    except DuplicateKeyError as e:
         raise HTTPException(
             status_code=409,
             detail=f"Symbol {item.symbol.upper()} is already in your watchlist",
-        )
+        ) from e
     except HTTPException:
         raise  # Re-raise HTTP exceptions (validation errors, auth errors)
     except Exception as e:
@@ -185,7 +185,7 @@ async def add_to_watchlist(
         raise HTTPException(
             status_code=500,
             detail="Unable to add symbol to watchlist. Please try again later.",
-        )
+        ) from e
 
 
 @router.get("", response_model=list[WatchlistItem])
@@ -225,7 +225,7 @@ async def get_watchlist(
         raise HTTPException(
             status_code=500,
             detail="Unable to retrieve watchlist. Please try again later.",
-        )
+        ) from e
 
 
 @router.delete("/{watchlist_id}", status_code=204)
@@ -276,7 +276,7 @@ async def remove_from_watchlist(
         raise HTTPException(
             status_code=500,
             detail="Unable to remove symbol from watchlist. Please try again later.",
-        )
+        ) from e
 
 
 @router.post("/analyze", status_code=202)
@@ -331,4 +331,4 @@ async def trigger_watchlist_analysis(
         raise HTTPException(
             status_code=500,
             detail="Unable to trigger watchlist analysis. Please try again later.",
-        )
+        ) from e

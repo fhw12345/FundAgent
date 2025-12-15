@@ -69,9 +69,7 @@ export const useChartData = (
         ) {
           return a.convertedTime - b.convertedTime;
         }
-        return a.convertedTime
-          .toString()
-          .localeCompare(b.convertedTime.toString());
+        return String(a.convertedTime).localeCompare(String(b.convertedTime));
       });
 
     if (chartType === "line") {

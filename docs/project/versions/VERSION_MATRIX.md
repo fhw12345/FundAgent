@@ -6,7 +6,7 @@ This document tracks compatibility between Financial Agent components across dif
 
 | Component | Version | Status | Released |
 |-----------|---------|--------|----------|
-| Backend | 0.8.3 | ✅ Current | 2025-11-28 |
+| Backend | 0.8.8 | ✅ Current | 2025-12-14 |
 | Frontend | 0.11.0 | ✅ Current | 2025-11-27 |
 
 ## Compatibility Table
@@ -15,6 +15,7 @@ This document tracks compatibility between Financial Agent components across dif
 
 | Backend | Frontend | Compatible | Notes |
 |---------|----------|------------|-------|
+| 0.8.8 | 0.11.0 | ✅ Yes | Module restructure, context compaction, get_stock_quote tool |
 | 0.8.3 | 0.11.0 | ✅ Yes | Portfolio analysis with structured output, order optimization |
 | 0.8.2 | 0.11.0 | ✅ Yes | Auto-inject selected symbol from UI |
 | 0.8.1 | 0.10.1 | ✅ Yes | Watchlist symbol validation fixes |
@@ -170,5 +171,5 @@ If you discover an incompatible version combination:
 
 ---
 
-**Last Updated**: 2025-11-28
-**Current Stable**: Backend v0.8.3 + Frontend v0.11.0
+**Last Updated**: 2025-12-14
+**Current Stable**: Backend v0.8.8 + Frontend v0.11.0

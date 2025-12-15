@@ -1,8 +1,8 @@
 # Streaming Issues Troubleshooting Guide
 
 > **Status:** Active
-> **Last Updated:** 2025-01-16
-> **Applies To:** Backend v0.5.14+, Frontend v0.10.1+
+> **Last Updated:** 2025-11-16
+> **Applies To:** Backend v0.7.0+, Frontend v0.10.1+
 
 This guide covers common issues with Server-Sent Events (SSE) streaming in the chat interface, particularly with ReAct Agent (v3) tool execution.
 

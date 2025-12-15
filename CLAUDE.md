@@ -149,87 +149,43 @@ python -m playwright install chromium
 
 ## Development Workflow
 
-### 1. Feature Specification (Required for New Features)
+> 📖 **Full Guide**: See [CONTRIBUTING.md](CONTRIBUTING.md) for complete development workflow, coding standards, and PR process.
 
-**Before implementing any new feature**, create a specification document:
+### Quick Reference
 
 ```bash
-# Create feature spec in /docs/features/
+# 1. Create feature spec (for new features)
 touch docs/features/<feature-name>.md
-```
 
-**Required sections**:
-- **Context**: Why this feature is needed, user problem it solves
-- **Problem Statement**: Clear description of the problem
-- **Proposed Solution**: Detailed technical approach
-- **Implementation Plan**: Step-by-step breakdown
-- **Acceptance Criteria**: How to verify success
-
-**Process**:
-1. Create feature spec document
-2. **Discuss and get approval** before coding
-3. Reference spec during implementation
-4. Update spec if design changes during development
-
-> 📖 **See [docs/features/](docs/features/) for examples**
-
-### 2. Make Changes Locally
-```bash
-# Backend changes
+# 2. Make changes and test
 cd backend && make test && make lint
+docker compose exec frontend npm run lint && npm test
 
-# Frontend changes - MUST run inside Docker
-docker compose exec frontend npm run lint
-docker compose exec frontend npm run type-check
-docker compose exec frontend npm test
-
-# Install new frontend dependencies
-docker compose exec frontend npm install --save-dev <package-name>
-```
-
-**⚠️ Frontend Commands**: Always run `npm` commands through `docker compose exec frontend` to ensure correct dependencies and environment. The `/app/node_modules` volume mount keeps node_modules isolated inside the container.
-
-**⚠️ Package Management**: ALWAYS check if packages are already installed before installing:
-- Check Docker containers: `docker compose exec <service> pip list` or `docker compose exec <service> npm list`
-- Check existing venv: Look for `/tmp/webtesting/*/venv` or project venvs
-- Check conda environments: `conda env list`
-- **REUSE existing environments** - don't install duplicate packages globally
-
-**Example:**
-```bash
-# ❌ DON'T: Install globally without checking
-pip install playwright
-
-# ✅ DO: Check and reuse existing venv
-ls /tmp/webtesting/*/venv  # Check for existing venvs
-source /tmp/webtesting/portfolio-analysis/venv/bin/activate  # Reuse it
-```
-
-### 3. Bump Version (Required)
-```bash
+# 3. Bump version (required for every commit)
 ./scripts/bump-version.sh backend patch   # 0.1.0 → 0.1.1
 ./scripts/bump-version.sh frontend minor  # 0.1.0 → 0.2.0
+
+# 4. Commit (pre-commit hooks run automatically)
+git add . && git commit -m "feat(scope): description"
 ```
-**Pre-commit hook enforces version increment.**
 
-### 4. Deploy to Production
+### Key Rules
 
-**Philosophy**: Every deployment must be:
-- ✅ **Versioned** - Unique tag for every build
-- ✅ **Tested locally** - Works in docker-compose first
-- ✅ **Monitored** - Watch logs for 5-10 minutes post-deploy
-- ✅ **Rollback-ready** - Know the previous working version
+**⚠️ Frontend Commands**: Always use `docker compose exec frontend npm ...` (node_modules isolated in container)
 
-**Quick Reference**:
+**⚠️ Package Management**: Check before installing - reuse existing venvs (`/tmp/webtesting/*/venv`)
+
+**⚠️ Version Required**: Pre-commit hook enforces version bump on every commit
+
+### Deploy to Production
+
 ```bash
-# Build images → Update kustomization → Apply → Verify
-# Detailed steps: docs/deployment/k8s-operations.md
+# Build → Update kustomization.yaml → Apply → Verify
+# Use: --load-restrictor=LoadRestrictionsNone for kustomize
 ```
 
-**Key Rule**: Use `--load-restrictor=LoadRestrictionsNone` flag for kustomize (security restriction workaround)
-
-> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for detailed K8s operations, build/deploy/verify/rollback procedures**
-> 📖 **See [Version Management](docs/project/versions/README.md) for versioning system**
+> 📖 **See [Deployment Workflow](docs/deployment/workflow.md) for K8s operations**
+> 📖 **See [Version Management](docs/project/versions/README.md) for versioning
 
 ## Code Standards
 

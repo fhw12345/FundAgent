@@ -105,6 +105,8 @@ dump.rdb
 
 # Docker volumes
 *_data/
+# Exception: source code packages named *_data
+!backend/src/**/market_data/
 .claude/
 
 # Testing artifacts

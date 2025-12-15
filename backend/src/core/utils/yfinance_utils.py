@@ -84,25 +84,6 @@ def get_valid_frontend_intervals() -> list[str]:
     ]
 
 
-def get_valid_yfinance_intervals() -> list[str]:
-    """Get list of valid yfinance interval formats."""
-    return [
-        "1m",
-        "2m",
-        "5m",
-        "15m",
-        "30m",
-        "60m",
-        "90m",
-        "1h",
-        "1d",
-        "5d",
-        "1wk",
-        "1mo",
-        "3mo",
-    ]
-
-
 # ============================================================
 # Multi-API Interval Mapping (Alpha Vantage, Alpaca)
 # ============================================================
@@ -170,60 +151,6 @@ def map_frontend_to_alpaca(frontend_interval: str) -> "TimeFrame":
         "1mo": TimeFrame.Month,
     }
     return mapping.get(frontend_interval, TimeFrame.Day)
-
-
-def map_yfinance_to_alphavantage(yfinance_interval: str) -> str:
-    """
-    Map yfinance interval to Alpha Vantage format.
-
-    For migrating existing code from yfinance to Alpha Vantage.
-
-    Args:
-        yfinance_interval: yfinance interval ('1m', '1wk', '1mo')
-
-    Returns:
-        Alpha Vantage interval
-    """
-    mapping = {
-        "1m": "1min",
-        "5m": "5min",
-        "15m": "15min",
-        "30m": "30min",
-        "60m": "60min",
-        "90m": "60min",  # Alpha Vantage doesn't have 90min
-        "1h": "60min",
-        "1d": "daily",
-        "1wk": "weekly",
-        "1mo": "monthly",
-    }
-    return mapping.get(yfinance_interval, "daily")
-
-
-def map_yfinance_to_alpaca(yfinance_interval: str) -> "TimeFrame":
-    """
-    Map yfinance interval to Alpaca TimeFrame.
-
-    For migrating existing code from yfinance to Alpaca.
-
-    Args:
-        yfinance_interval: yfinance interval ('1m', '1wk', '1mo')
-
-    Returns:
-        Alpaca TimeFrame enum
-    """
-    mapping = {
-        "1m": TimeFrame.Minute,
-        "5m": TimeFrame.Minute,
-        "15m": TimeFrame.Minute,
-        "30m": TimeFrame.Minute,
-        "60m": TimeFrame.Hour,
-        "90m": TimeFrame.Hour,
-        "1h": TimeFrame.Hour,
-        "1d": TimeFrame.Day,
-        "1wk": TimeFrame.Week,
-        "1mo": TimeFrame.Month,
-    }
-    return mapping.get(yfinance_interval, TimeFrame.Day)
 
 
 def get_valid_alphavantage_intervals() -> list[str]:

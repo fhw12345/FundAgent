@@ -2,12 +2,17 @@
 
 ## Quick Start
 
+> **Recommended**: Use Docker Compose for local development. See [CLAUDE.md](../../CLAUDE.md) for environment details.
+
 ### Prerequisites
-- **kubectl** configured with AKS cluster access
-- **Azure CLI** (az) authenticated
-- **Node.js 18+** (for local frontend development)
-- **Python 3.12+** (for local backend development)
+- **Docker & Docker Compose** (recommended for local dev)
+- **Python 3.12+** (for backend development)
+- **Node.js 18+** (for frontend development)
 - **Git**
+
+For cloud deployments only:
+- **kubectl** configured with ACK cluster access
+- **Azure CLI** (az) authenticated (for ACR image builds)
 
 ### 1. Clone Repository
 
@@ -16,33 +21,47 @@ git clone <repository>
 cd financial_agent
 ```
 
-### 2. Access Deployed Services
+### 2. Local Development (Recommended)
 
-The application is deployed on Kubernetes. Access it via:
-
-**Production URLs:**
-- **Frontend**: https://klinematrix.com
-- **Backend API**: https://klinematrix.com/api/health
-- **API Docs**: https://klinematrix.com/api/docs
-
-**Verify deployment:**
+**Using Docker Compose** (easiest):
 ```bash
-# Check pod status
-kubectl get pods -n klinematrix-test
-
-# Check services
-kubectl get svc -n klinematrix-test
-
-# View backend logs
-kubectl logs -f deployment/backend -n klinematrix-test
-
-# View frontend logs
-kubectl logs -f deployment/frontend -n klinematrix-test
+make dev  # Starts all services with hot reload
 ```
 
-### 3. Local Development (Optional)
+Access points:
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Langfuse UI**: http://localhost:3001
 
-For local code development with hot reload:
+### 3. Access Production (Read-Only)
+
+**Production URLs** (ACK - Alibaba Cloud):
+- **Frontend**: https://klinecubic.cn
+- **Backend API**: https://klinecubic.cn/api/health
+- **Langfuse**: https://monitor.klinecubic.cn
+
+**Verify production:**
+```bash
+# Health check (may need proxy bypass in China)
+HTTP_PROXY="" HTTPS_PROXY="" curl -s https://klinecubic.cn/api/health
+```
+
+**Production K8s access:**
+```bash
+# Set kubeconfig for ACK
+export KUBECONFIG=~/.kube/config-ack-prod
+
+# Check pod status
+kubectl get pods -n klinematrix-prod
+
+# View backend logs
+kubectl logs -f deployment/backend -n klinematrix-prod
+```
+
+### 4. Manual Local Development (Without Docker)
+
+For running services directly (not recommended):
 
 **Backend:**
 ```bash
@@ -60,20 +79,22 @@ npm install
 npm run dev  # Starts on http://localhost:5173
 ```
 
-**Note**: Local development requires port-forwarding to access Kubernetes services:
+**Note**: Manual setup requires MongoDB and Redis running locally or via Docker:
 ```bash
-# Forward MongoDB
-kubectl port-forward -n klinematrix-test svc/mongodb-service 27017:27017
-
-# Forward Redis
-kubectl port-forward -n klinematrix-test svc/redis-service 6379:6379
+# Start only database services
+docker compose up -d mongodb redis
 ```
 
-### 4. Verify Walking Skeleton
+### 5. Verify Walking Skeleton
 
-**Via production deployment:**
+**Via local Docker Compose:**
 ```bash
-curl https://klinematrix.com/api/health | python3 -m json.tool
+curl http://localhost:8000/api/health | python3 -m json.tool
+```
+
+**Via production:**
+```bash
+HTTP_PROXY="" HTTPS_PROXY="" curl https://klinecubic.cn/api/health | python3 -m json.tool
 ```
 
 Expected response:

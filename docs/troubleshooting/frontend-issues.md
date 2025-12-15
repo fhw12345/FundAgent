@@ -1,7 +1,7 @@
 # Frontend Issues Troubleshooting Guide
 
 > **Status:** Active
-> **Last Updated:** 2025-01-16
+> **Last Updated:** 2025-11-16
 > **Applies To:** Frontend v0.10.1+
 
 This guide covers common frontend issues in the Financial Agent platform.

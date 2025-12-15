@@ -8,7 +8,7 @@ AI-Enhanced Financial Analysis Platform documentation hub.
 
 | Component | Version | Environment | URL |
 |-----------|---------|-------------|-----|
-| Backend | v0.8.3 | Prod (ACK) | https://klinecubic.cn |
+| Backend | v0.8.8 | Prod (ACK) | https://klinecubic.cn |
 | Frontend | v0.11.0 | Prod (ACK) | https://klinecubic.cn |
 | Test | Planned | AKS | https://klinematrix.com |
 | Local Dev | Docker | Compose | http://localhost:3000 |
@@ -58,7 +58,10 @@ Local development and coding practices.
 Feature specifications (create before implementing).
 
 - [Feature Specs Guide](features/README.md) - How to write feature specs
-- Browse `features/` for active specifications
+- [Backend API Module Restructure](features/backend-api-module-restructure.md) - v0.8.8 modular architecture
+- [Portfolio Agent Architecture](features/portfolio-agent-architecture-refactor.md) - 3-phase analysis
+- [Langfuse Observability](features/langfuse-observability.md) - LLM trace visualization
+- Browse `features/` for more specifications
 
 #### Testing
 End-to-end testing guides.

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "financial-agent-backend"
-version = "0.8.7"
+version = "0.8.8"
 description = "AI-Enhanced Financial Analysis Platform Backend"
 authors = [
     {name = "Financial Agent Team", email = "team@financialagent.com"},
@@ -53,11 +53,12 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.12.0",
-    "black>=23.10.0",
+    "black==24.8.0",  # Pin version for consistent formatting across environments
     "ruff>=0.1.5",
     "mypy>=1.7.0",
     "pre-commit>=3.5.0",
     "httpx>=0.25.0",         # For testing async endpoints
+    "yfinance>=0.2.0",       # For yfinance integration tests (mocked)
 ]
 
 [tool.black]
@@ -81,6 +82,8 @@ extend-exclude = '''
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+
+[tool.ruff.lint]
 select = [
     "E",  # pycodestyle errors
     "W",  # pycodestyle warnings
@@ -96,8 +99,10 @@ ignore = [
     "C901",  # too complex
 ]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+# E402: Imports after patch_tongyi_check_response() call - intentional (patch must run before ChatTongyi import)
+"src/agent/langgraph_react_agent.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"

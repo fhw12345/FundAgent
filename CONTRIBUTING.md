@@ -120,8 +120,18 @@ touch docs/features/<feature-name>.md
 ### 2. Make Changes
 
 ```bash
-# Create feature branch
-git checkout -b feature/your-feature-name
+# Create feature branch (REQUIRED naming convention)
+git checkout -b users/YOUR_USERNAME/feature-name
+
+# Examples of valid branch names:
+#   users/danny/add-dark-mode
+#   users/allen/fix-login-bug
+#   users/john/feature/new-dashboard
+
+# ❌ Invalid branch names (will fail CI):
+#   feature/my-feature     # Missing users/{name}/ prefix
+#   danny/my-feature       # Missing users/ prefix
+#   users/danny            # Missing feature name
 
 # Make changes
 # ... edit files ...
@@ -131,6 +141,8 @@ make fmt    # Format code (Black, Prettier)
 make lint   # Lint code (Ruff, ESLint, mypy)
 make test   # Run all tests
 ```
+
+> **⚠️ Branch Naming Policy**: All contributor branches MUST follow the pattern `users/{username}/{feature-name}`. PRs from incorrectly named branches will be automatically rejected by CI.
 
 ### 3. Commit Changes
 
@@ -470,15 +482,25 @@ Relates to #456
 
 ### 4. Merge Requirements
 
-**Required Approvals**: 1+ maintainer approval
+**Required Approvals**: 1 approving review
 
 **CI Checks Must Pass**:
-- ✅ Pre-commit hooks (formatting, linting, tests)
+- ✅ Branch Policy (branch name matches `users/{username}/{feature}`)
+- ✅ Unit Tests (backend pytest + frontend tests)
+- ✅ Linting (Ruff, Black, ESLint, TypeScript)
 - ✅ No merge conflicts
 - ✅ Version bumped
-- ✅ Documentation updated
+
+**Branch Protection Rules** (enforced on `main`):
+- Direct push to `main` is **blocked** (except for admin `allenpan`)
+- All changes must go through Pull Request
+- 1 approving review required before merge
+- "Unit Tests" status check must pass
+- Stale reviews are dismissed on new commits
 
 **Merge Strategy**: Squash and merge (default)
+
+**Auto-Deployment**: Once merged to `main`, changes are automatically deployed to production (ACK cluster).
 
 ---
 

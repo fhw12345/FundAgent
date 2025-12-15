@@ -1,0 +1,288 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.pipeline/k8s/**'
+      - '.github/workflows/deploy.yml'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: 'Deploy backend'
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: 'Deploy frontend'
+        type: boolean
+        default: true
+
+env:
+  ACR_REGISTRY: financialagent-gxftdbbre4gtegea.azurecr.io
+  ACR_NAMESPACE: klinecubic
+  K8S_NAMESPACE: klinematrix-prod
+
+jobs:
+  # Detect which components changed
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      backend_version: ${{ steps.versions.outputs.backend }}
+      frontend_version: ${{ steps.versions.outputs.frontend }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for changes
+        id: changes
+        run: |
+          # For manual dispatch, use inputs; otherwise detect from git
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "backend=${{ github.event.inputs.deploy_backend }}" >> $GITHUB_OUTPUT
+            echo "frontend=${{ github.event.inputs.deploy_frontend }}" >> $GITHUB_OUTPUT
+          else
+            # Check if backend changed
+            if git diff --name-only HEAD^ HEAD | grep -q "^backend/"; then
+              echo "backend=true" >> $GITHUB_OUTPUT
+            else
+              echo "backend=false" >> $GITHUB_OUTPUT
+            fi
+
+            # Check if frontend changed
+            if git diff --name-only HEAD^ HEAD | grep -q "^frontend/"; then
+              echo "frontend=true" >> $GITHUB_OUTPUT
+            else
+              echo "frontend=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Get versions
+        id: versions
+        run: |
+          BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          FRONTEND_VERSION=$(node -p "require('./frontend/package.json').version")
+          echo "backend=$BACKEND_VERSION" >> $GITHUB_OUTPUT
+          echo "frontend=$FRONTEND_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Backend version: $BACKEND_VERSION"
+          echo "📦 Frontend version: $FRONTEND_VERSION"
+
+  # Build and push backend image
+  build-backend:
+    name: Build Backend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.AZURE_ACR_USERNAME }}
+          password: ${{ secrets.AZURE_ACR_PASSWORD }}
+
+      - name: Build and Push Backend
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/backend:prod-v${{ needs.detect-changes.outputs.backend_version }}
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/backend:prod-${{ github.sha }}
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/backend:prod-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Output image tag
+        run: |
+          IMAGE="${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/backend:prod-v${{ needs.detect-changes.outputs.backend_version }}"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "🐳 Built image: $IMAGE"
+
+  # Build and push frontend image
+  build-frontend:
+    name: Build Frontend
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.AZURE_ACR_USERNAME }}
+          password: ${{ secrets.AZURE_ACR_PASSWORD }}
+
+      - name: Build and Push Frontend
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/frontend:prod-v${{ needs.detect-changes.outputs.frontend_version }}
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/frontend:prod-${{ github.sha }}
+            ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/frontend:prod-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Output image tag
+        run: |
+          IMAGE="${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/frontend:prod-v${{ needs.detect-changes.outputs.frontend_version }}"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          echo "🐳 Built image: $IMAGE"
+
+  # Deploy to ACK (Alibaba Cloud Kubernetes)
+  deploy:
+    name: Deploy to ACK
+    needs: [detect-changes, build-backend, build-frontend]
+    # Run if at least one build succeeded (using always() to check even if one was skipped)
+    if: |
+      always() &&
+      (needs.build-backend.result == 'success' || needs.build-frontend.result == 'success')
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.ACK_KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      - name: Verify cluster connection
+        run: |
+          echo "🔗 Connecting to ACK cluster..."
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Update Kustomization
+        run: |
+          cd .pipeline/k8s/overlays/prod
+
+          # Update backend image if it was built
+          if [ "${{ needs.build-backend.result }}" = "success" ]; then
+            echo "📝 Updating backend image to prod-v${{ needs.detect-changes.outputs.backend_version }}"
+            sed -i 's|newTag: "prod-v[^"]*"|newTag: "prod-v${{ needs.detect-changes.outputs.backend_version }}"|' kustomization.yaml
+          fi
+
+          # Update frontend image if it was built
+          if [ "${{ needs.build-frontend.result }}" = "success" ]; then
+            echo "📝 Updating frontend image to prod-v${{ needs.detect-changes.outputs.frontend_version }}"
+            sed -i 's|newTag: "prod-v[^"]*"|newTag: "prod-v${{ needs.detect-changes.outputs.frontend_version }}"|' kustomization.yaml
+          fi
+
+          echo "📋 Updated kustomization.yaml:"
+          cat kustomization.yaml | grep -A2 "images:"
+
+      - name: Deploy to Kubernetes
+        run: |
+          echo "🚀 Deploying to ACK..."
+          kubectl apply -k .pipeline/k8s/overlays/prod --load-restrictor=LoadRestrictionsNone
+
+          # Restart deployments that were updated
+          if [ "${{ needs.build-backend.result }}" = "success" ]; then
+            echo "♻️ Restarting backend deployment..."
+            kubectl rollout restart deployment/backend -n ${{ env.K8S_NAMESPACE }}
+          fi
+
+          if [ "${{ needs.build-frontend.result }}" = "success" ]; then
+            echo "♻️ Restarting frontend deployment..."
+            kubectl rollout restart deployment/frontend -n ${{ env.K8S_NAMESPACE }}
+          fi
+
+      - name: Wait for rollout
+        run: |
+          echo "⏳ Waiting for deployments to be ready..."
+
+          if [ "${{ needs.build-backend.result }}" = "success" ]; then
+            kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          fi
+
+          if [ "${{ needs.build-frontend.result }}" = "success" ]; then
+            kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          fi
+
+      - name: Verify deployment
+        run: |
+          echo "📊 Deployment Status:"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l "app in (backend, frontend)"
+
+          echo ""
+          echo "🔍 Pod Details:"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -o wide
+
+      - name: Health check
+        run: |
+          echo "🏥 Running health checks..."
+
+          # Wait for services to be ready
+          sleep 15
+
+          # Check backend health via pod exec
+          BACKEND_POD=$(kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=backend -o jsonpath='{.items[0].metadata.name}')
+          if [ -n "$BACKEND_POD" ]; then
+            kubectl exec -n ${{ env.K8S_NAMESPACE }} $BACKEND_POD -- curl -sf http://localhost:8000/api/health && echo "✅ Backend healthy" || echo "⚠️ Backend health check failed"
+          fi
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo ""
+          echo "═══════════════════════════════════════════════════════"
+          echo "                  DEPLOYMENT SUMMARY                    "
+          echo "═══════════════════════════════════════════════════════"
+          echo ""
+          echo "🌐 Production URL: https://klinecubic.cn"
+          echo ""
+          if [ "${{ needs.build-backend.result }}" = "success" ]; then
+            echo "✅ Backend:  prod-v${{ needs.detect-changes.outputs.backend_version }}"
+          else
+            echo "⏭️ Backend:  (no changes)"
+          fi
+          if [ "${{ needs.build-frontend.result }}" = "success" ]; then
+            echo "✅ Frontend: prod-v${{ needs.detect-changes.outputs.frontend_version }}"
+          else
+            echo "⏭️ Frontend: (no changes)"
+          fi
+          echo ""
+          echo "📝 Commit: ${{ github.sha }}"
+          echo "👤 Author: ${{ github.actor }}"
+          echo ""
+          echo "═══════════════════════════════════════════════════════"

@@ -14,6 +14,7 @@ from ...database.repositories.chat_repository import ChatRepository
 from ...database.repositories.message_repository import MessageRepository
 from ...services.alphavantage_market_data import AlphaVantageMarketDataService
 from ...services.chat_service import ChatService
+from ...services.context_window_manager import ContextWindowManager
 from .auth import get_current_user_id, get_mongodb  # Import shared auth
 
 # ===== Agent Singleton (Per-Worker Process) =====
@@ -57,6 +58,13 @@ def get_chat_service(
 ) -> ChatService:
     """Get chat service instance."""
     return ChatService(chat_repo, message_repo, settings)
+
+
+def get_context_manager(
+    settings: Settings = Depends(get_settings),
+) -> ContextWindowManager:
+    """Get context window manager for automatic context compaction."""
+    return ContextWindowManager(settings)
 
 
 def get_chat_agent(
@@ -146,4 +154,6 @@ __all__ = [
     "get_chat_service",
     "get_chat_agent",
     "get_react_agent",
+    "get_context_manager",
+    "get_message_repository",
 ]

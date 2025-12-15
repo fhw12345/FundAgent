@@ -29,26 +29,13 @@ class StockDataFetcher:
 
         Returns:
             DataFrame with OHLCV data or None if failed
+
+        Raises:
+            NotImplementedError: This method is deprecated. Use AlphaVantageMarketDataService.
         """
-        try:
-            ticker = yf.Ticker(symbol)
-            data = ticker.history(start=start_date, end=end_date)
-
-            if data.empty:
-                logger.warning(
-                    "No data returned",
-                    symbol=symbol,
-                    start_date=start_date,
-                    end_date=end_date,
-                )
-                return None
-
-            # Clean and validate data
-            return StockDataFetcher._clean_data(data)
-
-        except Exception as e:
-            logger.error("Failed to fetch stock data", symbol=symbol, error=str(e))
-            return None
+        raise NotImplementedError(
+            "StockDataFetcher is deprecated. Use AlphaVantageMarketDataService instead."
+        )
 
     @staticmethod
     def _clean_data(data: pd.DataFrame) -> pd.DataFrame:

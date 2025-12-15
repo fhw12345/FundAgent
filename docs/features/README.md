@@ -235,6 +235,10 @@ Feature is complete when:
 
 Browse existing feature specs in this directory for examples:
 
+### Architecture & Refactoring
+- **[Backend API Module Restructure](backend-api-module-restructure.md)** - v0.8.8 modular package structure for API, agent, and services layers
+- **[Portfolio Agent Architecture](portfolio-agent-architecture-refactor.md)** - 3-phase analysis (research → decisions → execution)
+
 ### Observability & Monitoring
 - **[Langfuse Observability](langfuse-observability.md)** - LLM trace visualization with Langfuse v3.x (PostgreSQL, ClickHouse, MinIO, Redis)
 

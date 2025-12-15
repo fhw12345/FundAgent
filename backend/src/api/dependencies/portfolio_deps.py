@@ -43,13 +43,18 @@ def get_ticker_data_service(
     )
 
 
-def get_alpaca_trading_service(
-    settings: Settings = Depends(get_settings),
-) -> AlpacaTradingService | None:
-    """Get Alpaca trading service instance (returns None if credentials not set)."""
-    if not settings.alpaca_api_key or not settings.alpaca_secret_key:
-        return None
-    return AlpacaTradingService(settings=settings)
+def get_alpaca_trading_service() -> AlpacaTradingService | None:
+    """Get Alpaca trading service singleton from app.state.
+
+    Returns the single AlpacaTradingService instance created at startup,
+    avoiding re-initialization on every request (which was causing 8+ inits
+    during portfolio analysis runs).
+    """
+    from ...main import app
+
+    if hasattr(app.state, "alpaca_trading_service"):
+        return app.state.alpaca_trading_service
+    return None
 
 
 def get_portfolio_service(

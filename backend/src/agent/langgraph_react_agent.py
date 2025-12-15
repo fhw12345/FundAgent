@@ -46,7 +46,6 @@ patch_tongyi_check_response()
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
-from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
@@ -172,21 +171,6 @@ class FinancialAnalysisReActAgent:
         base_tool_count = len(base_tools)
         alpha_vantage_tool_count = len(alpha_vantage_tools)
 
-        # Initialize MCP client for Alpha Vantage tools (118 tools)
-        self.mcp_client = None
-        if settings.alpha_vantage_api_key:
-            try:
-                self.mcp_client = self._initialize_mcp_client()
-                logger.info("MCP client initialized", server="alphavantage")
-            except Exception as e:
-                logger.warning(
-                    "Failed to initialize MCP client - continuing with local tools only",
-                    error=str(e),
-                    error_type=type(e).__name__,
-                )
-        else:
-            logger.info("Alpha Vantage API key not configured - MCP tools disabled")
-
         # Create ReAct agent with memory and custom system prompt
         self.checkpointer = MemorySaver()
         self.agent = create_react_agent(
@@ -202,89 +186,7 @@ class FinancialAnalysisReActAgent:
             base_tools=base_tool_count,
             alpha_vantage_tools=alpha_vantage_tool_count,
             total_local_tools=len(self.tools),
-            mcp_enabled=self.mcp_client is not None,
         )
-
-    def _initialize_mcp_client(self) -> MultiServerMCPClient:
-        """
-        Initialize MCP client for Alpha Vantage tools.
-
-        Returns:
-            Configured MultiServerMCPClient with Alpha Vantage server
-        """
-        # Alpha Vantage MCP server URL
-        mcp_url = f"https://mcp.alphavantage.co/mcp?apikey={self.settings.alpha_vantage_api_key}"
-
-        # Initialize MCP client with Alpha Vantage server
-        # Note: Parameter is 'connections' not 'servers' in langchain-mcp-adapters
-        client = MultiServerMCPClient(
-            connections={
-                "alphavantage": {
-                    "transport": "streamable_http",
-                    "url": mcp_url,
-                }
-            }
-        )
-
-        logger.info(
-            "MCP client created",
-            server="alphavantage",
-            transport="streamable_http",
-        )
-
-        return client
-
-    async def initialize_mcp_tools(self) -> None:
-        """
-        Load MCP tools asynchronously and add to agent.
-
-        This method should be called during application startup (after __init__).
-        It loads 118 tools from Alpha Vantage MCP server and recreates the
-        agent with the full tool set (2 local + 118 MCP = 120 total).
-
-        DISABLED: MCP tools not needed - we use direct Alpha Vantage API calls.
-        """
-        logger.info("MCP tools loading disabled - using direct API calls only")
-        return
-
-        # DISABLED CODE BELOW - kept for reference
-        if not self.mcp_client:
-            logger.info("MCP client not configured - skipping MCP tool initialization")
-            return
-
-        try:
-            # Get tools from MCP client
-            mcp_tools = await self.mcp_client.get_tools()
-
-            # Add MCP tools to existing tools
-            self.tools.extend(mcp_tools)
-
-            # Recreate agent with full tool set
-            self.agent = create_react_agent(
-                self.llm,
-                self.tools,
-                checkpointer=self.checkpointer,
-                prompt=FINANCIAL_AGENT_SYSTEM_PROMPT,
-            )
-
-            # Calculate local tools before MCP addition (base + alpha vantage)
-            local_tools_before_mcp = len(self.tools) - len(mcp_tools)
-
-            logger.info(
-                "MCP tools initialized successfully",
-                local_tools_before_mcp=local_tools_before_mcp,
-                mcp_tools_added=len(mcp_tools),
-                total_tools=len(self.tools),
-                mcp_server="alphavantage",
-            )
-
-        except Exception as e:
-            logger.error(
-                "Failed to initialize MCP tools - continuing with local tools only",
-                error=str(e),
-                error_type=type(e).__name__,
-                exc_info=True,
-            )
 
     def _create_fibonacci_tool(self) -> Any:
         """

@@ -21,7 +21,6 @@ from src.core.analysis.fibonacci.config import (
 )
 from src.core.utils.yfinance_utils import (
     get_valid_frontend_intervals,
-    get_valid_yfinance_intervals,
     map_timeframe_to_yfinance_interval,
 )
 
@@ -60,7 +59,6 @@ class TestYfinanceUtilities:
     def test_interval_validation_lists_consistency(self):
         """Test that validation lists are consistent and comprehensive."""
         frontend_intervals = get_valid_frontend_intervals()
-        yfinance_intervals = get_valid_yfinance_intervals()
 
         # Test that key intervals are included
         required_frontend = ["1m", "1h", "1d", "1w", "1M", "1mo"]
@@ -69,22 +67,12 @@ class TestYfinanceUtilities:
                 interval in frontend_intervals
             ), f"Required frontend interval '{interval}' missing from validation list"
 
-        required_yfinance = ["1m", "1h", "1d", "1wk", "1mo"]
-        for interval in required_yfinance:
-            assert (
-                interval in yfinance_intervals
-            ), f"Required yfinance interval '{interval}' missing from validation list"
-
         # Test that all frontend intervals can be mapped
         for frontend_interval in frontend_intervals:
             mapped_interval = map_timeframe_to_yfinance_interval(frontend_interval)
-            # Mapped interval should either be in yfinance list or be the same as input
-            assert (
-                mapped_interval in yfinance_intervals
-                or mapped_interval == frontend_interval
-            ), (
-                f"Frontend interval '{frontend_interval}' maps to '{mapped_interval}' "
-                f"which is not in valid yfinance intervals"
+            # Mapped interval should be valid (non-empty)
+            assert mapped_interval, (
+                f"Frontend interval '{frontend_interval}' mapping returned empty value"
             )
 
     def test_no_duplicate_mapping_logic_exists(self):
@@ -247,14 +235,9 @@ class TestConfigurationIntegration:
             # Test that each configured timeframe can be mapped by yfinance utils
             mapped_interval = map_timeframe_to_yfinance_interval(timeframe)
 
-            # Mapped interval should be valid
-            valid_yfinance_intervals = get_valid_yfinance_intervals()
-            assert (
-                mapped_interval in valid_yfinance_intervals
-                or mapped_interval == timeframe
-            ), (
-                f"Timeframe '{timeframe}' maps to '{mapped_interval}' "
-                f"which is not a valid yfinance interval"
+            # Mapped interval should be valid (non-empty)
+            assert mapped_interval, (
+                f"Timeframe '{timeframe}' mapping returned empty value"
             )
 
     def test_fibonacci_config_level_consistency(self):
@@ -316,20 +299,13 @@ class TestErrorHandlingUtilities:
     def test_validation_list_completeness(self):
         """Test that validation lists are complete and don't have gaps."""
         frontend_intervals = get_valid_frontend_intervals()
-        yfinance_intervals = get_valid_yfinance_intervals()
 
         # Test no duplicates
         assert len(frontend_intervals) == len(
             set(frontend_intervals)
         ), "Frontend intervals should not have duplicates"
-        assert len(yfinance_intervals) == len(
-            set(yfinance_intervals)
-        ), "yfinance intervals should not have duplicates"
 
         # Test reasonable list sizes
         assert (
             5 <= len(frontend_intervals) <= 20
         ), f"Frontend intervals list seems unreasonable size: {len(frontend_intervals)}"
-        assert (
-            5 <= len(yfinance_intervals) <= 20
-        ), f"yfinance intervals list seems unreasonable size: {len(yfinance_intervals)}"

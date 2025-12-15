@@ -174,7 +174,7 @@ export const useChart = (
         dateSelection.startDate = timeStr;
         dateSelection.clickCount = 1;
       } else {
-        const startDate = dateSelection.startDate!;
+        const startDate = dateSelection.startDate ?? "";
         const endDate = timeStr;
 
         const finalStartDate = startDate <= endDate ? startDate : endDate;
@@ -225,7 +225,7 @@ export const useChart = (
         const timeDate =
           typeof param.time === "number"
             ? new Date(param.time * 1000).toISOString().split("T")[0]
-            : param.time.toString();
+            : String(param.time);
         volume = volumeMapRef.current.get(timeDate);
       }
 

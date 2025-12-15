@@ -97,7 +97,9 @@ class Settings(BaseSettings):
     # Development mode settings
     dev_bypass_email_verification: bool = False  # Skip actual email sending in dev mode
     dev_bypass_verification_code: str = "888888"  # Fixed code for dev bypass (6-digit)
-    dev_analysis_symbols: str = ""  # Comma-separated symbols to analyze in dev mode (empty = all)
+    dev_analysis_symbols: str = (
+        ""  # Comma-separated symbols to analyze in dev mode (empty = all)
+    )
 
     # Cloud storage (Alibaba OSS)
     oss_access_key: str = ""
@@ -114,6 +116,12 @@ class Settings(BaseSettings):
 
     # Kubernetes configuration
     kubernetes_namespace: str = "default"  # K8s namespace for metrics collection
+
+    # Portfolio Analysis settings
+    portfolio_analysis_batch_size: int = 5  # Concurrent symbol analysis batch size
+    portfolio_analysis_min_success_rate: float = (
+        0.7  # Min Phase 1 success rate for Phase 2
+    )
 
     @property
     def database_name(self) -> str:

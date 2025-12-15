@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.8] - 2025-12-14
+
+### Added
+- feat: add context compaction to chat API to prevent context window overflow
+
+### Changed
+- refactor(api): restructure API layer into modular packages
+  - `analysis.py` → `analysis/` (fibonacci, technical, fundamentals, macro, news, history)
+  - `chat.py` → `chat/` (endpoints, helpers, streaming/)
+  - `feedback.py` → `feedback/` (crud, admin, comments, upload)
+  - `portfolio.py` → `portfolio/` (holdings, orders, transactions, chats, history)
+  - `market_data.py` → `market/` (prices, search, fundamentals, status)
+- refactor(agent): modularize agent and tools architecture
+  - Portfolio agent split into phase1_research, phase2_decisions, phase3_execution
+  - Order optimizer split into base, plan_builder, executor, order_helpers
+  - Alpha Vantage tools split into quotes, fundamentals, technical, news
+- refactor(services): modularize service layer components
+  - Alpaca service split into base, orders, positions, helpers, service
+  - Response formatters split into base, fundamentals, market, technical
+  - Watchlist analyzer split into analyzer, analysis, chat_manager, context_handler, order_handler
+- refactor(shared): add centralized shared utilities module
+  - New `backend/src/shared/` with formatters.py and sanitizers.py
+  - Extracted formatting utilities from stock_analyzer.py
+  - Consolidated sanitization logic from multiple modules
+
+### Removed
+- Deprecated monolithic API files (analysis.py, chat.py, feedback.py, portfolio.py)
+  - All functionality migrated to new modular structure
+  - Original files deleted after migration verified
+
+
 ## [0.8.7] - 2025-12-13
 
 ### Added

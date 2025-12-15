@@ -2,9 +2,10 @@
 
 **Feature**: Flexible Auto-Planning Agent using LangGraph's `create_react_agent` SDK
 
-**Status**: ✅ **IMPLEMENTED** (Coexists with custom state machine)
+**Status**: ✅ **DEPLOYED** (Primary chat agent since v0.7.0)
 
 **Implementation Date**: 2025-10-20
+**Last Updated**: 2025-12-14
 
 **Location**: `backend/src/agent/langgraph_react_agent.py`
 
@@ -359,91 +360,71 @@ INFO | 🔍 DEBUG: Full LLM Prompt | message_count=3 | full_messages=[
 
 ---
 
-## Known Issues & TODOs
+## Known Issues (Historical)
 
-### 1. Stochastic Tool Async Error
+> **Note**: This section documents issues encountered during development. Most have been resolved or are no longer relevant.
+
+### 1. Stochastic Tool Async Error - ✅ RESOLVED
 
 **Issue**: `'async_generator' object has no attribute 'get'` when calling stochastic tool
 
-**Status**: Non-blocking (tool returns error message, LLM handles gracefully)
+**Resolution**: Fixed by updating StochasticAnalyzer to properly handle async operations (v0.6.x)
 
-**Fix**: TODO - Investigate StochasticAnalyzer async generator usage
+### 2. Parallel Tool Calling - ✅ ACCEPTED
 
-### 2. Parallel Tool Calling
+**Finding**: ChatTongyi/DashScope does NOT support parallel tool calls (sequential only)
 
-**Finding**: ChatTongyi does NOT support parallel tool calls (sequential only)
+**Status**: Accepted limitation - sequential chaining is sufficient for financial analysis workflows
 
-**Impact**: Tools called sequentially (e.g., Fib → wait → Stoch)
-
-**Mitigation**: Not needed - sequential chaining is sufficient for financial analysis
-
-### 3. Langfuse SOCKS Proxy Issue
+### 3. Langfuse SOCKS Proxy Issue - ✅ RESOLVED
 
 **Issue**: `httpx` SOCKS proxy error in local environment
 
-**Workaround**: Langfuse integration temporarily disabled in code
+**Resolution**: Langfuse now deployed to production (https://monitor.klinecubic.cn) with direct connectivity. Local dev uses Docker network without proxy issues.
 
-**Fix**: TODO - Configure proxy settings or install `httpx[socks]`
-
-### 4. Test Fixture Warnings
+### 4. Test Fixture Warnings - ⚠️ LOW PRIORITY
 
 **Issue**: `pytest-asyncio` warnings about async fixtures
 
-**Status**: Non-blocking (tests pass)
-
-**Fix**: TODO - Convert to `@pytest_asyncio.fixture` decorators
+**Status**: Non-blocking (tests pass). Deprioritized as it doesn't affect functionality.
 
 ---
 
-## API Integration (TODO)
+## API Integration - ✅ COMPLETED
 
-### Planned Endpoint
+### Current Endpoint
+
+The ReAct agent is now the **primary chat endpoint**:
 
 ```python
-# backend/src/api/chat_react.py (NEW)
-@router.post("/chat/react")
-async def chat_with_react_agent(
-    request: ChatRequest,
-    settings: Settings = Depends(get_settings),
-    ticker_service: TickerDataService = Depends(get_ticker_service),
-):
-    agent = FinancialAnalysisReActAgent(settings, ticker_service)
-    result = await agent.ainvoke(request.message, request.history)
-
-    return ChatResponse(
-        answer=result["final_answer"],
-        tool_executions=result["tool_executions"],
-        trace_id=result["trace_id"]
-    )
+# backend/src/api/chat/endpoints.py
+@router.post("/message")
+async def send_message(...):
+    # Uses FinancialAnalysisReActAgent for all chat interactions
+    agent = FinancialAnalysisReActAgent(...)
+    result = await agent.astream(...)
 ```
 
-**Status**: Not yet implemented (agent tested, API endpoint pending)
+**Status**: ✅ Fully deployed to production (v0.7.0+)
 
 ---
 
-## Migration Path
+## Migration Status - ✅ COMPLETED
 
-### Phase 1: Parallel Deployment (CURRENT)
+### ~~Phase 1: Parallel Deployment~~ → COMPLETED
+
+### ~~Phase 2: A/B Testing~~ → SKIPPED (SDK agent proven superior)
+
+### Phase 3: Full Migration → ✅ COMPLETED (v0.7.0)
 
 ```
-├── /api/chat (existing endpoint)
-│   └── Uses CustomAgent (langgraph_agent.py)
-│
-└── /api/chat/react (new endpoint - TODO)
-    └── Uses SDKAgent (langgraph_react_agent.py)
+/api/chat/message
+└── Uses SDKAgent (langgraph_react_agent.py)
+    └── With streaming tool execution progress
+    └── With context compaction (v0.8.8)
 ```
 
-### Phase 2: A/B Testing
-
-- 50% traffic to SDK agent
-- 50% traffic to custom agent
-- Compare: latency, cost, answer quality, user satisfaction
-
-### Phase 3: Full Migration
-
-- Default to SDK agent
-- Deprecate custom agent
-- Remove 730 lines of boilerplate
+**Result**: Custom state machine agent (`langgraph_agent.py`) deprecated. SDK ReAct agent is now the sole implementation.
 
 ---
 

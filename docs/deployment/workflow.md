@@ -2,17 +2,102 @@
 
 ## Overview
 
-This document describes the complete workflow for deploying code changes to the Financial Agent test environment on Azure Kubernetes Service (AKS).
+This document describes deployment workflows for the Financial Agent platform.
+
+> ⚠️ **Environment Status**:
+> - **Production (ACK)**: ✅ Active - https://klinecubic.cn - See [Production Deployment](#production-deployment-ack)
+> - **Test (AKS)**: 🚧 Planned - https://klinematrix.com - Not yet deployed
+
+**Current Workflow**: Local Development → Production (ACK)
+
+---
+
+## Test Environment (AKS) - PLANNED
+
+> **Note**: The test environment described below is **planned but not yet deployed**. For current deployments, skip to [Production Deployment](#production-deployment-ack).
 
 **Environment**: Test (`klinematrix-test` namespace)
-**Domain**: https://klinematrix.com
-**Users**: 10 beta testers
+**Domain**: https://klinematrix.com (not active)
+**Status**: 🚧 Planned
 
-## Current Deployment Method: Manual
+## Current Deployment Method: GitHub Actions CI/CD
 
-**Note**: GitHub Actions CI/CD is planned but not yet implemented. All deployments are currently manual.
+**Status**: ✅ Implemented
 
-## Manual Deployment Workflow
+### CI/CD Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    PR to main (Trigger)                             │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  .github/workflows/pr-checks.yml                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│  1. branch-policy    → Validate users/{name}/{feature} format       │
+│  2. unit-tests       → pytest (backend) + npm test (frontend)       │
+│  3. ai-summary       → Gemini writes PR description (parallel)      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Push to main (PR merged)                         │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  .github/workflows/deploy.yml                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  1. detect-changes   → Determine which components changed           │
+│  2. build-backend    → Build & push to Azure ACR (if changed)       │
+│  3. build-frontend   → Build & push to Azure ACR (if changed)       │
+│  4. deploy           → kubectl apply to ACK cluster                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Contributor Workflow
+
+```bash
+# 1. Create feature branch (REQUIRED naming convention)
+git checkout -b users/YOUR_NAME/feature-name
+
+# 2. Make changes and test locally
+make fmt && make lint && make test
+
+# 3. Bump version (required for every commit)
+./scripts/bump-version.sh backend patch   # or frontend, minor, major
+
+# 4. Push and create PR
+git push -u origin users/YOUR_NAME/feature-name
+# → Open PR on GitHub
+# → AI writes description automatically
+# → Wait for "Unit Tests" to pass
+# → Get 1 review approval
+# → Merge → Auto-deploys to production
+```
+
+### Branch Protection Rules
+
+| Rule | Setting |
+|------|---------|
+| Direct push to main | ❌ Blocked (except admin `allenpan`) |
+| PR required | ✅ Yes |
+| Required reviews | 1 approving review |
+| Required checks | "Unit Tests" must pass |
+| Dismiss stale reviews | ✅ Yes |
+
+### GitHub Secrets Required
+
+| Secret | Description |
+|--------|-------------|
+| `GEMINI_API_KEY` | Google Gemini API key for AI PR summaries |
+| `AZURE_ACR_USERNAME` | Azure Container Registry username |
+| `AZURE_ACR_PASSWORD` | Azure Container Registry password |
+| `ACK_KUBECONFIG` | Base64-encoded kubeconfig for Alibaba ACK |
+
+---
+
+## Manual Deployment Workflow (Fallback)
 
 ### Step 1: Make Code Changes
 
