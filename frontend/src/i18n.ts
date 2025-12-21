@@ -27,6 +27,7 @@ i18n
       "market",
       "feedback",
       "validation",
+      "insights",
     ],
     defaultNS: "common",
 

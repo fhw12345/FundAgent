@@ -20,6 +20,7 @@ AI-Enhanced Financial Analysis Platform documentation hub.
 ## Quick Navigation
 
 ### Essential Links
+- [PRD (Product Requirements)](prd.md) - Complete product specification
 - [Getting Started](development/getting-started.md) - Local development setup
 - [System Design](architecture/system-design.md) - Architecture overview
 - [Deployment Workflow](deployment/workflow.md) - Deploy to cloud

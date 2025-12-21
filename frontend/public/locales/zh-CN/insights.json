@@ -1,0 +1,41 @@
+{
+  "page": {
+    "title": "市场洞察",
+    "description": "AI驱动的市场分析，透明可解释"
+  },
+  "categories": {
+    "title": "分类",
+    "empty": "暂无分类",
+    "loading": "加载分类中..."
+  },
+  "category": {
+    "composite_score": "综合评分",
+    "metrics": "指标",
+    "last_updated": "最后更新",
+    "refresh": "刷新",
+    "refreshing": "刷新中...",
+    "refresh_success": "分类刷新成功",
+    "refresh_error": "刷新分类失败"
+  },
+  "metric": {
+    "score": "评分",
+    "status": "状态",
+    "explanation": "解释",
+    "methodology": "计算方法",
+    "data_sources": "数据来源",
+    "raw_data": "原始数据",
+    "historical_context": "历史背景",
+    "actionable_insight": "对您的意义"
+  },
+  "status": {
+    "low": "低风险",
+    "normal": "正常",
+    "elevated": "偏高",
+    "high": "高风险"
+  },
+  "errors": {
+    "load_failed": "加载洞察失败",
+    "category_not_found": "未找到分类",
+    "metric_not_found": "未找到指标"
+  }
+}

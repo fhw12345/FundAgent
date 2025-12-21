@@ -1,0 +1,41 @@
+{
+  "page": {
+    "title": "Market Insights",
+    "description": "AI-powered market analysis with transparent explanations"
+  },
+  "categories": {
+    "title": "Categories",
+    "empty": "No categories available",
+    "loading": "Loading categories..."
+  },
+  "category": {
+    "composite_score": "Composite Score",
+    "metrics": "Metrics",
+    "last_updated": "Last updated",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "refresh_success": "Category refreshed successfully",
+    "refresh_error": "Failed to refresh category"
+  },
+  "metric": {
+    "score": "Score",
+    "status": "Status",
+    "explanation": "Explanation",
+    "methodology": "Methodology",
+    "data_sources": "Data Sources",
+    "raw_data": "Raw Data",
+    "historical_context": "Historical Context",
+    "actionable_insight": "What This Means For You"
+  },
+  "status": {
+    "low": "Low Risk",
+    "normal": "Normal",
+    "elevated": "Elevated",
+    "high": "High Risk"
+  },
+  "errors": {
+    "load_failed": "Failed to load insights",
+    "category_not_found": "Category not found",
+    "metric_not_found": "Metric not found"
+  }
+}

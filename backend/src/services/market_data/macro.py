@@ -371,3 +371,81 @@ class MacroMixin(AlphaVantageBase):
                 error=str(e),
             )
             raise
+
+    async def get_treasury_yield(
+        self, maturity: str = "10year", interval: str = "monthly"
+    ) -> pd.DataFrame:
+        """
+        Get Treasury yield data using TREASURY_YIELD endpoint.
+
+        Args:
+            maturity: Treasury maturity (3month, 2year, 5year, 7year, 10year, 30year)
+            interval: daily, weekly, or monthly (default)
+
+        Returns:
+            DataFrame with date index and value (yield percentage) column
+        """
+        try:
+            valid_maturities = ["3month", "2year", "5year", "7year", "10year", "30year"]
+            if maturity not in valid_maturities:
+                raise ValueError(
+                    f"Invalid maturity: {maturity}. Use one of: {', '.join(valid_maturities)}"
+                )
+
+            response = await self.client.get(
+                self.base_url,
+                params={
+                    "function": "TREASURY_YIELD",
+                    "interval": interval,
+                    "maturity": maturity,
+                    "apikey": self.api_key,
+                },
+            )
+
+            if response.status_code != 200:
+                sanitized_text = self._sanitize_text(response.text)
+                raise ValueError(
+                    f"Alpha Vantage API error: {response.status_code} - {sanitized_text}"
+                )
+
+            data = response.json()
+
+            if "data" not in data:
+                sanitized = self._sanitize_response(data)
+                raise ValueError(f"No TREASURY_YIELD data available: {sanitized}")
+
+            # Convert to DataFrame
+            df_data = []
+            for item in data["data"]:
+                # Skip entries with "." as value (no data)
+                if item.get("value") == ".":
+                    continue
+                df_data.append(
+                    {
+                        "date": pd.to_datetime(item["date"]),
+                        "value": float(item["value"]),
+                    }
+                )
+
+            df = pd.DataFrame(df_data)
+            if not df.empty:
+                df.set_index("date", inplace=True)
+                df.sort_index(inplace=True)
+
+            logger.info(
+                "TREASURY_YIELD data fetched",
+                maturity=maturity,
+                interval=interval,
+                data_points=len(df),
+            )
+
+            return df
+
+        except Exception as e:
+            logger.error(
+                "TREASURY_YIELD fetch failed",
+                maturity=maturity,
+                interval=interval,
+                error=str(e),
+            )
+            raise

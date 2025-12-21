@@ -5,6 +5,7 @@ import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
 import { LoginPage } from "./components/LoginPage";
 import HealthPage from "./pages/HealthPage";
 import FeedbackPage from "./pages/FeedbackPage";
+import InsightsPage from "./pages/InsightsPage";
 import { TransactionHistory } from "./pages/TransactionHistory";
 import PortfolioDashboard from "./pages/PortfolioDashboard";
 import { CreditBalance } from "./components/credits/CreditBalance";
@@ -15,7 +16,7 @@ import { LanguageSwitcher } from "./components/LanguageSwitcher";
 function App() {
   const { t } = useTranslation(["common", "auth"]);
   const [activeTab, setActiveTab] = useState<
-    "health" | "chat" | "portfolio" | "feedback" | "transactions"
+    "health" | "chat" | "portfolio" | "insights" | "feedback" | "transactions"
   >("chat");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
@@ -139,6 +140,16 @@ function App() {
                 {t("common:navigation.portfolio")}
               </button>
               <button
+                onClick={() => setActiveTab("insights")}
+                className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
+                  activeTab === "insights"
+                    ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/30"
+                    : "text-gray-700 hover:bg-gray-100/80"
+                }`}
+              >
+                {t("common:navigation.insights")}
+              </button>
+              <button
                 onClick={() => setActiveTab("feedback")}
                 className={`px-3 sm:px-5 py-1.5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-lg sm:rounded-xl transition-all duration-200 ${
                   activeTab === "feedback"
@@ -183,6 +194,8 @@ function App() {
         {activeTab === "chat" && <EnhancedChatInterface />}
 
         {activeTab === "portfolio" && <PortfolioDashboard />}
+
+        {activeTab === "insights" && <InsightsPage />}
 
         {activeTab === "feedback" && <FeedbackPage />}
 

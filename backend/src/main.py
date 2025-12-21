@@ -25,6 +25,7 @@ from .api.credits import router as credits_router
 from .api.dependencies.rate_limit import limiter
 from .api.feedback import router as feedback_router
 from .api.health import router as health_router
+from .api.insights import router as insights_router
 from .api.llm_models import router as llm_models_router
 from .api.market_data import router as market_data_router
 from .api.portfolio import router as portfolio_router
@@ -211,6 +212,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.market_service = market_service
         app.state.alpaca_trading_service = alpaca_trading_service
 
+        # Initialize Market Insights registry (singleton for all requests)
+        from .services.insights import InsightsCategoryRegistry
+
+        insights_registry = InsightsCategoryRegistry(
+            settings=settings,
+            redis_cache=redis_cache,
+            market_service=market_service,
+        )
+        app.state.insights_registry = insights_registry
+        logger.info(
+            "Insights registry initialized",
+            category_count=len(insights_registry.list_categories()),
+        )
+
         logger.info("Database connections started")
 
         yield
@@ -325,6 +340,7 @@ def create_app() -> FastAPI:
     app.include_router(credits_router)  # Token-based credit economy
     app.include_router(llm_models_router)  # LLM model selection and pricing
     app.include_router(feedback_router)  # Feedback & Community Roadmap platform
+    app.include_router(insights_router)  # Market Insights Platform
 
     @app.get("/")
     async def root() -> dict[str, str]:

@@ -60,9 +60,11 @@ from ..core.localization import (
 )
 from ..core.utils import extract_token_usage_from_messages
 from ..services.alphavantage_response_formatter import AlphaVantageResponseFormatter
+from ..services.insights import InsightsCategoryRegistry
 from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
+from .tools.insights_tools import create_insights_tools
 
 logger = structlog.get_logger()
 
@@ -167,9 +169,19 @@ class FinancialAnalysisReActAgent:
         )
         self.tools.extend(alpha_vantage_tools)
 
+        # Add Market Insights tools (category analysis, metrics)
+        insights_registry = InsightsCategoryRegistry(
+            settings=settings,
+            redis_cache=None,  # Registry will work without cache (uses API directly)
+            market_service=market_service,
+        )
+        insights_tools = create_insights_tools(insights_registry)
+        self.tools.extend(insights_tools)
+
         # Track tool counts for logging
         base_tool_count = len(base_tools)
         alpha_vantage_tool_count = len(alpha_vantage_tools)
+        insights_tool_count = len(insights_tools)
 
         # Create ReAct agent with memory and custom system prompt
         self.checkpointer = MemorySaver()
@@ -185,6 +197,7 @@ class FinancialAnalysisReActAgent:
             agent_type="langgraph_sdk",
             base_tools=base_tool_count,
             alpha_vantage_tools=alpha_vantage_tool_count,
+            insights_tools=insights_tool_count,
             total_local_tools=len(self.tools),
         )
 
