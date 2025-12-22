@@ -1,0 +1,36 @@
+title: Market Insights Platform E2E Test
+slug: market-insights-e2e
+starred: true
+tags:
+  - insights
+  - e2e
+  - core-feature
+estimatedDuration: 120
+steps:
+  - id: '01'
+    title: Login and Navigate to Insights
+    file: 01-login-and-navigate-to-insights.md
+  - id: '02'
+    title: Verify Category List
+    file: 02-verify-category-list.md
+  - id: '03'
+    title: Open Category Detail View
+    file: 03-open-category-detail-view.md
+  - id: '04'
+    title: Verify Composite Score Display
+    file: 04-verify-composite-score-display.md
+  - id: '05'
+    title: Expand Metric Card
+    file: 05-expand-metric-card.md
+  - id: '06'
+    title: Test Refresh Functionality
+    file: 06-test-refresh-functionality.md
+  - id: '07'
+    title: Navigate Back to Category List
+    file: 07-navigate-back-to-category-list.md
+totalRuns: 0
+passCount: 0
+failCount: 0
+lastRun: null
+lastResult: null
+avgDuration: 0

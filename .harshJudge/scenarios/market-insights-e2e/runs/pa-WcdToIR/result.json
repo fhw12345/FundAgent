@@ -1,0 +1,71 @@
+{
+  "runId": "pa-WcdToIR",
+  "scenarioSlug": "market-insights-e2e",
+  "status": "running",
+  "startedAt": "2025-12-20T13:16:39.084Z",
+  "steps": [
+    {
+      "id": "01",
+      "status": "pass",
+      "duration": 5000,
+      "error": null,
+      "evidenceFiles": [
+        "Insights Page Navigation.png"
+      ]
+    },
+    {
+      "id": "02",
+      "status": "pass",
+      "duration": 2000,
+      "error": null,
+      "evidenceFiles": [
+        "Category List Verification.json"
+      ]
+    },
+    {
+      "id": "03",
+      "status": "pass",
+      "duration": 3000,
+      "error": null,
+      "evidenceFiles": [
+        "Category Detail View.png"
+      ]
+    },
+    {
+      "id": "04",
+      "status": "pass",
+      "duration": 2000,
+      "error": null,
+      "evidenceFiles": [
+        "Composite Score Verification.json"
+      ]
+    },
+    {
+      "id": "05",
+      "status": "pass",
+      "duration": 2000,
+      "error": null,
+      "evidenceFiles": [
+        "Expanded Metric Card.png"
+      ]
+    },
+    {
+      "id": "06",
+      "status": "pass",
+      "duration": 40000,
+      "error": null,
+      "evidenceFiles": [
+        "After Refresh.png"
+      ]
+    },
+    {
+      "id": "07",
+      "status": "pass",
+      "duration": 1000,
+      "error": null,
+      "evidenceFiles": [
+        "Back to Category List.png"
+      ]
+    }
+  ]
+}

@@ -111,3 +111,5 @@ dump.rdb
 
 # Testing artifacts
 .playwright-mcp/
+
+.bmad-core/
