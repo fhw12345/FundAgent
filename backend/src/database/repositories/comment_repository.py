@@ -11,6 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.feedback import Comment, CommentCreate
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -70,7 +71,7 @@ class CommentRepository:
         # Generate comment_id
         comment_id = f"comment_{uuid.uuid4().hex[:12]}"
 
-        now = datetime.utcnow()
+        now = utcnow()
 
         # Create database document
         comment_dict = {

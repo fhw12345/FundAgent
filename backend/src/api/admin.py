@@ -30,6 +30,7 @@ from .dependencies.auth import (
 )
 from .schemas.admin_models import DatabaseStats, HealthResponse, SystemMetrics
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -115,7 +116,7 @@ async def get_system_health(
                 )
 
     metrics = SystemMetrics(
-        timestamp=datetime.utcnow(),
+        timestamp=utcnow(),
         database=database_stats,
         pods=pods,
         nodes=nodes,
@@ -176,7 +177,7 @@ async def trigger_portfolio_analysis(
     Raises:
         HTTPException: 401 if not authenticated as admin
     """
-    run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    run_id = f"run_{utcnow().strftime('%Y%m%d_%H%M%S')}"
 
     logger.info(
         "Portfolio analysis triggered via API",

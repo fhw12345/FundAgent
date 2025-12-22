@@ -21,6 +21,10 @@ from .yfinance_utils import (
     map_frontend_to_alphavantage,
     map_timeframe_to_yfinance_interval,
 )
+from .date_utils import (
+    utcnow,
+    utcfromtimestamp,
+)
 
 __all__ = [
     # Interval mapping
@@ -39,4 +43,7 @@ __all__ = [
     # Token utilities
     "extract_token_usage_from_messages",
     "extract_token_usage_from_agent_result",
+    # Date utilities (replacements for deprecated datetime methods)
+    "utcnow",
+    "utcfromtimestamp",
 ]

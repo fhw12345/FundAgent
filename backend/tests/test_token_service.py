@@ -23,6 +23,7 @@ from src.services.token_service import TokenService
 # ===== Fixtures =====
 
 
+from src.core.utils.date_utils import utcnow, utcfromtimestamp
 @pytest.fixture
 def mock_settings():
     """Mock settings with test secret key"""
@@ -60,7 +61,7 @@ def mock_user():
         password_hash=None,
         email_verified=True,
         is_admin=False,
-        created_at=datetime.utcnow(),
+        created_at=utcnow(),
         last_login=None,
     )
 
@@ -179,8 +180,8 @@ class TestCreateAccessToken:
 
         # Check expiration is approximately ACCESS_TOKEN_EXPIRE_MINUTES from now
         exp_timestamp = payload["exp"]
-        exp_datetime = datetime.utcfromtimestamp(exp_timestamp)
-        expected_exp = datetime.utcnow() + timedelta(minutes=token_service.ACCESS_TOKEN_EXPIRE_MINUTES)
+        exp_datetime = utcfromtimestamp(exp_timestamp)
+        expected_exp = utcnow() + timedelta(minutes=token_service.ACCESS_TOKEN_EXPIRE_MINUTES)
         assert abs((exp_datetime - expected_exp).total_seconds()) < 5  # Within 5 seconds
 
     def test_create_access_token_unique_jti(self, token_service, mock_user, mock_settings):
@@ -277,8 +278,8 @@ class TestVerifyAccessToken:
         payload = {
             "sub": "user_123",
             "type": "refresh",  # Wrong type
-            "exp": datetime.utcnow() + timedelta(days=7),
-            "iat": datetime.utcnow(),
+            "exp": utcnow() + timedelta(days=7),
+            "iat": utcnow(),
         }
         token = jwt.encode(payload, "test_secret_key_for_testing", algorithm="HS256")
 
@@ -296,8 +297,8 @@ class TestVerifyAccessToken:
             payload = {
                 "sub": "user_123",
                 "type": "access",
-                "exp": datetime.utcnow() - timedelta(minutes=1),  # Expired 1 min ago
-                "iat": datetime.utcnow() - timedelta(minutes=31),
+                "exp": utcnow() - timedelta(minutes=1),  # Expired 1 min ago
+                "iat": utcnow() - timedelta(minutes=31),
             }
             token = jwt.encode(payload, "test_secret_key", algorithm="HS256")
 
@@ -314,8 +315,8 @@ class TestVerifyAccessToken:
             mock_settings.secret_key = "test_secret_key"
             payload = {
                 "type": "access",
-                "exp": datetime.utcnow() + timedelta(minutes=30),
-                "iat": datetime.utcnow(),
+                "exp": utcnow() + timedelta(minutes=30),
+                "iat": utcnow(),
             }
             token = jwt.encode(payload, "test_secret_key", algorithm="HS256")
 
@@ -332,8 +333,8 @@ class TestVerifyAccessToken:
             payload = {
                 "sub": "user_123",
                 "type": "access",
-                "exp": datetime.utcnow() + timedelta(minutes=30),
-                "iat": datetime.utcnow(),
+                "exp": utcnow() + timedelta(minutes=30),
+                "iat": utcnow(),
             }
             token = jwt.encode(payload, "wrong_secret", algorithm="HS256")
 
@@ -462,7 +463,7 @@ class TestRefreshAccessToken:
                 token_id="token_id_123",
                 user_id=mock_user.user_id,
                 token_hash=token_hash,
-                expires_at=datetime.utcnow() + timedelta(days=7),
+                expires_at=utcnow() + timedelta(days=7),
                 user_agent="Mozilla/5.0",
                 ip_address="192.168.1.100",
                 revoked=False,
@@ -500,7 +501,7 @@ class TestRefreshAccessToken:
                 token_id="token_id_123",
                 user_id=mock_user.user_id,
                 token_hash=token_hash,
-                expires_at=datetime.utcnow() + timedelta(days=7),
+                expires_at=utcnow() + timedelta(days=7),
                 user_agent=None,
                 ip_address=None,
                 revoked=False,
@@ -555,11 +556,11 @@ class TestRefreshAccessToken:
                 token_id="token_id_123",
                 user_id=mock_user.user_id,
                 token_hash=token_hash,
-                expires_at=datetime.utcnow() + timedelta(days=7),
+                expires_at=utcnow() + timedelta(days=7),
                 user_agent=None,
                 ip_address=None,
                 revoked=True,  # Revoked!
-                revoked_at=datetime.utcnow(),
+                revoked_at=utcnow(),
             )
             mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
 
@@ -598,8 +599,8 @@ class TestRefreshAccessToken:
                 "sub": "user_123",
                 "type": "refresh",
                 "token_value": "expired_token",
-                "exp": datetime.utcnow() - timedelta(days=1),  # Expired
-                "iat": datetime.utcnow() - timedelta(days=8),
+                "exp": utcnow() - timedelta(days=1),  # Expired
+                "iat": utcnow() - timedelta(days=8),
             }
             expired_token = jwt.encode(payload, "test_secret_key", algorithm="HS256")
 

@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.message import Message, MessageCreate, MessageMetadata
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -63,7 +64,7 @@ class MessageRepository:
             role=message_create.role,
             content=message_create.content,
             source=message_create.source,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             metadata=message_create.metadata,
             tool_call=message_create.tool_call,
         )

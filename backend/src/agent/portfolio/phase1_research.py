@@ -14,6 +14,7 @@ from ...models.chat import ChatCreate
 from ...models.message import MessageCreate, MessageMetadata
 from ...models.trading_decision import SymbolAnalysisResult
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -42,7 +43,7 @@ class Phase1ResearchMixin:
         """
         try:
             # Generate analysis_id for tracking
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
             analysis_id = f"{symbol}_{analysis_type}_{timestamp}"
 
             logger.info(
@@ -443,7 +444,7 @@ Technical terms can include English in parentheses for clarity.
                             await self.watchlist_repo.update_last_analyzed(
                                 watchlist_item.watchlist_id,
                                 user_id,
-                                datetime.utcnow(),
+                                utcnow(),
                             )
                         else:
                             result_summary["errors"].append(

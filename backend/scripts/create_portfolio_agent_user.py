@@ -23,6 +23,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from src.core.config import get_settings
 
 
+from src.core.utils.date_utils import utcnow
 async def create_portfolio_agent_user():
     """Create portfolio_agent system user."""
     settings = get_settings()
@@ -55,7 +56,7 @@ async def create_portfolio_agent_user():
         "total_tokens_used": 0,
         "total_credits_spent": 0.0,
         "feedbackVotes": [],
-        "created_at": datetime.utcnow(),
+        "created_at": utcnow(),
         "last_login": None,
     }
 

@@ -17,6 +17,7 @@ from ..database.repositories.refresh_token_repository import RefreshTokenReposit
 from ..models.refresh_token import RefreshToken, TokenPair
 from ..models.user import User
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 settings = get_settings()
 
@@ -68,7 +69,7 @@ class TokenService:
             token_id=str(uuid.uuid4()),
             user_id=user.user_id,
             token_hash=token_hash,
-            expires_at=datetime.utcnow()
+            expires_at=utcnow()
             + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS),
             user_agent=user_agent,
             ip_address=ip_address,
@@ -103,7 +104,7 @@ class TokenService:
         Returns:
             JWT access token string
         """
-        now = datetime.utcnow()
+        now = utcnow()
         expire = now + timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES)
 
         payload = {
@@ -129,7 +130,7 @@ class TokenService:
         Returns:
             JWT refresh token string
         """
-        now = datetime.utcnow()
+        now = utcnow()
         expire = now + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS)
 
         payload = {
@@ -223,7 +224,7 @@ class TokenService:
                     token_id=str(uuid.uuid4()),
                     user_id=user_id,
                     token_hash=new_token_hash,
-                    expires_at=datetime.utcnow()
+                    expires_at=utcnow()
                     + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS),
                     user_agent=db_token.user_agent,
                     ip_address=db_token.ip_address,
@@ -263,7 +264,7 @@ class TokenService:
 
     def _create_access_token_from_payload(self, refresh_payload: dict[str, Any]) -> str:
         """Create access token from refresh token payload."""
-        now = datetime.utcnow()
+        now = utcnow()
         expire = now + timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES)
 
         payload = {
@@ -284,7 +285,7 @@ class TokenService:
         self, user_id: str, token_value: str
     ) -> str:
         """Create refresh token JWT from user_id."""
-        now = datetime.utcnow()
+        now = utcnow()
         expire = now + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS)
 
         payload = {

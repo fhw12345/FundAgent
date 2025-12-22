@@ -11,6 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.chat import Chat, ChatCreate, ChatUpdate, UIState
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -71,8 +72,8 @@ class ChatRepository:
             is_archived=False,
             ui_state=UIState(),  # Default empty UI state
             last_message_preview=None,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utcnow(),
+            updated_at=utcnow(),
             last_message_at=None,
         )
 
@@ -157,7 +158,7 @@ class ChatRepository:
             Updated chat if found, None otherwise
         """
         # Build update dict (only include non-None fields)
-        update_dict: dict[str, Any] = {"updated_at": datetime.utcnow()}
+        update_dict: dict[str, Any] = {"updated_at": utcnow()}
 
         if chat_update.title is not None:
             update_dict["title"] = chat_update.title
@@ -204,7 +205,7 @@ class ChatRepository:
             {
                 "$set": {
                     "ui_state": ui_state.model_dump(),
-                    "updated_at": datetime.utcnow(),
+                    "updated_at": utcnow(),
                 }
             },
             return_document=True,
@@ -236,8 +237,8 @@ class ChatRepository:
             {"chat_id": chat_id},
             {
                 "$set": {
-                    "last_message_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
+                    "last_message_at": utcnow(),
+                    "updated_at": utcnow(),
                 }
             },
             return_document=True,

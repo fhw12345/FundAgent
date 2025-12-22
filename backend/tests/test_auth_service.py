@@ -23,6 +23,7 @@ from src.services.auth_service import AuthService
 # ===== Fixtures =====
 
 
+from src.core.utils.date_utils import utcnow
 @pytest.fixture
 def mock_user_repo():
     """Mock UserRepository"""
@@ -277,7 +278,7 @@ class TestJWTTokens:
         from src.core.config import get_settings
         settings = get_settings()
 
-        expire = datetime.utcnow() - timedelta(hours=1)  # Expired
+        expire = utcnow() - timedelta(hours=1)  # Expired
         payload = {"sub": "user_123", "exp": expire}
         expired_token = jwt.encode(payload, settings.secret_key, algorithm=AuthService.ALGORITHM)
 
@@ -290,7 +291,7 @@ class TestJWTTokens:
     def test_verify_token_invalid_signature(self, auth_service):
         """Test verification of token with invalid signature"""
         # Arrange - Create token with wrong secret
-        payload = {"sub": "user_123", "exp": datetime.utcnow() + timedelta(days=1)}
+        payload = {"sub": "user_123", "exp": utcnow() + timedelta(days=1)}
         invalid_token = jwt.encode(payload, "wrong_secret_key", algorithm=AuthService.ALGORITHM)
 
         # Act

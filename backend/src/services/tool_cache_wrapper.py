@@ -19,6 +19,7 @@ from ..database.redis import RedisCache
 from ..database.repositories.tool_execution_repository import ToolExecutionRepository
 from ..models.tool_execution import ToolExecution
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -102,7 +103,7 @@ class ToolCacheWrapper:
             False
         """
         execution_id = f"exec_{uuid.uuid4().hex[:12]}"
-        start_time = datetime.utcnow()
+        start_time = utcnow()
 
         # Generate cache key
         cache_key = generate_tool_cache_key(tool_source, tool_name, params)
@@ -121,7 +122,7 @@ class ToolCacheWrapper:
 
         if cached_result is not None:
             # Cache hit - return immediately
-            duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            duration_ms = int((utcnow() - start_time).total_seconds() * 1000)
 
             logger.info(
                 "Tool cache hit",
@@ -171,7 +172,7 @@ class ToolCacheWrapper:
                 result = tool_func(**params)
 
             # Calculate duration
-            end_time = datetime.utcnow()
+            end_time = utcnow()
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             # Get API cost
@@ -225,7 +226,7 @@ class ToolCacheWrapper:
 
         except Exception as e:
             # Tool execution failed
-            end_time = datetime.utcnow()
+            end_time = utcnow()
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             logger.error(
@@ -300,7 +301,7 @@ class ToolCacheWrapper:
                 status=status,
                 error_message=error_message,
                 started_at=started_at,
-                completed_at=datetime.utcnow(),
+                completed_at=utcnow(),
                 duration_ms=duration_ms,
                 is_paid_api=is_paid_api,
                 api_cost=api_cost,

@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+from src.core.utils.date_utils import utcnow
 class RefreshToken(BaseModel):
     """Refresh token model for database storage."""
 
@@ -24,7 +25,7 @@ class RefreshToken(BaseModel):
     @property
     def is_expired(self) -> bool:
         """Check if token has expired."""
-        return datetime.utcnow() > self.expires_at
+        return utcnow() > self.expires_at
 
     @property
     def is_valid(self) -> bool:

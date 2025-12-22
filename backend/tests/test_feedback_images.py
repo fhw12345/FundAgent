@@ -18,6 +18,7 @@ from src.models.feedback import (
 )
 
 
+from src.core.utils.date_utils import utcnow
 class TestFeedbackImageModels:
     """Test feedback models with image support."""
 
@@ -80,8 +81,8 @@ class TestFeedbackImageModels:
             status="under_consideration",
             voteCount=5,
             commentCount=2,
-            createdAt=datetime.utcnow(),
-            updatedAt=datetime.utcnow(),
+            createdAt=utcnow(),
+            updatedAt=utcnow(),
             image_urls=[
                 "https://oss.example.com/feedback/img1.png",
                 "https://oss.example.com/feedback/img2.png",
@@ -106,8 +107,8 @@ class TestFeedbackImageModels:
             status="under_consideration",
             voteCount=0,
             commentCount=0,
-            createdAt=datetime.utcnow(),
-            updatedAt=datetime.utcnow(),
+            createdAt=utcnow(),
+            updatedAt=utcnow(),
             image_urls=[
                 "https://oss.example.com/feedback/img1.png",
             ],
@@ -128,8 +129,8 @@ class TestFeedbackImageModels:
             status="under_consideration",
             voteCount=0,
             commentCount=0,
-            createdAt=datetime.utcnow(),
-            updatedAt=datetime.utcnow(),
+            createdAt=utcnow(),
+            updatedAt=utcnow(),
         )
 
         assert item.image_urls == []

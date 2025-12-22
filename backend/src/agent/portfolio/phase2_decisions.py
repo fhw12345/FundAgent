@@ -16,6 +16,7 @@ from ...models.trading_decision import SymbolAnalysisResult
 if TYPE_CHECKING:
     from ...models.trading_decision import PortfolioDecisionList
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -212,7 +213,7 @@ Include short reasoning (1-2 sentences) for each decision.
             chat_id = await self._get_portfolio_decisions_chat_id()
 
             # Build analysis ID for this portfolio decision batch
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
             symbols_str = "_".join(sorted([a.symbol for a in symbol_analyses[:3]]))
             if len(symbol_analyses) > 3:
                 symbols_str += f"_+{len(symbol_analyses) - 3}more"
@@ -221,7 +222,7 @@ Include short reasoning (1-2 sentences) for each decision.
             # Format the message content as markdown
             message_content = "## 📊 Portfolio Trading Decisions\n\n"
             message_content += (
-                f"**Date:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
+                f"**Date:** {utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
             )
             message_content += f"**Symbols Analyzed:** {len(symbol_analyses)}\n"
             message_content += (
@@ -378,13 +379,13 @@ Include short reasoning (1-2 sentences) for each decision.
         try:
             chat_id = await self._get_portfolio_decisions_chat_id()
 
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
             analysis_id = f"portfolio_failed_{timestamp}"
 
             # Format failure message
             message_content = "## ⚠️ Portfolio Analysis Failed\n\n"
             message_content += (
-                f"**Date:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
+                f"**Date:** {utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
             )
             message_content += "**Status:** Phase 2 Skipped\n\n"
             message_content += f"### Reason\n\n{reason}\n\n"

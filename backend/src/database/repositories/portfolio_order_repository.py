@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.portfolio import PortfolioOrder
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -290,7 +291,7 @@ class PortfolioOrderRepository:
         # Build update dict
         update_dict = {
             "status": status,
-            "updated_at": datetime.utcnow(),
+            "updated_at": utcnow(),
         }
 
         if filled_qty is not None:

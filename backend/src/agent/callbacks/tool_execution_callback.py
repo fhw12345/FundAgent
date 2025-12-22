@@ -25,6 +25,7 @@ from ...core.localization import (
     get_tool_display_name,
 )
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -87,7 +88,7 @@ class ToolExecutionCallback(AsyncCallbackHandler):
             **kwargs: Additional metadata
         """
         tool_name = serialized.get("name", "unknown_tool")
-        start_time = datetime.utcnow()
+        start_time = utcnow()
 
         # Store active tool metadata
         self.active_tools[run_id] = {
@@ -140,10 +141,10 @@ class ToolExecutionCallback(AsyncCallbackHandler):
         """
         tool_info = self.active_tools.get(run_id, {})
         tool_name = tool_info.get("name", "unknown_tool")
-        start_time = tool_info.get("start_time", datetime.utcnow())
+        start_time = tool_info.get("start_time", utcnow())
 
         # Calculate duration
-        end_time = datetime.utcnow()
+        end_time = utcnow()
         duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
         # Truncate output for SSE (prevent huge payloads)
@@ -196,10 +197,10 @@ class ToolExecutionCallback(AsyncCallbackHandler):
         """
         tool_info = self.active_tools.get(run_id, {})
         tool_name = tool_info.get("name", "unknown_tool")
-        start_time = tool_info.get("start_time", datetime.utcnow())
+        start_time = tool_info.get("start_time", utcnow())
 
         # Calculate duration
-        end_time = datetime.utcnow()
+        end_time = utcnow()
         duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
         # Push event to SSE queue

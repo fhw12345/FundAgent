@@ -1,5 +1,5 @@
 # Multi-stage Docker build for production-ready Python backend
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Install system dependencies
 # hadolint ignore=DL3008
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 
 # Production stage
-FROM python:3.12-slim as production
+FROM python:3.12-slim AS production
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app

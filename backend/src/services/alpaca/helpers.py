@@ -16,6 +16,7 @@ from ...models.portfolio import PortfolioOrder, PortfolioPosition
 MAX_ORDER_VALUE = 500000  # Maximum order value in USD (safety limit for paper trading)
 
 
+from src.core.utils.date_utils import utcnow
 def validate_order_quantity(quantity: float) -> None:
     """
     Validate order quantity is positive.
@@ -161,5 +162,5 @@ def alpaca_position_to_portfolio_position(
         cost_basis=float(alpaca_position.cost_basis),
         unrealized_pl=float(alpaca_position.unrealized_pl),
         unrealized_pl_pct=float(alpaca_position.unrealized_plpc) * 100,  # Convert to %
-        first_acquired=datetime.utcnow(),  # Alpaca doesn't provide this
+        first_acquired=utcnow(),  # Alpaca doesn't provide this
     )

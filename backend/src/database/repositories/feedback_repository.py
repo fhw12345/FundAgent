@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.feedback import FeedbackItem, FeedbackItemCreate
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -71,7 +72,7 @@ class FeedbackRepository:
         # Generate item_id
         item_id = f"feedback_{uuid.uuid4().hex[:12]}"
 
-        now = datetime.utcnow()
+        now = utcnow()
 
         # Create database document
         item_dict = {
@@ -188,7 +189,7 @@ class FeedbackRepository:
             {"item_id": item_id},
             {
                 "$inc": {"voteCount": delta},
-                "$set": {"updatedAt": datetime.utcnow()},
+                "$set": {"updatedAt": utcnow()},
             },
             session=session,
         )
@@ -218,7 +219,7 @@ class FeedbackRepository:
             {"item_id": item_id},
             {
                 "$inc": {"commentCount": 1},
-                "$set": {"updatedAt": datetime.utcnow()},
+                "$set": {"updatedAt": utcnow()},
             },
         )
 
@@ -262,7 +263,7 @@ class FeedbackRepository:
             {
                 "$set": {
                     "status": status,
-                    "updatedAt": datetime.utcnow(),
+                    "updatedAt": utcnow(),
                 }
             },
         )

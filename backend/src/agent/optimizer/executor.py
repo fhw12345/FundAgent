@@ -22,6 +22,7 @@ from ...models.trading_decision import (
     SymbolAnalysisResult,
 )
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -193,7 +194,7 @@ class OrderExecutor:
                     filled_avg_price=None,
                     filled_at=None,
                     error_message=error_message,
-                    created_at=datetime.utcnow(),
+                    created_at=utcnow(),
                 )
                 failed_orders.append(failed_order)
                 failed += 1

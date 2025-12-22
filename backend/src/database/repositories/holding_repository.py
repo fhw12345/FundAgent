@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.holding import Holding, HoldingCreate, HoldingUpdate
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -80,8 +81,8 @@ class HoldingRepository:
             market_value=None,
             unrealized_pl=None,
             unrealized_pl_pct=None,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utcnow(),
+            updated_at=utcnow(),
             last_price_update=None,
         )
 
@@ -202,7 +203,7 @@ class HoldingRepository:
             Updated holding if found, None otherwise
         """
         # Build update dict
-        update_dict: dict[str, Any] = {"updated_at": datetime.utcnow()}
+        update_dict: dict[str, Any] = {"updated_at": utcnow()}
 
         if holding_update.quantity is not None:
             update_dict["quantity"] = holding_update.quantity

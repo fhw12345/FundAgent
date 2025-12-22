@@ -19,6 +19,7 @@ from .chat_manager import ChatManager
 from .context_handler import ContextHandler
 from .order_handler import OrderHandler
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -415,7 +416,7 @@ REASONING: [your analysis]
                     await self.watchlist_repo.update_last_analyzed(
                         watchlist_id=item.watchlist_id,
                         user_id=item.user_id,
-                        timestamp=datetime.utcnow(),
+                        timestamp=utcnow(),
                     )
 
                 # Small delay between analyses to avoid rate limiting

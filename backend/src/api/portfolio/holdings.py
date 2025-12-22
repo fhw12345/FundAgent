@@ -21,6 +21,7 @@ from ..schemas.portfolio_models import (
     PortfolioSummaryResponse,
 )
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 router = APIRouter()
@@ -70,9 +71,9 @@ async def get_holdings(
                 market_value=pos.market_value,
                 unrealized_pl=pos.unrealized_pl,
                 unrealized_pl_pct=pos.unrealized_pl_pct,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-                last_price_update=datetime.utcnow(),
+                created_at=utcnow(),
+                updated_at=utcnow(),
+                last_price_update=utcnow(),
             )
             holdings.append(HoldingResponse.from_holding(holding))
 

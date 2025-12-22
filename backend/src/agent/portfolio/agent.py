@@ -27,6 +27,7 @@ from .phase1_research import Phase1ResearchMixin
 from .phase2_decisions import Phase2DecisionsMixin
 from .phase3_execution import Phase3ExecutionMixin
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -104,8 +105,8 @@ class PortfolioAnalysisAgent(
         Returns:
             Execution summary with metrics
         """
-        run_id = f"run_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
-        started_at = datetime.utcnow()
+        run_id = f"run_{utcnow().strftime('%Y%m%d_%H%M%S')}"
+        started_at = utcnow()
 
         logger.info(
             "Portfolio analysis started",
@@ -129,7 +130,7 @@ class PortfolioAnalysisAgent(
 
         if not users_to_analyze:
             logger.info("No users with portfolios to analyze", run_id=run_id)
-            results["completed_at"] = datetime.utcnow().isoformat()
+            results["completed_at"] = utcnow().isoformat()
             return results
 
         # Analyze each user's portfolio
@@ -162,7 +163,7 @@ class PortfolioAnalysisAgent(
                 )
 
         # Calculate metrics
-        completed_at = datetime.utcnow()
+        completed_at = utcnow()
         duration_seconds = (completed_at - started_at).total_seconds()
 
         results["completed_at"] = completed_at.isoformat()

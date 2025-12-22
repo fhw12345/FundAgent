@@ -15,6 +15,7 @@ from ..models.user import User, UserCreate
 from .auth_providers import EmailAuthProvider
 from .password import verify_password
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 settings = get_settings()
 
@@ -311,13 +312,13 @@ class AuthService:
             JWT token string
         """
         expires_delta = timedelta(minutes=self.ACCESS_TOKEN_EXPIRE_MINUTES)
-        expire = datetime.utcnow() + expires_delta
+        expire = utcnow() + expires_delta
 
         # JWT payload
         payload = {
             "sub": user_id,  # Subject (user ID)
             "exp": expire,  # Expiration time
-            "iat": datetime.utcnow(),  # Issued at
+            "iat": utcnow(),  # Issued at
         }
 
         # Encode JWT

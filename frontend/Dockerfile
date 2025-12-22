@@ -1,5 +1,5 @@
 # Multi-stage Docker build for React frontend
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -21,7 +21,7 @@ ENV VITE_API_URL=${VITE_API_URL}
 RUN npx vite build
 
 # Production stage with nginx
-FROM nginx:alpine as production
+FROM nginx:alpine AS production
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -40,7 +40,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 CMD ["nginx", "-g", "daemon off;"]
 
 # Development stage
-FROM node:20-alpine as development
+FROM node:20-alpine AS development
 
 WORKDIR /app
 

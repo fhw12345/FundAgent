@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.refresh_token import RefreshToken
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -130,7 +131,7 @@ class RefreshTokenRepository:
         Returns:
             List of active refresh tokens
         """
-        now = datetime.utcnow()
+        now = utcnow()
         cursor = self.collection.find(
             {
                 "user_id": user_id,
@@ -158,7 +159,7 @@ class RefreshTokenRepository:
         """
         result = await self.collection.find_one_and_update(
             {"token_hash": token_hash},
-            {"$set": {"last_used_at": datetime.utcnow()}},
+            {"$set": {"last_used_at": utcnow()}},
             return_document=True,
         )
 
@@ -183,7 +184,7 @@ class RefreshTokenRepository:
             {
                 "$set": {
                     "revoked": True,
-                    "revoked_at": datetime.utcnow(),
+                    "revoked_at": utcnow(),
                 }
             },
         )
@@ -238,7 +239,7 @@ class RefreshTokenRepository:
                         {
                             "$set": {
                                 "revoked": True,
-                                "revoked_at": datetime.utcnow(),
+                                "revoked_at": utcnow(),
                             }
                         },
                         session=session,
@@ -286,7 +287,7 @@ class RefreshTokenRepository:
                     {
                         "$set": {
                             "revoked": True,
-                            "revoked_at": datetime.utcnow(),
+                            "revoked_at": utcnow(),
                         }
                     },
                 )
@@ -327,7 +328,7 @@ class RefreshTokenRepository:
             {
                 "$set": {
                     "revoked": True,
-                    "revoked_at": datetime.utcnow(),
+                    "revoked_at": utcnow(),
                 }
             },
         )
@@ -349,7 +350,7 @@ class RefreshTokenRepository:
             Number of tokens deleted
         """
         result = await self.collection.delete_many(
-            {"expires_at": {"$lt": datetime.utcnow()}}
+            {"expires_at": {"$lt": utcnow()}}
         )
         deleted_count: int = result.deleted_count
 
@@ -368,7 +369,7 @@ class RefreshTokenRepository:
         Returns:
             Number of active tokens
         """
-        now = datetime.utcnow()
+        now = utcnow()
         count: int = await self.collection.count_documents(
             {
                 "user_id": user_id,

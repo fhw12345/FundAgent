@@ -18,6 +18,7 @@ import tiktoken
 from ..core.config import Settings
 from ..models.message import Message
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -314,7 +315,7 @@ Key patterns and trends from the historical analyses are preserved in this summa
         """
         # Create summary message (source='llm' because it's AI-generated summary)
         summary_message = Message(
-            message_id=f"summary_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            message_id=f"summary_{utcnow().strftime('%Y%m%d%H%M%S')}",
             chat_id="compacted_context",
             role="user",
             content=f"""Here is a summary of previous portfolio analyses:
@@ -323,7 +324,7 @@ Key patterns and trends from the historical analyses are preserved in this summa
 
 usage: continued""",
             source="llm",
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=utcnow().isoformat(),
         )
 
         # Reconstruct: HEAD + Summary + TAIL

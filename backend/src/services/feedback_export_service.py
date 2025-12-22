@@ -14,6 +14,7 @@ from ..database.repositories.feedback_repository import FeedbackRepository
 from ..database.repositories.user_repository import UserRepository
 from ..models.feedback import Comment
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -69,7 +70,7 @@ class FeedbackExportService:
         markdown_lines = [
             "# Feedback & Community Roadmap Export",
             "",
-            f"Generated: {datetime.utcnow().isoformat()}",
+            f"Generated: {utcnow().isoformat()}",
             f"Total Items: {len(items)}",
             f"Total Comments: {len(all_comments)}",
             "",

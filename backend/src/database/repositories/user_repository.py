@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 from ...models.user import User, UserCreate
 from ...services.password import hash_password
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -66,7 +67,7 @@ class UserRepository:
             password_hash=password_hash,
             email_verified=False,  # Will be set to True after email verification
             is_admin=False,  # Default to non-admin
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
             last_login=None,
         )
 
@@ -202,7 +203,7 @@ class UserRepository:
         """
         result = await self.collection.find_one_and_update(
             {"user_id": user_id},
-            {"$set": {"last_login": datetime.utcnow()}},
+            {"$set": {"last_login": utcnow()}},
             return_document=True,  # Return updated document
         )
 

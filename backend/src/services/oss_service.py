@@ -17,6 +17,7 @@ import oss2
 import structlog
 from oss2.credentials import EnvironmentVariableCredentialsProvider
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 # Allowed MIME types for feedback image attachments
@@ -108,10 +109,10 @@ class OSSService:
             Unique object key
         """
         # Get current date for organization
-        date_path = datetime.utcnow().strftime("%Y/%m/%d")
+        date_path = utcnow().strftime("%Y/%m/%d")
 
         # Generate hash from user_id + timestamp for uniqueness
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = utcnow().isoformat()
         hash_input = f"{user_id}_{timestamp}_{filename}"
         file_hash = hashlib.sha256(hash_input.encode()).hexdigest()[:12]
 

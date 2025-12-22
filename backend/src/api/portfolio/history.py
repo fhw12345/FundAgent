@@ -22,6 +22,7 @@ from ..schemas.portfolio_models import (
     PortfolioHistoryResponse,
 )
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 router = APIRouter()
@@ -96,10 +97,10 @@ async def get_portfolio_history(
         if data_points:
             # Extend range to include analyses from past 7 days
             start_time = data_points[0].timestamp - timedelta(days=7)
-            end_time = datetime.utcnow()  # Include future analyses up to now
+            end_time = utcnow()  # Include future analyses up to now
         else:
-            start_time = datetime.utcnow() - timedelta(days=7)
-            end_time = datetime.utcnow()
+            start_time = utcnow() - timedelta(days=7)
+            end_time = utcnow()
 
         # NO LONGER SHOWING ANALYSIS MARKERS ON CHART
         # Analysis markers are now shown in sidebar chat history

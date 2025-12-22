@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ...models.watchlist import WatchlistItem, WatchlistItemCreate
 
+from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -67,7 +68,7 @@ class WatchlistRepository:
             watchlist_id=watchlist_id,
             user_id=user_id,
             symbol=watchlist_create.symbol.upper(),  # Normalize to uppercase
-            added_at=datetime.utcnow(),
+            added_at=utcnow(),
             last_analyzed_at=None,
             notes=watchlist_create.notes,
         )
@@ -171,7 +172,7 @@ class WatchlistRepository:
             True if updated, False if not found
         """
         if timestamp is None:
-            timestamp = datetime.utcnow()
+            timestamp = utcnow()
 
         result = await self.collection.update_one(
             {"watchlist_id": watchlist_id, "user_id": user_id},
@@ -204,7 +205,7 @@ class WatchlistRepository:
         """
         from datetime import timedelta
 
-        cutoff_time = datetime.utcnow() - timedelta(minutes=minutes)
+        cutoff_time = utcnow() - timedelta(minutes=minutes)
 
         # Find items either never analyzed OR analyzed before cutoff
         cursor = self.collection.find(
