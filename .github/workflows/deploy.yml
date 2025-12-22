@@ -197,19 +197,21 @@ jobs:
           cd .pipeline/k8s/overlays/prod
 
           # Update backend image if it was built
+          # Use context-aware sed to only update the backend entry (not frontend)
           if [ "${{ needs.build-backend.result }}" = "success" ]; then
             echo "📝 Updating backend image to prod-v${{ needs.detect-changes.outputs.backend_version }}"
-            sed -i 's|newTag: "prod-v[^"]*"|newTag: "prod-v${{ needs.detect-changes.outputs.backend_version }}"|' kustomization.yaml
+            sed -i '/klinecubic\/backend$/{n;s|newTag:.*|newTag: "prod-v${{ needs.detect-changes.outputs.backend_version }}"|;}' kustomization.yaml
           fi
 
           # Update frontend image if it was built
+          # Use context-aware sed to only update the frontend entry (not backend)
           if [ "${{ needs.build-frontend.result }}" = "success" ]; then
             echo "📝 Updating frontend image to prod-v${{ needs.detect-changes.outputs.frontend_version }}"
-            sed -i 's|newTag: "prod-v[^"]*"|newTag: "prod-v${{ needs.detect-changes.outputs.frontend_version }}"|' kustomization.yaml
+            sed -i '/klinecubic\/frontend$/{n;s|newTag:.*|newTag: "prod-v${{ needs.detect-changes.outputs.frontend_version }}"|;}' kustomization.yaml
           fi
 
           echo "📋 Updated kustomization.yaml:"
-          cat kustomization.yaml | grep -A2 "images:"
+          cat kustomization.yaml | grep -A6 "images:"
 
       - name: Setup Kustomize
         uses: imranismail/setup-kustomize@v2
