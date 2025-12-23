@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.9] - 2025-12-23
+
+### Added
+- Enable Redis caching for AI Sector Risk agent tools (30min TTL)
+
+
 ## [0.8.8] - 2025-12-14
 
 ### Added

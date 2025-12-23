@@ -165,12 +165,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             logger.info("Tool execution tracking initialized")
 
-            # Create agent with tool cache wrapper
+            # Create agent with tool cache wrapper and Redis for insights caching
             react_agent = FinancialAnalysisReActAgent(
                 settings=settings,
                 ticker_data_service=ticker_service,
                 market_service=market_service,
                 tool_cache_wrapper=tool_cache_wrapper,
+                redis_cache=redis_cache,  # Enable 30min caching for AI Sector Risk
             )
 
             # Store in app state for use in dependencies

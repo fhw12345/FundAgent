@@ -100,6 +100,7 @@ def get_ticker_data_service(
 def get_react_agent(
     settings: Settings = Depends(get_settings),
     ticker_service: TickerDataService = Depends(get_ticker_data_service),
+    redis_cache: RedisCache = Depends(get_redis),
 ) -> FinancialAnalysisReActAgent:
     """
     Get SDK ReAct agent with MCP tools (120 total: 2 local + 118 MCP).
@@ -143,6 +144,7 @@ def get_react_agent(
             settings=settings,
             ticker_data_service=ticker_service,
             # NOTE: tool_cache_wrapper not passed - no execution tracking in fallback mode
+            redis_cache=redis_cache,  # Enable insights caching even in fallback mode
         )
 
     return _react_agent_singleton

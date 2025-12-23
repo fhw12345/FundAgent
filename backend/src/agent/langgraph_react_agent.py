@@ -100,6 +100,7 @@ class FinancialAnalysisReActAgent:
         ticker_data_service: TickerDataService,
         market_service,  # AlphaVantageMarketDataService for market data
         tool_cache_wrapper: ToolCacheWrapper | None = None,
+        redis_cache=None,  # RedisCache for insights caching
     ):
         """
         Initialize ReAct agent with SDK and MCP tools.
@@ -109,11 +110,13 @@ class FinancialAnalysisReActAgent:
             ticker_data_service: Service for fetching ticker data
             market_service: Hybrid market data service for stock data
             tool_cache_wrapper: Optional wrapper for tool caching + tracking
+            redis_cache: Optional Redis cache for insights caching (30min TTL)
         """
         self.settings = settings
         self.market_service = market_service
         self.ticker_data_service = ticker_data_service
         self.tool_cache_wrapper = tool_cache_wrapper
+        self.redis_cache = redis_cache
 
         # Initialize Langfuse client globally (SDK v3 pattern)
         # Only enable if credentials are configured and library is available
@@ -170,9 +173,10 @@ class FinancialAnalysisReActAgent:
         self.tools.extend(alpha_vantage_tools)
 
         # Add Market Insights tools (category analysis, metrics)
+        # Cache TTL: 30 minutes for full category data, 24 hours for AI basket symbols
         insights_registry = InsightsCategoryRegistry(
             settings=settings,
-            redis_cache=None,  # Registry will work without cache (uses API directly)
+            redis_cache=self.redis_cache,  # Enable caching for 30min TTL
             market_service=market_service,
         )
         insights_tools = create_insights_tools(insights_registry)

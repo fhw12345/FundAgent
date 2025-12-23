@@ -261,6 +261,7 @@ async def run_portfolio_analysis_background(
             settings=settings,
             ticker_data_service=ticker_service,
             market_service=market_service,
+            redis_cache=redis_cache,  # Enable insights caching
         )
 
         logger.info(
