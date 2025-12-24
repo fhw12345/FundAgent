@@ -20,7 +20,7 @@ resources:
 - ../../base/redis/secret.yaml
 - ../../base/ingress/clusterissuer.yaml
 - ../../base/ingress/ingress.yaml
-- ../../base/cronjobs/reconcile-transactions.yaml
+# REMOVED: reconcile-transactions.yaml (deprecated, always errored)
 # Use HTTP trigger pattern for portfolio analysis (5MB curl vs 1.14GB backend image)
 # See docs/features/portfolio-analysis-cronjob-http.md for details
 - ../../base/cronjobs/portfolio-analysis-trigger.yaml
@@ -78,7 +78,7 @@ patches:
 images:
 - name: klinematrix/backend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/backend
-  newTag: "prod-v0.8.8"
+  newTag: "prod-v0.8.9"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend
   newTag: "prod-v0.11.4"

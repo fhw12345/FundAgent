@@ -218,6 +218,133 @@ jobs:
         with:
           kustomize-version: '5.3.0'
 
+      - name: Pre-pull images (cache warming with DaemonSet)
+        run: |
+          echo "🔥 Pre-pulling images to ALL nodes via DaemonSet..."
+
+          # Pre-pull backend image if it was built
+          if [ "${{ needs.build-backend.result }}" = "success" ]; then
+            BACKEND_IMAGE="${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/backend:prod-v${{ needs.detect-changes.outputs.backend_version }}"
+            echo "📦 Pre-pulling backend to all nodes: $BACKEND_IMAGE"
+
+            # Create DaemonSet to pull image on ALL nodes
+            cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: pre-pull-backend
+            namespace: ${{ env.K8S_NAMESPACE }}
+          spec:
+            selector:
+              matchLabels:
+                app: pre-pull-backend
+            template:
+              metadata:
+                labels:
+                  app: pre-pull-backend
+              spec:
+                imagePullSecrets:
+                - name: acr-secret
+                initContainers:
+                - name: pre-pull
+                  image: $BACKEND_IMAGE
+                  command: ["echo", "Backend image cached on this node"]
+                  resources:
+                    requests:
+                      cpu: "10m"
+                      memory: "16Mi"
+                    limits:
+                      cpu: "100m"
+                      memory: "64Mi"
+                containers:
+                - name: pause
+                  image: registry.cn-shanghai.aliyuncs.com/acs/pause:3.5
+                  resources:
+                    requests:
+                      cpu: "1m"
+                      memory: "4Mi"
+                tolerations:
+                - operator: Exists
+          EOF
+
+            # Wait for DaemonSet to be ready (all pods running = images cached)
+            echo "⏳ Waiting for backend image to be cached on all nodes (up to 20 min)..."
+            for i in $(seq 1 40); do
+              DESIRED=$(kubectl get daemonset pre-pull-backend -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")
+              READY=$(kubectl get daemonset pre-pull-backend -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
+              echo "  DaemonSet status: $READY/$DESIRED ready"
+              if [ "$DESIRED" != "0" ] && [ "$READY" = "$DESIRED" ]; then
+                echo "✅ Backend image cached on all $DESIRED nodes"
+                break
+              fi
+              sleep 30
+            done
+
+            # Clean up DaemonSet after caching
+            kubectl delete daemonset pre-pull-backend -n ${{ env.K8S_NAMESPACE }} --ignore-not-found
+          fi
+
+          # Pre-pull frontend image if it was built
+          if [ "${{ needs.build-frontend.result }}" = "success" ]; then
+            FRONTEND_IMAGE="${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/frontend:prod-v${{ needs.detect-changes.outputs.frontend_version }}"
+            echo "📦 Pre-pulling frontend to all nodes: $FRONTEND_IMAGE"
+
+            cat <<EOF | kubectl apply -f -
+          apiVersion: apps/v1
+          kind: DaemonSet
+          metadata:
+            name: pre-pull-frontend
+            namespace: ${{ env.K8S_NAMESPACE }}
+          spec:
+            selector:
+              matchLabels:
+                app: pre-pull-frontend
+            template:
+              metadata:
+                labels:
+                  app: pre-pull-frontend
+              spec:
+                imagePullSecrets:
+                - name: acr-secret
+                initContainers:
+                - name: pre-pull
+                  image: $FRONTEND_IMAGE
+                  command: ["echo", "Frontend image cached on this node"]
+                  resources:
+                    requests:
+                      cpu: "10m"
+                      memory: "16Mi"
+                    limits:
+                      cpu: "100m"
+                      memory: "64Mi"
+                containers:
+                - name: pause
+                  image: registry.cn-shanghai.aliyuncs.com/acs/pause:3.5
+                  resources:
+                    requests:
+                      cpu: "1m"
+                      memory: "4Mi"
+                tolerations:
+                - operator: Exists
+          EOF
+
+            echo "⏳ Waiting for frontend image to be cached on all nodes..."
+            for i in $(seq 1 40); do
+              DESIRED=$(kubectl get daemonset pre-pull-frontend -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")
+              READY=$(kubectl get daemonset pre-pull-frontend -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
+              echo "  DaemonSet status: $READY/$DESIRED ready"
+              if [ "$DESIRED" != "0" ] && [ "$READY" = "$DESIRED" ]; then
+                echo "✅ Frontend image cached on all $DESIRED nodes"
+                break
+              fi
+              sleep 30
+            done
+
+            kubectl delete daemonset pre-pull-frontend -n ${{ env.K8S_NAMESPACE }} --ignore-not-found
+          fi
+
+          echo "✅ Image cache warming complete on all nodes"
+
       - name: Deploy to Kubernetes
         run: |
           echo "🚀 Deploying to ACK..."
@@ -240,11 +367,11 @@ jobs:
           echo "⏳ Waiting for deployments to be ready..."
 
           if [ "${{ needs.build-backend.result }}" = "success" ]; then
-            kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+            kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=600s
           fi
 
           if [ "${{ needs.build-frontend.result }}" = "success" ]; then
-            kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+            kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=600s
           fi
 
       - name: Verify deployment
