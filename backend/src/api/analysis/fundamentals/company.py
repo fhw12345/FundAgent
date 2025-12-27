@@ -8,6 +8,7 @@ including valuation metrics, profitability, and growth indicators.
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
+from ....core.config import get_settings
 from ....database.redis import RedisCache
 from ....services.alphavantage_market_data import AlphaVantageMarketDataService
 from ....services.alphavantage_response_formatter import (
@@ -306,9 +307,12 @@ async def stock_fundamentals(
             key_metrics=key_metrics,
         )
 
-        # Cache for 4 hours - Fundamentals change quarterly (earnings)
+        # Cache for 24 hours - Fundamentals change quarterly (earnings)
         # Date-based cache key ensures fresh daily data
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
+        settings = get_settings()
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_fundamentals
+        )
 
         logger.info("Fundamentals analysis completed", symbol=symbol)
         return result
@@ -452,8 +456,11 @@ async def company_overview(
             formatted_markdown=formatted_markdown,
         )
 
-        # Cache for 4 hours - Company info rarely changes
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
+        # Cache for 24 hours - Company info rarely changes
+        settings = get_settings()
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_fundamentals
+        )
 
         logger.info(
             "Company overview completed", symbol=symbol, company_name=company_name

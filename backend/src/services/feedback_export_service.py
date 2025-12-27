@@ -5,16 +5,15 @@ This service handles exporting all feedback items and comments to Markdown forma
 optimized with batch fetching to avoid N+1 query problems.
 """
 
-from datetime import datetime
-
 import structlog
+
+from src.core.utils.date_utils import utcnow
 
 from ..database.repositories.comment_repository import CommentRepository
 from ..database.repositories.feedback_repository import FeedbackRepository
 from ..database.repositories.user_repository import UserRepository
 from ..models.feedback import Comment
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

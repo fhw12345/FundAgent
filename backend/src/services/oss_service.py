@@ -11,13 +11,13 @@ This service handles secure file uploads to OSS with:
 
 import hashlib
 import re
-from datetime import datetime
 
 import oss2
 import structlog
 from oss2.credentials import EnvironmentVariableCredentialsProvider
 
 from src.core.utils.date_utils import utcnow
+
 logger = structlog.get_logger()
 
 # Allowed MIME types for feedback image attachments

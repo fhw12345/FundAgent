@@ -8,6 +8,7 @@ market indices, and sector performance to gauge overall market conditions.
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
+from ...core.config import get_settings
 from ...core.financial_analysis import MacroAnalyzer
 from ...database.redis import RedisCache
 from ...services.alphavantage_market_data import AlphaVantageMarketDataService
@@ -52,9 +53,12 @@ async def macro_sentiment_analysis(
             include_indices=request.include_indices,
         )
 
-        # Cache for 1 hour - Macro sentiment provides daily market overview
+        # Cache for 30 min - Macro sentiment provides intraday market overview
         # Date-based cache key ensures fresh data each day
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)
+        settings = get_settings()
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_analysis
+        )
 
         return result
 

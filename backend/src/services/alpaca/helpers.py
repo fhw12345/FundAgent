@@ -5,9 +5,9 @@ Provides validation, conversion, and transformation utilities
 shared across order and position operations.
 """
 
-from datetime import datetime
-
 from alpaca.trading.enums import OrderSide, TimeInForce
+
+from src.core.utils.date_utils import utcnow
 
 from ...models.portfolio import PortfolioOrder, PortfolioPosition
 
@@ -16,7 +16,6 @@ from ...models.portfolio import PortfolioOrder, PortfolioPosition
 MAX_ORDER_VALUE = 500000  # Maximum order value in USD (safety limit for paper trading)
 
 
-from src.core.utils.date_utils import utcnow
 def validate_order_quantity(quantity: float) -> None:
     """
     Validate order quantity is positive.
@@ -107,7 +106,7 @@ def alpaca_order_to_portfolio_order(
         PortfolioOrder model
     """
     return PortfolioOrder(
-        order_id=f"order_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        order_id=f"order_{utcnow().strftime('%Y%m%d%H%M%S%f')}",
         chat_id=chat_id,
         user_id=user_id,
         message_id=message_id,

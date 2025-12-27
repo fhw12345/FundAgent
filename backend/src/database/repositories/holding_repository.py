@@ -8,9 +8,10 @@ from typing import Any
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from src.core.utils.date_utils import utcnow
+
 from ...models.holding import Holding, HoldingCreate, HoldingUpdate
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

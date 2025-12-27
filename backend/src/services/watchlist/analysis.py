@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 
 import structlog
 
+from src.core.utils.date_utils import utcnow
+
 from ...core.financial_analysis import FibonacciAnalyzer
 from ...database.repositories.message_repository import MessageRepository
 from ...database.repositories.watchlist_repository import WatchlistRepository
@@ -19,7 +21,6 @@ from .chat_manager import ChatManager
 from .context_handler import ContextHandler
 from .order_handler import OrderHandler
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

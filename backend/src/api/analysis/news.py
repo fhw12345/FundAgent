@@ -8,6 +8,7 @@ market awareness and trading signals.
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
+from ...core.config import get_settings
 from ...database.redis import RedisCache
 from ...services.alphavantage_market_data import AlphaVantageMarketDataService
 from ...services.alphavantage_response_formatter import AlphaVantageResponseFormatter
@@ -96,9 +97,10 @@ async def news_sentiment(
             formatted_markdown=formatted_markdown,
         )
 
+        settings = get_settings()
         await redis_cache.set(
-            cache_key, result.model_dump(), ttl_seconds=3600
-        )  # 1 hour
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_news
+        )
         logger.info("News sentiment completed", symbol=request.symbol)
         return result
 
@@ -179,9 +181,10 @@ async def market_movers(
             formatted_markdown=formatted_markdown,
         )
 
+        settings = get_settings()
         await redis_cache.set(
-            cache_key, result.model_dump(), ttl_seconds=3600
-        )  # 1 hour
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_news
+        )
         logger.info("Market movers completed")
         return result
 

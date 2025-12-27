@@ -5,16 +5,16 @@ This module handles concurrent research for individual symbols without portfolio
 """
 
 import asyncio
-from datetime import datetime
 from typing import Any
 
 import structlog
+
+from src.core.utils.date_utils import utcnow
 
 from ...models.chat import ChatCreate
 from ...models.message import MessageCreate, MessageMetadata
 from ...models.trading_decision import SymbolAnalysisResult
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

@@ -6,8 +6,9 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-
 from src.core.utils.date_utils import utcnow
+
+
 class RefreshToken(BaseModel):
     """Refresh token model for database storage."""
 

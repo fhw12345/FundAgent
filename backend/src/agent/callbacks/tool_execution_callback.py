@@ -12,12 +12,13 @@ Key Features:
 """
 
 import asyncio
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 import structlog
 from langchain_core.callbacks.base import AsyncCallbackHandler
+
+from src.core.utils.date_utils import utcnow
 
 from ...core.localization import (
     DEFAULT_LANGUAGE,
@@ -25,7 +26,6 @@ from ...core.localization import (
     get_tool_display_name,
 )
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

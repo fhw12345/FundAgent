@@ -3,14 +3,13 @@ Message repository for conversation history.
 Handles CRUD operations for message collection.
 """
 
-from datetime import datetime
-
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from src.core.utils.date_utils import utcnow
+
 from ...models.message import Message, MessageCreate, MessageMetadata
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

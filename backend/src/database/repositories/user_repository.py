@@ -3,16 +3,16 @@ User repository for user authentication and profile management.
 Handles CRUD operations for user collection.
 """
 
-from datetime import datetime
 from typing import Any
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from src.core.utils.date_utils import utcnow
+
 from ...models.user import User, UserCreate
 from ...services.password import hash_password
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

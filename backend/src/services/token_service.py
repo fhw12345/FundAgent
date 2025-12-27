@@ -6,18 +6,19 @@ Implements dual-token authentication with automatic rotation.
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import structlog
 from jose import JWTError, jwt
+
+from src.core.utils.date_utils import utcnow
 
 from ..core.config import get_settings
 from ..database.repositories.refresh_token_repository import RefreshTokenRepository
 from ..models.refresh_token import RefreshToken, TokenPair
 from ..models.user import User
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 settings = get_settings()
 
@@ -69,8 +70,7 @@ class TokenService:
             token_id=str(uuid.uuid4()),
             user_id=user.user_id,
             token_hash=token_hash,
-            expires_at=utcnow()
-            + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=utcnow() + timedelta(days=self.REFRESH_TOKEN_EXPIRE_DAYS),
             user_agent=user_agent,
             ip_address=ip_address,
             revoked=False,

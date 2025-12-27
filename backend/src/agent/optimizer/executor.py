@@ -8,10 +8,11 @@ Handles:
 """
 
 import uuid
-from datetime import datetime
 from typing import Any
 
 import structlog
+
+from src.core.utils.date_utils import utcnow
 
 from ...database.repositories.message_repository import MessageRepository
 from ...database.repositories.portfolio_order_repository import PortfolioOrderRepository
@@ -22,7 +23,6 @@ from ...models.trading_decision import (
     SymbolAnalysisResult,
 )
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

@@ -3,15 +3,15 @@ Chat repository for conversation management.
 Handles CRUD operations for chat collection with UI state management.
 """
 
-from datetime import datetime
 from typing import Any
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from src.core.utils.date_utils import utcnow
+
 from ...models.chat import Chat, ChatCreate, ChatUpdate, UIState
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

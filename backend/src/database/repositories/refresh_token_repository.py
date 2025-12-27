@@ -3,14 +3,13 @@ Refresh token repository for JWT token refresh mechanism.
 Handles CRUD operations for refresh_tokens collection.
 """
 
-from datetime import datetime
-
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from src.core.utils.date_utils import utcnow
+
 from ...models.refresh_token import RefreshToken
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -349,9 +348,7 @@ class RefreshTokenRepository:
         Returns:
             Number of tokens deleted
         """
-        result = await self.collection.delete_many(
-            {"expires_at": {"$lt": utcnow()}}
-        )
+        result = await self.collection.delete_many({"expires_at": {"$lt": utcnow()}})
         deleted_count: int = result.deleted_count
 
         if deleted_count > 0:

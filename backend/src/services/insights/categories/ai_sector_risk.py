@@ -215,7 +215,10 @@ class AISectorRiskCategory(InsightCategoryBase):
         # Metrics that use AI basket receive it as parameter
         metric_calculators: list[tuple[str, Any]] = [
             ("ai_price_anomaly", lambda: self._calculate_ai_price_anomaly(ai_basket)),
-            ("news_sentiment", self._calculate_news_sentiment),  # Uses topics=technology
+            (
+                "news_sentiment",
+                self._calculate_news_sentiment,
+            ),  # Uses topics=technology
             ("smart_money_flow", lambda: self._calculate_smart_money_flow(ai_basket)),
             ("ipo_heat", self._calculate_ipo_heat),
             ("yield_curve", self._calculate_yield_curve),

@@ -7,10 +7,11 @@ Main orchestration class that coordinates the 3-phase analysis flow:
 - Phase 3: Execution (order placement)
 """
 
-from datetime import datetime
 from typing import Any
 
 import structlog
+
+from src.core.utils.date_utils import utcnow
 
 from ...core.config import Settings
 from ...database.mongodb import MongoDB
@@ -27,7 +28,6 @@ from .phase1_research import Phase1ResearchMixin
 from .phase2_decisions import Phase2DecisionsMixin
 from .phase3_execution import Phase3ExecutionMixin
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

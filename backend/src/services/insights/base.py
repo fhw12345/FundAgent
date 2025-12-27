@@ -53,7 +53,8 @@ class InsightCategoryBase(ABC):
     CATEGORY_ICON: str = ""
     CATEGORY_DESCRIPTION: str = ""
 
-    # Default cache TTL for calculated metrics (30 minutes)
+    # Default cache TTL for calculated metrics (uses settings.cache_ttl_insights)
+    # This class attribute is kept for backward compatibility but settings takes precedence
     CACHE_TTL_SECONDS: int = 1800
 
     def __init__(
@@ -175,18 +176,19 @@ class InsightCategoryBase(ABC):
             last_updated=datetime.now(UTC),
         )
 
-        # Cache result
+        # Cache result using centralized settings TTL
         if self.redis_cache:
+            cache_ttl = self.settings.cache_ttl_insights
             await self.redis_cache.set(
                 cache_key,
                 category.model_dump(mode="json"),
-                ttl_seconds=self.CACHE_TTL_SECONDS,
+                ttl_seconds=cache_ttl,
             )
             logger.info(
                 "Category cached",
                 category_id=self.CATEGORY_ID,
                 cache_key=cache_key,
-                ttl_seconds=self.CACHE_TTL_SECONDS,
+                ttl_seconds=cache_ttl,
             )
 
         return category

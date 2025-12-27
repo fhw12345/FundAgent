@@ -3,7 +3,7 @@ Date utility functions for financial data analysis.
 Handles conversion between yfinance periods and absolute date ranges.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 
 def utcnow() -> datetime:
@@ -13,7 +13,7 @@ def utcnow() -> datetime:
     Replaces deprecated datetime.utcnow() which is scheduled for removal in Python 3.14.
     See: https://docs.python.org/3/library/datetime.html#datetime.datetime.utcnow
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def utcfromtimestamp(timestamp: float) -> datetime:
@@ -23,7 +23,7 @@ def utcfromtimestamp(timestamp: float) -> datetime:
     Replaces deprecated datetime.utcfromtimestamp() which is scheduled for removal.
     See: https://docs.python.org/3/library/datetime.html#datetime.datetime.utcfromtimestamp
     """
-    return datetime.fromtimestamp(timestamp, timezone.utc)
+    return datetime.fromtimestamp(timestamp, UTC)
 
 
 class DateUtils:

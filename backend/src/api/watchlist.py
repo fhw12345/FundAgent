@@ -194,24 +194,40 @@ async def get_watchlist(
     request: Request,
     user_id: str = Depends(get_current_user_id),  # JWT authentication required
     mongodb: MongoDB = Depends(get_mongodb),
+    skip: int = 0,
+    limit: int = 50,
 ) -> list[WatchlistItem]:
     """
-    Get all symbols in user's watchlist.
+    Get user's watchlist with pagination.
 
     Args:
         user_id: Authenticated user ID
         mongodb: MongoDB instance
+        skip: Number of items to skip (default: 0)
+        limit: Maximum items to return (default: 50, max: 100)
 
     Returns:
         List of watchlist items sorted by added_at descending
     """
+    # Validate pagination parameters
+    if skip < 0:
+        raise HTTPException(status_code=400, detail="skip must be >= 0")
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 100")
+
     try:
         watchlist_collection = mongodb.get_collection("watchlist")
         watchlist_repo = WatchlistRepository(watchlist_collection)
 
-        items = await watchlist_repo.get_by_user(user_id)
+        items = await watchlist_repo.get_by_user(user_id, skip=skip, limit=limit)
 
-        logger.info("Watchlist retrieved", user_id=user_id, count=len(items))
+        logger.info(
+            "Watchlist retrieved",
+            user_id=user_id,
+            count=len(items),
+            skip=skip,
+            limit=limit,
+        )
 
         return items
 

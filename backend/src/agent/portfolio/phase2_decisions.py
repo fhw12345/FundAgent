@@ -4,7 +4,6 @@ Phase 2: Decisions - Portfolio-wide trading decisions.
 This module makes holistic trading decisions after all symbol research completes.
 """
 
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -17,6 +16,7 @@ if TYPE_CHECKING:
     from ...models.trading_decision import PortfolioDecisionList
 
 from src.core.utils.date_utils import utcnow
+
 logger = structlog.get_logger()
 
 
@@ -221,9 +221,7 @@ Include short reasoning (1-2 sentences) for each decision.
 
             # Format the message content as markdown
             message_content = "## 📊 Portfolio Trading Decisions\n\n"
-            message_content += (
-                f"**Date:** {utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
-            )
+            message_content += f"**Date:** {utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
             message_content += f"**Symbols Analyzed:** {len(symbol_analyses)}\n"
             message_content += (
                 f"**Decisions Made:** {len(decision_result.decisions)}\n\n"
@@ -384,9 +382,7 @@ Include short reasoning (1-2 sentences) for each decision.
 
             # Format failure message
             message_content = "## ⚠️ Portfolio Analysis Failed\n\n"
-            message_content += (
-                f"**Date:** {utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
-            )
+            message_content += f"**Date:** {utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n"
             message_content += "**Status:** Phase 2 Skipped\n\n"
             message_content += f"### Reason\n\n{reason}\n\n"
 

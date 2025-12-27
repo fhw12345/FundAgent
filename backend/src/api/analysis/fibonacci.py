@@ -11,6 +11,7 @@ from datetime import datetime
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
+from ...core.config import get_settings
 from ...core.financial_analysis import FibonacciAnalyzer
 from ...database.redis import RedisCache
 from ...services.alphavantage_market_data import AlphaVantageMarketDataService
@@ -140,10 +141,13 @@ async def fibonacci_analysis(
             analysis_duration_ms=round(analysis_duration * 1000, 2),
         )
 
-        # Cache for 1 hour - Fibonacci levels don't change significantly intraday
-        # Date-based cache key ensures data refreshes daily
+        # Cache for 30 min - Fibonacci levels based on recent price action
+        # Date-based cache key ensures data refreshes
+        settings = get_settings()
         cache_store_start_time = time.time()
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_analysis
+        )
         cache_store_duration = time.time() - cache_store_start_time
 
         total_duration = time.time() - request_start_time

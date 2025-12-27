@@ -206,7 +206,11 @@ class FundamentalsMixin(AlphaVantageBase):
                 filter_desc = f"tickers={tickers}"
             if topics:
                 params["topics"] = topics
-                filter_desc = f"topics={topics}" if not filter_desc else f"{filter_desc}, topics={topics}"
+                filter_desc = (
+                    f"topics={topics}"
+                    if not filter_desc
+                    else f"{filter_desc}, topics={topics}"
+                )
 
             response = await self.client.get(self.base_url, params=params)
 
@@ -239,7 +243,9 @@ class FundamentalsMixin(AlphaVantageBase):
             return data  # type: ignore[no-any-return]
 
         except Exception as e:
-            logger.error("News sentiment fetch failed", filter=filter_desc, error=str(e))
+            logger.error(
+                "News sentiment fetch failed", filter=filter_desc, error=str(e)
+            )
             raise
 
     async def get_top_gainers_losers(self) -> dict[str, Any]:

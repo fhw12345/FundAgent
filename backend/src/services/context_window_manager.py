@@ -15,10 +15,11 @@ from typing import Any
 import structlog
 import tiktoken
 
+from src.core.utils.date_utils import utcnow
+
 from ..core.config import Settings
 from ..models.message import Message
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

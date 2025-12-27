@@ -12,6 +12,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
+from ...core.config import get_settings
 from ...core.financial_analysis import StochasticAnalyzer
 from ...database.redis import RedisCache
 from ...services.alphavantage_market_data import AlphaVantageMarketDataService
@@ -136,10 +137,13 @@ async def stochastic_analysis(
             analysis_duration_ms=round(analysis_duration * 1000, 2),
         )
 
-        # Cache for 1 hour - Stochastic oscillator values stable for daily analysis
-        # Date-based cache key ensures data refreshes daily
+        # Cache for 30 min - Stochastic oscillator needs regular updates
+        # Date-based cache key ensures data refreshes
+        settings = get_settings()
         cache_store_start_time = time.time()
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=3600)
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_analysis
+        )
         cache_store_duration = time.time() - cache_store_start_time
 
         total_duration = time.time() - request_start_time

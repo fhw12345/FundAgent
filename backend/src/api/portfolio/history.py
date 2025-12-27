@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from src.core.utils.date_utils import utcnow
+
 from ...database.mongodb import MongoDB
 from ...services.alpaca_trading_service import AlpacaTradingService
 from ..dependencies.auth import get_current_user_id, get_mongodb
@@ -22,7 +24,6 @@ from ..schemas.portfolio_models import (
     PortfolioHistoryResponse,
 )
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 router = APIRouter()

@@ -8,6 +8,7 @@ for fundamental financial analysis.
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 
+from ....core.config import get_settings
 from ....database.redis import RedisCache
 from ....services.alphavantage_market_data import AlphaVantageMarketDataService
 from ....services.alphavantage_response_formatter import (
@@ -86,7 +87,10 @@ async def cash_flow(
             formatted_markdown=formatted_markdown,
         )
 
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
+        settings = get_settings()
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_fundamentals
+        )
         logger.info("Cash flow completed", symbol=request.symbol)
         return result
 
@@ -162,7 +166,10 @@ async def balance_sheet(
             formatted_markdown=formatted_markdown,
         )
 
-        await redis_cache.set(cache_key, result.model_dump(), ttl_seconds=14400)
+        settings = get_settings()
+        await redis_cache.set(
+            cache_key, result.model_dump(), ttl_seconds=settings.cache_ttl_fundamentals
+        )
         logger.info("Balance sheet completed", symbol=request.symbol)
         return result
 

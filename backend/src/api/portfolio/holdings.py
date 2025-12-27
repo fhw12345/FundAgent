@@ -6,10 +6,10 @@ Provides:
 - GET /summary: Get portfolio account summary
 """
 
-from datetime import datetime
-
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
+
+from src.core.utils.date_utils import utcnow
 
 from ...models.holding import Holding
 from ...services.alpaca_trading_service import AlpacaTradingService
@@ -21,7 +21,6 @@ from ..schemas.portfolio_models import (
     PortfolioSummaryResponse,
 )
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 router = APIRouter()

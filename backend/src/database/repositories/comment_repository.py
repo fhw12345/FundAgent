@@ -4,14 +4,14 @@ Handles CRUD operations for comments collection.
 """
 
 import uuid
-from datetime import datetime
 
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from src.core.utils.date_utils import utcnow
+
 from ...models.feedback import Comment, CommentCreate
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 

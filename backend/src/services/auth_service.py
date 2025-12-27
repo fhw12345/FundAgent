@@ -3,11 +3,13 @@ Authentication service with modular provider support.
 Handles JWT tokens and delegates verification to auth providers (email, SMS, WeChat).
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, Literal
 
 import structlog
 from jose import JWTError, jwt
+
+from src.core.utils.date_utils import utcnow
 
 from ..core.config import get_settings
 from ..database.repositories.user_repository import UserRepository
@@ -15,7 +17,6 @@ from ..models.user import User, UserCreate
 from .auth_providers import EmailAuthProvider
 from .password import verify_password
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 settings = get_settings()
 
