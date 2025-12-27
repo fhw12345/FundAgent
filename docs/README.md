@@ -70,6 +70,16 @@ End-to-end testing guides.
 - [E2E Automation Guide](testing/e2e-automation-guide.md) - Playwright testing
 - [E2E Reference](testing/e2e-reference.md) - Selectors, endpoints
 
+#### Performance
+System performance baselines and optimization.
+
+- [Performance Overview](performance/README.md) - Bottleneck analysis, success metrics
+- [API Baseline](performance/api-baseline.md) - Endpoint response times
+- [Redis Baseline](performance/redis-baseline.md) - Cache hit rates, memory usage
+- [LLM Baseline](performance/llm-baseline.md) - Agent performance, token usage
+- [Frontend Baseline](performance/frontend-baseline.md) - Bundle size, Core Web Vitals
+- [Infrastructure Baseline](performance/infrastructure-baseline.md) - K8s resource utilization
+
 #### Troubleshooting
 Issue resolution and debugging.
 

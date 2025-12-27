@@ -264,6 +264,15 @@ docker compose logs langfuse-server --tail=50  # Logs
 - [ ] Test health endpoint (bypass proxy)
 - [ ] Monitor logs for 5-10 minutes
 
+**⚠️ Deployment Strategy Notes:**
+- **Strategy: `Recreate`** (intentional) - Limited cluster resources can't run 2 backend pods simultaneously
+- **Image pull time**: Azure ACR (East Asia) → Alibaba ACK (Shanghai) can take 10-20 min for ~240MB image
+- **CI/CD pre-pull**: Pipeline creates a Job to cache image BEFORE deployment restart
+- **Pre-pull timeout**: 15 minutes (`--timeout=900s`) for slow pulls
+- **Rollout timeout**: 10 minutes (`--timeout=600s`) - should be fast after pre-pull
+- **Downtime expected**: `Recreate` strategy kills old pod before new one is ready
+- **If pre-pull fails**: Deployment continues but may be slow; check node cache
+
 ### 🔍 When Debugging
 1. Check pod logs first
 2. Verify data contracts alignment
