@@ -5,6 +5,7 @@ Following Factor 11/12: Triggerable & Stateless design.
 CI/CD: GitHub Actions automated deployment enabled.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -23,6 +24,7 @@ from .api.auth import router as auth_router
 from .api.chat import router as chat_router
 from .api.credits import router as credits_router
 from .api.dependencies.rate_limit import limiter
+from .api.dependencies.timing_middleware import TimingMiddleware
 from .api.feedback import router as feedback_router
 from .api.health import router as health_router
 from .api.insights import router as insights_router
@@ -227,6 +229,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             category_count=len(insights_registry.list_categories()),
         )
 
+        # Initialize cache warming service and run startup warming in background
+        from .services.cache_warming_service import CacheWarmingService
+
+        cache_warming_service = CacheWarmingService(
+            redis_cache=redis_cache,
+            market_service=market_service,
+            watchlist_collection=mongodb.get_collection("watchlist"),
+            settings=settings,
+        )
+        app.state.cache_warming_service = cache_warming_service
+
+        # Run cache warming in background task (non-blocking)
+        async def warm_cache_background() -> None:
+            """Background task to warm cache on startup."""
+            try:
+                # Small delay to let other startup tasks complete first
+                await asyncio.sleep(2)
+                await cache_warming_service.warm_startup_cache()
+            except Exception as e:
+                logger.warning("Background cache warming failed", error=str(e))
+
+        asyncio.create_task(warm_cache_background())
+        logger.info("Cache warming service initialized (background warming started)")
+
         logger.info("Database connections started")
 
         yield
@@ -271,6 +297,15 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
+
+    # Request timing middleware for performance profiling
+    # Added first so it wraps all other middleware and measures total time
+    if settings.environment != "test":
+        app.add_middleware(
+            TimingMiddleware,
+            log_all_requests=False,  # Only log slow requests by default
+            slow_threshold_ms=500.0,  # Log requests slower than 500ms
+        )
 
     # Rate limiting - SlowAPI integration
     app.state.limiter = limiter

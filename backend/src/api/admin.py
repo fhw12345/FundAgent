@@ -2,10 +2,10 @@
 Admin-only API endpoints for system monitoring and health checks.
 """
 
-from datetime import datetime
-
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+
+from src.core.utils.date_utils import utcnow
 
 from ..agent.langgraph_react_agent import FinancialAnalysisReActAgent
 from ..agent.portfolio_analysis_agent import PortfolioAnalysisAgent
@@ -13,6 +13,7 @@ from ..core.config import get_settings
 from ..core.data.ticker_data_service import TickerDataService
 from ..database.mongodb import MongoDB
 from ..database.redis import RedisCache
+from ..database.repositories.tool_execution_repository import ToolExecutionRepository
 from ..database.repositories.transaction_repository import TransactionRepository
 from ..database.repositories.user_repository import UserRepository
 from ..models.user import User
@@ -28,9 +29,9 @@ from .dependencies.auth import (
     get_redis_cache,
     require_admin,
 )
+from .dependencies.timing_middleware import TimingMiddleware
 from .schemas.admin_models import DatabaseStats, HealthResponse, SystemMetrics
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -150,6 +151,42 @@ async def get_database_stats(
         List of database collection statistics
     """
     return await db_stats_service.get_collection_stats()
+
+
+@router.get("/timing-metrics")
+async def get_timing_metrics(
+    _: None = Depends(require_admin),
+) -> dict[str, dict[str, float | None]]:
+    """
+    Get API endpoint timing metrics (P50, P95, P99 response times).
+
+    **Admin only**: Requires admin privileges.
+
+    Returns:
+        Dictionary mapping endpoints to their percentile metrics:
+        - p50: Median response time in ms
+        - p95: 95th percentile response time in ms
+        - p99: 99th percentile response time in ms
+        - count: Number of samples
+        - min, max, avg: Additional statistics
+    """
+    metrics = TimingMiddleware.get_all_metrics()
+
+    # Sort by P95 descending to show slowest endpoints first
+    sorted_metrics = dict(
+        sorted(
+            metrics.items(),
+            key=lambda x: x[1].get("p95") or 0,
+            reverse=True,
+        )
+    )
+
+    logger.info(
+        "Timing metrics requested",
+        endpoint_count=len(sorted_metrics),
+    )
+
+    return sorted_metrics
 
 
 @router.post("/portfolio/trigger-analysis", status_code=202)
@@ -328,3 +365,345 @@ async def run_portfolio_analysis_background(
             exc_info=True,
         )
         # Don't raise - background task failure shouldn't crash the API
+
+
+# =============================================================================
+# Cache Warming Endpoints
+# =============================================================================
+
+
+def get_cache_warming_service(request: Request):
+    """Get cache warming service from app state."""
+    return getattr(request.app.state, "cache_warming_service", None)
+
+
+@router.post("/cache/warm")
+async def warm_cache(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(require_admin),
+):
+    """
+    Trigger cache warming for common symbols.
+
+    Warms the cache with data for popular stocks and market movers.
+    Runs in background and returns immediately.
+
+    **Admin only**: Requires admin privileges.
+
+    Returns:
+        dict: Status message
+    """
+    cache_warming_service = get_cache_warming_service(request)
+
+    if not cache_warming_service:
+        return {"status": "error", "message": "Cache warming service not initialized"}
+
+    logger.info("Manual cache warming triggered via API")
+
+    # Run warming in background
+    background_tasks.add_task(cache_warming_service.warm_startup_cache)
+
+    return {
+        "status": "started",
+        "message": "Cache warming running in background",
+        "symbols": cache_warming_service.DEFAULT_SYMBOLS,
+    }
+
+
+@router.post("/cache/warm-market-movers")
+async def warm_market_movers_cache(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(require_admin),
+):
+    """
+    Trigger cache warming for current market movers.
+
+    Fetches and caches top gainers, losers, and most active stocks.
+    Runs in background and returns immediately.
+
+    **Admin only**: Requires admin privileges.
+
+    Returns:
+        dict: Status message
+    """
+    cache_warming_service = get_cache_warming_service(request)
+
+    if not cache_warming_service:
+        return {"status": "error", "message": "Cache warming service not initialized"}
+
+    logger.info("Market movers cache warming triggered via API")
+
+    background_tasks.add_task(cache_warming_service.warm_market_movers)
+
+    return {
+        "status": "started",
+        "message": "Market movers cache warming running in background",
+    }
+
+
+@router.get("/cache/warming-status")
+async def get_cache_warming_status(
+    request: Request,
+    _: None = Depends(require_admin),
+):
+    """
+    Get current cache warming status.
+
+    **Admin only**: Requires admin privileges.
+
+    Returns:
+        dict: Cache warming status and statistics
+    """
+    cache_warming_service = get_cache_warming_service(request)
+
+    if not cache_warming_service:
+        return {"status": "error", "message": "Cache warming service not initialized"}
+
+    return await cache_warming_service.get_warming_status()
+
+
+@router.get("/cache/stats")
+async def get_cache_stats(
+    _: None = Depends(require_admin),
+    redis_cache: RedisCache = Depends(get_redis_cache),
+):
+    """
+    Get comprehensive Redis cache statistics.
+
+    Returns memory usage, hit/miss ratio, key counts, and performance metrics.
+    Useful for monitoring cache efficiency and optimization decisions.
+
+    **Admin only**: Requires admin privileges.
+
+    Returns:
+        dict: Cache statistics including:
+        - memory: Used/peak memory, fragmentation ratio
+        - keys: Total, with expiry, expired, evicted counts
+        - cache_efficiency: Hits, misses, hit ratio percentage
+        - connections: Connected and blocked clients
+        - performance: Operations per second, total commands
+    """
+    logger.info("Cache stats requested via admin endpoint")
+
+    try:
+        stats = await redis_cache.get_cache_stats()
+        return stats
+    except Exception as e:
+        logger.error("Failed to get cache stats", error=str(e))
+        return {"status": "error", "message": str(e)}
+
+
+# =============================================================================
+# LLM/Agent Performance Metrics Endpoints
+# =============================================================================
+
+
+def get_tool_execution_repository(
+    mongodb: MongoDB = Depends(get_mongodb),
+) -> ToolExecutionRepository:
+    """Get tool execution repository instance."""
+    return ToolExecutionRepository(mongodb.get_collection("tool_executions"))
+
+
+@router.get("/llm/tool-performance")
+async def get_tool_performance_metrics(
+    days: int = 7,
+    limit: int = 50,
+    _: None = Depends(require_admin),
+    tool_repo: ToolExecutionRepository = Depends(get_tool_execution_repository),
+):
+    """
+    Get LLM tool execution performance metrics.
+
+    Returns aggregated performance data for all tools used by the ReAct agent,
+    including average execution times, percentiles, success rates, and cache hit rates.
+
+    **Admin only**: Requires admin privileges.
+
+    Args:
+        days: Number of days to analyze (default: 7)
+        limit: Maximum number of tools to return (default: 50)
+
+    Returns:
+        dict: Performance metrics including:
+        - period: Start and end dates
+        - summary: Overall averages (executions, duration, success rate, cache hit rate)
+        - by_tool: Per-tool metrics with percentiles (P50, P95, P99)
+    """
+    from datetime import timedelta
+
+    end_date = utcnow()
+    start_date = end_date - timedelta(days=days)
+
+    logger.info(
+        "Tool performance metrics requested",
+        days=days,
+        start_date=start_date.isoformat(),
+        end_date=end_date.isoformat(),
+    )
+
+    try:
+        metrics = await tool_repo.get_tool_performance_metrics(
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+        )
+        return metrics
+    except Exception as e:
+        logger.error("Failed to get tool performance metrics", error=str(e))
+        return {"status": "error", "message": str(e)}
+
+
+@router.get("/llm/slowest-tools")
+async def get_slowest_tools(
+    days: int = 7,
+    limit: int = 10,
+    _: None = Depends(require_admin),
+    tool_repo: ToolExecutionRepository = Depends(get_tool_execution_repository),
+):
+    """
+    Get the slowest tools by average execution time.
+
+    Identifies optimization targets by showing tools with highest latency.
+
+    **Admin only**: Requires admin privileges.
+
+    Args:
+        days: Number of days to analyze (default: 7)
+        limit: Number of tools to return (default: 10)
+
+    Returns:
+        list: Slowest tools sorted by avg_duration_ms descending
+    """
+    from datetime import timedelta
+
+    end_date = utcnow()
+    start_date = end_date - timedelta(days=days)
+
+    logger.info(
+        "Slowest tools requested",
+        days=days,
+        limit=limit,
+    )
+
+    try:
+        slowest = await tool_repo.get_slowest_tools(
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+        )
+        return {"period_days": days, "tools": slowest}
+    except Exception as e:
+        logger.error("Failed to get slowest tools", error=str(e))
+        return {"status": "error", "message": str(e)}
+
+
+@router.get("/llm/token-usage")
+async def get_token_usage_metrics(
+    days: int = 7,
+    _: None = Depends(require_admin),
+    mongodb: MongoDB = Depends(get_mongodb),
+):
+    """
+    Get token usage metrics aggregated from message metadata.
+
+    Provides insights into token consumption for cost optimization.
+
+    **Admin only**: Requires admin privileges.
+
+    Args:
+        days: Number of days to analyze (default: 7)
+
+    Returns:
+        dict: Token usage metrics including:
+        - period: Start and end dates
+        - summary: Total tokens consumed
+        - by_model: Token usage breakdown by LLM model
+        - budgets: Current token budget configuration
+    """
+    from datetime import timedelta
+
+    end_date = utcnow()
+    start_date = end_date - timedelta(days=days)
+
+    logger.info(
+        "Token usage metrics requested",
+        days=days,
+    )
+
+    try:
+        messages_collection = mongodb.get_collection("messages")
+
+        # Aggregation pipeline for token usage from message metadata
+        pipeline = [
+            {
+                "$match": {
+                    "timestamp": {"$gte": start_date, "$lte": end_date},
+                    "metadata.tokens": {"$exists": True, "$gt": 0},
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$metadata.model",
+                    "total_messages": {"$sum": 1},
+                    "total_tokens": {"$sum": "$metadata.tokens"},
+                    "total_input_tokens": {"$sum": "$metadata.input_tokens"},
+                    "total_output_tokens": {"$sum": "$metadata.output_tokens"},
+                    "avg_tokens_per_message": {"$avg": "$metadata.tokens"},
+                }
+            },
+            {"$sort": {"total_tokens": -1}},
+        ]
+
+        results = await messages_collection.aggregate(pipeline).to_list(100)
+
+        # Calculate totals
+        total_tokens = sum(r.get("total_tokens", 0) or 0 for r in results)
+        total_input = sum(r.get("total_input_tokens", 0) or 0 for r in results)
+        total_output = sum(r.get("total_output_tokens", 0) or 0 for r in results)
+        total_messages = sum(r.get("total_messages", 0) for r in results)
+
+        # Get current budget settings
+        settings = get_settings()
+
+        return {
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+                "days": days,
+            },
+            "summary": {
+                "total_messages_with_tokens": total_messages,
+                "total_tokens": total_tokens,
+                "total_input_tokens": total_input,
+                "total_output_tokens": total_output,
+                "avg_tokens_per_message": round(
+                    total_tokens / total_messages if total_messages > 0 else 0, 2
+                ),
+            },
+            "by_model": [
+                {
+                    "model": r["_id"] or "unknown",
+                    "total_messages": r["total_messages"],
+                    "total_tokens": r.get("total_tokens", 0) or 0,
+                    "total_input_tokens": r.get("total_input_tokens", 0) or 0,
+                    "total_output_tokens": r.get("total_output_tokens", 0) or 0,
+                    "avg_tokens_per_message": round(
+                        r.get("avg_tokens_per_message", 0) or 0, 2
+                    ),
+                }
+                for r in results
+            ],
+            "budgets": {
+                "chat": settings.token_budget_chat,
+                "analysis": settings.token_budget_analysis,
+                "portfolio": settings.token_budget_portfolio,
+                "summary": settings.token_budget_summary,
+                "warning_threshold": settings.token_warning_threshold,
+            },
+        }
+    except Exception as e:
+        logger.error("Failed to get token usage metrics", error=str(e))
+        return {"status": "error", "message": str(e)}
