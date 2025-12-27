@@ -2,8 +2,9 @@
 
 > **Epic Type**: Brownfield Enhancement
 > **Created**: 2025-12-20
-> **Status**: Draft
-> **Estimated Stories**: 6
+> **Updated**: 2025-12-27
+> **Status**: In Progress
+> **Estimated Stories**: 11 (6 original + 5 trend/DML enhancement)
 
 ---
 
@@ -335,6 +336,260 @@ interface MetricExplanation {
 
 ---
 
+## Phase 2: Trend Visualization & Data Management Layer
+
+> **Added**: 2025-12-27
+> **Reference**: [Sprint Change Proposal](../stories/sprint-change-proposal-ai-sector-risk-trends.md)
+
+These stories enhance the insights platform with historical trend visualization, performance optimization, and a unified Data Manager Layer (DML) as the single source of truth for all data access.
+
+---
+
+### Story 7: Data Manager Layer (DML) - Foundation 🏗️
+
+**Goal**: Create single source of truth for ALL data access across the application
+
+**Deliverables**:
+```
+backend/src/services/data_manager/
+├── __init__.py
+├── manager.py          # DataManager class
+├── cache.py            # Redis operations
+├── keys.py             # Naming conventions (market:{granularity}:{symbol})
+└── types.py            # OHLCVData, TrendPoint, etc.
+```
+
+**Key Features**:
+- Unified data access interface for all consumers (Charts, AI Tools, Insights, Analysis)
+- Consistent cache key naming convention: `{domain}:{granularity}:{symbol}`
+- Tiered caching: Hot (Redis) → Warm (MongoDB)
+- No caching for intraday (1min-15min), cache for daily+ granularity
+- Pre-fetch shared data pattern to eliminate duplicate API calls
+
+**Acceptance Criteria**:
+- [ ] `DataManager.get_ohlcv()` returns cached data for daily+ granularity
+- [ ] `DataManager.get_ohlcv()` returns fresh data for intraday (no cache)
+- [ ] Key convention: `market:{granularity}:{symbol}` consistently applied
+- [ ] Existing AI tools migrated to use DML
+- [ ] Existing chart APIs migrated to use DML
+- [ ] `AlphaVantageMarketDataService` marked deprecated
+- [ ] No direct Alpha Vantage calls outside DML
+- [ ] Treasury 2Y data shared between yield_curve and fed_expectations metrics
+
+**Verification**:
+```bash
+# Cache hit test
+redis-cli GET "market:daily:AAPL" | jq 'length'
+
+# No bypass check
+grep -r "AlphaVantageMarketDataService" backend/src/ | grep -v "deprecated"
+# Expected: 0 matches
+```
+
+---
+
+### Story 8: Daily Snapshot Cron Job ⏰
+
+**Goal**: Automated daily data collection with optimized parallel performance
+
+**Deliverables**:
+- K8s CronJob manifest: `.pipeline/k8s/base/insights-cron.yaml`
+- Parallel calculation with `asyncio.gather()` for all 6 metrics
+- Pre-fetch shared data pattern (fetch once, use many)
+- MongoDB snapshot persistence to `insight_snapshots` collection
+- Redis cache update with 24-hour TTL
+
+**Performance Architecture**:
+```
+PHASE 1: Pre-fetch all shared data (parallel)
+├── Daily bars (AI symbols)
+├── Intraday bars (top 3 AI symbols)
+├── Treasury 10Y
+├── Treasury 2Y          ← SHARED by 2 metrics
+├── News sentiment
+└── IPO calendar
+
+PHASE 2: Calculate metrics (parallel with shared data)
+├── ai_price_anomaly(shared_data)
+├── news_sentiment(shared_data)
+├── smart_money_flow(shared_data)
+├── ipo_heat(shared_data)
+├── yield_curve(shared_data)      ← Uses shared Treasury 2Y
+└── fed_expectations(shared_data) ← Uses shared Treasury 2Y
+
+PHASE 3: Batch persist
+├── MongoDB: insight_snapshots
+└── Redis: insights:ai_sector_risk:latest (24hr TTL)
+```
+
+**Acceptance Criteria**:
+- [ ] Cron runs daily at 9:30 AM ET (14:30 UTC)
+- [ ] All 6 metrics calculated in parallel (< 10 seconds total vs 30+ sequential)
+- [ ] Treasury 2Y fetched ONCE (shared by yield_curve + fed_expectations)
+- [ ] Snapshot saved to `insight_snapshots` collection with date index
+- [ ] Redis key `insights:ai_sector_risk:latest` updated with 24hr TTL
+- [ ] Graceful handling of partial API failures (return_exceptions=True)
+
+**Verification**:
+```bash
+# Manual trigger
+kubectl create job insights-manual --from=cronjob/insights-cron
+
+# Check MongoDB
+mongosh --eval "db.insight_snapshots.findOne({date: ISODate('2025-12-27')})"
+
+# Check Redis
+redis-cli GET "insights:ai_sector_risk:latest" | jq .composite_score
+
+# Data consistency check
+REDIS=$(redis-cli GET "insights:ai_sector_risk:latest" | jq .composite_score)
+MONGO=$(mongosh --eval "db.insight_snapshots.find().sort({date:-1}).limit(1)" | jq .composite_score)
+[ "$REDIS" == "$MONGO" ] && echo "✅ Consistent" || echo "❌ Mismatch"
+```
+
+---
+
+### Story 9: Trend API Endpoints 📈
+
+**Goal**: API endpoints for historical trend data queries
+
+**Deliverables**:
+- New endpoint: `GET /api/insights/{category_id}/trend`
+- Query parameters: `?days=30` (default), supports 7, 14, 30, 60, 90
+- `TrendDataPoint` response model in `insights_models.py`
+- MongoDB date range query optimization
+
+**API Response Schema**:
+```json
+{
+  "category_id": "ai_sector_risk",
+  "days": 30,
+  "trend": [
+    {"date": "2025-12-27", "composite_score": 72.5, "status": "elevated"},
+    {"date": "2025-12-26", "composite_score": 70.2, "status": "elevated"}
+  ],
+  "metrics": {
+    "ai_price_anomaly": [
+      {"date": "2025-12-27", "score": 85, "status": "high"},
+      {"date": "2025-12-26", "score": 82, "status": "high"}
+    ],
+    "news_sentiment": [...],
+    "smart_money_flow": [...],
+    "ipo_heat": [...],
+    "yield_curve": [...],
+    "fed_expectations": [...]
+  }
+}
+```
+
+**Acceptance Criteria**:
+- [ ] Endpoint returns 30 days by default
+- [ ] Supports `?days=7|14|30|60|90` query parameter
+- [ ] Each datapoint includes date, score, status
+- [ ] Includes both composite and individual metric trends
+- [ ] Returns empty array gracefully if < requested days of data
+- [ ] Response time < 500ms for 30-day query
+
+---
+
+### Story 10: Frontend Trend Visualization 📊
+
+**Goal**: Interactive trend display with swipe gesture and scale controls
+
+**Deliverables**:
+```
+frontend/src/components/insights/
+├── TrendSparkline.tsx      # Compact sparkline for metric cards
+├── TrendChart.tsx          # Full trend chart with zoom/pan
+├── SwipeContainer.tsx      # Swipe left gesture handler
+└── hooks/useInsightTrend.ts # Data fetching hook
+```
+
+**UX Requirements**:
+- **Default**: 30 days displayed in sparkline
+- **Swipe left**: Load more history (60, 90 days)
+- **Scale/zoom**: Pinch gesture to show more/fewer datapoints
+- **Today highlight**: Current day's datapoint in different color/marker
+- **Responsive**: Works on mobile and desktop
+
+**Updated Metric Card Design**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  📊 AI Price Anomaly                              Score: 85/100 │
+│  ───────────────────────────────────────────────────────────────│
+│                                                                 │
+│  [30-Day Trend Sparkline ~~~~~~~~~~~●]  ← Today highlighted    │
+│                              ← Swipe left for more history     │
+│                                                                 │
+│  [════════════════════════════════●══════]                      │
+│  0          25          50         75        100                │
+│                                                                 │
+│  💡 AI stocks trading 2.3 std dev above 200-day SMA...         │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Acceptance Criteria**:
+- [ ] Sparkline shows 30-day trend in each metric card
+- [ ] Today's datapoint highlighted with distinct color/marker
+- [ ] Swipe left gesture loads more history (60, 90 days)
+- [ ] Pinch/zoom scales chart to show more/fewer datapoints
+- [ ] Loading skeleton while fetching trend data
+- [ ] Mobile responsive layout
+
+---
+
+### Story 11: AI Tools Redis Integration 🤖
+
+**Goal**: Fast AI tool access via DML cache with trend query capability
+
+**Deliverables**:
+- Update `insights_tools.py` to use DataManager
+- New tool: `get_insight_trend` for historical queries
+- Response time < 100ms for cached data
+
+**New Tool**:
+```python
+@tool
+async def get_insight_trend(category_id: str, days: int = 30) -> str:
+    """
+    Get historical trend for a market insight category.
+
+    Shows how the composite score and individual metrics
+    have changed over the specified number of days.
+
+    Args:
+        category_id: Category identifier (e.g., "ai_sector_risk")
+        days: Number of days of history (default: 30, max: 90)
+
+    Returns:
+        Trend analysis with score changes and patterns
+
+    Example:
+        get_insight_trend("ai_sector_risk", 30)
+    """
+```
+
+**Acceptance Criteria**:
+- [ ] `get_insight_category()` reads from Redis via DML (no API calls)
+- [ ] `get_insight_trend()` returns formatted 30-day history
+- [ ] Tool response time < 100ms when data is cached
+- [ ] Graceful fallback if cache miss (trigger calculation or return stale)
+- [ ] Rich markdown formatting with trend direction indicators (↑↓→)
+
+**Verification**:
+```bash
+# Performance test
+time curl -X POST /api/chat -d '{"message": "What is the AI sector risk?"}'
+# Expected: < 2 seconds (vs 15-30 seconds without cache)
+
+# Trend query test
+curl -X POST /api/chat -d '{"message": "How has AI sector risk changed this month?"}'
+# Expected: Returns 30-day trend analysis
+```
+
+---
+
 ## Future Categories (Backlog)
 
 These categories can be added by implementing the `InsightCategory` base class:
@@ -353,47 +608,79 @@ These categories can be added by implementing the `InsightCategory` base class:
 
 ### Caching Strategy
 
+> **Updated 2025-12-27**: All caching now managed through Data Manager Layer (DML)
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     CACHING LAYERS                          │
+│                DATA MANAGER LAYER (DML)                      │
+│              *** SINGLE SOURCE OF TRUTH ***                  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  Layer 1: Raw API Data (Alpha Vantage)                      │
-│  ├── Price data: 5 min TTL                                  │
+│  Cache Key Convention: {domain}:{granularity}:{symbol}      │
+│  ├── market:daily:AAPL           (OHLCV bars)               │
+│  ├── macro:treasury:2y           (Treasury yields)          │
+│  ├── sentiment:news:technology   (News sentiment)           │
+│  ├── etf:holdings:AIQ            (ETF basket)               │
+│  └── insights:ai_sector_risk:latest  (Computed results)     │
+│                                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Layer 1: Raw API Data (via DML)                            │
+│  ├── Intraday (1min-15min): NO CACHE (always fresh)         │
+│  ├── Daily+ OHLCV: 1-4 hour TTL                             │
 │  ├── News sentiment: 1 hour TTL                             │
 │  ├── IPO calendar: 24 hour TTL                              │
-│  └── Treasury yields: 1 hour TTL                            │
+│  ├── Treasury yields: 1 hour TTL                            │
+│  └── ETF holdings: 24 hour TTL                              │
 │                                                             │
-│  Layer 2: Calculated Metrics                                │
-│  ├── Individual metrics: 30 min TTL                         │
-│  └── Composite scores: 30 min TTL                           │
+│  Layer 2: Computed Insights (Redis)                         │
+│  ├── insights:{category}:latest: 24 hour TTL                │
+│  └── Updated daily by cron job                              │
 │                                                             │
 │  Layer 3: Historical Snapshots (MongoDB)                    │
-│  └── Daily snapshots for trend analysis                     │
+│  ├── Collection: insight_snapshots                          │
+│  ├── Retention: 90 days                                     │
+│  └── Used for trend queries                                 │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+**DML Guarantees**:
+- All data consumers use same cache (no duplication)
+- Consistent key naming across application
+- Shared data fetched once (e.g., Treasury 2Y for 2 metrics)
+- No direct API calls outside DML
+
 ### Database Schema
+
+> **Updated 2025-12-27**: Added composite_status field for trend queries
 
 ```javascript
 // Collection: insight_snapshots
 {
   "_id": ObjectId,
   "category_id": "ai_sector_risk",
-  "date": ISODate("2025-12-20"),
+  "date": ISODate("2025-12-27"),
   "composite_score": 72.5,
+  "composite_status": "elevated",           // Added for trend display
   "metrics": {
     "ai_price_anomaly": { "score": 85, "status": "high" },
     "news_sentiment": { "score": 78, "status": "elevated" },
-    // ... other metrics
+    "smart_money_flow": { "score": 52, "status": "normal" },
+    "ipo_heat": { "score": 35, "status": "normal" },
+    "yield_curve": { "score": 70, "status": "elevated" },
+    "fed_expectations": { "score": 62, "status": "elevated" }
   },
   "created_at": ISODate
 }
 
-// Index for efficient queries
+// Index for efficient trend queries
 db.insight_snapshots.createIndex({ "category_id": 1, "date": -1 })
+
+// Retention: 90 days (managed by application or TTL index)
 ```
+
+**See also**: [Database Schema Documentation](../architecture/database-schema.md) (needs update for this collection)
 
 ---
 
@@ -420,13 +707,26 @@ db.insight_snapshots.createIndex({ "category_id": 1, "date": -1 })
 
 ## Definition of Done
 
+### Phase 1 (Stories 1-6)
 - [ ] All 6 stories completed with acceptance criteria
 - [ ] Insights page accessible at `/insights`
 - [ ] All 6 AI Risk metrics functional
 - [ ] Explanations clear and helpful
 - [ ] LLM can discuss any metric
+
+### Phase 2 (Stories 7-11)
+- [ ] Data Manager Layer (DML) is single source of truth
+- [ ] All data consumers migrated to DML
+- [ ] Daily cron job populates snapshots
+- [ ] Trend API returns 30-day history
+- [ ] Frontend sparklines show trend with today highlighted
+- [ ] AI tools respond < 100ms from cache
+- [ ] Swipe gesture loads more history
+
+### Overall
 - [ ] Documentation complete
 - [ ] No regression in existing features
+- [ ] Performance verified (< 10s cron, < 100ms cached reads)
 
 ---
 
@@ -440,6 +740,9 @@ db.insight_snapshots.createIndex({ "category_id": 1, "date": -1 })
 | Cache Utils | `backend/src/core/utils/cache_utils.py` |
 | Page Components | `frontend/src/pages/` |
 | API Router Pattern | `backend/src/api/` |
+| **Data Manager Layer** | `backend/src/services/data_manager/` (Story 7) |
+| **Insights Cron Job** | `.pipeline/k8s/base/insights-cron.yaml` (Story 8) |
+| **Sprint Change Proposal** | `docs/stories/sprint-change-proposal-ai-sector-risk-trends.md` |
 
 ---
 
@@ -447,10 +750,29 @@ db.insight_snapshots.createIndex({ "category_id": 1, "date": -1 })
 
 **Key considerations for story development:**
 
+### Phase 1 (Stories 1-6) - Core Platform
 1. This is an **extensible platform** - architecture must support future categories
 2. **Explainability is core UX** - not an afterthought
 3. **AI integration** - every metric must be "talkable"
 4. Follow existing patterns in `market_data/` and `agent/tools/`
 5. Each story should verify no regression in existing features
 
-The epic delivers a **Market Insights Platform** starting with AI Sector Risk, designed for expansion to additional categories over time.
+### Phase 2 (Stories 7-11) - Trend & DML Enhancement
+1. **Story 7 (DML) is foundational** - must be completed first, all other Phase 2 stories depend on it
+2. **DML is the single source of truth** - no bypass allowed, all consumers must migrate
+3. **Performance is critical** - parallel execution, shared data, cache-first access
+4. **Cron job runs at market open** - 9:30 AM ET (14:30 UTC)
+5. **UX: Swipe + Scale** - mobile-first gesture interactions for trend exploration
+
+### Story Dependencies
+```
+Story 7 (DML) ──┬──► Story 8 (Cron) ──┬──► Story 9 (Trend API) ──► Story 10 (Frontend)
+                │                     │
+                └──► Story 11 (AI Tools) ◄─┘
+```
+
+The epic delivers a **Market Insights Platform** with:
+- AI Sector Risk category with 6 metrics
+- 30-day trend visualization with swipe/scale UX
+- Data Manager Layer for unified, high-performance data access
+- AI tools with < 100ms response time from cache
