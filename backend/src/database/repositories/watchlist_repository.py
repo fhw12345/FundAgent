@@ -8,9 +8,10 @@ from datetime import datetime
 import structlog
 from motor.motor_asyncio import AsyncIOMotorCollection
 
+from src.core.utils.date_utils import utcnow
+
 from ...models.watchlist import WatchlistItem, WatchlistItemCreate
 
-from src.core.utils.date_utils import utcnow
 logger = structlog.get_logger()
 
 
@@ -88,19 +89,26 @@ class WatchlistRepository:
 
         return watchlist_item
 
-    async def get_by_user(self, user_id: str) -> list[WatchlistItem]:
+    async def get_by_user(
+        self, user_id: str, skip: int = 0, limit: int = 50
+    ) -> list[WatchlistItem]:
         """
-        Get all watchlist items for a user.
+        Get watchlist items for a user with pagination.
 
         Args:
             user_id: User identifier
+            skip: Number of items to skip (for pagination)
+            limit: Maximum items to return
 
         Returns:
             List of watchlist items sorted by added_at descending
         """
-        cursor = self.collection.find({"user_id": user_id}).sort(
-            "added_at", -1
-        )  # Newest first
+        cursor = (
+            self.collection.find({"user_id": user_id})
+            .sort("added_at", -1)  # Newest first
+            .skip(skip)
+            .limit(limit)
+        )
 
         items = []
         async for item_dict in cursor:

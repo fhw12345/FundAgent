@@ -32,6 +32,8 @@ Design Philosophy:
 """
 
 import asyncio
+import random
+import time
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -80,6 +82,7 @@ try:
 except ImportError:
     LANGFUSE_AVAILABLE = False
     LangfuseCallbackHandler = None
+    Langfuse = None
     logger.warning("Langfuse not available - observability disabled")
 
 
@@ -121,13 +124,14 @@ class FinancialAnalysisReActAgent:
         # Initialize Langfuse client globally (SDK v3 pattern)
         # Only enable if credentials are configured and library is available
         self.langfuse_enabled = False
+        self.langfuse_client = None  # Store client for custom span creation (Story 1.4)
         if (
             LANGFUSE_AVAILABLE
             and settings.langfuse_public_key
             and settings.langfuse_secret_key
         ):
             try:
-                Langfuse(
+                self.langfuse_client = Langfuse(
                     public_key=settings.langfuse_public_key,
                     secret_key=settings.langfuse_secret_key,
                     host=settings.langfuse_host,
@@ -370,6 +374,30 @@ Summary: {result.analysis_summary}"""
             f"thread_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         )
 
+        # ===== LANGFUSE LATENCY TRACKING (Story 1.4) =====
+        # Track agent invocation latency with custom trace
+        langfuse_trace = None
+        agent_start_time = time.perf_counter()
+        if self.langfuse_enabled and self.langfuse_client:
+            try:
+                langfuse_trace = self.langfuse_client.trace(
+                    id=trace_id,
+                    name="react_agent_invocation",
+                    input={"user_message": user_message[:500]},  # Truncate for storage
+                    metadata={
+                        "thread_id": thread_id,
+                        "language": language,
+                        "history_length": (
+                            len(conversation_history) if conversation_history else 0
+                        ),
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to create Langfuse trace for latency tracking",
+                    error=str(e),
+                )
+
         logger.info(
             "ReAct agent invocation started",
             trace_id=trace_id,
@@ -438,10 +466,26 @@ Summary: {result.analysis_summary}"""
             )
 
         try:
-            # Retry configuration for DashScope API (SSL errors, timeouts)
+            # ===== RETRY CONFIGURATION (Story 1.4: Retry Logic Optimization) =====
+            # Exponential backoff with jitter for DashScope API (SSL errors, timeouts)
             max_retries = 3
             base_delay = 2.0  # seconds
             max_delay = 30.0  # seconds
+            jitter_factor = 0.25  # Add 0-25% random jitter to prevent thundering herd
+
+            # Retryable error keywords (network and transient errors)
+            retryable_keywords = [
+                "ssl",
+                "certificate",
+                "connection",
+                "timeout",
+                "max retries",
+                "eof occurred",
+                "rate limit",
+                "service unavailable",
+                "bad gateway",
+                "gateway timeout",
+            ]
 
             last_exception = None
             for attempt in range(max_retries):
@@ -451,46 +495,53 @@ Summary: {result.analysis_summary}"""
                         {"messages": messages}, config=config
                     )
                     # Success - break out of retry loop
+                    if attempt > 0:
+                        logger.info(
+                            "ReAct agent retry succeeded",
+                            trace_id=trace_id,
+                            attempt=attempt + 1,
+                            recovery_after_retries=attempt,
+                        )
                     break
                 except Exception as e:
                     last_exception = e
-                    # Check if this is a retryable error (SSL, connection, timeout)
+                    # Check if this is a retryable error
                     error_str = str(e).lower()
                     is_retryable = any(
-                        keyword in error_str
-                        for keyword in [
-                            "ssl",
-                            "certificate",
-                            "connection",
-                            "timeout",
-                            "max retries",
-                            "eof occurred",
-                        ]
+                        keyword in error_str for keyword in retryable_keywords
                     )
 
                     if not is_retryable or attempt == max_retries - 1:
                         # Non-retryable error or last attempt - raise immediately
                         logger.error(
-                            "ReAct agent invocation failed (non-retryable or max retries reached)",
+                            "ReAct agent invocation failed (non-retryable or max retries exhausted)",
                             trace_id=trace_id,
                             attempt=attempt + 1,
                             max_retries=max_retries,
                             error=str(e),
                             error_type=type(e).__name__,
                             is_retryable=is_retryable,
+                            total_attempts=attempt + 1,
                         )
                         raise
 
-                    # Calculate exponential backoff delay
-                    delay = min(base_delay * (2**attempt), max_delay)
+                    # Calculate exponential backoff with jitter (Story 1.4)
+                    # Jitter prevents thundering herd problem when many requests retry simultaneously
+                    base_wait = min(base_delay * (2**attempt), max_delay)
+                    jitter = random.uniform(0, jitter_factor * base_wait)
+                    delay = base_wait + jitter
+
                     logger.warning(
-                        "ReAct agent invocation failed - retrying with exponential backoff",
+                        "ReAct agent retry scheduled",
                         trace_id=trace_id,
                         attempt=attempt + 1,
                         max_retries=max_retries,
+                        remaining_attempts=max_retries - attempt - 1,
                         error=str(e),
                         error_type=type(e).__name__,
-                        retry_delay_seconds=delay,
+                        retry_delay_seconds=round(delay, 2),
+                        base_delay=base_wait,
+                        jitter_applied=round(jitter, 2),
                     )
 
                     # Wait before retrying
@@ -518,6 +569,9 @@ Summary: {result.analysis_summary}"""
                 extract_token_usage_from_messages(result["messages"])
             )
 
+            # Calculate agent execution duration (Story 1.4)
+            agent_duration_ms = int((time.perf_counter() - agent_start_time) * 1000)
+
             logger.info(
                 "ReAct agent invocation completed",
                 trace_id=trace_id,
@@ -526,7 +580,32 @@ Summary: {result.analysis_summary}"""
                 final_answer_length=len(final_answer),
                 input_tokens=total_input_tokens,
                 output_tokens=total_output_tokens,
+                agent_duration_ms=agent_duration_ms,
             )
+
+            # ===== LANGFUSE LATENCY SPAN UPDATE (Story 1.4) =====
+            # Add latency metrics to Langfuse trace
+            if langfuse_trace:
+                try:
+                    langfuse_trace.update(
+                        output={"final_answer_length": len(final_answer)},
+                        metadata={
+                            "duration_ms": agent_duration_ms,
+                            "tool_executions": len(tool_messages),
+                            "input_tokens": total_input_tokens,
+                            "output_tokens": total_output_tokens,
+                            "total_tokens": total_input_tokens + total_output_tokens,
+                            "status": "success",
+                        },
+                    )
+                    # Flush to ensure data is sent
+                    if self.langfuse_client:
+                        self.langfuse_client.flush()
+                except Exception as e:
+                    logger.warning(
+                        "Failed to update Langfuse trace with latency metrics",
+                        error=str(e),
+                    )
 
             return {
                 "trace_id": trace_id,
@@ -536,6 +615,7 @@ Summary: {result.analysis_summary}"""
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
                 "total_tokens": total_input_tokens + total_output_tokens,
+                "agent_duration_ms": agent_duration_ms,  # Story 1.4: Include latency
             }
 
         except Exception as e:
@@ -544,13 +624,37 @@ Summary: {result.analysis_summary}"""
 
             tb_str = traceback.format_exc()
 
+            # Calculate agent execution duration even on error
+            agent_duration_ms = int((time.perf_counter() - agent_start_time) * 1000)
+
             logger.error(
                 "ReAct agent invocation failed",
                 trace_id=trace_id,
                 error=str(e),
                 error_type=type(e).__name__,
                 traceback=tb_str,
+                agent_duration_ms=agent_duration_ms,
             )
+
+            # ===== LANGFUSE ERROR TRACKING (Story 1.4) =====
+            if langfuse_trace:
+                try:
+                    langfuse_trace.update(
+                        output={"error": str(e)},
+                        metadata={
+                            "duration_ms": agent_duration_ms,
+                            "status": "error",
+                            "error_type": type(e).__name__,
+                        },
+                    )
+                    if self.langfuse_client:
+                        self.langfuse_client.flush()
+                except Exception as trace_error:
+                    logger.warning(
+                        "Failed to update Langfuse trace with error",
+                        error=str(trace_error),
+                    )
+
             return {
                 "trace_id": trace_id,
                 "messages": messages,
@@ -560,6 +664,7 @@ Summary: {result.analysis_summary}"""
                 "input_tokens": 0,
                 "output_tokens": 0,
                 "total_tokens": 0,
+                "agent_duration_ms": agent_duration_ms,  # Story 1.4: Include latency
             }
 
     async def ainvoke_structured(
@@ -602,48 +707,69 @@ Summary: {result.analysis_summary}"""
             if context:
                 full_prompt = f"{context}\n\n---\n\n{prompt}"
 
-            # Invoke with retry logic (same as ainvoke)
+            # ===== RETRY CONFIGURATION (Story 1.4: Retry Logic Optimization) =====
+            # Same pattern as ainvoke - exponential backoff with jitter
             max_retries = 3
             base_delay = 2.0
             max_delay = 30.0
+            jitter_factor = 0.25
+
+            retryable_keywords = [
+                "ssl",
+                "certificate",
+                "connection",
+                "timeout",
+                "max retries",
+                "eof occurred",
+                "rate limit",
+                "service unavailable",
+            ]
 
             last_exception = None
             for attempt in range(max_retries):
                 try:
                     result = await structured_llm.ainvoke(full_prompt)
+                    if attempt > 0:
+                        logger.info(
+                            "Structured output retry succeeded",
+                            schema=schema.__name__,
+                            attempt=attempt + 1,
+                            recovery_after_retries=attempt,
+                        )
                     break
                 except Exception as e:
                     last_exception = e
                     error_str = str(e).lower()
                     is_retryable = any(
-                        keyword in error_str
-                        for keyword in [
-                            "ssl",
-                            "certificate",
-                            "connection",
-                            "timeout",
-                            "max retries",
-                            "eof occurred",
-                        ]
+                        keyword in error_str for keyword in retryable_keywords
                     )
 
                     if not is_retryable or attempt == max_retries - 1:
                         logger.error(
-                            "Structured output invocation failed",
+                            "Structured output invocation failed (non-retryable or max retries exhausted)",
                             schema=schema.__name__,
                             attempt=attempt + 1,
+                            max_retries=max_retries,
                             error=str(e),
                             error_type=type(e).__name__,
+                            is_retryable=is_retryable,
                         )
                         raise
 
-                    delay = min(base_delay * (2**attempt), max_delay)
+                    # Calculate exponential backoff with jitter (Story 1.4)
+                    base_wait = min(base_delay * (2**attempt), max_delay)
+                    jitter = random.uniform(0, jitter_factor * base_wait)
+                    delay = base_wait + jitter
+
                     logger.warning(
-                        "Structured output failed - retrying",
+                        "Structured output retry scheduled",
                         schema=schema.__name__,
                         attempt=attempt + 1,
-                        retry_delay=delay,
+                        max_retries=max_retries,
+                        remaining_attempts=max_retries - attempt - 1,
                         error=str(e),
+                        error_type=type(e).__name__,
+                        retry_delay_seconds=round(delay, 2),
                     )
                     await asyncio.sleep(delay)
 

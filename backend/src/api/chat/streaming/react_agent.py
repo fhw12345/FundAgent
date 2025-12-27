@@ -4,6 +4,11 @@ ReAct agent streaming handler (v3).
 This module contains the streaming response logic for the ReAct Agent (v3),
 handling SSE streaming, tool execution callbacks, credit integration,
 and context management.
+
+Story 1.4: Streaming Latency Optimization
+- Added TTFT (Time-To-First-Token) tracking
+- Implemented eager streaming with "thinking" events
+- Added latency metrics for Langfuse observability
 """
 
 import asyncio
@@ -15,6 +20,7 @@ from fastapi.responses import StreamingResponse
 from ....agent.callbacks.tool_execution_callback import ToolExecutionCallback
 from ....agent.langgraph_react_agent import FinancialAnalysisReActAgent
 from ....core.utils import extract_token_usage_from_agent_result
+from ....core.utils.date_utils import utcnow
 from ....database.repositories.message_repository import MessageRepository
 from ....services.chat_service import ChatService
 from ....services.context_window_manager import ContextWindowManager
@@ -29,6 +35,8 @@ from .helpers import (
     create_chunk_event,
     create_done_event,
     create_error_event,
+    create_latency_event,
+    create_thinking_event,
     format_sse_event,
 )
 
@@ -63,6 +71,16 @@ async def stream_with_react_agent(
         transaction = None
         tool_event_queue = None
 
+        # ===== TTFT TRACKING (Story 1.4) =====
+        # Track request start time for latency metrics
+        request_start = utcnow()
+        ttft_recorded = False  # Track when first content chunk is sent
+        first_tool_recorded = False  # Track when first tool event is sent
+
+        def get_elapsed_ms() -> int:
+            """Get milliseconds elapsed since request start."""
+            return int((utcnow() - request_start).total_seconds() * 1000)
+
         try:
             # Create or get chat
             chat_id, chat_created_event = await get_or_create_chat(
@@ -70,6 +88,11 @@ async def stream_with_react_agent(
             )
             if chat_created_event:
                 yield format_sse_event(chat_created_event)
+
+            # ===== EAGER STREAMING (Story 1.4) =====
+            # Emit thinking event immediately to reduce perceived latency
+            # This gives users immediate feedback that processing has started
+            yield create_thinking_event("initializing", chat_id)
 
             # Save message
             logger.debug(
@@ -119,12 +142,16 @@ async def stream_with_react_agent(
                 model=request.model,
             )
 
+            # Emit latency metric: credit check complete
+            yield create_latency_event("credit_checked", get_elapsed_ms())
+
             logger.info(
                 "Credits checked and transaction created for v3 agent",
                 user_id=user_id,
                 chat_id=chat_id,
                 transaction_id=transaction.transaction_id,
                 estimated_cost=estimated_cost,
+                elapsed_ms=get_elapsed_ms(),
             )
 
             # Get conversation history for context
@@ -182,7 +209,14 @@ async def stream_with_react_agent(
                     {"role": msg["role"], "content": msg["content"][:50]}
                     for msg in conversation_history[-3:]
                 ],
+                elapsed_ms=get_elapsed_ms(),
             )
+
+            # Emit latency metric: context preparation complete
+            yield create_latency_event("context_prepared", get_elapsed_ms())
+
+            # Update thinking stage: now reasoning/analyzing
+            yield create_thinking_event("reasoning", chat_id)
 
             # ===== TOOL EXECUTION CALLBACK SETUP =====
             # Create event queue for real-time tool execution streaming
@@ -250,6 +284,9 @@ async def stream_with_react_agent(
 
             # Invoke ReAct agent with callback (auto-loop handles tool chaining)
             try:
+                # Emit latency metric: agent starting
+                yield create_latency_event("agent_started", get_elapsed_ms())
+
                 # Create agent invocation task
                 agent_task = asyncio.create_task(
                     asyncio.wait_for(
@@ -266,8 +303,19 @@ async def stream_with_react_agent(
 
                 # Stream tool events concurrently while agent runs
                 # The generator will automatically stop when agent completes
-                logger.info("Starting tool event streaming loop")
+                logger.info(
+                    "Starting tool event streaming loop",
+                    elapsed_ms=get_elapsed_ms(),
+                )
                 async for tool_event in stream_tool_events_background():
+                    # Track first tool event (Story 1.4: TTFT optimization)
+                    if not first_tool_recorded:
+                        first_tool_recorded = True
+                        yield create_latency_event(
+                            "first_tool",
+                            get_elapsed_ms(),
+                            tool_name=tool_event.get("tool_name"),
+                        )
                     yield tool_event
 
                 # Generator has exited, agent is done
@@ -398,13 +446,29 @@ async def stream_with_react_agent(
                 answer_length=len(final_answer),
                 chunk_size=CHUNK_SIZE,
                 chat_id=chat_id,
+                elapsed_ms=get_elapsed_ms(),
             )
             for i in range(0, len(final_answer), CHUNK_SIZE):
                 chunk_text = final_answer[i : i + CHUNK_SIZE]
+                # Track TTFT (Time-To-First-Token) - Story 1.4
+                if not ttft_recorded:
+                    ttft_recorded = True
+                    ttft_ms = get_elapsed_ms()
+                    yield create_latency_event("first_chunk", ttft_ms)
+                    logger.info(
+                        "TTFT recorded (Time-To-First-Token)",
+                        chat_id=chat_id,
+                        ttft_ms=ttft_ms,
+                        trace_id=trace_id,
+                    )
                 yield create_chunk_event(chunk_text)
                 await asyncio.sleep(0.03)  # Proportional delay (10 chars → 0.03s)
 
-            logger.info("Finished streaming final answer", chat_id=chat_id)
+            logger.info(
+                "Finished streaming final answer",
+                chat_id=chat_id,
+                elapsed_ms=get_elapsed_ms(),
+            )
 
             # Save assistant message with metadata (including transaction linkage)
             assistant_message = await chat_service.add_message(
@@ -449,6 +513,26 @@ async def stream_with_react_agent(
                     "Failed to complete transaction for v3 agent",
                     transaction_id=transaction.transaction_id,
                 )
+
+            # Emit final latency metric: stream complete (Story 1.4)
+            total_duration_ms = get_elapsed_ms()
+            yield create_latency_event(
+                "stream_complete",
+                total_duration_ms,
+                trace_id=trace_id,
+                tool_executions=tool_executions,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
+
+            logger.info(
+                "Stream latency metrics complete",
+                chat_id=chat_id,
+                trace_id=trace_id,
+                total_duration_ms=total_duration_ms,
+                ttft_recorded=ttft_recorded,
+                first_tool_recorded=first_tool_recorded,
+            )
 
             # Send completion event (include credit info)
             yield create_done_event(

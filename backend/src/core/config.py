@@ -107,12 +107,28 @@ class Settings(BaseSettings):
     oss_bucket: str = "klinecubic-financialagent-oss"
     oss_endpoint: str = "oss-cn-shanghai.aliyuncs.com"
 
-    # Cache settings
+    # Cache settings - TTL values in seconds by data category
+    # These values are optimized based on data freshness requirements
     redis_ttl_seconds: int = 3600  # 1 hour default cache TTL
+    cache_ttl_realtime: int = 60  # Real-time quotes (1 min)
+    cache_ttl_price_data: int = 300  # Price data (5 min)
+    cache_ttl_analysis: int = 1800  # Analysis results (30 min)
+    cache_ttl_news: int = 3600  # News/sentiment (1 hour)
+    cache_ttl_historical: int = 7200  # Historical data (2 hours)
+    cache_ttl_fundamentals: int = 86400  # Company fundamentals (24 hours)
+    cache_ttl_insights: int = 1800  # AI insights (30 min)
 
     # Rate limiting
     rate_limit_requests: int = 100
     rate_limit_window: int = 60  # per minute
+
+    # Token budget limits per request type (Story 1.4: Token Usage Optimization)
+    # Limits help control costs and ensure predictable response times
+    token_budget_chat: int = 8000  # Regular chat messages
+    token_budget_analysis: int = 16000  # Analysis requests with tool calls
+    token_budget_portfolio: int = 32000  # Portfolio analysis (multi-symbol)
+    token_budget_summary: int = 4000  # Context summarization
+    token_warning_threshold: float = 0.8  # Warn at 80% of budget
 
     # Kubernetes configuration
     kubernetes_namespace: str = "default"  # K8s namespace for metrics collection

@@ -228,3 +228,198 @@ class ToolExecutionRepository:
             ),
             "by_tool_source": by_tool_source,
         }
+
+    async def get_tool_performance_metrics(
+        self, start_date: datetime, end_date: datetime, limit: int = 50
+    ) -> dict[str, Any]:
+        """
+        Get tool execution performance metrics aggregated by tool name.
+
+        Used for baseline performance measurement and optimization tracking.
+
+        Args:
+            start_date: Start datetime for analysis period
+            end_date: End datetime for analysis period
+            limit: Maximum number of tools to return
+
+        Returns:
+            Performance metrics dict:
+            {
+                "period": {"start": ..., "end": ...},
+                "summary": {
+                    "total_executions": 1000,
+                    "avg_duration_ms": 1250,
+                    "success_rate": 0.98,
+                    "cache_hit_rate": 0.75
+                },
+                "by_tool": [
+                    {
+                        "tool_name": "GLOBAL_QUOTE",
+                        "tool_source": "mcp_alphavantage",
+                        "total_calls": 500,
+                        "avg_duration_ms": 1200,
+                        "p50_duration_ms": 1100,
+                        "p95_duration_ms": 2500,
+                        "p99_duration_ms": 3500,
+                        "success_rate": 0.99,
+                        "cache_hit_rate": 0.80
+                    },
+                    ...
+                ]
+            }
+        """
+        # Aggregation pipeline for tool performance
+        pipeline = [
+            {
+                "$match": {
+                    "started_at": {"$gte": start_date, "$lte": end_date},
+                    "duration_ms": {"$exists": True, "$ne": None},
+                }
+            },
+            {
+                "$group": {
+                    "_id": {"tool_name": "$tool_name", "tool_source": "$tool_source"},
+                    "total_calls": {"$sum": 1},
+                    "avg_duration_ms": {"$avg": "$duration_ms"},
+                    "min_duration_ms": {"$min": "$duration_ms"},
+                    "max_duration_ms": {"$max": "$duration_ms"},
+                    "durations": {"$push": "$duration_ms"},
+                    "successful_calls": {
+                        "$sum": {"$cond": [{"$eq": ["$status", "success"]}, 1, 0]}
+                    },
+                    "cache_hits": {"$sum": {"$cond": ["$cache_hit", 1, 0]}},
+                }
+            },
+            {"$sort": {"total_calls": -1}},
+            {"$limit": limit},
+        ]
+
+        results = await self.collection.aggregate(pipeline).to_list(limit)
+
+        # Calculate percentiles and format results
+        by_tool = []
+        total_executions = 0
+        total_duration_sum = 0
+        total_successful = 0
+        total_cache_hits = 0
+
+        for r in results:
+            durations = sorted(r["durations"])
+            count = len(durations)
+
+            # Calculate percentiles
+            p50_idx = int(count * 0.50)
+            p95_idx = int(count * 0.95)
+            p99_idx = int(count * 0.99)
+
+            p50 = durations[min(p50_idx, count - 1)] if count > 0 else 0
+            p95 = durations[min(p95_idx, count - 1)] if count > 0 else 0
+            p99 = durations[min(p99_idx, count - 1)] if count > 0 else 0
+
+            tool_metrics = {
+                "tool_name": r["_id"]["tool_name"],
+                "tool_source": r["_id"]["tool_source"],
+                "total_calls": r["total_calls"],
+                "avg_duration_ms": round(r["avg_duration_ms"], 2),
+                "min_duration_ms": r["min_duration_ms"],
+                "max_duration_ms": r["max_duration_ms"],
+                "p50_duration_ms": p50,
+                "p95_duration_ms": p95,
+                "p99_duration_ms": p99,
+                "success_rate": round(
+                    (
+                        r["successful_calls"] / r["total_calls"]
+                        if r["total_calls"] > 0
+                        else 0
+                    ),
+                    4,
+                ),
+                "cache_hit_rate": round(
+                    r["cache_hits"] / r["total_calls"] if r["total_calls"] > 0 else 0,
+                    4,
+                ),
+            }
+            by_tool.append(tool_metrics)
+
+            # Accumulate totals
+            total_executions += r["total_calls"]
+            total_duration_sum += r["avg_duration_ms"] * r["total_calls"]
+            total_successful += r["successful_calls"]
+            total_cache_hits += r["cache_hits"]
+
+        return {
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+            },
+            "summary": {
+                "total_executions": total_executions,
+                "avg_duration_ms": round(
+                    (
+                        total_duration_sum / total_executions
+                        if total_executions > 0
+                        else 0
+                    ),
+                    2,
+                ),
+                "success_rate": round(
+                    total_successful / total_executions if total_executions > 0 else 0,
+                    4,
+                ),
+                "cache_hit_rate": round(
+                    total_cache_hits / total_executions if total_executions > 0 else 0,
+                    4,
+                ),
+            },
+            "by_tool": by_tool,
+        }
+
+    async def get_slowest_tools(
+        self, start_date: datetime, end_date: datetime, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """
+        Get the slowest tools by average execution time.
+
+        Used to identify optimization targets.
+
+        Args:
+            start_date: Start datetime
+            end_date: End datetime
+            limit: Number of tools to return
+
+        Returns:
+            List of tools sorted by avg_duration_ms descending
+        """
+        pipeline = [
+            {
+                "$match": {
+                    "started_at": {"$gte": start_date, "$lte": end_date},
+                    "duration_ms": {"$exists": True, "$ne": None},
+                    "status": "success",  # Only successful executions
+                }
+            },
+            {
+                "$group": {
+                    "_id": {"tool_name": "$tool_name", "tool_source": "$tool_source"},
+                    "total_calls": {"$sum": 1},
+                    "avg_duration_ms": {"$avg": "$duration_ms"},
+                    "max_duration_ms": {"$max": "$duration_ms"},
+                }
+            },
+            {"$match": {"total_calls": {"$gte": 5}}},  # Min 5 calls for significance
+            {"$sort": {"avg_duration_ms": -1}},
+            {"$limit": limit},
+        ]
+
+        results = await self.collection.aggregate(pipeline).to_list(limit)
+
+        return [
+            {
+                "tool_name": r["_id"]["tool_name"],
+                "tool_source": r["_id"]["tool_source"],
+                "total_calls": r["total_calls"],
+                "avg_duration_ms": round(r["avg_duration_ms"], 2),
+                "max_duration_ms": r["max_duration_ms"],
+            }
+            for r in results
+        ]
