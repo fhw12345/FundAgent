@@ -137,9 +137,7 @@ class TestCreate:
         assert len(result.chat_id) == 17  # "chat_" + 12 hex chars
 
     @pytest.mark.asyncio
-    async def test_create_chat_with_default_title(
-        self, repository, mock_collection
-    ):
+    async def test_create_chat_with_default_title(self, repository, mock_collection):
         """Test creating chat with default title"""
         # Arrange
         chat_create = ChatCreate(user_id="user_123")  # No title
@@ -282,6 +280,7 @@ class TestListByUser:
     @pytest.mark.asyncio
     async def test_list_by_user_with_pagination(self, repository, mock_collection):
         """Test listing chats with pagination"""
+
         # Arrange
         async def mock_async_iter():
             return
@@ -304,6 +303,7 @@ class TestListByUser:
     @pytest.mark.asyncio
     async def test_list_by_user_include_archived(self, repository, mock_collection):
         """Test listing chats including archived"""
+
         # Arrange
         async def mock_async_iter():
             return

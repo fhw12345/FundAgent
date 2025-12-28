@@ -25,6 +25,7 @@ from src.models.portfolio import PortfolioOrder
 
 class AsyncIterator:
     """Helper class to make a list async-iterable for testing"""
+
     def __init__(self, items):
         self.items = items
         self.index = 0
@@ -87,7 +88,7 @@ def sample_order():
         cancelled_at=None,
         failed_at=None,
         failure_reason=None,
-        created_at=datetime.now(UTC)
+        created_at=datetime.now(UTC),
     )
 
 
@@ -98,7 +99,9 @@ class TestEnsureIndexes:
     """Test index creation"""
 
     @pytest.mark.asyncio
-    async def test_ensure_indexes_creates_all_indexes(self, repository, mock_collection):
+    async def test_ensure_indexes_creates_all_indexes(
+        self, repository, mock_collection
+    ):
         """Test that all required indexes are created"""
         # Act
         await repository.ensure_indexes()
@@ -124,7 +127,9 @@ class TestCreate:
     """Test order creation"""
 
     @pytest.mark.asyncio
-    async def test_create_order_success(self, repository, mock_collection, sample_order):
+    async def test_create_order_success(
+        self, repository, mock_collection, sample_order
+    ):
         """Test successful order creation"""
         # Arrange
         mock_collection.insert_one.return_value = Mock(inserted_id="mongo_id")
@@ -142,7 +147,9 @@ class TestCreate:
         assert call_args["symbol"] == "AAPL"
 
     @pytest.mark.asyncio
-    async def test_create_duplicate_alpaca_id_raises_error(self, repository, mock_collection, sample_order):
+    async def test_create_duplicate_alpaca_id_raises_error(
+        self, repository, mock_collection, sample_order
+    ):
         """Test that duplicate alpaca_order_id raises error"""
         # Arrange
         mock_collection.insert_one.side_effect = DuplicateKeyError("Duplicate key")
@@ -183,7 +190,7 @@ class TestGet:
             "cancelled_at": None,
             "failed_at": None,
             "failure_reason": None,
-            "created_at": datetime.now(UTC)
+            "created_at": datetime.now(UTC),
         }
 
         # Act
@@ -196,7 +203,9 @@ class TestGet:
         mock_collection.find_one.assert_called_once_with({"order_id": "order_123"})
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_order_returns_none(self, repository, mock_collection):
+    async def test_get_nonexistent_order_returns_none(
+        self, repository, mock_collection
+    ):
         """Test that non-existent order returns None"""
         # Arrange
         mock_collection.find_one.return_value = None
@@ -236,7 +245,7 @@ class TestGetByAlpacaId:
             "cancelled_at": None,
             "failed_at": None,
             "failure_reason": None,
-            "created_at": datetime.now(UTC)
+            "created_at": datetime.now(UTC),
         }
 
         # Act
@@ -245,7 +254,9 @@ class TestGetByAlpacaId:
         # Assert
         assert result is not None
         assert result.alpaca_order_id == "alpaca_xyz"
-        mock_collection.find_one.assert_called_once_with({"alpaca_order_id": "alpaca_xyz"})
+        mock_collection.find_one.assert_called_once_with(
+            {"alpaca_order_id": "alpaca_xyz"}
+        )
 
 
 class TestGetByAnalysisId:
@@ -276,7 +287,7 @@ class TestGetByAnalysisId:
             "cancelled_at": None,
             "failed_at": None,
             "failure_reason": None,
-            "created_at": datetime.now(UTC)
+            "created_at": datetime.now(UTC),
         }
 
         # Act
@@ -285,7 +296,9 @@ class TestGetByAnalysisId:
         # Assert
         assert result is not None
         assert result.analysis_id == "analysis_abc"
-        mock_collection.find_one.assert_called_once_with({"analysis_id": "analysis_abc"})
+        mock_collection.find_one.assert_called_once_with(
+            {"analysis_id": "analysis_abc"}
+        )
 
 
 # ===== List Tests =====
@@ -320,7 +333,7 @@ class TestListByUser:
                 "cancelled_at": None,
                 "failed_at": None,
                 "failure_reason": None,
-                "created_at": datetime.now(UTC)
+                "created_at": datetime.now(UTC),
             },
             {
                 "order_id": "order_2",
@@ -343,8 +356,8 @@ class TestListByUser:
                 "cancelled_at": None,
                 "failed_at": None,
                 "failure_reason": None,
-                "created_at": datetime.now(UTC)
-            }
+                "created_at": datetime.now(UTC),
+            },
         ]
         mock_cursor = AsyncIterator(order_data)
         mock_cursor.sort = Mock(return_value=mock_cursor)
@@ -431,7 +444,7 @@ class TestUpdateStatus:
             "failed_at": None,
             "failure_reason": None,
             "created_at": datetime.now(UTC),
-            "updated_at": datetime.now(UTC)
+            "updated_at": datetime.now(UTC),
         }
 
         # Act
@@ -440,7 +453,7 @@ class TestUpdateStatus:
             status="filled",
             filled_qty=10,
             filled_avg_price=150.50,
-            filled_at=filled_at
+            filled_at=filled_at,
         )
 
         # Assert
@@ -458,8 +471,7 @@ class TestUpdateStatus:
 
         # Act
         result = await repository.update_status(
-            alpaca_order_id="nonexistent",
-            status="filled"
+            alpaca_order_id="nonexistent", status="filled"
         )
 
         # Assert
@@ -496,7 +508,6 @@ class TestCountByUser:
 
         # Assert
         assert result == 10
-        mock_collection.count_documents.assert_called_once_with({
-            "user_id": "user_456",
-            "status": "filled"
-        })
+        mock_collection.count_documents.assert_called_once_with(
+            {"user_id": "user_456", "status": "filled"}
+        )

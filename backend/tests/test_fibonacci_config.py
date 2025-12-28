@@ -319,7 +319,17 @@ class TestTimeframeConfigs:
     def test_all_timeframes_have_configs(self):
         """Test that all expected timeframes have configurations"""
         # Arrange
-        expected_timeframes = ["1m", "1h", "60m", "60min", "1d", "1w", "1wk", "1M", "1mo"]
+        expected_timeframes = [
+            "1m",
+            "1h",
+            "60m",
+            "60min",
+            "1d",
+            "1w",
+            "1wk",
+            "1M",
+            "1mo",
+        ]
 
         # Act & Assert
         for timeframe in expected_timeframes:

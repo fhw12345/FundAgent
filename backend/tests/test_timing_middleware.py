@@ -177,7 +177,9 @@ class TestTimingMiddlewareIntegration:
         async def mock_app(scope: dict, receive: AsyncMock, send: AsyncMock) -> None:
             pass
 
-        middleware = TimingMiddleware(mock_app, log_all_requests=True, slow_threshold_ms=1000.0)
+        middleware = TimingMiddleware(
+            mock_app, log_all_requests=True, slow_threshold_ms=1000.0
+        )
 
         # Call dispatch
         result = await middleware.dispatch(mock_request, mock_call_next)

@@ -130,9 +130,7 @@ class TestCreate:
         mock_collection.insert_one.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_holding_uppercases_symbol(
-        self, repository, mock_collection
-    ):
+    async def test_create_holding_uppercases_symbol(self, repository, mock_collection):
         """Test that symbol is converted to uppercase"""
         # Arrange
         holding_create = HoldingCreate(symbol="aapl", quantity=10, avg_price=100.0)
@@ -263,9 +261,7 @@ class TestGetBySymbol:
         )
 
     @pytest.mark.asyncio
-    async def test_get_by_symbol_uppercases_symbol(
-        self, repository, mock_collection
-    ):
+    async def test_get_by_symbol_uppercases_symbol(self, repository, mock_collection):
         """Test that symbol is converted to uppercase in query"""
         # Arrange
         mock_collection.find_one.return_value = None
@@ -298,9 +294,7 @@ class TestListByUser:
     """Test listing user holdings"""
 
     @pytest.mark.asyncio
-    async def test_list_by_user_multiple_holdings(
-        self, repository, mock_collection
-    ):
+    async def test_list_by_user_multiple_holdings(self, repository, mock_collection):
         """Test listing multiple holdings for a user"""
         # Arrange
         now = datetime.now(UTC)
@@ -361,6 +355,7 @@ class TestListByUser:
     @pytest.mark.asyncio
     async def test_list_by_user_empty_portfolio(self, repository, mock_collection):
         """Test listing holdings for user with no holdings"""
+
         # Arrange
         async def mock_async_iter():
             return
@@ -624,9 +619,7 @@ class TestUpdatePrice:
         assert result.unrealized_pl_pct == 10.00
 
     @pytest.mark.asyncio
-    async def test_update_price_nonexistent_holding(
-        self, repository, mock_collection
-    ):
+    async def test_update_price_nonexistent_holding(self, repository, mock_collection):
         """Test updating price for non-existent holding"""
         # Arrange
         mock_collection.find_one.return_value = None

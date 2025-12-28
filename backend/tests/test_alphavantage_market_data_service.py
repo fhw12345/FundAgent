@@ -132,7 +132,9 @@ class TestValidateDateRange:
 
     def test_intraday_future_date(self):
         """Test intraday interval with future date"""
-        future_date = (pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(days=5)).strftime("%Y-%m-%d")
+        future_date = (
+            pd.Timestamp.now(tz="America/New_York") + pd.Timedelta(days=5)
+        ).strftime("%Y-%m-%d")
         today = pd.Timestamp.now(tz="America/New_York").strftime("%Y-%m-%d")
 
         is_valid, error = validate_date_range(today, future_date, "1m")
@@ -141,7 +143,9 @@ class TestValidateDateRange:
 
     def test_intraday_too_old(self):
         """Test intraday interval with date older than 30 days"""
-        old_date = (pd.Timestamp.now(tz="America/New_York") - pd.Timedelta(days=35)).strftime("%Y-%m-%d")
+        old_date = (
+            pd.Timestamp.now(tz="America/New_York") - pd.Timedelta(days=35)
+        ).strftime("%Y-%m-%d")
         today = pd.Timestamp.now(tz="America/New_York").strftime("%Y-%m-%d")
 
         is_valid, error = validate_date_range(old_date, today, "1m")
@@ -150,7 +154,9 @@ class TestValidateDateRange:
 
     def test_intraday_within_30_days_valid(self):
         """Test intraday interval within 30-day window is valid"""
-        date_7_days_ago = (pd.Timestamp.now(tz="America/New_York") - pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+        date_7_days_ago = (
+            pd.Timestamp.now(tz="America/New_York") - pd.Timedelta(days=7)
+        ).strftime("%Y-%m-%d")
         today = pd.Timestamp.now(tz="America/New_York").strftime("%Y-%m-%d")
 
         is_valid, error = validate_date_range(date_7_days_ago, today, "1m")
@@ -181,7 +187,7 @@ class TestAlphaVantageMarketDataService:
         """Test API key sanitization in response dict"""
         response = {
             "Error Message": "Invalid apikey=ABCD1234567890XYZ",
-            "data": {"info": "Some data"}
+            "data": {"info": "Some data"},
         }
         sanitized = service._sanitize_response(response)
         assert "ABCD1234567890XYZ" not in str(sanitized)
@@ -211,15 +217,15 @@ class TestAlphaVantageMarketDataService:
                     "2. name": "Apple Inc.",
                     "3. type": "Equity",
                     "4. region": "United States",
-                    "8. currency": "USD"
+                    "8. currency": "USD",
                 },
                 {
                     "1. symbol": "AAPLF",
                     "2. name": "Apple Inc. (Frankfurt)",
                     "3. type": "Equity",
                     "4. region": "Germany",
-                    "8. currency": "EUR"
-                }
+                    "8. currency": "EUR",
+                },
             ]
         }
         mock_get.return_value = mock_response
@@ -229,8 +235,12 @@ class TestAlphaVantageMarketDataService:
 
         # Assertions
         assert len(results) == 2
-        assert results[0]["symbol"] == "AAPL"  # Method transforms "1. symbol" to "symbol"
-        assert results[0]["name"] == "Apple Inc."  # Method transforms "2. name" to "name"
+        assert (
+            results[0]["symbol"] == "AAPL"
+        )  # Method transforms "1. symbol" to "symbol"
+        assert (
+            results[0]["name"] == "Apple Inc."
+        )  # Method transforms "2. name" to "name"
         mock_get.assert_called_once()
 
     @pytest.mark.asyncio
@@ -261,7 +271,7 @@ class TestAlphaVantageMarketDataService:
                 "05. price": "150.25",
                 "06. volume": "50000000",
                 "09. change": "2.50",
-                "10. change percent": "1.69%"
+                "10. change percent": "1.69%",
             }
         }
         mock_get.return_value = mock_response
@@ -286,7 +296,7 @@ class TestAlphaVantageMarketDataService:
             "Description": "Technology company",
             "Sector": "Technology",
             "MarketCapitalization": "3000000000000",
-            "PERatio": "28.5"
+            "PERatio": "28.5",
         }
         mock_get.return_value = mock_response
 
@@ -309,10 +319,10 @@ class TestAlphaVantageMarketDataService:
                     "url": "https://example.com/news",
                     "time_published": "20240110T120000",
                     "overall_sentiment_score": 0.75,
-                    "overall_sentiment_label": "Bullish"
+                    "overall_sentiment_label": "Bullish",
                 }
             ],
-            "sentiment_score_definition": "x <= -0.35: Bearish"
+            "sentiment_score_definition": "x <= -0.35: Bearish",
         }
         mock_get.return_value = mock_response
 
@@ -334,9 +344,9 @@ class TestAlphaVantageMarketDataService:
                 {
                     "fiscalDateEnding": "2023-12-31",
                     "operatingCashflow": "100000000000",
-                    "capitalExpenditures": "10000000000"
+                    "capitalExpenditures": "10000000000",
                 }
-            ]
+            ],
         }
         mock_get.return_value = mock_response
 
@@ -358,9 +368,9 @@ class TestAlphaVantageMarketDataService:
                 {
                     "fiscalDateEnding": "2023-12-31",
                     "totalAssets": "500000000000",
-                    "totalLiabilities": "200000000000"
+                    "totalLiabilities": "200000000000",
                 }
-            ]
+            ],
         }
         mock_get.return_value = mock_response
 
@@ -384,7 +394,7 @@ class TestAlphaVantageMarketDataService:
             ],
             "most_actively_traded": [
                 {"ticker": "DEF", "price": "75.00", "volume": "10000000"}
-            ]
+            ],
         }
         mock_get.return_value = mock_response
 
@@ -409,7 +419,7 @@ class TestAlphaVantageMarketDataService:
                     "3. low": "149.00",
                     "4. close": "153.00",
                     "5. adjusted close": "153.00",
-                    "6. volume": "50000000"
+                    "6. volume": "50000000",
                 },
                 "2024-01-09": {
                     "1. open": "148.00",
@@ -417,8 +427,8 @@ class TestAlphaVantageMarketDataService:
                     "3. low": "147.00",
                     "4. close": "150.00",
                     "5. adjusted close": "150.00",
-                    "6. volume": "45000000"
-                }
+                    "6. volume": "45000000",
+                },
             }
         }
         mock_get.return_value = mock_response

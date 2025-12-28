@@ -203,9 +203,7 @@ class TestInsightsCategoryRegistry:
         assert instance is None
 
     @pytest.mark.asyncio
-    async def test_get_category_data(
-        self, registry: InsightsCategoryRegistry
-    ) -> None:
+    async def test_get_category_data(self, registry: InsightsCategoryRegistry) -> None:
         """Test getting category data via registry."""
         data = await registry.get_category_data("ai_sector_risk")
         assert data is not None

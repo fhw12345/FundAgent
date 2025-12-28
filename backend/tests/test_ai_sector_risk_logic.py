@@ -11,6 +11,7 @@ from src.core.config import Settings
 from src.services.insights.categories.ai_sector_risk import AISectorRiskCategory
 from src.services.insights.models import MetricStatus
 
+
 class TestAISectorRiskLogic:
     """Tests for AI Sector Risk specific calculation logic."""
 
@@ -31,8 +32,7 @@ class TestAISectorRiskLogic:
         """Create category instance with mock service."""
         settings = Settings()
         return AISectorRiskCategory(
-            settings=settings,
-            market_service=mock_market_service
+            settings=settings, market_service=mock_market_service
         )
 
     def create_intraday_df(self, open_prices, close_prices, dates=None):
@@ -59,7 +59,7 @@ class TestAISectorRiskLogic:
             "Close": close_prices,
             "High": [max(o, c) + 1 for o, c in zip(open_prices, close_prices)],
             "Low": [min(o, c) - 1 for o, c in zip(open_prices, close_prices)],
-            "Volume": [1000000] * len(open_prices)
+            "Volume": [1000000] * len(open_prices),
         }
 
         df = pd.DataFrame(data, index=timestamps)
@@ -85,8 +85,7 @@ class TestAISectorRiskLogic:
         # First Hour: 100 -> 99 (-1%)
         # Last Hour: 100 -> 102 (+2%)
         df = self.create_intraday_df(
-            open_prices=[100.0, 100.0],
-            close_prices=[99.0, 102.0]
+            open_prices=[100.0, 100.0], close_prices=[99.0, 102.0]
         )
         mock_market_service.get_intraday_bars.return_value = df
 
@@ -124,8 +123,7 @@ class TestAISectorRiskLogic:
         # First Hour: 100 -> 101 (+1%)
         # Last Hour: 100 -> 98 (-2%)
         df = self.create_intraday_df(
-            open_prices=[100.0, 100.0],
-            close_prices=[101.0, 98.0]
+            open_prices=[100.0, 100.0], close_prices=[101.0, 98.0]
         )
         mock_market_service.get_intraday_bars.return_value = df
 
@@ -142,7 +140,9 @@ class TestAISectorRiskLogic:
         assert "Smart money is selling" in metric.explanation.detail
 
     @pytest.mark.asyncio
-    async def test_smart_money_flow_insufficient_data(self, category, mock_market_service):
+    async def test_smart_money_flow_insufficient_data(
+        self, category, mock_market_service
+    ):
         """Test handling of insufficient data."""
         mock_market_service.get_etf_profile.return_value = {
             "holdings": [{"symbol": "NVDA", "weight": "0.1"}]
@@ -181,7 +181,7 @@ class TestAISectorRiskLogic:
         future_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
         mock_market_service.get_ipo_calendar.return_value = [
             {"symbol": "ABC", "ipoDate": future_date},
-            {"symbol": "XYZ", "ipoDate": future_date}
+            {"symbol": "XYZ", "ipoDate": future_date},
         ]
 
         metric = await category._calculate_ipo_heat()
@@ -192,7 +192,9 @@ class TestAISectorRiskLogic:
         assert metric.raw_data["ipo_count_90d"] == 2
 
     @pytest.mark.asyncio
-    async def test_smart_money_flow_multi_symbol_aggregation(self, category, mock_market_service):
+    async def test_smart_money_flow_multi_symbol_aggregation(
+        self, category, mock_market_service
+    ):
         """
         Test Smart Money Flow aggregates SMI across multiple symbols.
 
@@ -222,13 +224,16 @@ class TestAISectorRiskLogic:
                 hour=15, minute=30, tzinfo=pytz.timezone("America/New_York")
             )
 
-            return pd.DataFrame({
-                "Open": [100.0, 100.0],
-                "Close": [first_close, last_close],
-                "High": [max(100, first_close) + 1, max(100, last_close) + 1],
-                "Low": [min(100, first_close) - 1, min(100, last_close) - 1],
-                "Volume": [1000000, 1000000]
-            }, index=[ts_first, ts_last])
+            return pd.DataFrame(
+                {
+                    "Open": [100.0, 100.0],
+                    "Close": [first_close, last_close],
+                    "High": [max(100, first_close) + 1, max(100, last_close) + 1],
+                    "Low": [min(100, first_close) - 1, min(100, last_close) - 1],
+                    "Volume": [1000000, 1000000],
+                },
+                index=[ts_first, ts_last],
+            )
 
         # NVDA: First Hour -1%, Last Hour +1% => SMI = +2%
         nvda_df = create_single_day_df(-1.0, 1.0)
@@ -239,6 +244,7 @@ class TestAISectorRiskLogic:
 
         # Mock to return different data for each symbol
         call_count = [0]
+
         async def mock_intraday(symbol, interval, outputsize):
             idx = call_count[0]
             call_count[0] += 1

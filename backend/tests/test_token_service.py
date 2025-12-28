@@ -24,6 +24,8 @@ from src.services.token_service import TokenService
 
 
 from src.core.utils.date_utils import utcnow, utcfromtimestamp
+
+
 @pytest.fixture
 def mock_settings():
     """Mock settings with test secret key"""
@@ -149,7 +151,9 @@ class TestCreateTokenPair:
 
         # Decode and verify payload
         payload = jwt.decode(
-            token_pair.refresh_token, "test_secret_key_for_testing", algorithms=["HS256"]
+            token_pair.refresh_token,
+            "test_secret_key_for_testing",
+            algorithms=["HS256"],
         )
 
         # Assert
@@ -167,7 +171,9 @@ class TestCreateTokenPair:
 class TestCreateAccessToken:
     """Test access token creation"""
 
-    def test_create_access_token_structure(self, token_service, mock_user, mock_settings):
+    def test_create_access_token_structure(
+        self, token_service, mock_user, mock_settings
+    ):
         """Test access token has correct structure and expiration"""
         # Act
         token = token_service._create_access_token(mock_user)
@@ -181,17 +187,27 @@ class TestCreateAccessToken:
         # Check expiration is approximately ACCESS_TOKEN_EXPIRE_MINUTES from now
         exp_timestamp = payload["exp"]
         exp_datetime = utcfromtimestamp(exp_timestamp)
-        expected_exp = utcnow() + timedelta(minutes=token_service.ACCESS_TOKEN_EXPIRE_MINUTES)
-        assert abs((exp_datetime - expected_exp).total_seconds()) < 5  # Within 5 seconds
+        expected_exp = utcnow() + timedelta(
+            minutes=token_service.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
+        assert (
+            abs((exp_datetime - expected_exp).total_seconds()) < 5
+        )  # Within 5 seconds
 
-    def test_create_access_token_unique_jti(self, token_service, mock_user, mock_settings):
+    def test_create_access_token_unique_jti(
+        self, token_service, mock_user, mock_settings
+    ):
         """Test that each access token has unique JTI (JWT ID)"""
         # Act
         token1 = token_service._create_access_token(mock_user)
         token2 = token_service._create_access_token(mock_user)
 
-        payload1 = jwt.decode(token1, "test_secret_key_for_testing", algorithms=["HS256"])
-        payload2 = jwt.decode(token2, "test_secret_key_for_testing", algorithms=["HS256"])
+        payload1 = jwt.decode(
+            token1, "test_secret_key_for_testing", algorithms=["HS256"]
+        )
+        payload2 = jwt.decode(
+            token2, "test_secret_key_for_testing", algorithms=["HS256"]
+        )
 
         # Assert
         assert payload1["jti"] != payload2["jti"]
@@ -407,9 +423,7 @@ class TestRevokeToken:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_revoke_token_malformed(
-        self, token_service, mock_refresh_token_repo
-    ):
+    async def test_revoke_token_malformed(self, token_service, mock_refresh_token_repo):
         """Test revoking malformed token"""
         # Arrange
         malformed_token = "not.a.valid.token"
@@ -422,9 +436,7 @@ class TestRevokeToken:
         mock_refresh_token_repo.revoke_by_hash.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_revoke_all_user_tokens(
-        self, token_service, mock_refresh_token_repo
-    ):
+    async def test_revoke_all_user_tokens(self, token_service, mock_refresh_token_repo):
         """Test revoking all tokens for a user"""
         # Arrange
         user_id = "user_123"
@@ -472,7 +484,9 @@ class TestRefreshAccessToken:
             mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
 
             # Act
-            result = await token_service.refresh_access_token(refresh_token, rotate=True)
+            result = await token_service.refresh_access_token(
+                refresh_token, rotate=True
+            )
 
             # Assert
             assert result.access_token is not None
@@ -616,7 +630,9 @@ class TestTokenServiceIntegration:
     """Test integration scenarios"""
 
     @pytest.mark.asyncio
-    async def test_full_token_lifecycle(self, token_service, mock_user, mock_refresh_token_repo):
+    async def test_full_token_lifecycle(
+        self, token_service, mock_user, mock_refresh_token_repo
+    ):
         """Test complete token lifecycle: create → verify → refresh → revoke"""
         # Create token pair
         token_pair = await token_service.create_token_pair(mock_user)

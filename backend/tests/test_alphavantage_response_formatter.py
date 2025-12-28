@@ -110,7 +110,9 @@ class TestAlphaVantageResponseFormatter:
             {"fiscalDateEnding": "2023-12-31"},  # Different year
         ]
 
-        result = formatter._extract_current_year_quarters(quarterly_reports, current_year=2024)
+        result = formatter._extract_current_year_quarters(
+            quarterly_reports, current_year=2024
+        )
 
         assert len(result) == 4
         assert result[0]["fiscalDateEnding"] == "2024-03-31"
@@ -124,7 +126,9 @@ class TestAlphaVantageResponseFormatter:
             {"fiscalDateEnding": "2024-09-30"},
         ]
 
-        result = formatter._extract_current_year_quarters(quarterly_reports, current_year=2024)
+        result = formatter._extract_current_year_quarters(
+            quarterly_reports, current_year=2024
+        )
 
         assert len(result) == 3
 
@@ -177,10 +181,12 @@ class TestAlphaVantageResponseFormatter:
 
         # Check key metrics (formatter doesn't have trillion support, uses billions)
         assert "$3000.00B" in result  # Market cap (3 trillion = 3000 billion)
-        assert "25.50" in result      # P/E ratio
-        assert "$6.12" in result      # EPS
+        assert "25.50" in result  # P/E ratio
+        assert "$6.12" in result  # EPS
 
-    def test_format_company_overview_missing_optional_fields(self, formatter, sample_invoked_at):
+    def test_format_company_overview_missing_optional_fields(
+        self, formatter, sample_invoked_at
+    ):
         """Test company overview formatting with missing optional fields."""
         raw_data = {
             "Symbol": "XYZ",
@@ -198,7 +204,9 @@ class TestAlphaVantageResponseFormatter:
 
         # Should not crash and should contain N/A for missing fields
         assert "XYZ Corp" in result
-        assert "N/A" in result  # Should appear for missing Description, Industry, Sector
+        assert (
+            "N/A" in result
+        )  # Should appear for missing Description, Industry, Sector
 
     # ========================================
     # Cash Flow Tests
@@ -207,6 +215,7 @@ class TestAlphaVantageResponseFormatter:
     def test_format_cash_flow_with_quarters(self, formatter, sample_invoked_at):
         """Test cash flow formatting with annual + quarterly data."""
         from datetime import datetime
+
         current_year = datetime.now().year
 
         raw_data = {
@@ -254,7 +263,9 @@ class TestAlphaVantageResponseFormatter:
 
         # Check quarterly data exists (formatter shows current year quarters)
         assert str(current_year) in result  # Should have current year quarterly data
-        assert "$25.00B" in result or "$27.00B" in result or "$28.00B" in result  # Q1, Q2, or Q3 data
+        assert (
+            "$25.00B" in result or "$27.00B" in result or "$28.00B" in result
+        )  # Q1, Q2, or Q3 data
 
     def test_format_cash_flow_no_quarters(self, formatter, sample_invoked_at):
         """Test cash flow formatting with only annual data."""
@@ -278,7 +289,9 @@ class TestAlphaVantageResponseFormatter:
 
         # Should not crash with no quarterly data
         assert "TSLA" in result
-        assert "FY 2023" in result or "2023" in result  # Formatter shows "FY 2023" not raw date
+        assert (
+            "FY 2023" in result or "2023" in result
+        )  # Formatter shows "FY 2023" not raw date
 
     # ========================================
     # Balance Sheet Tests
@@ -287,6 +300,7 @@ class TestAlphaVantageResponseFormatter:
     def test_format_balance_sheet_with_quarters(self, formatter, sample_invoked_at):
         """Test balance sheet formatting with annual + quarterly data."""
         from datetime import datetime
+
         current_year = datetime.now().year
 
         raw_data = {
@@ -455,8 +469,14 @@ class TestAlphaVantageResponseFormatter:
         )
 
         # Check titles are clickable links with link icon and bold
-        assert "🔗 **[Apple announces record profits](https://example.com/apple-profits)**" in result
-        assert "🔗 **[Tech stocks face pressure](https://example.com/tech-pressure)**" in result
+        assert (
+            "🔗 **[Apple announces record profits](https://example.com/apple-profits)**"
+            in result
+        )
+        assert (
+            "🔗 **[Tech stocks face pressure](https://example.com/tech-pressure)**"
+            in result
+        )
 
         # Check summaries are included in expandable sections
         assert "Apple Inc. reported record quarterly profits" in result
@@ -570,7 +590,9 @@ class TestEdgeCases:
         ]
 
         # Should not crash
-        result = formatter._extract_current_year_quarters(quarterly_reports, current_year=2024)
+        result = formatter._extract_current_year_quarters(
+            quarterly_reports, current_year=2024
+        )
         assert isinstance(result, list)
 
     def test_none_values_in_calculations(self, formatter):
@@ -586,7 +608,9 @@ class TestEdgeCases:
         """Test formatting extremely large numbers."""
         # Trillions
         result = formatter._format_large_number(1_500_000_000_000)
-        assert result == "$1500.00B"  # Formatter doesn't have trillion support, uses billions
+        assert (
+            result == "$1500.00B"
+        )  # Formatter doesn't have trillion support, uses billions
 
         # Very large billions
         result = formatter._format_large_number(999_000_000_000)

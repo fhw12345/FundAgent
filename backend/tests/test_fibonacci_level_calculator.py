@@ -231,7 +231,9 @@ class TestCalculateGoldenPressureZone:
         assert zone["upper_bound"] == pytest.approx(180.90, abs=0.1)
         assert zone["strength"] == 0.9
 
-    def test_golden_zone_upper_always_greater_than_lower(self, calculator, uptrend_data):
+    def test_golden_zone_upper_always_greater_than_lower(
+        self, calculator, uptrend_data
+    ):
         """Test that upper bound is always greater than lower bound"""
         # Act
         zone = calculator.calculate_golden_pressure_zone(uptrend_data)
@@ -383,7 +385,9 @@ class TestCalculateConfidenceScore:
         current_price = 100.0  # Magnitude 50 / 100 = 50% > 40%
 
         # Act
-        confidence = calculator.calculate_confidence_score([uptrend_data], current_price)
+        confidence = calculator.calculate_confidence_score(
+            [uptrend_data], current_price
+        )
 
         # Assert
         # Base: min(50/40, 0.8) = 0.8

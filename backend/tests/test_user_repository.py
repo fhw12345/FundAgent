@@ -144,9 +144,7 @@ class TestCreate:
         assert result.phone_number == "+8613812345678"
 
     @pytest.mark.asyncio
-    async def test_create_user_with_wechat_openid(
-        self, repository, mock_collection
-    ):
+    async def test_create_user_with_wechat_openid(self, repository, mock_collection):
         """Test creating user with WeChat OpenID"""
         # Arrange
         user_create = UserCreate(
@@ -253,6 +251,7 @@ class TestGetByIDs:
     @pytest.mark.asyncio
     async def test_get_by_ids_multiple_users(self, repository, mock_collection):
         """Test batch fetching multiple users"""
+
         # Arrange
         async def mock_async_iter():
             user_docs = [
@@ -742,10 +741,9 @@ class TestGetActiveUsersWithPortfolios:
     """Test portfolio user aggregation query"""
 
     @pytest.mark.asyncio
-    async def test_get_active_users_with_portfolios(
-        self, repository, mock_collection
-    ):
+    async def test_get_active_users_with_portfolios(self, repository, mock_collection):
         """Test retrieving users with portfolios using aggregation"""
+
         # Arrange
         async def mock_async_iter():
             users = [

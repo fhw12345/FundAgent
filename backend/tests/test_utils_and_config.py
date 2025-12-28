@@ -11,7 +11,6 @@ Tests centralized utilities and configuration logic:
 These tests ensure robust utility functions and prevent configuration errors.
 """
 
-
 import pytest
 
 from src.core.analysis.fibonacci.config import (
@@ -63,9 +62,9 @@ class TestYfinanceUtilities:
         # Test that key intervals are included
         required_frontend = ["1m", "1h", "1d", "1w", "1M", "1mo"]
         for interval in required_frontend:
-            assert (
-                interval in frontend_intervals
-            ), f"Required frontend interval '{interval}' missing from validation list"
+            assert interval in frontend_intervals, (
+                f"Required frontend interval '{interval}' missing from validation list"
+            )
 
         # Test that all frontend intervals can be mapped
         for frontend_interval in frontend_intervals:
@@ -95,9 +94,9 @@ class TestYfinanceUtilities:
 
         for input_val, expected, description in test_cases:
             result = map_timeframe_to_yfinance_interval(input_val)
-            assert (
-                result == expected
-            ), f"Failed {description}: {input_val} → {result}, expected {expected}"
+            assert result == expected, (
+                f"Failed {description}: {input_val} → {result}, expected {expected}"
+            )
 
 
 class TestTimeframeConfiguration:
@@ -109,40 +108,40 @@ class TestTimeframeConfiguration:
 
         for timeframe in required_timeframes:
             config = TimeframeConfigs.get_config(timeframe)
-            assert (
-                config is not None
-            ), f"Missing configuration for timeframe '{timeframe}'"
-            assert isinstance(
-                config, TimeframeConfig
-            ), f"Configuration for '{timeframe}' should be TimeframeConfig instance"
+            assert config is not None, (
+                f"Missing configuration for timeframe '{timeframe}'"
+            )
+            assert isinstance(config, TimeframeConfig), (
+                f"Configuration for '{timeframe}' should be TimeframeConfig instance"
+            )
 
     def test_timeframe_config_parameter_validation(self):
         """Test that timeframe configuration parameters are reasonable."""
         for timeframe, config in TimeframeConfigs.CONFIGS.items():
             # Test that all parameters are positive
-            assert (
-                config.swing_lookback > 0
-            ), f"Timeframe '{timeframe}' swing_lookback must be positive"
-            assert (
-                config.prominence > 0
-            ), f"Timeframe '{timeframe}' prominence must be positive"
-            assert (
-                config.min_magnitude_pct > 0
-            ), f"Timeframe '{timeframe}' min_magnitude_pct must be positive"
-            assert (
-                config.tolerance_pct > 0
-            ), f"Timeframe '{timeframe}' tolerance_pct must be positive"
+            assert config.swing_lookback > 0, (
+                f"Timeframe '{timeframe}' swing_lookback must be positive"
+            )
+            assert config.prominence > 0, (
+                f"Timeframe '{timeframe}' prominence must be positive"
+            )
+            assert config.min_magnitude_pct > 0, (
+                f"Timeframe '{timeframe}' min_magnitude_pct must be positive"
+            )
+            assert config.tolerance_pct > 0, (
+                f"Timeframe '{timeframe}' tolerance_pct must be positive"
+            )
 
             # Test reasonable ranges
-            assert (
-                1 <= config.swing_lookback <= 20
-            ), f"Timeframe '{timeframe}' swing_lookback should be reasonable (1-20)"
-            assert (
-                0.1 <= config.prominence <= 10
-            ), f"Timeframe '{timeframe}' prominence should be reasonable (0.1-10)"
-            assert (
-                0.001 <= config.tolerance_pct <= 0.05
-            ), f"Timeframe '{timeframe}' tolerance_pct should be reasonable (0.1%-5%)"
+            assert 1 <= config.swing_lookback <= 20, (
+                f"Timeframe '{timeframe}' swing_lookback should be reasonable (1-20)"
+            )
+            assert 0.1 <= config.prominence <= 10, (
+                f"Timeframe '{timeframe}' prominence should be reasonable (0.1-10)"
+            )
+            assert 0.001 <= config.tolerance_pct <= 0.05, (
+                f"Timeframe '{timeframe}' tolerance_pct should be reasonable (0.1%-5%)"
+            )
 
     def test_timeframe_config_scaling_logic(self):
         """Test that longer timeframes have appropriately scaled parameters."""
@@ -151,9 +150,9 @@ class TestTimeframeConfiguration:
         monthly_config = TimeframeConfigs.get_config("1M")
 
         # Monthly should have parameters scaled for longer timeframes
-        assert (
-            monthly_config.prominence >= daily_config.prominence
-        ), "Monthly prominence should be >= daily for longer timeframe scaling"
+        assert monthly_config.prominence >= daily_config.prominence, (
+            "Monthly prominence should be >= daily for longer timeframe scaling"
+        )
 
     def test_default_timeframe_fallback(self):
         """Test that unknown timeframes fall back to daily configuration."""
@@ -162,9 +161,9 @@ class TestTimeframeConfiguration:
         daily_config = TimeframeConfigs.get_config("1d")
 
         # Should return daily config as fallback
-        assert (
-            config == daily_config
-        ), f"Unknown timeframe '{unknown_timeframe}' should fallback to daily config"
+        assert config == daily_config, (
+            f"Unknown timeframe '{unknown_timeframe}' should fallback to daily config"
+        )
 
 
 class TestFibonacciConstants:
@@ -192,21 +191,21 @@ class TestFibonacciConstants:
         key_levels = FibonacciConstants.KEY_LEVELS
 
         for key_level in key_levels:
-            assert (
-                key_level in all_levels
-            ), f"Key level {key_level} must be in the main Fibonacci levels list"
+            assert key_level in all_levels, (
+                f"Key level {key_level} must be in the main Fibonacci levels list"
+            )
 
         # Test that we have reasonable number of key levels
-        assert (
-            2 <= len(key_levels) <= 5
-        ), f"Should have 2-5 key levels, got {len(key_levels)}"
+        assert 2 <= len(key_levels) <= 5, (
+            f"Should have 2-5 key levels, got {len(key_levels)}"
+        )
 
     def test_golden_ratio_constants(self):
         """Test golden ratio and zone constants."""
         # Test golden ratio value
-        assert (
-            abs(FibonacciConstants.GOLDEN_RATIO - 0.618) < 0.001
-        ), "Golden ratio should be approximately 0.618"
+        assert abs(FibonacciConstants.GOLDEN_RATIO - 0.618) < 0.001, (
+            "Golden ratio should be approximately 0.618"
+        )
 
         # Test golden zone boundaries
         assert (
@@ -218,9 +217,9 @@ class TestFibonacciConstants:
         zone_start = FibonacciConstants.GOLDEN_ZONE_START
         zone_end = FibonacciConstants.GOLDEN_ZONE_END
 
-        assert (
-            zone_start <= golden_ratio <= zone_end
-        ), f"Golden ratio {golden_ratio} should be within zone [{zone_start}, {zone_end}]"
+        assert zone_start <= golden_ratio <= zone_end, (
+            f"Golden ratio {golden_ratio} should be within zone [{zone_start}, {zone_end}]"
+        )
 
 
 class TestConfigurationIntegration:
@@ -247,21 +246,21 @@ class TestConfigurationIntegration:
 
         # Test that golden ratio is in the levels list
         golden_ratio = FibonacciConstants.GOLDEN_RATIO
-        assert (
-            golden_ratio in levels
-        ), f"Golden ratio {golden_ratio} should be in Fibonacci levels"
+        assert golden_ratio in levels, (
+            f"Golden ratio {golden_ratio} should be in Fibonacci levels"
+        )
 
         # Test that golden ratio is a key level
-        assert (
-            golden_ratio in key_levels
-        ), f"Golden ratio {golden_ratio} should be a key level"
+        assert golden_ratio in key_levels, (
+            f"Golden ratio {golden_ratio} should be a key level"
+        )
 
         # Test that all key levels are actually important Fibonacci numbers
         important_levels = [0.236, 0.382, 0.5, 0.618, 0.786]
         for key_level in key_levels:
-            assert (
-                key_level in important_levels
-            ), f"Key level {key_level} should be an important Fibonacci number"
+            assert key_level in important_levels, (
+                f"Key level {key_level} should be an important Fibonacci number"
+            )
 
 
 class TestErrorHandlingUtilities:
@@ -273,9 +272,9 @@ class TestErrorHandlingUtilities:
         invalid_config = TimeframeConfigs.get_config("invalid_timeframe")
         default_config = TimeframeConfigs.get_config("1d")
 
-        assert (
-            invalid_config == default_config
-        ), "Invalid timeframe should return default (daily) configuration"
+        assert invalid_config == default_config, (
+            "Invalid timeframe should return default (daily) configuration"
+        )
 
     def test_utility_function_error_handling(self):
         """Test that utility functions handle errors gracefully."""
@@ -288,9 +287,9 @@ class TestErrorHandlingUtilities:
         for input_val, expected_str in test_cases:
             try:
                 result = map_timeframe_to_yfinance_interval(str(input_val))
-                assert (
-                    result == expected_str
-                ), f"Should handle string conversion: {input_val} → {result}"
+                assert result == expected_str, (
+                    f"Should handle string conversion: {input_val} → {result}"
+                )
             except Exception as e:
                 pytest.fail(
                     f"Utility function should handle type conversion gracefully: {e}"
@@ -301,11 +300,11 @@ class TestErrorHandlingUtilities:
         frontend_intervals = get_valid_frontend_intervals()
 
         # Test no duplicates
-        assert len(frontend_intervals) == len(
-            set(frontend_intervals)
-        ), "Frontend intervals should not have duplicates"
+        assert len(frontend_intervals) == len(set(frontend_intervals)), (
+            "Frontend intervals should not have duplicates"
+        )
 
         # Test reasonable list sizes
-        assert (
-            5 <= len(frontend_intervals) <= 20
-        ), f"Frontend intervals list seems unreasonable size: {len(frontend_intervals)}"
+        assert 5 <= len(frontend_intervals) <= 20, (
+            f"Frontend intervals list seems unreasonable size: {len(frontend_intervals)}"
+        )

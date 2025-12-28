@@ -129,7 +129,9 @@ class TestTransactionRepositoryCreatePending:
         assert transaction.transaction_id.startswith("txn_")
         assert len(transaction.transaction_id) == 16  # "txn_" (4) + 12 hex
 
-    async def test_create_pending_with_defaults(self, transaction_repo, mock_collection):
+    async def test_create_pending_with_defaults(
+        self, transaction_repo, mock_collection
+    ):
         """Test creating transaction with default model and request_type."""
         transaction_create = TransactionCreate(
             user_id="user123",
@@ -182,14 +184,18 @@ class TestTransactionRepositoryGetById:
         transaction = await transaction_repo.get_by_id("nonexistent")
 
         assert transaction is None
-        mock_collection.find_one.assert_called_once_with({"transaction_id": "nonexistent"})
+        mock_collection.find_one.assert_called_once_with(
+            {"transaction_id": "nonexistent"}
+        )
 
 
 @pytest.mark.asyncio
 class TestTransactionRepositoryCompleteTransaction:
     """Test completing transactions."""
 
-    async def test_complete_transaction_success(self, transaction_repo, mock_collection):
+    async def test_complete_transaction_success(
+        self, transaction_repo, mock_collection
+    ):
         """Test successfully completing a PENDING transaction."""
         updated_transaction = {
             "_id": "mongo_id_123",
@@ -369,7 +375,9 @@ class TestTransactionRepositoryFindStuck:
         mock_cursor = FakeCursor([old_transaction])
         mock_collection.find = Mock(return_value=mock_cursor)
 
-        stuck_transactions = await transaction_repo.find_stuck_transactions(age_minutes=10)
+        stuck_transactions = await transaction_repo.find_stuck_transactions(
+            age_minutes=10
+        )
 
         assert len(stuck_transactions) == 1
         assert stuck_transactions[0].transaction_id == "txn123"
@@ -387,7 +395,9 @@ class TestTransactionRepositoryFindStuck:
         mock_cursor = FakeCursor([])
         mock_collection.find = Mock(return_value=mock_cursor)
 
-        stuck_transactions = await transaction_repo.find_stuck_transactions(age_minutes=10)
+        stuck_transactions = await transaction_repo.find_stuck_transactions(
+            age_minutes=10
+        )
 
         assert len(stuck_transactions) == 0
 
@@ -411,7 +421,9 @@ class TestTransactionRepositoryFindStuck:
         mock_cursor = FakeCursor([old_transaction])
         mock_collection.find = Mock(return_value=mock_cursor)
 
-        stuck_transactions = await transaction_repo.find_stuck_transactions(age_minutes=20)
+        stuck_transactions = await transaction_repo.find_stuck_transactions(
+            age_minutes=20
+        )
 
         assert len(stuck_transactions) == 1
 

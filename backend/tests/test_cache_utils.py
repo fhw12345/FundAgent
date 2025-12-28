@@ -8,7 +8,6 @@ Tests caching key generation and TTL strategies for:
 - API cost tracking
 """
 
-
 from src.core.utils.cache_utils import (
     INTERVAL_TTL_MAP,
     TOOL_TTL_MAP,
@@ -96,9 +95,7 @@ class TestGenerateToolCacheKey:
         key_alphavantage = generate_tool_cache_key(
             "mcp_alphavantage", "GLOBAL_QUOTE", params
         )
-        key_first_party = generate_tool_cache_key(
-            "1st_party", "GLOBAL_QUOTE", params
-        )
+        key_first_party = generate_tool_cache_key("1st_party", "GLOBAL_QUOTE", params)
 
         # Assert
         assert key_alphavantage != key_first_party
@@ -144,7 +141,10 @@ class TestGenerateToolCacheKey:
         cache_key = generate_tool_cache_key(tool_source, tool_name, params)
 
         # Assert
-        assert cache_key == "mcp_alphavantage:NEWS_SENTIMENT:tickers=COIN,CRYPTO:BTC,FOREX:USD"
+        assert (
+            cache_key
+            == "mcp_alphavantage:NEWS_SENTIMENT:tickers=COIN,CRYPTO:BTC,FOREX:USD"
+        )
 
 
 # ===== Tool TTL Tests =====

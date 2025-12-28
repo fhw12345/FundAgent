@@ -424,7 +424,19 @@ class TestDateUtilsIntegration:
         """Test that all supported periods produce valid date ranges"""
         # Arrange
         reference = datetime(2025, 11, 15)
-        periods = ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"]
+        periods = [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max",
+        ]
 
         # Act & Assert
         for period in periods:

@@ -355,9 +355,7 @@ class TestShouldReplaceDuplicate:
         unknown_replaced_by_known = should_replace_duplicate(
             existing_unknown, 0.75, "NYQ"
         )
-        known_replaced_by_unknown = should_replace_duplicate(
-            existing_known, 0.75, ""
-        )
+        known_replaced_by_unknown = should_replace_duplicate(existing_known, 0.75, "")
 
         # Assert
         assert unknown_replaced_by_known is True  # Known exchange beats unknown

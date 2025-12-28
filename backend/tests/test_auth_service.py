@@ -24,6 +24,8 @@ from src.services.auth_service import AuthService
 
 
 from src.core.utils.date_utils import utcnow
+
+
 @pytest.fixture
 def mock_user_repo():
     """Mock UserRepository"""
@@ -65,7 +67,7 @@ def sample_user():
         email="test@example.com",
         hashed_password="$2b$12$hashed_password_here",
         is_active=True,
-        created_at=datetime.now()
+        created_at=datetime.now(),
     )
 
 
@@ -93,7 +95,7 @@ class TestUserRegistration:
             hashed_password="hashed_pass",
             is_active=True,
             email_verified=True,
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
         mock_user_repo.create.return_value = new_user
 
@@ -102,7 +104,7 @@ class TestUserRegistration:
             email="new@example.com",
             code="123456",
             username="newuser",
-            password="SecureP@ssw0rd"
+            password="SecureP@ssw0rd",
         )
 
         # Assert
@@ -110,13 +112,17 @@ class TestUserRegistration:
         assert user.email == "new@example.com"
         assert token is not None
         assert isinstance(token, str)
-        auth_service.email_provider.verify_code.assert_called_once_with("new@example.com", "123456")
+        auth_service.email_provider.verify_code.assert_called_once_with(
+            "new@example.com", "123456"
+        )
         mock_user_repo.get_by_email.assert_called_once_with("new@example.com")
         mock_user_repo.get_by_username.assert_called_once_with("newuser")
         mock_user_repo.create.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_register_user_duplicate_email(self, auth_service, mock_user_repo, sample_user):
+    async def test_register_user_duplicate_email(
+        self, auth_service, mock_user_repo, sample_user
+    ):
         """Test registration with duplicate email"""
         # Arrange
         # Mock email verification
@@ -131,7 +137,7 @@ class TestUserRegistration:
                 email="test@example.com",
                 code="123456",
                 username="duplicate",
-                password="Password123"
+                password="Password123",
             )
 
 
@@ -143,7 +149,9 @@ class TestLoginWithPassword:
 
     @pytest.mark.asyncio
     @patch("src.services.auth_service.verify_password")
-    async def test_login_success(self, mock_verify, auth_service, mock_user_repo, sample_user):
+    async def test_login_success(
+        self, mock_verify, auth_service, mock_user_repo, sample_user
+    ):
         """Test successful login with correct password"""
         # Arrange
         # Add password_hash attribute to sample_user
@@ -153,13 +161,17 @@ class TestLoginWithPassword:
         mock_verify.return_value = True
 
         # Act
-        user, token = await auth_service.login_with_password("testuser", "correct_password")
+        user, token = await auth_service.login_with_password(
+            "testuser", "correct_password"
+        )
 
         # Assert
         assert user.username == "testuser"
         assert token is not None
         assert isinstance(token, str)
-        mock_verify.assert_called_once_with("correct_password", sample_user.password_hash)
+        mock_verify.assert_called_once_with(
+            "correct_password", sample_user.password_hash
+        )
 
     @pytest.mark.asyncio
     async def test_login_user_not_found(self, auth_service, mock_user_repo):
@@ -173,7 +185,9 @@ class TestLoginWithPassword:
 
     @pytest.mark.asyncio
     @patch("src.services.auth_service.verify_password")
-    async def test_login_wrong_password(self, mock_verify, auth_service, mock_user_repo, sample_user):
+    async def test_login_wrong_password(
+        self, mock_verify, auth_service, mock_user_repo, sample_user
+    ):
         """Test login with wrong password"""
         # Arrange
         # Add password_hash attribute to sample_user
@@ -196,17 +210,23 @@ class TestEmailVerification:
     async def test_send_code_email(self, auth_service):
         """Test sending verification code to email"""
         # Mock email provider
-        auth_service.email_provider.send_verification_code = AsyncMock(return_value="123456")
+        auth_service.email_provider.send_verification_code = AsyncMock(
+            return_value="123456"
+        )
 
         # Act
         code = await auth_service.send_code_email("test@example.com")
 
         # Assert
         assert code == "123456"
-        auth_service.email_provider.send_verification_code.assert_called_once_with("test@example.com")
+        auth_service.email_provider.send_verification_code.assert_called_once_with(
+            "test@example.com"
+        )
 
     @pytest.mark.asyncio
-    async def test_verify_and_login_email_success(self, auth_service, mock_user_repo, sample_user):
+    async def test_verify_and_login_email_success(
+        self, auth_service, mock_user_repo, sample_user
+    ):
         """Test verify email code and login"""
         # Arrange
         auth_service.email_provider.verify_code = AsyncMock(return_value=True)
@@ -214,12 +234,16 @@ class TestEmailVerification:
         mock_user_repo.update_last_login.return_value = sample_user
 
         # Act
-        user, token = await auth_service.verify_and_login("email", "test@example.com", code="123456")
+        user, token = await auth_service.verify_and_login(
+            "email", "test@example.com", code="123456"
+        )
 
         # Assert
         assert user.email == "test@example.com"
         assert token is not None
-        auth_service.email_provider.verify_code.assert_called_once_with("test@example.com", "123456")
+        auth_service.email_provider.verify_code.assert_called_once_with(
+            "test@example.com", "123456"
+        )
 
     @pytest.mark.asyncio
     async def test_verify_and_login_email_invalid_code(self, auth_service):
@@ -229,7 +253,9 @@ class TestEmailVerification:
 
         # Act & Assert
         with pytest.raises(ValueError, match="Invalid verification code"):
-            await auth_service.verify_and_login("email", "test@example.com", code="wrong")
+            await auth_service.verify_and_login(
+                "email", "test@example.com", code="wrong"
+            )
 
     @pytest.mark.asyncio
     async def test_verify_and_login_missing_code(self, auth_service):
@@ -256,8 +282,11 @@ class TestJWTTokens:
 
         # Verify token structure
         from src.core.config import get_settings
+
         settings = get_settings()
-        payload = jwt.decode(token, settings.secret_key, algorithms=[AuthService.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.secret_key, algorithms=[AuthService.ALGORITHM]
+        )
         assert payload["sub"] == "user_123"
         assert "exp" in payload
 
@@ -276,11 +305,14 @@ class TestJWTTokens:
         """Test verification of expired token"""
         # Arrange - Create token that expired 1 hour ago
         from src.core.config import get_settings
+
         settings = get_settings()
 
         expire = utcnow() - timedelta(hours=1)  # Expired
         payload = {"sub": "user_123", "exp": expire}
-        expired_token = jwt.encode(payload, settings.secret_key, algorithm=AuthService.ALGORITHM)
+        expired_token = jwt.encode(
+            payload, settings.secret_key, algorithm=AuthService.ALGORITHM
+        )
 
         # Act
         user_id = auth_service.verify_token(expired_token)
@@ -292,7 +324,9 @@ class TestJWTTokens:
         """Test verification of token with invalid signature"""
         # Arrange - Create token with wrong secret
         payload = {"sub": "user_123", "exp": utcnow() + timedelta(days=1)}
-        invalid_token = jwt.encode(payload, "wrong_secret_key", algorithm=AuthService.ALGORITHM)
+        invalid_token = jwt.encode(
+            payload, "wrong_secret_key", algorithm=AuthService.ALGORITHM
+        )
 
         # Act
         user_id = auth_service.verify_token(invalid_token)
@@ -308,7 +342,9 @@ class TestPasswordReset:
     """Test password reset functionality"""
 
     @pytest.mark.asyncio
-    async def test_reset_password_success(self, auth_service, mock_user_repo, sample_user):
+    async def test_reset_password_success(
+        self, auth_service, mock_user_repo, sample_user
+    ):
         """Test successful password reset"""
         # Arrange
         # Mock email verification
@@ -317,13 +353,17 @@ class TestPasswordReset:
         mock_user_repo.update_last_login.return_value = sample_user
 
         # Act
-        user, token = await auth_service.reset_password("test@example.com", "123456", "NewP@ssw0rd123")
+        user, token = await auth_service.reset_password(
+            "test@example.com", "123456", "NewP@ssw0rd123"
+        )
 
         # Assert
         assert user.email == "test@example.com"
         assert token is not None
         assert isinstance(token, str)
-        auth_service.email_provider.verify_code.assert_called_once_with("test@example.com", "123456")
+        auth_service.email_provider.verify_code.assert_called_once_with(
+            "test@example.com", "123456"
+        )
         # Check that collection.update_one was called to update password
         mock_user_repo.collection.update_one.assert_called_once()
 
@@ -336,8 +376,12 @@ class TestPasswordReset:
         mock_user_repo.get_by_email.return_value = None
 
         # Act & Assert
-        with pytest.raises(ValueError, match="No account found with this email address"):
-            await auth_service.reset_password("nonexistent@example.com", "123456", "NewPassword123")
+        with pytest.raises(
+            ValueError, match="No account found with this email address"
+        ):
+            await auth_service.reset_password(
+                "nonexistent@example.com", "123456", "NewPassword123"
+            )
 
 
 # ===== User Retrieval Tests =====
@@ -347,7 +391,9 @@ class TestGetCurrentUser:
     """Test user retrieval by token"""
 
     @pytest.mark.asyncio
-    async def test_get_current_user_success(self, auth_service, mock_user_repo, sample_user):
+    async def test_get_current_user_success(
+        self, auth_service, mock_user_repo, sample_user
+    ):
         """Test get user with valid token"""
         # Arrange
         token = auth_service.create_access_token("user_123")

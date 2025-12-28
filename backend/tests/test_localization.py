@@ -10,7 +10,6 @@ Tests language code normalization, instruction templates, and tool name translat
 - DEFAULT_LANGUAGE and LANGUAGE_NAMES constants
 """
 
-
 from src.core.localization import (
     DEFAULT_LANGUAGE,
     LANGUAGE_NAMES,

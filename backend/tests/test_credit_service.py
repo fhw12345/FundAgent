@@ -36,7 +36,10 @@ class TestCreditServiceCostCalculation:
         """Test cost calculation with thinking mode (4x output multiplier)."""
         # qwen-plus with thinking: output cost * 4
         # 500 input + 1000 output thinking = (500/1000)*0.0008 + (1000/1000)*0.002*4 = 0.0004 + 0.008 = 0.0084 CNY = 8.4 credits
-        assert CreditService.calculate_cost(500, 1000, "qwen-plus", thinking_enabled=True) == 8.4
+        assert (
+            CreditService.calculate_cost(500, 1000, "qwen-plus", thinking_enabled=True)
+            == 8.4
+        )
 
     def test_calculate_cost_zero_tokens(self):
         """Test cost calculation with zero tokens."""
@@ -86,9 +89,7 @@ class TestCreditServiceBalanceCheck:
             settings=mock_settings,
         )
 
-    async def test_check_balance_sufficient(
-        self, credit_service, mock_user_repo
-    ):
+    async def test_check_balance_sufficient(self, credit_service, mock_user_repo):
         """Test balance check when user has sufficient credits."""
         user = User(
             user_id="user123",
@@ -102,9 +103,7 @@ class TestCreditServiceBalanceCheck:
         assert result is True
         mock_user_repo.get_by_id.assert_called_once_with("user123")
 
-    async def test_check_balance_insufficient(
-        self, credit_service, mock_user_repo
-    ):
+    async def test_check_balance_insufficient(self, credit_service, mock_user_repo):
         """Test balance check when user has insufficient credits."""
         user = User(
             user_id="user123",
@@ -117,9 +116,7 @@ class TestCreditServiceBalanceCheck:
 
         assert result is False
 
-    async def test_check_balance_user_not_found(
-        self, credit_service, mock_user_repo
-    ):
+    async def test_check_balance_user_not_found(self, credit_service, mock_user_repo):
         """Test balance check when user doesn't exist."""
         mock_user_repo.get_by_id.return_value = None
 
@@ -262,7 +259,9 @@ class TestCreditServiceCompleteTransaction:
         mock_session.start_transaction = Mock(return_value=mock_transaction)
 
         # Mock start_session to return an awaitable that resolves to mock_session
-        credit_service.mongodb.client.start_session = AsyncMock(return_value=mock_session)
+        credit_service.mongodb.client.start_session = AsyncMock(
+            return_value=mock_session
+        )
 
         credit_service.transaction_repo.complete_transaction.return_value = (
             completed_transaction
@@ -346,7 +345,9 @@ class TestCreditServiceCompleteTransaction:
             side_effect=Exception("Transaction not supported on standalone instance")
         )
 
-        credit_service.mongodb.client.start_session = AsyncMock(return_value=mock_session)
+        credit_service.mongodb.client.start_session = AsyncMock(
+            return_value=mock_session
+        )
 
         # Setup successful sequential operations
         completed_transaction = CreditTransaction(
@@ -439,9 +440,13 @@ class TestCreditServiceCompleteTransaction:
         mock_session = Mock()
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
-        mock_session.start_transaction = Mock(side_effect=Exception("Transaction not supported"))
+        mock_session.start_transaction = Mock(
+            side_effect=Exception("Transaction not supported")
+        )
 
-        credit_service.mongodb.client.start_session = AsyncMock(return_value=mock_session)
+        credit_service.mongodb.client.start_session = AsyncMock(
+            return_value=mock_session
+        )
 
         # Transaction completes but deduction fails
         completed_transaction = CreditTransaction(
@@ -473,7 +478,9 @@ class TestCreditServiceCompleteTransaction:
 
         assert result == (None, None)
         # Should mark transaction as failed
-        credit_service.transaction_repo.fail_transaction.assert_called_once_with("txn123")
+        credit_service.transaction_repo.fail_transaction.assert_called_once_with(
+            "txn123"
+        )
 
 
 @pytest.mark.asyncio
@@ -497,7 +504,9 @@ class TestCreditServiceFailTransaction:
         result = await credit_service.fail_transaction("txn123")
 
         assert result is True
-        credit_service.transaction_repo.fail_transaction.assert_called_once_with("txn123")
+        credit_service.transaction_repo.fail_transaction.assert_called_once_with(
+            "txn123"
+        )
 
     async def test_fail_transaction_not_found(self, credit_service):
         """Test failing a non-existent transaction."""

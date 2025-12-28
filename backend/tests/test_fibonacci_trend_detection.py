@@ -3,7 +3,6 @@ Unit tests for directional greedy accumulation trend detection algorithm.
 Tests the new Fibonacci trend detection logic that replaced scipy-based swing point detection.
 """
 
-
 import pandas as pd
 import pytest
 
@@ -88,9 +87,7 @@ class TestDirectionalTrendDetection:
         uptrends = [t for t in trends if t["Trend Type"] == "Uptrend"]
         assert len(uptrends) > 0
         # Longest uptrend should span multiple days despite pullback
-        assert max(
-            (t["End Date"] - t["Start Date"]).days for t in uptrends
-        ) >= 5
+        assert max((t["End Date"] - t["Start Date"]).days for t in uptrends) >= 5
 
     def test_downtrend_with_small_bounce(self, trend_detector):
         """Test that downtrends allow small bounces within 0.7% tolerance."""
@@ -101,7 +98,8 @@ class TestDirectionalTrendDetection:
         lows = [118, 116, 114, 112, 113, 111, 109, 107, 105, 103]  # Bounce: 112→113
 
         data = pd.DataFrame(
-            {"High": highs, "Low": lows, "Close": [low + 1 for low in lows]}, index=dates
+            {"High": highs, "Low": lows, "Close": [low + 1 for low in lows]},
+            index=dates,
         )
 
         trends = trend_detector.detect_top_trends(data)
@@ -109,16 +107,25 @@ class TestDirectionalTrendDetection:
         # Should detect downtrend that spans the bounce
         downtrends = [t for t in trends if t["Trend Type"] == "Downtrend"]
         assert len(downtrends) > 0
-        assert max(
-            (t["End Date"] - t["Start Date"]).days for t in downtrends
-        ) >= 5
+        assert max((t["End Date"] - t["Start Date"]).days for t in downtrends) >= 5
 
     def test_large_pullback_breaks_trend(self, trend_detector):
         """Test that pullbacks exceeding 0.7% break the trend."""
         dates = pd.date_range("2024-01-01", periods=10, freq="D")
 
         # Uptrend with LARGE pullback (>0.7%) on day 5
-        highs = [100, 102, 104, 106, 102, 104, 106, 108, 110, 112]  # Large drop: 106→102
+        highs = [
+            100,
+            102,
+            104,
+            106,
+            102,
+            104,
+            106,
+            108,
+            110,
+            112,
+        ]  # Large drop: 106→102
         lows = [98, 100, 102, 104, 100, 102, 104, 106, 108, 110]  # Large drop: 104→100
 
         data = pd.DataFrame(
@@ -276,9 +283,10 @@ class TestDateHandling:
         trend = trends[0]
 
         # Start date should be from the dataframe
-        assert trend["Start Date"] == dates[0].date() or trend["Start Date"] == dates[
-            1
-        ].date()
+        assert (
+            trend["Start Date"] == dates[0].date()
+            or trend["Start Date"] == dates[1].date()
+        )
         # End date should be reasonable
         assert trend["End Date"] <= dates[-1].date()
         assert trend["Start Date"] <= trend["End Date"]

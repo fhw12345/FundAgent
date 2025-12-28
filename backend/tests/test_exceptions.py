@@ -8,7 +8,6 @@ Tests exception mapping, status codes, and error serialization including:
 - External service errors (503): ExternalServiceError with service context
 """
 
-
 from src.core.exceptions import (
     AppError,
     AuthenticationError,
@@ -390,7 +389,11 @@ class TestExceptionHierarchy:
 
         # Act & Assert
         for exc_class in exceptions:
-            error = exc_class("Test") if exc_class != ExternalServiceError else exc_class("Test", service="test")
+            error = (
+                exc_class("Test")
+                if exc_class != ExternalServiceError
+                else exc_class("Test", service="test")
+            )
             assert isinstance(error, AppError)
             assert isinstance(error, Exception)
 
@@ -411,7 +414,11 @@ class TestExceptionHierarchy:
 
         # Act & Assert
         for exc_class, expected_type in error_types.items():
-            error = exc_class("Test") if exc_class != ExternalServiceError else exc_class("Test", service="test")
+            error = (
+                exc_class("Test")
+                if exc_class != ExternalServiceError
+                else exc_class("Test", service="test")
+            )
             assert error.error_type == expected_type
 
     def test_all_exceptions_have_valid_status_codes(self):
@@ -431,7 +438,11 @@ class TestExceptionHierarchy:
 
         # Act & Assert
         for exc_class, expected_code in status_codes.items():
-            error = exc_class("Test") if exc_class != ExternalServiceError else exc_class("Test", service="test")
+            error = (
+                exc_class("Test")
+                if exc_class != ExternalServiceError
+                else exc_class("Test", service="test")
+            )
             assert error.status_code == expected_code
 
     def test_exceptions_can_be_caught_as_app_error(self):

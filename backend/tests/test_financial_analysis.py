@@ -4,7 +4,6 @@ Unit tests for financial analysis module exports.
 Tests that the core financial analysis module properly exports all analyzer components.
 """
 
-
 from src.core import financial_analysis
 
 
@@ -57,7 +56,9 @@ class TestFinancialAnalysisExports:
         """Test that all __all__ exports are accessible as attributes"""
         # Act & Assert
         for export_name in financial_analysis.__all__:
-            assert hasattr(financial_analysis, export_name), f"{export_name} not accessible"
+            assert hasattr(financial_analysis, export_name), (
+                f"{export_name} not accessible"
+            )
 
     def test_can_import_all_from_module(self):
         """Test that 'from financial_analysis import *' works"""
