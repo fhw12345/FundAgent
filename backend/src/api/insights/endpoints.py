@@ -7,11 +7,14 @@ and composite scores with caching support.
 import time
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from ...services.insights import InsightsCategoryRegistry
+from ...database.mongodb import MongoDB
+from ...database.redis import RedisCache
+from ...services.insights import InsightsCategoryRegistry, InsightsSnapshotService
+from ..dependencies.auth import get_mongodb, get_redis_cache
 from ..schemas.insights_models import (
     CategoriesListResponse,
     CategoryMetadataResponse,
@@ -19,6 +22,8 @@ from ..schemas.insights_models import (
     InsightCategoryResponse,
     InsightMetricResponse,
     RefreshResponse,
+    TrendDataPoint,
+    TrendResponse,
 )
 
 logger = structlog.get_logger()
@@ -234,6 +239,112 @@ async def get_composite(
         raise HTTPException(
             status_code=500, detail="Failed to get composite score"
         ) from e
+
+
+@router.get("/{category_id}/trend", response_model=TrendResponse)
+@limiter.limit("60/minute")
+async def get_category_trend(
+    category_id: str,
+    request: Request,
+    days: int = Query(default=30, ge=7, le=90, description="Number of days of history"),
+    mongodb: MongoDB = Depends(get_mongodb),
+    redis_cache: RedisCache = Depends(get_redis_cache),
+    registry: InsightsCategoryRegistry = Depends(get_insights_registry),
+) -> TrendResponse:
+    """
+    Get historical trend for a category.
+
+    Returns the composite score trend and individual metric trends
+    for the specified number of days. Data comes from daily snapshots
+    stored in MongoDB.
+
+    **Rate Limit**: 60 requests per minute
+
+    Args:
+        category_id: The category identifier (e.g., 'ai_sector_risk')
+        days: Number of days of history (7, 14, 30, 60, or 90)
+
+    Returns:
+        Trend data with composite and individual metric trends
+    """
+    request_start = time.time()
+
+    try:
+        # Verify category exists
+        if registry.get_category_instance(category_id) is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Category '{category_id}' not found",
+            )
+
+        # Create snapshot service and get trend data
+        snapshot_service = InsightsSnapshotService(
+            mongodb=mongodb,
+            redis_cache=redis_cache,
+            data_manager=None,  # Not needed for read operations
+            settings=None,  # Not needed for read operations
+            registry=registry,
+        )
+
+        snapshots = await snapshot_service.get_trend(category_id, days)
+
+        # Build composite trend
+        composite_trend = [
+            TrendDataPoint(
+                date=s.get("date", "").strftime("%Y-%m-%d")
+                if hasattr(s.get("date"), "strftime")
+                else str(s.get("date", ""))[:10],
+                score=s.get("composite_score", 0.0),
+                status=s.get("composite_status", "unknown"),
+            )
+            for s in snapshots
+        ]
+
+        # Build individual metric trends
+        metric_trends: dict[str, list[TrendDataPoint]] = {}
+        for s in snapshots:
+            metrics_data = s.get("metrics", {})
+            for metric_id, metric_info in metrics_data.items():
+                if metric_id not in metric_trends:
+                    metric_trends[metric_id] = []
+                metric_trends[metric_id].append(
+                    TrendDataPoint(
+                        date=s.get("date", "").strftime("%Y-%m-%d")
+                        if hasattr(s.get("date"), "strftime")
+                        else str(s.get("date", ""))[:10],
+                        score=metric_info.get("score", 0.0),
+                        status=metric_info.get("status", "unknown"),
+                    )
+                )
+
+        response = TrendResponse(
+            category_id=category_id,
+            days=days,
+            trend=composite_trend,
+            metrics=metric_trends,
+        )
+
+        duration = time.time() - request_start
+        logger.info(
+            "Trend data returned",
+            category_id=category_id,
+            days=days,
+            datapoints=len(composite_trend),
+            duration_ms=round(duration * 1000, 2),
+        )
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "Failed to get trend data",
+            category_id=category_id,
+            days=days,
+            error=str(e),
+        )
+        raise HTTPException(status_code=500, detail="Failed to get trend data") from e
 
 
 @router.get("/{category_id}/{metric_id}", response_model=InsightMetricResponse)

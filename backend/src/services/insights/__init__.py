@@ -44,6 +44,7 @@ from .models import (
     ThresholdConfig,
 )
 from .registry import InsightsCategoryRegistry, register_category
+from .snapshot_service import InsightsSnapshotService
 
 __all__ = [
     # Base class
@@ -51,6 +52,8 @@ __all__ = [
     # Registry
     "InsightsCategoryRegistry",
     "register_category",
+    # Services
+    "InsightsSnapshotService",
     # Models
     "CategoryMetadata",
     "CompositeScore",

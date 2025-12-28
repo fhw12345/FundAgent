@@ -24,6 +24,8 @@ resources:
 # Use HTTP trigger pattern for portfolio analysis (5MB curl vs 1.14GB backend image)
 # See docs/features/portfolio-analysis-cronjob-http.md for details
 - ../../base/cronjobs/portfolio-analysis-trigger.yaml
+# Daily insights snapshot trigger (9:30 AM ET)
+- ../../base/cronjobs/insights-snapshot-trigger.yaml
 # Production-specific resources (Alibaba Cloud ACK)
 - namespace.yaml
 - mongodb-statefulset.yaml
@@ -60,6 +62,10 @@ patches:
   target:
     kind: CronJob
     name: portfolio-analysis-trigger
+- path: cronjob-insights-trigger-patch.yaml
+  target:
+    kind: CronJob
+    name: insights-snapshot-trigger
 # Langfuse production patches (OSS bucket, node affinity, domain)
 - path: langfuse-server-prod-patch.yaml
   target:

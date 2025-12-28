@@ -141,6 +141,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
         from .services.alpaca_trading_service import AlpacaTradingService
         from .services.alphavantage_market_data import AlphaVantageMarketDataService
+        from .services.data_manager import DataManager
+        from .services.insights.snapshot_service import InsightsSnapshotService
         from .services.tool_cache_wrapper import ToolCacheWrapper
 
         react_agent = None
@@ -167,6 +169,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             logger.info("Tool execution tracking initialized")
 
+            # Story 2.5: Initialize DataManager and InsightsSnapshotService
+            # for cache-first reads in AI tools (< 100ms response time)
+            data_manager = DataManager(
+                redis_cache=redis_cache,
+                alpha_vantage_service=market_service,
+            )
+            snapshot_service = InsightsSnapshotService(
+                mongodb=mongodb,
+                redis_cache=redis_cache,
+                data_manager=data_manager,
+                settings=settings,
+            )
+            logger.info(
+                "InsightsSnapshotService initialized for cache-first tool reads"
+            )
+
+            # Store DataManager and SnapshotService in app state for admin API access
+            app.state.data_manager = data_manager
+            app.state.snapshot_service = snapshot_service
+
             # Create agent with tool cache wrapper and Redis for insights caching
             react_agent = FinancialAnalysisReActAgent(
                 settings=settings,
@@ -174,6 +196,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 market_service=market_service,
                 tool_cache_wrapper=tool_cache_wrapper,
                 redis_cache=redis_cache,  # Enable 30min caching for AI Sector Risk
+                snapshot_service=snapshot_service,  # Story 2.5: Cache-first insights
             )
 
             # Store in app state for use in dependencies

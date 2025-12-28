@@ -83,3 +83,31 @@ class RefreshResponse(BaseModel):
     category_id: str = Field(..., description="Category that was refreshed")
     message: str = Field(..., description="Status message")
     last_updated: datetime = Field(..., description="New last_updated timestamp")
+
+
+class TrendDataPoint(BaseModel):
+    """A single data point in a trend series."""
+
+    date: str = Field(..., description="Date in YYYY-MM-DD format")
+    score: float = Field(..., description="Score at this date (0-100)")
+    status: str = Field(..., description="Status at this date")
+
+
+class MetricTrendData(BaseModel):
+    """Trend data for a single metric."""
+
+    metric_id: str = Field(..., description="Metric identifier")
+    trend: list[TrendDataPoint] = Field(..., description="Trend data points")
+
+
+class TrendResponse(BaseModel):
+    """Response model for trend data."""
+
+    category_id: str = Field(..., description="Category identifier")
+    days: int = Field(..., description="Number of days requested")
+    trend: list[TrendDataPoint] = Field(
+        ..., description="Composite score trend data points"
+    )
+    metrics: dict[str, list[TrendDataPoint]] = Field(
+        ..., description="Individual metric trends keyed by metric_id"
+    )
