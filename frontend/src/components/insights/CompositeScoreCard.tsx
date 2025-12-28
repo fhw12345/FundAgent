@@ -1,18 +1,27 @@
 /**
  * CompositeScoreCard component for displaying category composite scores.
- * Shows the weighted aggregate score with breakdown.
+ * Shows the weighted aggregate score with breakdown and trend chart.
  */
 
 import { useTranslation } from "react-i18next";
 import { formatScore } from "../../services/insightsApi";
-import type { CompositeScore } from "../../types/insights";
+import type { CompositeScore, TrendDataPoint } from "../../types/insights";
+import { ExpandedTrendChart, ExpandedTrendChartSkeleton } from "./ExpandedTrendChart";
 import { StatusBadge } from "./StatusBadge";
 
 interface CompositeScoreCardProps {
   composite: CompositeScore;
+  /** Trend data for composite score over time */
+  trendData?: TrendDataPoint[];
+  /** Whether trend data is loading */
+  trendLoading?: boolean;
 }
 
-export function CompositeScoreCard({ composite }: CompositeScoreCardProps) {
+export function CompositeScoreCard({
+  composite,
+  trendData,
+  trendLoading = false,
+}: CompositeScoreCardProps) {
   const { t } = useTranslation(["insights"]);
 
   return (
@@ -71,6 +80,26 @@ export function CompositeScoreCard({ composite }: CompositeScoreCardProps) {
             })}
           </div>
         </div>
+
+        {/* Composite score trend chart - full width */}
+        {(trendLoading || (trendData && trendData.length > 1)) && (
+          <div className="pt-4 mt-4 border-t border-white/20">
+            <div className="text-xs text-blue-200 mb-2 uppercase tracking-wider">
+              {t("insights:trend.risk_over_time")}
+            </div>
+            <div className="bg-white/5 rounded-lg p-2">
+              {trendLoading ? (
+                <ExpandedTrendChartSkeleton height={100} darkTheme />
+              ) : (
+                <ExpandedTrendChart
+                  data={trendData!}
+                  height={100}
+                  darkTheme
+                />
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

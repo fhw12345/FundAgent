@@ -71,3 +71,18 @@ export interface RefreshResponse {
   message: string;
   last_updated: string;
 }
+
+/** Single data point in a trend series */
+export interface TrendDataPoint {
+  date: string; // YYYY-MM-DD format
+  score: number; // 0-100
+  status: MetricStatus;
+}
+
+/** API Response: Trend data for a category */
+export interface TrendResponse {
+  category_id: string;
+  days: number;
+  trend: TrendDataPoint[]; // Composite score trend
+  metrics: Record<string, TrendDataPoint[]>; // Individual metric trends
+}

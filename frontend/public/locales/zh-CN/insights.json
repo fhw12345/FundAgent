@@ -27,6 +27,11 @@
     "historical_context": "历史背景",
     "actionable_insight": "对您的意义"
   },
+  "trend": {
+    "score_history": "评分历史",
+    "risk_over_time": "风险评分趋势",
+    "no_data": "暂无趋势数据"
+  },
   "status": {
     "low": "低风险",
     "normal": "正常",

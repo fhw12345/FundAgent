@@ -10,6 +10,7 @@ import type {
   CompositeScore,
   InsightCategory,
   InsightMetric,
+  TrendResponse,
 } from "../types/insights";
 
 /**
@@ -23,6 +24,8 @@ export const insightsKeys = {
   composite: (id: string) => [...insightsKeys.all, "composite", id] as const,
   metric: (categoryId: string, metricId: string) =>
     [...insightsKeys.all, "metric", categoryId, metricId] as const,
+  trend: (categoryId: string, days: number) =>
+    [...insightsKeys.all, "trend", categoryId, days] as const,
 };
 
 /**
@@ -83,6 +86,23 @@ export function useMetric(categoryId: string, metricId: string) {
     staleTime: 2 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     enabled: !!categoryId && !!metricId,
+  });
+}
+
+/**
+ * Hook to fetch historical trend data for a category.
+ * Returns composite and individual metric trends over time.
+ *
+ * @param categoryId - Category identifier
+ * @param days - Number of days of history (default: 30)
+ */
+export function useInsightTrend(categoryId: string, days: number = 30) {
+  return useQuery<TrendResponse>({
+    queryKey: insightsKeys.trend(categoryId, days),
+    queryFn: () => insightsApi.getTrend(categoryId, days),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    enabled: !!categoryId,
   });
 }
 

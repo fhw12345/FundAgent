@@ -1,21 +1,64 @@
 /**
  * MetricCard component for displaying individual metrics.
- * Expandable card with score, status, and rich explanation.
+ * Expandable card with score, status, trend sparkline, and rich explanation.
  */
 
 import { ChevronRight } from "lucide-react";
-import type { InsightMetric } from "../../types/insights";
+import { useTranslation } from "react-i18next";
+import type { InsightMetric, TrendDataPoint } from "../../types/insights";
+import { ExpandedTrendChart, ExpandedTrendChartSkeleton } from "./ExpandedTrendChart";
 import { ExplanationPanel, ExplanationPreview } from "./ExplanationPanel";
 import { ScoreGauge } from "./ScoreGauge";
 import { StatusBadge } from "./StatusBadge";
+import { SwipeContainer } from "./SwipeContainer";
+import { TrendSparkline, TrendSparklineSkeleton } from "./TrendSparkline";
 
 interface MetricCardProps {
   metric: InsightMetric;
   isExpanded: boolean;
   onToggle: () => void;
+  /** Optional trend data for sparkline visualization */
+  trendData?: TrendDataPoint[];
+  /** Whether trend data is loading */
+  trendLoading?: boolean;
+  /** Callback when user swipes for more history */
+  onLoadMoreHistory?: () => void;
 }
 
-export function MetricCard({ metric, isExpanded, onToggle }: MetricCardProps) {
+export function MetricCard({
+  metric,
+  isExpanded,
+  onToggle,
+  trendData,
+  trendLoading = false,
+  onLoadMoreHistory,
+}: MetricCardProps) {
+  const { t } = useTranslation(["insights"]);
+
+  // Render sparkline section
+  const renderSparkline = () => {
+    if (trendLoading) {
+      return <TrendSparklineSkeleton width={100} height={20} className="mt-2" />;
+    }
+    if (trendData && trendData.length > 0) {
+      return (
+        <SwipeContainer
+          onSwipeLeft={onLoadMoreHistory}
+          showHint={!!onLoadMoreHistory}
+          className="mt-2"
+        >
+          <TrendSparkline
+            data={trendData}
+            highlightToday={true}
+            width={100}
+            height={20}
+          />
+        </SwipeContainer>
+      );
+    }
+    return null;
+  };
+
   return (
     <div
       className={`bg-white/60 border rounded-xl overflow-hidden transition-all duration-300 ${
@@ -42,6 +85,8 @@ export function MetricCard({ metric, isExpanded, onToggle }: MetricCardProps) {
             <StatusBadge status={metric.status} size="sm" />
           </div>
           <ExplanationPreview summary={metric.explanation.summary} />
+          {/* Trend sparkline */}
+          {renderSparkline()}
         </div>
         <div className="flex items-center gap-4 ml-4 flex-shrink-0">
           <ScoreGauge score={metric.score} status={metric.status} />
@@ -62,7 +107,21 @@ export function MetricCard({ metric, isExpanded, onToggle }: MetricCardProps) {
           isExpanded ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
-        <div className="px-4 pb-4 border-t border-gray-100 pt-4">
+        <div className="px-4 pb-4 border-t border-gray-100 pt-4 space-y-4">
+          {/* Expanded trend chart - full width */}
+          {trendLoading ? (
+            <ExpandedTrendChartSkeleton height={120} />
+          ) : trendData && trendData.length > 1 ? (
+            <div className="bg-gray-50/50 rounded-lg p-3 -mx-1">
+              <ExpandedTrendChart
+                data={trendData}
+                title={t("insights:trend.score_history")}
+                height={120}
+              />
+            </div>
+          ) : null}
+
+          {/* Explanation panel */}
           <ExplanationPanel
             explanation={metric.explanation}
             dataSources={metric.data_sources}

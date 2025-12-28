@@ -27,6 +27,11 @@
     "historical_context": "Historical Context",
     "actionable_insight": "What This Means For You"
   },
+  "trend": {
+    "score_history": "Score History",
+    "risk_over_time": "Risk Score Over Time",
+    "no_data": "No trend data available"
+  },
   "status": {
     "low": "Low Risk",
     "normal": "Normal",

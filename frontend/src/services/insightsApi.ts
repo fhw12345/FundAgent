@@ -10,6 +10,7 @@ import type {
   InsightCategory,
   InsightMetric,
   RefreshResponse,
+  TrendResponse,
 } from "../types/insights";
 
 // Re-export types for use by hooks
@@ -86,6 +87,24 @@ export async function refreshCategory(
 ): Promise<RefreshResponse> {
   const response = await apiClient.post<RefreshResponse>(
     `/api/insights/${categoryId}/refresh`
+  );
+  return response.data;
+}
+
+/**
+ * Get historical trend data for a category.
+ * Returns composite and individual metric trends over time.
+ *
+ * @param categoryId - Category identifier
+ * @param days - Number of days of history (7, 14, 30, 60, or 90)
+ */
+export async function getTrend(
+  categoryId: string,
+  days: number = 30
+): Promise<TrendResponse> {
+  const response = await apiClient.get<TrendResponse>(
+    `/api/insights/${categoryId}/trend`,
+    { params: { days } }
   );
   return response.data;
 }

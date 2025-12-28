@@ -18,7 +18,10 @@ import {
   MetricCard,
   MetricCardSkeleton,
 } from "../components/insights";
-import { useCategories, useCategory, useRefreshCategory } from "../hooks/useInsights";
+import { useCategories, useCategory, useInsightTrend, useRefreshCategory } from "../hooks/useInsights";
+
+/** Available days options for trend history */
+const DAYS_OPTIONS = [30, 60, 90] as const;
 
 /** Category detail view */
 function CategoryDetail({
@@ -32,6 +35,10 @@ function CategoryDetail({
   const { data: category, isLoading, isError } = useCategory(categoryId);
   const refreshMutation = useRefreshCategory();
   const [expandedMetrics, setExpandedMetrics] = useState<Set<string>>(new Set());
+  const [trendDays, setTrendDays] = useState<number>(30);
+
+  // Fetch trend data for sparklines
+  const { data: trendData, isLoading: trendLoading } = useInsightTrend(categoryId, trendDays);
 
   const toggleMetric = (metricId: string) => {
     setExpandedMetrics((prev) => {
@@ -43,6 +50,20 @@ function CategoryDetail({
       }
       return next;
     });
+  };
+
+  // Handle swipe for more history
+  const handleLoadMoreHistory = () => {
+    const currentIndex = DAYS_OPTIONS.indexOf(trendDays as typeof DAYS_OPTIONS[number]);
+    if (currentIndex < DAYS_OPTIONS.length - 1) {
+      setTrendDays(DAYS_OPTIONS[currentIndex + 1]);
+    }
+  };
+
+  // Get trend data for a specific metric
+  const getMetricTrend = (metricId: string) => {
+    if (!trendData?.metrics) return undefined;
+    return trendData.metrics[metricId];
   };
 
   if (isLoading) {
@@ -103,7 +124,11 @@ function CategoryDetail({
 
       {/* Composite score card */}
       {category.composite && (
-        <CompositeScoreCard composite={category.composite} />
+        <CompositeScoreCard
+          composite={category.composite}
+          trendData={trendData?.trend}
+          trendLoading={trendLoading}
+        />
       )}
 
       {/* Metrics list */}
@@ -121,6 +146,11 @@ function CategoryDetail({
               metric={metric}
               isExpanded={expandedMetrics.has(metric.id)}
               onToggle={() => toggleMetric(metric.id)}
+              trendData={getMetricTrend(metric.id)}
+              trendLoading={trendLoading}
+              onLoadMoreHistory={
+                trendDays < 90 ? handleLoadMoreHistory : undefined
+              }
             />
           ))}
         </div>
