@@ -1,0 +1,20 @@
+Trend response formatting verified in insights_tools.py:
+
+1. Direction indicators implemented (AC #5):
+   - ↑ Rising (change > 2)
+   - ↓ Falling (change < -2)
+   - → Stable (-2 to +2)
+
+2. Rich markdown formatting includes:
+   - Category name + 📊 emoji header
+   - Current Score with status emoji (🟢🔵🟠🔴)
+   - N-Day Change with direction indicator
+   - Metric Trends table: | Metric | Current | Change | Direction |
+
+3. Graceful handling for insufficient data:
+   - Shows current score when < 2 snapshots
+   - Message: "Not enough historical data for trend analysis."
+
+Code verified in:
+- _get_trend_direction() function (lines 386-400)
+- _format_trend_response() function (lines 403-474)
