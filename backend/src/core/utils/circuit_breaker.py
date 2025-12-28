@@ -58,8 +58,7 @@ class CircuitBreakerOpenError(Exception):
         self.tool_name = tool_name
         self.time_until_retry = time_until_retry
         super().__init__(
-            f"Circuit breaker OPEN for '{tool_name}'. "
-            f"Retry in {time_until_retry:.1f}s"
+            f"Circuit breaker OPEN for '{tool_name}'. Retry in {time_until_retry:.1f}s"
         )
 
 

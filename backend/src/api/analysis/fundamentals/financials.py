@@ -64,9 +64,9 @@ async def cash_flow(
 
         summary = f"Latest annual cash flow for {company_name} ({latest.get('fiscalDateEnding')}). "
         if operating_cf:
-            summary += f"Operating cash flow: ${operating_cf/1e6:.1f}M. "
+            summary += f"Operating cash flow: ${operating_cf / 1e6:.1f}M. "
         if free_cf:
-            summary += f"Free cash flow: ${free_cf/1e6:.1f}M. "
+            summary += f"Free cash flow: ${free_cf / 1e6:.1f}M. "
 
         # Generate rich markdown using formatter
         formatted_markdown = formatter.format_cash_flow(
@@ -141,9 +141,9 @@ async def balance_sheet(
 
         summary = f"Latest annual balance sheet for {company_name} ({latest.get('fiscalDateEnding')}). "
         if total_assets:
-            summary += f"Total assets: ${total_assets/1e6:.1f}M. "
+            summary += f"Total assets: ${total_assets / 1e6:.1f}M. "
         if equity:
-            summary += f"Shareholder equity: ${equity/1e6:.1f}M. "
+            summary += f"Shareholder equity: ${equity / 1e6:.1f}M. "
 
         # Generate rich markdown using formatter
         formatted_markdown = formatter.format_balance_sheet(

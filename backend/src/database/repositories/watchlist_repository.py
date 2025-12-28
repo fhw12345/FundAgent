@@ -223,9 +223,7 @@ class WatchlistRepository:
                     {"last_analyzed_at": {"$lt": cutoff_time}},
                 ]
             }
-        ).sort(
-            "last_analyzed_at", 1
-        )  # Oldest first
+        ).sort("last_analyzed_at", 1)  # Oldest first
 
         items = []
         async for item_dict in cursor:

@@ -181,7 +181,7 @@ class MarketFormatter:
                 volume = int(stock.get("volume", 0))
 
                 output.append(
-                    f"| {ticker} | ${price:.2f} | {change_pct} | {volume/1e6:.1f}M |"
+                    f"| {ticker} | ${price:.2f} | {change_pct} | {volume / 1e6:.1f}M |"
                 )
 
             output.append("")
@@ -203,7 +203,7 @@ class MarketFormatter:
                 volume = int(stock.get("volume", 0))
 
                 output.append(
-                    f"| {ticker} | ${price:.2f} | {change_pct} | {volume/1e6:.1f}M |"
+                    f"| {ticker} | ${price:.2f} | {change_pct} | {volume / 1e6:.1f}M |"
                 )
 
             output.append("")
@@ -225,7 +225,7 @@ class MarketFormatter:
                 volume = int(stock.get("volume", 0))
 
                 output.append(
-                    f"| {ticker} | ${price:.2f} | {change_pct} | {volume/1e6:.1f}M |"
+                    f"| {ticker} | ${price:.2f} | {change_pct} | {volume / 1e6:.1f}M |"
                 )
 
         return "\n".join(output)

@@ -183,7 +183,7 @@ async def stock_fundamentals(
         )
 
         if market_cap > 0:
-            summary += f"Market cap: ${market_cap/1e9:.1f}B. "
+            summary += f"Market cap: ${market_cap / 1e9:.1f}B. "
 
         key_metrics = [
             f"52-Week Range: ${fifty_two_week_low:.2f} - ${fifty_two_week_high:.2f}",
@@ -196,7 +196,9 @@ async def stock_fundamentals(
             pe_interpretation = (
                 "expensive"
                 if pe_ratio > 25
-                else "reasonable" if pe_ratio > 15 else "cheap"
+                else "reasonable"
+                if pe_ratio > 15
+                else "cheap"
             )
             key_metrics.append(f"P/E Ratio (TTM): {pe_ratio:.2f} ({pe_interpretation})")
             summary += (
@@ -216,7 +218,9 @@ async def stock_fundamentals(
             peg_interpretation = (
                 "attractive"
                 if peg_ratio < 1
-                else "fair" if peg_ratio < 2 else "expensive"
+                else "fair"
+                if peg_ratio < 2
+                else "expensive"
             )
             key_metrics.append(f"PEG Ratio: {peg_ratio:.2f} ({peg_interpretation})")
 
@@ -231,7 +235,9 @@ async def stock_fundamentals(
             margin_quality = (
                 "excellent"
                 if profit_margin > 20
-                else "good" if profit_margin > 10 else "moderate"
+                else "good"
+                if profit_margin > 10
+                else "moderate"
             )
             key_metrics.append(
                 f"Profit Margin: {profit_margin:.1f}% ({margin_quality})"
@@ -250,7 +256,7 @@ async def stock_fundamentals(
 
         # Growth Metrics Section
         if revenue_ttm > 0:
-            key_metrics.append(f"Revenue (TTM): ${revenue_ttm/1e9:.2f}B")
+            key_metrics.append(f"Revenue (TTM): ${revenue_ttm / 1e9:.2f}B")
 
         if quarterly_earnings_growth is not None:
             growth_trend = "growing" if quarterly_earnings_growth > 0 else "declining"
@@ -269,7 +275,9 @@ async def stock_fundamentals(
             div_quality = (
                 "high income"
                 if dividend_yield > 4
-                else "moderate income" if dividend_yield > 2 else "low income"
+                else "moderate income"
+                if dividend_yield > 2
+                else "low income"
             )
             key_metrics.append(f"Dividend Yield: {dividend_yield:.2f}% ({div_quality})")
             if dividend_yield > 4:
@@ -403,7 +411,7 @@ async def company_overview(
         key_metrics = []
 
         if market_cap:
-            key_metrics.append(f"Market Cap: ${market_cap/1e9:.2f}B")
+            key_metrics.append(f"Market Cap: ${market_cap / 1e9:.2f}B")
         if pe_ratio:
             key_metrics.append(f"P/E Ratio: {pe_ratio:.2f}")
         if eps:
@@ -411,7 +419,7 @@ async def company_overview(
         if profit_margin:
             key_metrics.append(f"Profit Margin: {profit_margin:.2f}%")
         if revenue_ttm:
-            key_metrics.append(f"Revenue (TTM): ${revenue_ttm/1e9:.2f}B")
+            key_metrics.append(f"Revenue (TTM): ${revenue_ttm / 1e9:.2f}B")
         if dividend_yield:
             key_metrics.append(f"Dividend Yield: {dividend_yield:.2f}%")
         if beta:

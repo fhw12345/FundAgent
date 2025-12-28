@@ -42,9 +42,11 @@ class MacroAnalyzer:
             logger.info("Starting macro sentiment analysis with AlphaVantage")
 
             # Fetch economic indicators
-            commodity_level, commodity_interpretation, fear_greed_score = (
-                await self._analyze_commodity_prices()
-            )
+            (
+                commodity_level,
+                commodity_interpretation,
+                fear_greed_score,
+            ) = await self._analyze_commodity_prices()
 
             # Get economic indicators performance
             economic_indicators = {}

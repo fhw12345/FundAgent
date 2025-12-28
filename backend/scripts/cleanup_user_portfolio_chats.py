@@ -50,7 +50,9 @@ async def cleanup_user_portfolio_chats(dry_run: bool = True):
         title = chat.get("title", "Untitled")
 
         # Get messages for this chat
-        messages = await messages_collection.find({"chat_id": chat_id}).to_list(length=None)
+        messages = await messages_collection.find({"chat_id": chat_id}).to_list(
+            length=None
+        )
 
         # Check if this chat contains portfolio analysis
         is_portfolio_chat = False
@@ -59,35 +61,43 @@ async def cleanup_user_portfolio_chats(dry_run: bool = True):
                 content = msg.get("content", "")
                 content_lower = content.lower()
                 # Portfolio analysis indicators
-                if any(indicator in content_lower for indicator in [
-                    "fibonacci analysis",
-                    "stochastic analysis",
-                    "watchlist",
-                    "portfolio analysis",
-                    "trend: uptrend",
-                    "trend: downtrend",
-                    "support level",
-                    "resistance level",
-                    "key fibonacci levels",
-                    "rsi",
-                    "portfolio agent analysis",  # New format
-                    "decision: buy",
-                    "decision: sell",
-                    "decision: hold",
-                    "position_size:",
-                    "analysis_id:",
-                ]) or "## 📈 Portfolio Agent Analysis" in content:  # Check exact header
+                if (
+                    any(
+                        indicator in content_lower
+                        for indicator in [
+                            "fibonacci analysis",
+                            "stochastic analysis",
+                            "watchlist",
+                            "portfolio analysis",
+                            "trend: uptrend",
+                            "trend: downtrend",
+                            "support level",
+                            "resistance level",
+                            "key fibonacci levels",
+                            "rsi",
+                            "portfolio agent analysis",  # New format
+                            "decision: buy",
+                            "decision: sell",
+                            "decision: hold",
+                            "position_size:",
+                            "analysis_id:",
+                        ]
+                    )
+                    or "## 📈 Portfolio Agent Analysis" in content
+                ):  # Check exact header
                     is_portfolio_chat = True
                     break
 
         if is_portfolio_chat:
-            chats_to_delete.append({
-                "chat_id": chat_id,
-                "user_id": user_id,
-                "title": title,
-                "message_count": len(messages),
-                "created_at": chat.get("created_at"),
-            })
+            chats_to_delete.append(
+                {
+                    "chat_id": chat_id,
+                    "user_id": user_id,
+                    "title": title,
+                    "message_count": len(messages),
+                    "created_at": chat.get("created_at"),
+                }
+            )
 
     if not chats_to_delete:
         print("✅ No portfolio chats found in user accounts - database is clean!")
@@ -113,7 +123,9 @@ async def cleanup_user_portfolio_chats(dry_run: bool = True):
         print("DRY RUN - No changes made")
         print("=" * 80)
         print("\nTo actually delete these chats, run:")
-        print("  docker compose exec backend python scripts/cleanup_user_portfolio_chats.py --execute")
+        print(
+            "  docker compose exec backend python scripts/cleanup_user_portfolio_chats.py --execute"
+        )
         return
 
     # Actually delete

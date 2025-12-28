@@ -64,7 +64,7 @@ def extract_token_usage_from_messages(messages: list[Any]) -> tuple[int, int, in
 
 
 def extract_token_usage_from_agent_result(
-    agent_result: dict[str, Any]
+    agent_result: dict[str, Any],
 ) -> dict[str, int]:
     """
     Extract token usage from agent invocation result.

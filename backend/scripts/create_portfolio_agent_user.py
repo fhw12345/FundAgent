@@ -24,6 +24,8 @@ from src.core.config import get_settings
 
 
 from src.core.utils.date_utils import utcnow
+
+
 async def create_portfolio_agent_user():
     """Create portfolio_agent system user."""
     settings = get_settings()

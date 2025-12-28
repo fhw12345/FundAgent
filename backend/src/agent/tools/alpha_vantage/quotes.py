@@ -154,7 +154,7 @@ def create_quote_tools(service: AlphaVantageMarketDataService) -> list:
             ]
 
             return f"""Ticker Search: "{query}"
-Top Matches: {', '.join(formatted[:3])}
+Top Matches: {", ".join(formatted[:3])}
 {f"More: {', '.join(formatted[3:])}" if len(formatted) > 3 else ""}"""
 
         except Exception as e:

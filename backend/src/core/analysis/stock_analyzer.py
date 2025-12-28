@@ -88,7 +88,7 @@ class StockAnalyzer:
         )
 
         if market_cap > 0:
-            summary += f"Market cap: ${market_cap/1e9:.1f}B. "
+            summary += f"Market cap: ${market_cap / 1e9:.1f}B. "
 
         key_metrics = [
             f"52-Week Range: ${week_52_low:.2f} - ${week_52_high:.2f}",
@@ -101,7 +101,9 @@ class StockAnalyzer:
             pe_interpretation = (
                 "expensive"
                 if pe_ratio > 25
-                else "reasonable" if pe_ratio > 15 else "cheap"
+                else "reasonable"
+                if pe_ratio > 15
+                else "cheap"
             )
             key_metrics.append(f"P/E Ratio: {pe_ratio:.1f} ({pe_interpretation})")
             summary += (

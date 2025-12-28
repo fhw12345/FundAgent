@@ -172,7 +172,8 @@ async def stream_with_simple_agent(
                         yield create_chunk_event(chunk)
 
                 async for chunk_data in asyncio.wait_for(
-                    stream_with_timeout(), timeout=120.0  # 2 minutes max
+                    stream_with_timeout(),
+                    timeout=120.0,  # 2 minutes max
                 ):
                     yield chunk_data
 
@@ -241,15 +242,16 @@ async def stream_with_simple_agent(
             )
 
             # Complete transaction and deduct credits atomically
-            updated_transaction, updated_user = (
-                await credit_service.complete_transaction_with_deduction(
-                    transaction_id=transaction.transaction_id,
-                    message_id=assistant_message.message_id,
-                    input_tokens=token_usage.input_tokens,
-                    output_tokens=token_usage.output_tokens,
-                    model=request.model,
-                    thinking_enabled=request.thinking_enabled,
-                )
+            (
+                updated_transaction,
+                updated_user,
+            ) = await credit_service.complete_transaction_with_deduction(
+                transaction_id=transaction.transaction_id,
+                message_id=assistant_message.message_id,
+                input_tokens=token_usage.input_tokens,
+                output_tokens=token_usage.output_tokens,
+                model=request.model,
+                thinking_enabled=request.thinking_enabled,
             )
 
             if not updated_transaction or not updated_user:

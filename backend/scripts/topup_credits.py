@@ -47,8 +47,7 @@ async def topup_credits(username: str, target_amount: float):
 
         # Update credits
         result = await users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"credits": target_amount}}
+            {"user_id": user_id}, {"$set": {"credits": target_amount}}
         )
 
         if result.modified_count > 0:

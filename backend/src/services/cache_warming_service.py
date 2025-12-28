@@ -13,9 +13,9 @@ Supports:
 from datetime import UTC, datetime
 
 import structlog
+from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ..core.config import Settings
-from ..database.mongodb import Collection
 from ..database.redis import RedisCache
 from ..services.alphavantage_market_data import AlphaVantageMarketDataService
 
@@ -43,7 +43,7 @@ class CacheWarmingService:
         self,
         redis_cache: RedisCache,
         market_service: AlphaVantageMarketDataService,
-        watchlist_collection: Collection | None = None,
+        watchlist_collection: AsyncIOMotorCollection | None = None,
         settings: Settings | None = None,
     ) -> None:
         """Initialize cache warming service.
@@ -192,8 +192,6 @@ class CacheWarmingService:
                 }
 
             # Cache the market movers response directly
-            from datetime import UTC, datetime
-
             current_date = datetime.now(UTC).strftime("%Y-%m-%d")
             cache_key = f"market_movers:{current_date}"
 
@@ -249,7 +247,7 @@ class CacheWarmingService:
 
         # Warm quote data
         try:
-            quote = await self.market_service.get_global_quote(symbol)
+            quote = await self.market_service.get_quote(symbol)
             if quote:
                 cache_key = f"quote:{symbol}:{current_date}"
                 ttl = self.settings.cache_ttl_realtime if self.settings else 60

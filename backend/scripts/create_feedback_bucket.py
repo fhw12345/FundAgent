@@ -16,10 +16,13 @@ ACCESS_KEY_SECRET = os.getenv("OSS_SECRET_KEY", "")
 ENDPOINT = os.getenv("OSS_ENDPOINT", "oss-cn-hangzhou.aliyuncs.com")
 BUCKET_NAME = "financial-agent-feedback"
 
+
 def main():
     # Validate credentials
     if not ACCESS_KEY_ID or not ACCESS_KEY_SECRET:
-        print("❌ Error: OSS_ACCESS_KEY and OSS_SECRET_KEY environment variables required")
+        print(
+            "❌ Error: OSS_ACCESS_KEY and OSS_SECRET_KEY environment variables required"
+        )
         print("   Set them in your environment or .env file")
         return 1
 
@@ -53,17 +56,17 @@ def main():
                 oss2.BUCKET_ACL_PRIVATE,  # Private access (default)
                 oss2.models.BucketCreateConfig(
                     oss2.BUCKET_STORAGE_CLASS_STANDARD  # Standard storage class
-                )
+                ),
             )
 
             print(f"✅ Bucket '{BUCKET_NAME}' created successfully!")
 
             # Set CORS rules to allow browser uploads
             rule = oss2.models.CorsRule(
-                allowed_origins=['*'],  # Allow all origins (restrict in production)
-                allowed_methods=['GET', 'PUT', 'POST'],
-                allowed_headers=['*'],
-                max_age_seconds=3600
+                allowed_origins=["*"],  # Allow all origins (restrict in production)
+                allowed_methods=["GET", "PUT", "POST"],
+                allowed_headers=["*"],
+                max_age_seconds=3600,
             )
             bucket.put_bucket_cors(oss2.models.BucketCors([rule]))
             print("✅ CORS rules configured for browser uploads")
@@ -91,6 +94,7 @@ def main():
     except Exception as e:
         print(f"❌ Error: {e}")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

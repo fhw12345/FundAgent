@@ -12,6 +12,7 @@ Story 1.4: Streaming Latency Optimization
 """
 
 import asyncio
+import json
 from collections.abc import AsyncGenerator
 
 import structlog
@@ -309,12 +310,23 @@ async def stream_with_react_agent(
                 )
                 async for tool_event in stream_tool_events_background():
                     # Track first tool event (Story 1.4: TTFT optimization)
+                    # Note: tool_event is already an SSE-formatted string from format_sse_event()
                     if not first_tool_recorded:
                         first_tool_recorded = True
+                        # Extract tool_name from SSE string if possible
+                        tool_name = None
+                        if isinstance(tool_event, str) and tool_event.startswith("data: "):
+                            try:
+                                event_data = json.loads(tool_event[6:].strip())
+                                tool_name = event_data.get("tool_name")
+                            except (json.JSONDecodeError, AttributeError):
+                                pass
+                        elif isinstance(tool_event, dict):
+                            tool_name = tool_event.get("tool_name")
                         yield create_latency_event(
                             "first_tool",
                             get_elapsed_ms(),
-                            tool_name=tool_event.get("tool_name"),
+                            tool_name=tool_name,
                         )
                     yield tool_event
 
@@ -488,15 +500,16 @@ async def stream_with_react_agent(
             )
 
             # ===== COMPLETE TRANSACTION AND DEDUCT CREDITS =====
-            updated_transaction, updated_user = (
-                await credit_service.complete_transaction_with_deduction(
-                    transaction_id=transaction.transaction_id,
-                    message_id=assistant_message.message_id,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    model=request.model,
-                    thinking_enabled=request.thinking_enabled,
-                )
+            (
+                updated_transaction,
+                updated_user,
+            ) = await credit_service.complete_transaction_with_deduction(
+                transaction_id=transaction.transaction_id,
+                message_id=assistant_message.message_id,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                model=request.model,
+                thinking_enabled=request.thinking_enabled,
             )
 
             if updated_transaction and updated_user:

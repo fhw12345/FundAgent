@@ -109,11 +109,11 @@ def format_large_number(
         value = abs_value
 
     if abs_value >= 1e9:
-        return f"{sign}{currency_prefix}{value/1e9:.2f}B"
+        return f"{sign}{currency_prefix}{value / 1e9:.2f}B"
     elif abs_value >= 1e6:
-        return f"{sign}{currency_prefix}{value/1e6:.1f}M"
+        return f"{sign}{currency_prefix}{value / 1e6:.1f}M"
     elif abs_value >= 1e3:
-        return f"{sign}{currency_prefix}{value/1e3:.1f}K"
+        return f"{sign}{currency_prefix}{value / 1e3:.1f}K"
     else:
         return f"{sign}{currency_prefix}{value:.2f}"
 

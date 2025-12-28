@@ -31,13 +31,15 @@ def migrate_analysis_chats():
     # Find all chats with "Analysis" in title that are NOT already portfolio_agent
     query = {
         "title": {"$regex": "Analysis$"},  # Ends with "Analysis"
-        "user_id": {"$ne": "portfolio_agent"}  # Not already portfolio_agent
+        "user_id": {"$ne": "portfolio_agent"},  # Not already portfolio_agent
     }
 
     chats_to_migrate = list(chats_collection.find(query))
 
     if not chats_to_migrate:
-        print("\n✅ No chats need migration. All analysis chats are already portfolio_agent.")
+        print(
+            "\n✅ No chats need migration. All analysis chats are already portfolio_agent."
+        )
         return
 
     print(f"\nFound {len(chats_to_migrate)} analysis chats to migrate:\n")
@@ -49,16 +51,17 @@ def migrate_analysis_chats():
         print()
 
     # Confirm migration
-    response = input(f"\nMigrate {len(chats_to_migrate)} chats to portfolio_agent? (yes/no): ")
+    response = input(
+        f"\nMigrate {len(chats_to_migrate)} chats to portfolio_agent? (yes/no): "
+    )
 
-    if response.lower() not in ['yes', 'y']:
+    if response.lower() not in ["yes", "y"]:
         print("❌ Migration cancelled.")
         return
 
     # Perform migration
     result = chats_collection.update_many(
-        query,
-        {"$set": {"user_id": "portfolio_agent"}}
+        query, {"$set": {"user_id": "portfolio_agent"}}
     )
 
     print("\n✅ Migration complete!")
@@ -79,13 +82,14 @@ def migrate_analysis_chats():
     print("=" * 70)
 
     portfolio_count = chats_collection.count_documents({"user_id": "portfolio_agent"})
-    user_count = chats_collection.count_documents({
-        "user_id": {"$ne": "portfolio_agent"}
-    })
+    user_count = chats_collection.count_documents(
+        {"user_id": {"$ne": "portfolio_agent"}}
+    )
 
     print(f"Portfolio agent chats: {portfolio_count}")
     print(f"User chats (non-analysis): {user_count}")
     print()
+
 
 if __name__ == "__main__":
     migrate_analysis_chats()

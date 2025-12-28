@@ -63,6 +63,7 @@ from ..core.localization import (
 from ..core.utils import extract_token_usage_from_messages
 from ..services.alphavantage_response_formatter import AlphaVantageResponseFormatter
 from ..services.insights import InsightsCategoryRegistry
+from ..services.insights.snapshot_service import InsightsSnapshotService
 from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
@@ -104,6 +105,8 @@ class FinancialAnalysisReActAgent:
         market_service,  # AlphaVantageMarketDataService for market data
         tool_cache_wrapper: ToolCacheWrapper | None = None,
         redis_cache=None,  # RedisCache for insights caching
+        snapshot_service: InsightsSnapshotService
+        | None = None,  # Story 2.5: Cache-first insights
     ):
         """
         Initialize ReAct agent with SDK and MCP tools.
@@ -114,6 +117,7 @@ class FinancialAnalysisReActAgent:
             market_service: Hybrid market data service for stock data
             tool_cache_wrapper: Optional wrapper for tool caching + tracking
             redis_cache: Optional Redis cache for insights caching (30min TTL)
+            snapshot_service: Optional InsightsSnapshotService for cache-first reads (Story 2.5)
         """
         self.settings = settings
         self.market_service = market_service
@@ -183,7 +187,11 @@ class FinancialAnalysisReActAgent:
             redis_cache=self.redis_cache,  # Enable caching for 30min TTL
             market_service=market_service,
         )
-        insights_tools = create_insights_tools(insights_registry)
+        # Story 2.5: Pass snapshot_service for cache-first reads and trend queries
+        insights_tools = create_insights_tools(
+            insights_registry,
+            snapshot_service=snapshot_service,
+        )
         self.tools.extend(insights_tools)
 
         # Track tool counts for logging
@@ -255,7 +263,7 @@ class FinancialAnalysisReActAgent:
                 ]
 
                 return f"""Fibonacci Analysis: {symbol} @ ${result.current_price:.2f}
-Key Levels: {', '.join(key_levels) if key_levels else 'N/A'}
+Key Levels: {", ".join(key_levels) if key_levels else "N/A"}
 Trend Strength: {result.trend_strength}, Confidence: {result.confidence_score * 100:.0f}%"""
 
             except Exception as e:

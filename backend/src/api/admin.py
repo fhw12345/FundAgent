@@ -21,7 +21,9 @@ from ..services.alpaca_data_service import AlpacaDataService
 from ..services.alpaca_trading_service import AlpacaTradingService
 from ..services.alphavantage_market_data import AlphaVantageMarketDataService
 from ..services.credit_service import CreditService
+from ..services.data_manager import DataManager
 from ..services.database_stats_service import DatabaseStatsService
+from ..services.insights import InsightsSnapshotService
 from ..services.kubernetes_metrics_service import KubernetesMetricsService
 from .dependencies.auth import (
     get_current_user,
@@ -359,6 +361,156 @@ async def run_portfolio_analysis_background(
     except Exception as e:
         logger.error(
             "Portfolio analysis background task failed",
+            run_id=run_id,
+            error=str(e),
+            error_type=type(e).__name__,
+            exc_info=True,
+        )
+        # Don't raise - background task failure shouldn't crash the API
+
+
+# =============================================================================
+# Insights Snapshot Endpoints
+# =============================================================================
+
+
+def get_data_manager(request: Request) -> DataManager:
+    """Get DataManager from app state."""
+    return getattr(request.app.state, "data_manager", None)
+
+
+def get_insights_registry(request: Request):
+    """Get insights registry from app state."""
+    return getattr(request.app.state, "insights_registry", None)
+
+
+@router.post("/insights/trigger-snapshot", status_code=202)
+async def trigger_insights_snapshot(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    mongodb: MongoDB = Depends(get_mongodb),
+    redis_cache: RedisCache = Depends(get_redis_cache),
+    _: None = Depends(require_admin),
+):
+    """
+    Trigger insights snapshot creation (admin only).
+
+    This endpoint is designed to be called by:
+    1. Kubernetes CronJob (scheduled daily at 9:30 AM ET)
+    2. Admin UI (manual trigger for testing)
+    3. CLI tools (development/testing)
+
+    Returns immediately with 202 Accepted. Snapshot creation runs in background.
+
+    **Admin only**: Requires admin privileges.
+
+    Returns:
+        dict: Status message with run_id
+
+    Raises:
+        HTTPException: 401 if not authenticated as admin
+    """
+    run_id = f"snapshot_{utcnow().strftime('%Y%m%d_%H%M%S')}"
+
+    logger.info(
+        "Insights snapshot triggered via API",
+        run_id=run_id,
+        trigger_source="admin_endpoint",
+    )
+
+    # Get services from app state
+    data_manager = get_data_manager(request)
+    insights_registry = get_insights_registry(request)
+
+    if not data_manager:
+        return {
+            "status": "error",
+            "message": "DataManager not initialized",
+        }
+
+    # Add background task
+    background_tasks.add_task(
+        run_insights_snapshot_background,
+        mongodb=mongodb,
+        redis_cache=redis_cache,
+        data_manager=data_manager,
+        insights_registry=insights_registry,
+        run_id=run_id,
+    )
+
+    return {
+        "status": "started",
+        "run_id": run_id,
+        "message": "Insights snapshot running in background",
+        "note": "Check backend logs for progress and results",
+    }
+
+
+async def run_insights_snapshot_background(
+    mongodb: MongoDB,
+    redis_cache: RedisCache,
+    data_manager: DataManager,
+    insights_registry,
+    run_id: str,
+):
+    """
+    Background task for insights snapshot creation.
+
+    Args:
+        mongodb: MongoDB connection
+        redis_cache: Redis cache connection
+        data_manager: DataManager (DML) instance
+        insights_registry: Insights category registry
+        run_id: Unique run identifier
+    """
+    logger.info(
+        "Insights snapshot background task started",
+        run_id=run_id,
+    )
+
+    try:
+        settings = get_settings()
+
+        # Create snapshot service
+        snapshot_service = InsightsSnapshotService(
+            mongodb=mongodb,
+            redis_cache=redis_cache,
+            data_manager=data_manager,
+            settings=settings,
+            registry=insights_registry,
+        )
+
+        # Ensure indexes exist
+        await snapshot_service.ensure_indexes()
+
+        # Create snapshot
+        result = await snapshot_service.create_snapshot(
+            category_id="ai_sector_risk",
+            run_id=run_id,
+        )
+
+        # Log summary
+        logger.info(
+            "Insights snapshot completed",
+            run_id=run_id,
+            status=result.get("status"),
+            composite_score=result.get("composite_score"),
+            total_seconds=result.get("timing", {}).get("total_seconds"),
+        )
+
+        # Print summary (appears in pod logs)
+        print("\n" + "=" * 60)
+        print("INSIGHTS SNAPSHOT SUMMARY")
+        print("=" * 60)
+        print(f"Run ID: {run_id}")
+        print(f"Status: {result.get('status')}")
+        print(f"Composite Score: {result.get('composite_score')}")
+        print(f"Duration: {result.get('timing', {}).get('total_seconds', 0):.2f}s")
+        print("=" * 60)
+
+    except Exception as e:
+        logger.error(
+            "Insights snapshot background task failed",
             run_id=run_id,
             error=str(e),
             error_type=type(e).__name__,

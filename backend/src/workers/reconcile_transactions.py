@@ -135,13 +135,14 @@ async def reconcile_stuck_transactions(
             continue
 
         # Complete transaction with actual token usage
-        updated_transaction, updated_user = (
-            await credit_service.complete_transaction_with_deduction(
-                transaction_id=transaction_id,
-                message_id=linked_message.message_id,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-            )
+        (
+            updated_transaction,
+            updated_user,
+        ) = await credit_service.complete_transaction_with_deduction(
+            transaction_id=transaction_id,
+            message_id=linked_message.message_id,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
 
         if updated_transaction and updated_user:
