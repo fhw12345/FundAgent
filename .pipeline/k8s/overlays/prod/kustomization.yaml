@@ -87,7 +87,7 @@ images:
   newTag: "prod-v0.8.9"
 - name: klinematrix/frontend
   newName: financialagent-gxftdbbre4gtegea.azurecr.io/klinecubic/frontend
-  newTag: "prod-v0.11.4"
+  newTag: "prod-v0.11.5"
 
 # Resource allocation for production
 replicas:
