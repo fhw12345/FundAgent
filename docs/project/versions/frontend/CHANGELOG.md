@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5] - 2025-12-29
+
+### Fixed
+- fix(insights): Smart tooltip positioning in ExpandedTrendChart
+  - Tooltip now shows below data point when point is in top 40% of chart area
+  - Tooltip shows above data point when in lower 60% of chart area
+  - Added `overflow: visible` to SVG element to prevent clipping
+  - Added `overflow-visible` class to chart containers in CompositeScoreCard and MetricCard
+  - Fixes tooltip cutoff issue when hovering high-score data points
+
 ## [0.11.4] - 2025-12-11
 
 ### Added

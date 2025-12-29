@@ -87,7 +87,7 @@ export function CompositeScoreCard({
             <div className="text-xs text-blue-200 mb-2 uppercase tracking-wider">
               {t("insights:trend.risk_over_time")}
             </div>
-            <div className="bg-white/5 rounded-lg p-2">
+            <div className="bg-white/5 rounded-lg p-2 overflow-visible">
               {trendLoading ? (
                 <ExpandedTrendChartSkeleton height={100} darkTheme />
               ) : (

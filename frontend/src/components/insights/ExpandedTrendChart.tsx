@@ -140,6 +140,7 @@ export function ExpandedTrendChart({
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="w-full"
+        style={{ overflow: "visible" }}
         preserveAspectRatio="xMidYMid meet"
         aria-label={`Trend chart showing ${isUptrend ? "upward" : isFlat ? "flat" : "downward"} trend`}
       >
@@ -219,39 +220,63 @@ export function ExpandedTrendChart({
           />
         ))}
 
-        {/* Tooltip */}
-        {hoveredIndex !== null && points[hoveredIndex] && (
-          <g>
-            <rect
-              x={points[hoveredIndex].x - 45}
-              y={points[hoveredIndex].y - 40}
-              width="90"
-              height="32"
-              rx="4"
-              fill={tooltipBg}
-              filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"
-            />
-            <text
-              x={points[hoveredIndex].x}
-              y={points[hoveredIndex].y - 26}
-              fill={tooltipText}
-              fontSize="11"
-              fontWeight="600"
-              textAnchor="middle"
-            >
-              Score: {points[hoveredIndex].score.toFixed(1)}
-            </text>
-            <text
-              x={points[hoveredIndex].x}
-              y={points[hoveredIndex].y - 14}
-              fill={textColor}
-              fontSize="10"
-              textAnchor="middle"
-            >
-              {formatDate(chartData[hoveredIndex].date)}
-            </text>
-          </g>
-        )}
+        {/* Tooltip with smart positioning */}
+        {hoveredIndex !== null && points[hoveredIndex] && (() => {
+          const point = points[hoveredIndex];
+          // Smart positioning: show below if point is in top 40% of chart area
+          const chartTop = padding.top;
+          const chartBottom = height - padding.bottom;
+          const chartAreaHeight = chartBottom - chartTop;
+          const isInTopArea = point.y < chartTop + chartAreaHeight * 0.4;
+
+          // Tooltip dimensions
+          const tooltipWidth = 90;
+          const tooltipHeight = 32;
+          const tooltipOffset = 12; // Gap between point and tooltip
+
+          // Calculate tooltip position
+          const tooltipX = point.x - tooltipWidth / 2;
+          const tooltipY = isInTopArea
+            ? point.y + tooltipOffset // Below point
+            : point.y - tooltipHeight - tooltipOffset; // Above point
+
+          // Text Y positions (relative to tooltip)
+          const scoreTextY = tooltipY + 13;
+          const dateTextY = tooltipY + 25;
+
+          return (
+            <g>
+              <rect
+                x={tooltipX}
+                y={tooltipY}
+                width={tooltipWidth}
+                height={tooltipHeight}
+                rx="4"
+                fill={tooltipBg}
+                filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"
+              />
+              <text
+                x={point.x}
+                y={scoreTextY}
+                fill={tooltipText}
+                fontSize="11"
+                fontWeight="600"
+                textAnchor="middle"
+              >
+                Score: {point.score.toFixed(1)}
+              </text>
+              <text
+                x={point.x}
+                y={dateTextY}
+                fill={textColor}
+                fontSize="10"
+                textAnchor="middle"
+              >
+                {formatDate(chartData[hoveredIndex].date)}
+              </text>
+            </g>
+          );
+        })()}
       </svg>
     </div>
   );

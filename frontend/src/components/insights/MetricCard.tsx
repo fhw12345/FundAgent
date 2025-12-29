@@ -112,7 +112,7 @@ export function MetricCard({
           {trendLoading ? (
             <ExpandedTrendChartSkeleton height={120} />
           ) : trendData && trendData.length > 1 ? (
-            <div className="bg-gray-50/50 rounded-lg p-3 -mx-1">
+            <div className="bg-gray-50/50 rounded-lg p-3 -mx-1 overflow-visible">
               <ExpandedTrendChart
                 data={trendData}
                 title={t("insights:trend.score_history")}
