@@ -616,9 +616,84 @@ HTTP_PROXY="" HTTPS_PROXY="" curl -s https://monitor.klinecubic.cn/api/public/he
 - **UI**: https://monitor.klinecubic.cn
 - **API**: Internal `http://langfuse-server:3000` (backend uses this)
 
+## CronJob Management
+
+Production CronJobs for scheduled tasks.
+
+### Current CronJobs
+
+| Name | Schedule (UTC) | Status | Purpose |
+|------|----------------|--------|---------|
+| `insights-snapshot-trigger` | 14:30 daily | ✅ Enabled | Creates daily Market Insights snapshots |
+| `portfolio-analysis-trigger` | 14:30 daily | ❌ Suspended | Portfolio analysis (disabled in prod) |
+
+### Check CronJob Status
+
+```bash
+KUBECONFIG=~/.kube/config-ack-prod kubectl get cronjob -n klinematrix-prod -o wide
+```
+
+### Suspend/Resume CronJobs
+
+**Runtime (immediate, lost on next deploy):**
+```bash
+# Suspend
+KUBECONFIG=~/.kube/config-ack-prod kubectl patch cronjob <name> \
+  -n klinematrix-prod -p '{"spec":{"suspend":true}}'
+
+# Resume
+KUBECONFIG=~/.kube/config-ack-prod kubectl patch cronjob <name> \
+  -n klinematrix-prod -p '{"spec":{"suspend":false}}'
+```
+
+**Permanent (via YAML):**
+
+Edit the overlay patch file:
+```yaml
+# .pipeline/k8s/overlays/prod/cronjob-<name>-patch.yaml
+spec:
+  suspend: true  # Add this line
+```
+
+Then apply:
+```bash
+KUBECONFIG=~/.kube/config-ack-prod kubectl apply -k .pipeline/k8s/overlays/prod
+```
+
+### Manual Trigger
+
+Trigger a CronJob manually without waiting for schedule:
+
+```bash
+# Create a one-off Job from CronJob template
+KUBECONFIG=~/.kube/config-ack-prod kubectl create job \
+  --from=cronjob/insights-snapshot-trigger \
+  manual-insights-$(date +%Y%m%d%H%M) \
+  -n klinematrix-prod
+```
+
+Or via Admin API (requires auth):
+```bash
+curl -X POST https://klinecubic.cn/api/admin/insights/trigger-snapshot \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### View CronJob History
+
+```bash
+# List completed/failed jobs
+KUBECONFIG=~/.kube/config-ack-prod kubectl get jobs -n klinematrix-prod
+
+# View logs from last run
+KUBECONFIG=~/.kube/config-ack-prod kubectl logs job/<job-name> -n klinematrix-prod
+```
+
+---
+
 ## Related Documentation
 
 - [Resource Inventory](RESOURCE_INVENTORY.md) - All Azure and K8s resources
 - [Migration Guide](MIGRATION_DEV_TO_TEST.md) - How we got to test environment
 - [Infrastructure](infrastructure.md) - Architecture overview
 - [Langfuse Observability](../features/langfuse-observability.md) - LLM tracing setup
+- [Market Insights Trend](../features/market-insights-trend-visualization.md) - Insights snapshot workflow

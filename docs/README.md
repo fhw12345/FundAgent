@@ -9,7 +9,7 @@ AI-Enhanced Financial Analysis Platform documentation hub.
 | Component | Version | Environment | URL |
 |-----------|---------|-------------|-----|
 | Backend | v0.8.8 | Prod (ACK) | https://klinecubic.cn |
-| Frontend | v0.11.0 | Prod (ACK) | https://klinecubic.cn |
+| Frontend | v0.11.4 | Prod (ACK) | https://klinecubic.cn |
 | Test | Planned | AKS | https://klinematrix.com |
 | Local Dev | Docker | Compose | http://localhost:3000 |
 
@@ -59,6 +59,7 @@ Local development and coding practices.
 Feature specifications (create before implementing).
 
 - [Feature Specs Guide](features/README.md) - How to write feature specs
+- [Market Insights Trend Visualization](features/market-insights-trend-visualization.md) - Phase 2 trend charts & sparklines
 - [Backend API Module Restructure](features/backend-api-module-restructure.md) - v0.8.8 modular architecture
 - [Portfolio Agent Architecture](features/portfolio-agent-architecture-refactor.md) - 3-phase analysis
 - [Langfuse Observability](features/langfuse-observability.md) - LLM trace visualization
@@ -106,6 +107,13 @@ Version history and specifications.
 - Fundamental analysis (overview, balance sheet, cash flow)
 - News sentiment analysis
 - Market movers (gainers, losers)
+
+### Market Insights (NEW - Phase 2)
+- AI-powered sector risk analysis (AI Sector Risk Index)
+- Multi-metric composite scoring with transparent breakdowns
+- Historical trend visualization with sparklines
+- Daily automated snapshots via CronJob
+- Expandable metric cards with methodology explanations
 
 > **Note**: Technical analysis available for daily/weekly/monthly intervals only. Intraday (1min) is price-only.
 

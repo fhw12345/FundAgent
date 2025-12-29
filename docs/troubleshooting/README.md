@@ -5,16 +5,27 @@ This directory contains documentation for bugs, fixes, and common issues encount
 ## Quick Index
 
 ### Common Issues
-- [🚨 Docker Env Reload Issue](docker-env-reload-issue.md) - **CRITICAL**: Containers don't reload env vars on restart
+
+**🚨 Critical (Stop & Fix Immediately)**
+- [Docker Env Reload Issue](docker-env-reload-issue.md) - Containers don't reload env vars on restart
+- [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems
+
+**⚠️ High Priority**
 - [CORS & API Connectivity](cors-api-connectivity.md) - CORS errors, localhost issues, nginx proxy problems
+- [External Secrets Sync](external-secrets-sync.md) - Secrets not updating from Azure Key Vault
+- [Streaming Issues](streaming-issues.md) - SSE streaming, agent response issues
+- [SLS Logging Issues](sls-logging-issues.md) - Logs not appearing in Alibaba Cloud SLS
+
+**📋 Standard Priority**
 - [Data Validation](data-validation-issues.md) - Pydantic validation errors, data format mismatches
-- [Deployment Issues](deployment-issues.md) - Pod crashes, image pulls, Kubernetes problems, service selectors
-- [External Secrets Sync](external-secrets-sync.md) - Secrets not updating from Azure Key Vault, force-sync procedures
-- [MongoDB Cosmos DB](mongodb-cosmos-db.md) - Throughput modes, indexes, unique constraints with NULL values
-- [SLS Logging Issues](sls-logging-issues.md) - Application logs not appearing in Alibaba Cloud SLS, loongcollector troubleshooting
-- [Git History Rewrite](git-history-rewrite.md) - Team awareness for git history rewrites, recovery steps
-- [Technical Analysis Limitations](technical-analysis-limitations.md) - Intraday analysis not available, insufficient data errors
+- [MongoDB Cosmos DB](mongodb-cosmos-db.md) - Throughput modes, indexes, unique constraints
+- [Git History Rewrite](git-history-rewrite.md) - Team awareness for git history rewrites
+- [Technical Analysis Limitations](technical-analysis-limitations.md) - Intraday analysis not available
 - [Transaction Reconciliation Fix](transaction-reconciliation-datetime-fix.md) - Datetime deprecation fix
+- [Frontend Issues](frontend-issues.md) - React, TypeScript, build problems
+- [Kubernetes Issues](kubernetes-issues.md) - K8s-specific debugging
+- [Symbol Injection Race Condition](symbol-injection-race-condition.md) - Chat symbol context issues
+- [Slow ACR to ACK Image Pull](slow-acr-to-ack-image-pull.md) - Cross-region image pulls
 
 ### Bug Reports
 - [Known Bugs](known-bugs.md) - Current open issues and workarounds

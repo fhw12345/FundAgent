@@ -17,7 +17,15 @@
 - **Secrets**: `langfuse-secrets` (infra) + `backend-secrets` (API keys)
 - **Details**: [docs/features/langfuse-observability.md](docs/features/langfuse-observability.md)
 
-**Portfolio Analysis CronJob** (2025-11-27 - Deployed): Migrated from dedicated pod (1.14GB image) to HTTP trigger pattern (5MB curl image).
+**Market Insights Phase 2** (2025-12-28 - Deployed): Trend visualization with daily snapshots.
+- **Features**: Sparklines, expanded trend charts, composite score tracking
+- **CronJob**: `insights-snapshot-trigger` runs at 14:30 UTC daily
+- **Storage**: MongoDB `insight_snapshots` + Redis cache (24hr TTL)
+- **Management**: See [CronJob Management](docs/deployment/workflow.md#cronjob-management)
+- **Details**: [docs/features/market-insights-trend-visualization.md](docs/features/market-insights-trend-visualization.md)
+
+**Portfolio Analysis CronJob** (2025-11-27 - Suspended): Migrated from dedicated pod (1.14GB image) to HTTP trigger pattern (5MB curl image).
+- **Status**: ❌ Suspended in production (set `suspend: true` in YAML)
 - **Old**: CronJob → Dedicated Pod → Python script → Direct DB access
 - **New**: CronJob → curl (5MB) → Backend API → Background Task
 - **Schedule**: `30 14 * * *` (9:30 AM ET / US market open)
