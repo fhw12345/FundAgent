@@ -17,7 +17,8 @@
 - **Secrets**: `langfuse-secrets` (infra) + `backend-secrets` (API keys)
 - **Details**: [docs/features/langfuse-observability.md](docs/features/langfuse-observability.md)
 
-**Market Insights Phase 2** (2025-12-28 - Deployed): Trend visualization with daily snapshots.
+**Market Insights v0.9.0** (2025-12-30 - Deployed): 7 metrics with Options PCR and FRED Liquidity.
+- **New Metrics**: Options Put/Call Ratio (HISTORICAL_OPTIONS), Market Liquidity (FRED API)
 - **Features**: Sparklines, expanded trend charts, composite score tracking
 - **CronJob**: `insights-snapshot-trigger` runs at 14:30 UTC daily
 - **Storage**: MongoDB `insight_snapshots` + Redis cache (24hr TTL)

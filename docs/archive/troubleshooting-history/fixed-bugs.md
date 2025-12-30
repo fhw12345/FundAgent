@@ -1129,3 +1129,86 @@ logging.getLogger("opentelemetry.exporter.otlp.proto.http.trace_exporter").setLe
 **Version**: Backend v0.5.4
 
 **Documentation**: See [langfuse-observability.md](../features/langfuse-observability.md) for comprehensive observability troubleshooting guide
+
+---
+
+## Stock Split Creates Broken Chart/Fibonacci Data - Fixed 2025-12-30
+
+**Problem**: Stocks with historical splits (AVGO, NVDA, AAPL, TSLA, GOOG) showed massive price spikes in charts and absurd Fibonacci retracement levels
+
+**Symptoms**:
+- Charts show 10x price spikes around split dates (e.g., AVGO jumps from ~$170 to ~$2200 in July 2024)
+- Fibonacci analysis produces absurd levels (38.2% retracement at $771 instead of ~$218)
+- Swing high/low values are orders of magnitude different from current price
+- Analysis text mentions "异常偏高" (abnormally high values)
+
+**Root Cause**: Alpha Vantage `TIME_SERIES_DAILY_ADJUSTED` returns mixed data:
+- **Fields 1-4** (Open, High, Low, Close): RAW/unadjusted prices
+- **Field 5** (Adjusted Close): Split-adjusted price
+
+Previous code only adjusted Close, creating "frankendata":
+```python
+# BEFORE (BUG): Pre-split row had mixed data
+# AVGO Jul 12, 2024: Open=$1711, High=$1725, Low=$1691, Close=$167.57 ← 10x mismatch!
+
+"Open": float(values["1. open"]),      # RAW (~$1700 pre-split)
+"High": float(values["2. high"]),      # RAW (~$1700 pre-split)
+"Low": float(values["3. low"]),        # RAW (~$1700 pre-split)
+"Close": float(values["5. adjusted close"]),  # ADJUSTED (~$170)
+```
+
+**Solution**: Calculate adjustment factor and apply to ALL OHLC values
+
+`backend/src/services/market_data/bars_basic.py`:
+```python
+# AFTER (FIXED): All prices consistently adjusted
+raw_close = float(values["4. close"])
+adjusted_close = float(values["5. adjusted close"])
+
+# For a 10:1 split: raw=1700, adjusted=170, factor=0.1
+adjustment_factor = adjusted_close / raw_close if raw_close != 0 else 1.0
+
+"Open": float(values["1. open"]) * adjustment_factor,
+"High": float(values["2. high"]) * adjustment_factor,
+"Low": float(values["3. low"]) * adjustment_factor,
+"Close": adjusted_close,
+```
+
+Also switched weekly/monthly endpoints to adjusted versions:
+- `TIME_SERIES_WEEKLY` → `TIME_SERIES_WEEKLY_ADJUSTED`
+- `TIME_SERIES_MONTHLY` → `TIME_SERIES_MONTHLY_ADJUSTED`
+
+**Files Changed**:
+- `backend/src/services/market_data/bars_basic.py`
+  - `get_daily_bars()`: Added adjustment factor calculation
+  - `get_weekly_bars()`: Switched to adjusted endpoint + factor
+  - `get_monthly_bars()`: Switched to adjusted endpoint + factor
+
+**Verification**:
+```bash
+# Test AVGO Fibonacci analysis - should show reasonable prices
+curl -X POST "http://localhost:8000/api/analysis/fibonacci" \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "AVGO", "timeframe": "1d", "start_date": "2024-01-01", "end_date": "2024-12-30"}'
+
+# Expected (FIXED):
+# - Swing High: ~$250 (not $1700+)
+# - Swing Low: ~$170
+# - Fib 38.2%: ~$218 (not $771)
+```
+
+**Lesson**:
+- Alpha Vantage only adjusts Close (field 5), not OHLC (fields 1-4) - must calculate and apply adjustment factor
+- Always test with stocks that have recent splits before deploying price-related features
+- Add validation that swing high/low are within reasonable range of current price
+
+**Affected Stocks**:
+- **AVGO**: 10:1 split on July 15, 2024
+- **NVDA**: 10:1 split on June 10, 2024
+- **AAPL**: 4:1 split on August 28, 2020
+- **TSLA**: 5:1 split Aug 2020; 3:1 split Aug 2022
+- **GOOG/GOOGL**: 20:1 split on July 18, 2022
+
+**Version**: Backend v0.8.10
+
+**Documentation**: See [data-validation-issues.md](../../troubleshooting/data-validation-issues.md#issue-stock-split-creates-broken-chartfibonacci-data---fixed-v0810) for detailed troubleshooting guide

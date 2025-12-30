@@ -1,8 +1,8 @@
 # Market Insights Trend Visualization
 
 **Status**: Deployed (Phase 2 Complete)
-**Version**: Backend v0.8.9, Frontend v0.11.4
-**Last Updated**: 2025-12-28
+**Version**: Backend v0.9.0, Frontend v0.11.4
+**Last Updated**: 2025-12-30
 
 ## Overview
 

@@ -208,23 +208,28 @@ interface MetricExplanation {
 
 ### Story 2: Backend - AI Sector Risk Implementation
 
-**Goal**: Implement all 6 metrics for the first category
+**Goal**: Implement all 7 metrics for the first category
 
 **Deliverables**:
 - Add missing Alpha Vantage endpoints:
   - `TREASURY_YIELD` (10Y, 2Y) in `market_data/macro.py`
   - `IPO_CALENDAR` (CSV parsing) in `market_data/macro.py`
+  - `HISTORICAL_OPTIONS` in `market_data/options.py` (v0.9.0)
+- Add FRED API integration:
+  - `FREDService` for SOFR, EFFR, RRP Balance data (v0.9.0)
 - Implement calculation logic:
   - Z-score calculation with 200 SMA
   - Sentiment normalization
   - Intraday volume divergence detection
   - IPO count with date filtering
   - Yield spread and slope calculations
+  - Options Put/Call Ratio (v0.9.0)
+  - Market Liquidity from FRED (v0.9.0)
 - Explanation templates for each metric
 - Rate limiter integration (queue for free tier)
 
 **Acceptance Criteria**:
-- [ ] All 6 metrics return valid 0-100 scores
+- [x] All 7 metrics return valid 0-100 scores (v0.9.0)
 - [ ] Each metric has complete explanation object
 - [ ] Rate limiting prevents API quota exhaustion
 - [ ] Graceful degradation on partial API failure
@@ -276,11 +281,11 @@ interface MetricExplanation {
 - Responsive layout (mobile: stack, desktop: grid)
 
 **Acceptance Criteria**:
-- [ ] Page loads at `/insights` route
-- [ ] Category tabs switch content
-- [ ] All 6 metrics display with gauges
-- [ ] Explanations visible by default (not hidden)
-- [ ] Mobile responsive layout works
+- [x] Page loads at `/insights` route
+- [x] Category tabs switch content
+- [x] All 7 metrics display with gauges (v0.9.0)
+- [x] Explanations visible by default (not hidden)
+- [x] Mobile responsive layout works
 
 ---
 
@@ -396,7 +401,7 @@ grep -r "AlphaVantageMarketDataService" backend/src/ | grep -v "deprecated"
 
 **Deliverables**:
 - K8s CronJob manifest: `.pipeline/k8s/base/insights-cron.yaml`
-- Parallel calculation with `asyncio.gather()` for all 6 metrics
+- Parallel calculation with `asyncio.gather()` for all 7 metrics
 - Pre-fetch shared data pattern (fetch once, use many)
 - MongoDB snapshot persistence to `insight_snapshots` collection
 - Redis cache update with 24-hour TTL
@@ -407,7 +412,8 @@ PHASE 1: Pre-fetch all shared data (parallel)
 ├── Daily bars (AI symbols)
 ├── Intraday bars (top 3 AI symbols)
 ├── Treasury 10Y
-├── Treasury 2Y          ← SHARED by 2 metrics
+├── Treasury 2Y          ← Used by fed_expectations
+├── FRED Data (RRP, SOFR, EFFR) ← Used by market_liquidity
 ├── News sentiment
 └── IPO calendar
 
@@ -416,7 +422,7 @@ PHASE 2: Calculate metrics (parallel with shared data)
 ├── news_sentiment(shared_data)
 ├── smart_money_flow(shared_data)
 ├── ipo_heat(shared_data)
-├── yield_curve(shared_data)      ← Uses shared Treasury 2Y
+├── market_liquidity(fred_data)   ← Uses FRED RRP, SOFR, EFFR
 └── fed_expectations(shared_data) ← Uses shared Treasury 2Y
 
 PHASE 3: Batch persist
@@ -425,12 +431,13 @@ PHASE 3: Batch persist
 ```
 
 **Acceptance Criteria**:
-- [ ] Cron runs daily at 9:30 AM ET (14:30 UTC)
-- [ ] All 6 metrics calculated in parallel (< 10 seconds total vs 30+ sequential)
-- [ ] Treasury 2Y fetched ONCE (shared by yield_curve + fed_expectations)
-- [ ] Snapshot saved to `insight_snapshots` collection with date index
-- [ ] Redis key `insights:ai_sector_risk:latest` updated with 24hr TTL
-- [ ] Graceful handling of partial API failures (return_exceptions=True)
+- [x] Cron runs daily at 9:30 AM ET (14:30 UTC)
+- [x] All 7 metrics calculated in parallel (< 10 seconds total vs 30+ sequential)
+- [x] Treasury 2Y fetched ONCE (used by fed_expectations)
+- [x] FRED data fetched ONCE (used by market_liquidity)
+- [x] Snapshot saved to `insight_snapshots` collection with date index
+- [x] Redis key `insights:ai_sector_risk:latest` updated with 24hr TTL
+- [x] Graceful handling of partial API failures (return_exceptions=True)
 
 **Verification**:
 ```bash
@@ -478,7 +485,7 @@ MONGO=$(mongosh --eval "db.insight_snapshots.find().sort({date:-1}).limit(1)" | 
     "news_sentiment": [...],
     "smart_money_flow": [...],
     "ipo_heat": [...],
-    "yield_curve": [...],
+    "market_liquidity": [...],
     "fed_expectations": [...]
   }
 }
@@ -761,7 +768,7 @@ These categories can be added by implementing the `InsightCategory` base class:
     "news_sentiment": { "score": 78, "status": "elevated" },
     "smart_money_flow": { "score": 52, "status": "normal" },
     "ipo_heat": { "score": 35, "status": "normal" },
-    "yield_curve": { "score": 70, "status": "elevated" },
+    "market_liquidity": { "score": 45, "status": "normal" },
     "fed_expectations": { "score": 62, "status": "elevated" }
   },
   "created_at": ISODate
@@ -865,7 +872,7 @@ Story 7 (DML) ──┬──► Story 8 (Cron) ──┬──► Story 9 (Tren
 ```
 
 The epic delivers a **Market Insights Platform** with:
-- AI Sector Risk category with 6 metrics
+- AI Sector Risk category with 7 metrics (v0.9.0)
 - 30-day trend visualization with swipe/scale UX
 - Data Manager Layer for unified, high-performance data access
 - AI tools with < 100ms response time from cache
