@@ -145,17 +145,27 @@ class BarsBasicMixin(AlphaVantageBase):
 
             # Convert to DataFrame
             # DAILY_ADJUSTED provides: adjusted close (field 5), dividend (7), split coeff (8)
+            # IMPORTANT: We must adjust ALL OHLC values using the adjustment factor,
+            # not just Close. Otherwise, stock splits create frankendata where
+            # pre-split OHLC (~$1700) is mixed with adjusted Close (~$170).
             df_data = []
             for date, values in time_series.items():
+                raw_close = float(values["4. close"])
+                adjusted_close = float(values["5. adjusted close"])
+
+                # Calculate adjustment factor (handles both splits and dividends)
+                # For a 10:1 split: raw_close=1700, adjusted_close=170, factor=0.1
+                adjustment_factor = (
+                    adjusted_close / raw_close if raw_close != 0 else 1.0
+                )
+
                 df_data.append(
                     {
                         "date": pd.to_datetime(date),
-                        "Open": float(values["1. open"]),
-                        "High": float(values["2. high"]),
-                        "Low": float(values["3. low"]),
-                        "Close": float(
-                            values["5. adjusted close"]
-                        ),  # Use adjusted close
+                        "Open": float(values["1. open"]) * adjustment_factor,
+                        "High": float(values["2. high"]) * adjustment_factor,
+                        "Low": float(values["3. low"]) * adjustment_factor,
+                        "Close": adjusted_close,
                         "Volume": int(
                             values["6. volume"]
                         ),  # Volume is field 6 in DAILY_ADJUSTED
@@ -188,20 +198,20 @@ class BarsBasicMixin(AlphaVantageBase):
         outputsize: str = "compact",
     ) -> pd.DataFrame:
         """
-        Get weekly bars using TIME_SERIES_WEEKLY.
+        Get weekly bars using TIME_SERIES_WEEKLY_ADJUSTED (split-adjusted prices).
 
         Args:
             symbol: Stock symbol
             outputsize: compact (latest 100 weeks) or full (20+ years)
 
         Returns:
-            DataFrame with Open, High, Low, Close, Volume columns
+            DataFrame with Open, High, Low, Close, Volume columns (split-adjusted)
         """
         try:
             response = await self.client.get(
                 self.base_url,
                 params={
-                    "function": "TIME_SERIES_WEEKLY",
+                    "function": "TIME_SERIES_WEEKLY_ADJUSTED",
                     "symbol": symbol,
                     "apikey": self.api_key,
                 },
@@ -215,22 +225,31 @@ class BarsBasicMixin(AlphaVantageBase):
 
             data = response.json()
 
-            if "Weekly Time Series" not in data:
+            if "Weekly Adjusted Time Series" not in data:
                 raise ValueError(f"No weekly data for symbol: {symbol}")
 
-            time_series = data["Weekly Time Series"]
+            time_series = data["Weekly Adjusted Time Series"]
 
-            # Convert to DataFrame
+            # Convert to DataFrame with split adjustment
+            # Same logic as daily: adjust OHLC using adjustment factor
             df_data = []
             for date, values in time_series.items():
+                raw_close = float(values["4. close"])
+                adjusted_close = float(values["5. adjusted close"])
+
+                # Calculate adjustment factor (handles both splits and dividends)
+                adjustment_factor = (
+                    adjusted_close / raw_close if raw_close != 0 else 1.0
+                )
+
                 df_data.append(
                     {
                         "date": pd.to_datetime(date),
-                        "Open": float(values["1. open"]),
-                        "High": float(values["2. high"]),
-                        "Low": float(values["3. low"]),
-                        "Close": float(values["4. close"]),
-                        "Volume": int(values["5. volume"]),
+                        "Open": float(values["1. open"]) * adjustment_factor,
+                        "High": float(values["2. high"]) * adjustment_factor,
+                        "Low": float(values["3. low"]) * adjustment_factor,
+                        "Close": adjusted_close,
+                        "Volume": int(values["6. volume"]),
                     }
                 )
 
@@ -239,7 +258,7 @@ class BarsBasicMixin(AlphaVantageBase):
             df.sort_index(inplace=True)
 
             logger.info(
-                "Weekly bars fetched",
+                "Weekly bars fetched (split-adjusted)",
                 symbol=symbol,
                 bars_count=len(df),
             )
@@ -260,20 +279,20 @@ class BarsBasicMixin(AlphaVantageBase):
         outputsize: str = "compact",
     ) -> pd.DataFrame:
         """
-        Get monthly bars using TIME_SERIES_MONTHLY.
+        Get monthly bars using TIME_SERIES_MONTHLY_ADJUSTED (split-adjusted prices).
 
         Args:
             symbol: Stock symbol
             outputsize: compact (latest 100 months) or full (20+ years)
 
         Returns:
-            DataFrame with Open, High, Low, Close, Volume columns
+            DataFrame with Open, High, Low, Close, Volume columns (split-adjusted)
         """
         try:
             response = await self.client.get(
                 self.base_url,
                 params={
-                    "function": "TIME_SERIES_MONTHLY",
+                    "function": "TIME_SERIES_MONTHLY_ADJUSTED",
                     "symbol": symbol,
                     "apikey": self.api_key,
                 },
@@ -287,22 +306,31 @@ class BarsBasicMixin(AlphaVantageBase):
 
             data = response.json()
 
-            if "Monthly Time Series" not in data:
+            if "Monthly Adjusted Time Series" not in data:
                 raise ValueError(f"No monthly data for symbol: {symbol}")
 
-            time_series = data["Monthly Time Series"]
+            time_series = data["Monthly Adjusted Time Series"]
 
-            # Convert to DataFrame
+            # Convert to DataFrame with split adjustment
+            # Same logic as daily: adjust OHLC using adjustment factor
             df_data = []
             for date, values in time_series.items():
+                raw_close = float(values["4. close"])
+                adjusted_close = float(values["5. adjusted close"])
+
+                # Calculate adjustment factor (handles both splits and dividends)
+                adjustment_factor = (
+                    adjusted_close / raw_close if raw_close != 0 else 1.0
+                )
+
                 df_data.append(
                     {
                         "date": pd.to_datetime(date),
-                        "Open": float(values["1. open"]),
-                        "High": float(values["2. high"]),
-                        "Low": float(values["3. low"]),
-                        "Close": float(values["4. close"]),
-                        "Volume": int(values["5. volume"]),
+                        "Open": float(values["1. open"]) * adjustment_factor,
+                        "High": float(values["2. high"]) * adjustment_factor,
+                        "Low": float(values["3. low"]) * adjustment_factor,
+                        "Close": adjusted_close,
+                        "Volume": int(values["6. volume"]),
                     }
                 )
 
@@ -311,7 +339,7 @@ class BarsBasicMixin(AlphaVantageBase):
             df.sort_index(inplace=True)
 
             logger.info(
-                "Monthly bars fetched",
+                "Monthly bars fetched (split-adjusted)",
                 symbol=symbol,
                 bars_count=len(df),
             )

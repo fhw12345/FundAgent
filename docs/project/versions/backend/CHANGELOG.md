@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.10] - 2025-12-30
+
+### Added
+- fix: Apply split adjustment to all OHLC prices for daily/weekly/monthly bars
+
+
+## [0.8.10] - 2025-12-29
+
+### Added
+- fix(insights): increase cache TTL from 30min to 24hrs for instant page loads
+
+
 ## [0.8.9] - 2025-12-23
 
 ### Added
