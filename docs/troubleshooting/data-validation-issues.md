@@ -342,3 +342,101 @@ const action = userInput.toLowerCase() as "buy" | "sell" | "hold"
 - Use validators to accept multiple formats
 - Document case requirements in API specs
 - Add frontend validation before API calls
+
+---
+
+## Issue: Stock Split Creates Broken Chart/Fibonacci Data - Fixed v0.8.10
+
+### Symptoms
+- Charts show massive price spikes (e.g., AVGO jumps from ~$170 to ~$2200 around July 2024)
+- Fibonacci analysis produces absurd levels (e.g., 38.2% retracement at $771 instead of $218)
+- Swing high/low values are orders of magnitude different from current price
+- Analysis text mentions "异常偏高" (abnormally high values)
+
+### Affected Stocks
+Any stock with historical splits:
+- **AVGO**: 10:1 split on July 15, 2024
+- **AAPL**: 4:1 split on August 28, 2020
+- **TSLA**: 5:1 split on August 31, 2020; 3:1 split on August 25, 2022
+- **NVDA**: 10:1 split on June 10, 2024
+- **GOOG/GOOGL**: 20:1 split on July 18, 2022
+
+### Root Cause
+Alpha Vantage `TIME_SERIES_DAILY_ADJUSTED` endpoint returns:
+- **Fields 1-4** (Open, High, Low, Close): **RAW/unadjusted** prices
+- **Field 5** (Adjusted Close): **Split-adjusted** price
+
+Previous code used raw OHLC + adjusted Close, creating "frankendata":
+```python
+# BEFORE (BUG): Pre-split row had mixed data
+# Open=1711, High=1725, Low=1691, Close=167.57  ← 10x mismatch!
+
+"Open": float(values["1. open"]),      # RAW (~$1700 pre-split)
+"High": float(values["2. high"]),      # RAW (~$1700 pre-split)
+"Low": float(values["3. low"]),        # RAW (~$1700 pre-split)
+"Close": float(values["5. adjusted close"]),  # ADJUSTED (~$170)
+```
+
+This caused:
+1. Charts to display the raw High/Low, showing massive spikes
+2. Fibonacci trend detector to find swing highs of ~$1700
+3. Retracement levels calculated from wrong price range
+
+### Solution (v0.8.10)
+Calculate adjustment factor and apply to ALL OHLC values:
+
+```python
+# AFTER (FIXED): All prices consistently adjusted
+raw_close = float(values["4. close"])
+adjusted_close = float(values["5. adjusted close"])
+
+# For a 10:1 split: raw=1700, adjusted=170, factor=0.1
+adjustment_factor = adjusted_close / raw_close if raw_close != 0 else 1.0
+
+"Open": float(values["1. open"]) * adjustment_factor,
+"High": float(values["2. high"]) * adjustment_factor,
+"Low": float(values["3. low"]) * adjustment_factor,
+"Close": adjusted_close,
+```
+
+Also switched weekly/monthly endpoints to adjusted versions:
+- `TIME_SERIES_WEEKLY` → `TIME_SERIES_WEEKLY_ADJUSTED`
+- `TIME_SERIES_MONTHLY` → `TIME_SERIES_MONTHLY_ADJUSTED`
+
+### Files Changed
+- `backend/src/services/market_data/bars_basic.py`
+  - `get_daily_bars()`: Added adjustment factor calculation
+  - `get_weekly_bars()`: Switched to adjusted endpoint + factor
+  - `get_monthly_bars()`: Switched to adjusted endpoint + factor
+
+### Verification
+```bash
+# Test AVGO Fibonacci analysis - should show reasonable prices
+curl -X POST "http://localhost:8000/api/analysis/fibonacci" \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "AVGO", "timeframe": "1d", "start_date": "2024-01-01", "end_date": "2024-12-30"}'
+
+# Expected (FIXED):
+# - Swing High: ~$250 (not $1700+)
+# - Swing Low: ~$170
+# - Fib 38.2%: ~$218 (not $771)
+
+# Check raw daily data
+docker compose exec backend python3 -c "
+import asyncio
+from src.services.alphavantage_market_data import AlphaVantageMarketDataService
+from src.core.config import Settings
+
+async def test():
+    service = AlphaVantageMarketDataService(Settings())
+    data = await service.get_daily_bars('AVGO', outputsize='full')
+    # Pre-split Jul 12 should show ~$170, not ~$1700
+    print(data.loc['2024-07-12'])
+asyncio.run(test())
+"
+```
+
+### Prevention
+- When using Alpha Vantage (or any financial data API), verify that ALL price fields use consistent adjustment
+- Test with stocks that have recent splits before deploying price-related features
+- Add validation that swing high/low are within reasonable range of current price

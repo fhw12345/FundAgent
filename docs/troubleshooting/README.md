@@ -17,7 +17,7 @@ This directory contains documentation for bugs, fixes, and common issues encount
 - [SLS Logging Issues](sls-logging-issues.md) - Logs not appearing in Alibaba Cloud SLS
 
 **📋 Standard Priority**
-- [Data Validation](data-validation-issues.md) - Pydantic validation errors, data format mismatches
+- [Data Validation](data-validation-issues.md) - Pydantic validation errors, data format mismatches, stock split price adjustments
 - [MongoDB Cosmos DB](mongodb-cosmos-db.md) - Throughput modes, indexes, unique constraints
 - [Git History Rewrite](git-history-rewrite.md) - Team awareness for git history rewrites
 - [Technical Analysis Limitations](technical-analysis-limitations.md) - Intraday analysis not available
