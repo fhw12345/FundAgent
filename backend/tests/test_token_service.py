@@ -10,20 +10,17 @@ Tests JWT access/refresh token management including:
 """
 
 import hashlib
-from datetime import datetime, timedelta
+from datetime import timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from jose import jwt
 
+# ===== Fixtures =====
+from src.core.utils.date_utils import utcfromtimestamp, utcnow
 from src.models.refresh_token import RefreshToken
 from src.models.user import User
 from src.services.token_service import TokenService
-
-# ===== Fixtures =====
-
-
-from src.core.utils.date_utils import utcnow, utcfromtimestamp
 
 
 @pytest.fixture

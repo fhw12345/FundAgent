@@ -2,9 +2,9 @@
 
 > **Epic Type**: Brownfield Enhancement
 > **Created**: 2025-12-20
-> **Updated**: 2025-12-27
+> **Updated**: 2025-12-30
 > **Status**: In Progress
-> **Estimated Stories**: 11 (6 original + 5 trend/DML enhancement)
+> **Estimated Stories**: 12 (6 original + 5 trend/DML + 1 Put/Call Ratio)
 
 ---
 
@@ -162,8 +162,9 @@ interface MetricExplanation {
 | 2 | `news_sentiment` | News Sentiment | NEWS_SENTIMENT | Normalized avg sentiment (-0.35 to +0.35 → 0-100) | 20% |
 | 3 | `smart_money_flow` | Smart Money Flow | TIME_SERIES_INTRADAY | First hour vs last hour volume divergence | 20% |
 | 4 | `ipo_heat` | IPO Heat | IPO_CALENDAR | Count of IPOs in next 90 days | 10% |
-| 5 | `yield_curve` | Yield Curve | TREASURY_YIELD | 10Y-2Y spread (loose money indicator) | 15% |
-| 6 | `fed_expectations` | Fed Expectations | TREASURY_YIELD | 2Y yield slope over 20 days | 15% |
+| 5 | `market_liquidity` | Market Liquidity | FRED API | RRP balance + SOFR-EFFR spread (actual liquidity) | 13% |
+| 6 | `fed_expectations` | Fed Expectations | TREASURY_YIELD | 2Y yield slope over 20 days | 12% |
+| 7 | `options_put_call_ratio` | Put/Call Ratio | HISTORICAL_OPTIONS | Aggregate PCR across AI basket (Premium) | 15% |
 
 ### Interpretation Zones
 
@@ -374,7 +375,8 @@ backend/src/services/data_manager/
 - [ ] Existing chart APIs migrated to use DML
 - [ ] `AlphaVantageMarketDataService` marked deprecated
 - [ ] No direct Alpha Vantage calls outside DML
-- [ ] Treasury 2Y data shared between yield_curve and fed_expectations metrics
+- [ ] Treasury 2Y data used by fed_expectations metric
+- [ ] FRED data (RRP, SOFR, EFFR) used by market_liquidity metric
 
 **Verification**:
 ```bash
@@ -590,6 +592,97 @@ curl -X POST /api/chat -d '{"message": "How has AI sector risk changed this mont
 
 ---
 
+### Story 12: Put/Call Ratio Metric (Options Sentiment) 📊
+
+> **Added**: 2025-12-30
+> **Reference**: [Story 2.6](../stories/2.6.story.md)
+
+**Goal**: Add 7th metric to AI Sector Risk using Alpha Vantage Premium Options API
+
+**Deliverables**:
+- `get_historical_options()` method in Alpha Vantage service
+- `_calculate_options_put_call_ratio()` in AISectorRiskCategory
+- Weight rebalancing for 7-metric composite score
+- Graceful degradation for non-Premium API keys
+
+**Financial Rationale**:
+- Put/Call Ratio (PCR) is a **contrarian sentiment indicator**
+- Low PCR (< 0.5) = extreme bullishness = bubble risk
+- High PCR (> 1.0) = fear/hedging = potential bottom
+- Complements existing metrics with options market sentiment
+
+**Acceptance Criteria**:
+- [ ] `options_put_call_ratio` metric added as 7th indicator
+- [ ] Uses Alpha Vantage HISTORICAL_OPTIONS (Premium) endpoint
+- [ ] Calculates aggregate PCR across top 5 AI basket symbols
+- [ ] Score inverted: Low PCR → High Risk Score (contrarian)
+- [ ] Graceful placeholder if Premium API unavailable
+- [ ] Weights rebalanced to 100% across 7 metrics
+- [ ] Unit tests with mocked API responses
+
+**Verification**:
+```bash
+# Check metric in API response
+curl -s https://klinecubic.cn/api/insights/ai_sector_risk | jq '.metrics[] | select(.id == "options_put_call_ratio")'
+
+# Verify 7 metrics returned
+curl -s https://klinecubic.cn/api/insights/ai_sector_risk | jq '.metrics | length'
+# Expected: 7
+```
+
+---
+
+### Story 13: Replace Yield Curve with Market Liquidity 💧
+
+> **Added**: 2025-12-30
+> **Reference**: [Story 2.7](../stories/2.7.story.md)
+
+**Goal**: Replace `yield_curve` (10Y-2Y spread) with true `market_liquidity` metric using FRED API
+
+**Rationale**:
+- `yield_curve` measures term structure/economic expectations, NOT actual liquidity
+- Professional liquidity assessment uses: RRP balance, SOFR-EFFR spread
+- Core theory: "当资金充裕 → 容易出现泡沫; 当资金不充裕 → 不容易出现泡沫"
+
+**Data Sources (FRED API)**:
+| Series | Data | Purpose |
+|--------|------|---------|
+| `RRPONTSYD` | Fed Reverse Repo Balance | System liquidity level |
+| `SOFR` | Secured Overnight Financing Rate | Overnight funding cost |
+| `EFFR` | Effective Federal Funds Rate | Overnight funding benchmark |
+
+**Calculation**:
+```
+market_liquidity = (
+    RRP_Balance_Score × 0.50 +      # High RRP = abundant liquidity = bubble fuel
+    SOFR_EFFR_Spread_Score × 0.30 + # Low spread = no stress = bubble can form
+    RRP_20d_Trend_Score × 0.20      # Rising RRP = increasing liquidity
+)
+```
+
+**Acceptance Criteria**:
+- [x] FRED API service integrated (`backend/src/services/market_data/fred.py`)
+- [x] `yield_curve` metric removed from AI Sector Risk
+- [x] `market_liquidity` metric added with 13% weight
+- [x] High liquidity → High risk score (bubble CAN form)
+- [ ] FRED API key added to K8s secrets *(deployment pending)*
+- [x] Graceful fallback if FRED unavailable
+- [x] Unit tests with mocked FRED responses
+
+**Status**: ✅ Implementation Complete (2025-12-30) - Pending deployment
+
+**Verification**:
+```bash
+# Check new metric
+curl -s https://klinecubic.cn/api/insights/ai_sector_risk | jq '.metrics[] | select(.id == "market_liquidity")'
+
+# Verify yield_curve removed
+curl -s https://klinecubic.cn/api/insights/ai_sector_risk | jq '.metrics[] | select(.id == "yield_curve")'
+# Expected: null/empty
+```
+
+---
+
 ## Future Categories (Backlog)
 
 These categories can be added by implementing the `InsightCategory` base class:
@@ -599,7 +692,7 @@ These categories can be added by implementing the `InsightCategory` base class:
 | **Sector Rotation** | Tech/Value ratio, Cyclical/Defensive, Growth/Value | Medium |
 | **Macro Environment** | Inflation trend, GDP growth, Dollar index | Medium |
 | **Market Breadth** | Advance/Decline, New Highs/Lows, McClellan | Low |
-| **Volatility Regime** | VIX term structure, Put/Call ratio, SKEW | Low |
+| **Volatility Regime** | VIX term structure, SKEW index | Low |
 | **Credit Conditions** | HY spreads, TED spread, Bank lending | Low |
 
 ---

@@ -79,6 +79,7 @@ class Settings(BaseSettings):
 
     # External APIs - Market Data & Trading
     alpha_vantage_api_key: str = ""  # Alpha Vantage API key (premium: 75 calls/min)
+    fred_api_key: str = ""  # FRED API key (free, for liquidity metrics)
     alpaca_api_key: str = ""  # Alpaca Paper Trading API key
     alpaca_secret_key: str = ""  # Alpaca Paper Trading secret key
     alpaca_base_url: str = "https://paper-api.alpaca.markets"  # Paper trading endpoint
@@ -116,7 +117,9 @@ class Settings(BaseSettings):
     cache_ttl_news: int = 3600  # News/sentiment (1 hour)
     cache_ttl_historical: int = 7200  # Historical data (2 hours)
     cache_ttl_fundamentals: int = 86400  # Company fundamentals (24 hours)
-    cache_ttl_insights: int = 1800  # AI insights (30 min)
+    cache_ttl_insights: int = (
+        86400  # AI insights (24 hours - synced with daily CronJob)
+    )
 
     # Rate limiting
     rate_limit_requests: int = 100

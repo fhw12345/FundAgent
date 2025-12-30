@@ -112,12 +112,12 @@ class TestAISectorRiskCategory:
         assert metadata.id == "ai_sector_risk"
         assert metadata.name == "AI Sector Risk"
         assert metadata.icon == "🎯"
-        assert metadata.metric_count == 6
+        assert metadata.metric_count == 7
 
     def test_get_metric_definitions(self, category: AISectorRiskCategory) -> None:
         """Test metric definitions."""
         definitions = category.get_metric_definitions()
-        assert len(definitions) == 6
+        assert len(definitions) == 7
 
         # Check all expected metrics exist
         metric_ids = {d["id"] for d in definitions}
@@ -125,8 +125,9 @@ class TestAISectorRiskCategory:
             "ai_price_anomaly",
             "news_sentiment",
             "smart_money_flow",
+            "options_put_call_ratio",
             "ipo_heat",
-            "yield_curve",
+            "market_liquidity",
             "fed_expectations",
         }
         assert metric_ids == expected_ids
@@ -142,7 +143,7 @@ class TestAISectorRiskCategory:
         """Test metric calculation returns valid metrics."""
         metrics = await category.calculate_metrics()
 
-        assert len(metrics) == 6
+        assert len(metrics) == 7
 
         for metric in metrics:
             # Check basic structure
@@ -160,7 +161,7 @@ class TestAISectorRiskCategory:
 
         assert data.id == "ai_sector_risk"
         assert data.name == "AI Sector Risk"
-        assert len(data.metrics) == 6
+        assert len(data.metrics) == 7
         assert data.composite is not None
         assert 0 <= data.composite.score <= 100
 
@@ -208,7 +209,7 @@ class TestInsightsCategoryRegistry:
         data = await registry.get_category_data("ai_sector_risk")
         assert data is not None
         assert data.id == "ai_sector_risk"
-        assert len(data.metrics) == 6
+        assert len(data.metrics) == 7
 
     @pytest.mark.asyncio
     async def test_get_category_data_not_found(

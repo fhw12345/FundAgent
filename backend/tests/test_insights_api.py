@@ -9,7 +9,7 @@ Tests cover:
 - Error handling for 404 cases
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI

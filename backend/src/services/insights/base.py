@@ -55,13 +55,14 @@ class InsightCategoryBase(ABC):
 
     # Default cache TTL for calculated metrics (uses settings.cache_ttl_insights)
     # This class attribute is kept for backward compatibility but settings takes precedence
-    CACHE_TTL_SECONDS: int = 1800
+    CACHE_TTL_SECONDS: int = 86400  # 24 hours - synced with daily CronJob
 
     def __init__(
         self,
         settings: Settings,
         redis_cache: RedisCache | None = None,
         market_service: Any | None = None,
+        fred_service: Any | None = None,
     ) -> None:
         """Initialize category with dependencies.
 
@@ -69,10 +70,12 @@ class InsightCategoryBase(ABC):
             settings: Application settings with API keys
             redis_cache: Optional Redis cache for caching results
             market_service: AlphaVantageMarketDataService for data fetching
+            fred_service: FREDService for liquidity metrics (SOFR, EFFR, RRP)
         """
         self.settings = settings
         self.redis_cache = redis_cache
         self.market_service = market_service
+        self.fred_service = fred_service
 
     @property
     def cache_key_prefix(self) -> str:

@@ -20,6 +20,7 @@ from ...core.config import Settings
 from ...database.mongodb import MongoDB
 from ...database.redis import RedisCache
 from ..data_manager import CacheKeys, DataManager
+from ..market_data import FREDService
 from .models import CompositeScore, InsightMetric
 from .registry import InsightsCategoryRegistry
 
@@ -78,9 +79,15 @@ class InsightsSnapshotService:
     def registry(self) -> InsightsCategoryRegistry:
         """Get or create insights registry."""
         if self._registry is None:
+            # Create FRED service if API key is available
+            fred_service = None
+            if self.settings.fred_api_key:
+                fred_service = FREDService(api_key=self.settings.fred_api_key)
+
             self._registry = InsightsCategoryRegistry(
                 settings=self.settings,
                 redis_cache=self.redis_cache,
+                fred_service=fred_service,
             )
         return self._registry
 

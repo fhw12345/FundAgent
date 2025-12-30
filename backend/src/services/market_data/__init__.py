@@ -1,13 +1,17 @@
 """
-Alpha Vantage market data service.
-Provides symbol search, quotes, and historical data using Alpha Vantage API.
+Market data services for financial data access.
 
-This module is organized into the following components:
+This module provides:
+- Alpha Vantage API integration for market data
+- FRED API integration for economic/liquidity indicators
+
+Components:
 - base: Initialization, HTTP client, and sanitization utilities
 - quotes: Stock quotes, symbol search, and price bars
 - fundamentals: Company data, financial statements, earnings
 - macro: Economic indicators and commodity prices
 - technical: Technical indicators (SMA, EMA, RSI, MACD, etc.)
+- fred: FRED API for SOFR, EFFR, RRP liquidity metrics
 """
 
 from datetime import datetime, time
@@ -18,8 +22,10 @@ import pandas as pd
 from .bars_basic import BarsBasicMixin
 from .bars_extended import BarsExtendedMixin
 from .base import AlphaVantageBase
+from .fred import FREDService
 from .fundamentals import FundamentalsMixin
 from .macro import MacroMixin
+from .options import OptionsMixin
 from .quotes import QuotesMixin
 from .technical import TechnicalMixin
 
@@ -136,6 +142,7 @@ class AlphaVantageMarketDataService(
     BarsExtendedMixin,
     FundamentalsMixin,
     MacroMixin,
+    OptionsMixin,
     TechnicalMixin,
     AlphaVantageBase,
 ):
@@ -194,6 +201,7 @@ class AlphaVantageMarketDataService(
 # Export all public APIs for backward compatibility
 __all__ = [
     "AlphaVantageMarketDataService",
+    "FREDService",
     "get_market_session",
     "validate_date_range",
 ]

@@ -9,6 +9,7 @@ Tests cover:
 
 import pytest
 
+from src.core.utils.date_utils import utcnow
 from src.models.feedback import (
     FeedbackImageUploadRequest,
     FeedbackImageUploadResponse,
@@ -16,9 +17,6 @@ from src.models.feedback import (
     FeedbackItemCreate,
     FeedbackItemInDB,
 )
-
-
-from src.core.utils.date_utils import utcnow
 
 
 class TestFeedbackImageModels:
@@ -72,7 +70,6 @@ class TestFeedbackImageModels:
 
     def test_feedback_response_model_includes_images(self):
         """Test that feedback response model includes images."""
-        from datetime import datetime
 
         item = FeedbackItem(
             item_id="feedback_abc123",
@@ -98,7 +95,6 @@ class TestFeedbackImageModels:
 
     def test_feedback_db_model_includes_images(self):
         """Test that database model includes images."""
-        from datetime import datetime
 
         item = FeedbackItemInDB(
             item_id="feedback_abc123",
@@ -120,7 +116,6 @@ class TestFeedbackImageModels:
 
     def test_feedback_db_model_default_empty_images(self):
         """Test that database model has empty images by default."""
-        from datetime import datetime
 
         item = FeedbackItemInDB(
             item_id="feedback_abc123",

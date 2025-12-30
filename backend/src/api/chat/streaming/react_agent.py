@@ -315,7 +315,9 @@ async def stream_with_react_agent(
                         first_tool_recorded = True
                         # Extract tool_name from SSE string if possible
                         tool_name = None
-                        if isinstance(tool_event, str) and tool_event.startswith("data: "):
+                        if isinstance(tool_event, str) and tool_event.startswith(
+                            "data: "
+                        ):
                             try:
                                 event_data = json.loads(tool_event[6:].strip())
                                 tool_name = event_data.get("tool_name")

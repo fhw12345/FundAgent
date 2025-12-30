@@ -64,6 +64,7 @@ from ..core.utils import extract_token_usage_from_messages
 from ..services.alphavantage_response_formatter import AlphaVantageResponseFormatter
 from ..services.insights import InsightsCategoryRegistry
 from ..services.insights.snapshot_service import InsightsSnapshotService
+from ..services.market_data import FREDService
 from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
@@ -105,8 +106,9 @@ class FinancialAnalysisReActAgent:
         market_service,  # AlphaVantageMarketDataService for market data
         tool_cache_wrapper: ToolCacheWrapper | None = None,
         redis_cache=None,  # RedisCache for insights caching
-        snapshot_service: InsightsSnapshotService
-        | None = None,  # Story 2.5: Cache-first insights
+        snapshot_service: (
+            InsightsSnapshotService | None
+        ) = None,  # Story 2.5: Cache-first insights
     ):
         """
         Initialize ReAct agent with SDK and MCP tools.
@@ -182,10 +184,16 @@ class FinancialAnalysisReActAgent:
 
         # Add Market Insights tools (category analysis, metrics)
         # Cache TTL: 30 minutes for full category data, 24 hours for AI basket symbols
+        # Create FRED service for liquidity metrics
+        fred_service = None
+        if settings.fred_api_key:
+            fred_service = FREDService(api_key=settings.fred_api_key)
+
         insights_registry = InsightsCategoryRegistry(
             settings=settings,
             redis_cache=self.redis_cache,  # Enable caching for 30min TTL
             market_service=market_service,
+            fred_service=fred_service,
         )
         # Story 2.5: Pass snapshot_service for cache-first reads and trend queries
         insights_tools = create_insights_tools(

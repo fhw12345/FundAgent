@@ -12,17 +12,13 @@ These tests ensure mathematical accuracy and prevent calculation errors.
 """
 
 from datetime import date
-from unittest.mock import Mock, patch
 
-import pandas as pd
 import pytest
 
 from src.core.analysis.fibonacci import (
     LevelCalculator,
 )
 from src.core.analysis.fibonacci.config import FibonacciConstants
-from src.core.analysis.stock_analyzer import StockAnalyzer
-
 
 # TestDividendYieldCalculation class removed - marked with:
 # @pytest.mark.skip(reason="Requires Alpha Vantage fundamentals implementation - yfinance deprecated")

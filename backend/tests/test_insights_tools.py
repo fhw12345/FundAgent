@@ -8,7 +8,7 @@ Tests cover:
 - Edge cases (empty registry, missing categories/metrics)
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -47,7 +47,7 @@ def sample_categories() -> list[CategoryMetadata]:
             icon="🎯",
             description="Measures bubble risk in AI sector",
             metric_count=6,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         ),
         CategoryMetadata(
             id="crypto_sentiment",
@@ -55,7 +55,7 @@ def sample_categories() -> list[CategoryMetadata]:
             icon="💎",
             description="Analyzes crypto market sentiment",
             metric_count=4,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         ),
     ]
 
@@ -83,7 +83,7 @@ def sample_category_data() -> InsightCategory:
                     actionable_insight="Consider reducing exposure",
                 ),
                 data_sources=["Alpha Vantage", "Yahoo Finance"],
-                last_updated=datetime.now(timezone.utc),
+                last_updated=datetime.now(UTC),
             ),
             InsightMetric(
                 id="news_sentiment",
@@ -98,7 +98,7 @@ def sample_category_data() -> InsightCategory:
                     actionable_insight="Monitor for changes",
                 ),
                 data_sources=["Alpha Vantage News"],
-                last_updated=datetime.now(timezone.utc),
+                last_updated=datetime.now(UTC),
             ),
         ],
         composite=CompositeScore(
@@ -108,7 +108,7 @@ def sample_category_data() -> InsightCategory:
             breakdown={"ai_price_anomaly": 39.0, "news_sentiment": 16.8},
             interpretation="Elevated risk - monitor positions",
         ),
-        last_updated=datetime.now(timezone.utc),
+        last_updated=datetime.now(UTC),
     )
 
 
@@ -129,7 +129,7 @@ def sample_metric() -> InsightMetric:
             actionable_insight="Consider reducing exposure",
         ),
         data_sources=["Alpha Vantage"],
-        last_updated=datetime.now(timezone.utc),
+        last_updated=datetime.now(UTC),
     )
 
 

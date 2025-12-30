@@ -96,6 +96,32 @@ class CacheKeys:
         return f"{CacheKeys.ETF}:holdings:{symbol.upper()}"
 
     @staticmethod
+    def quote(symbol: str) -> str:
+        """
+        Generate cache key for real-time quote data.
+
+        Args:
+            symbol: Stock symbol (uppercase)
+
+        Returns:
+            Cache key like 'market:quote:NVDA'
+        """
+        return f"{CacheKeys.MARKET}:quote:{symbol.upper()}"
+
+    @staticmethod
+    def options(symbol: str) -> str:
+        """
+        Generate cache key for options chain data.
+
+        Args:
+            symbol: Stock symbol (uppercase)
+
+        Returns:
+            Cache key like 'market:options:NVDA'
+        """
+        return f"{CacheKeys.MARKET}:options:{symbol.upper()}"
+
+    @staticmethod
     def insights(category_id: str, suffix: str = "latest") -> str:
         """
         Generate cache key for computed insight data.

@@ -6,8 +6,8 @@ metadata:
     app: insights-snapshot
     component: trigger
 spec:
-  # Run daily at 9:30 AM ET / 2:30 PM UTC (US market open)
-  schedule: "30 14 * * *"
+  # Run daily at 9:00 AM CST (Beijing) / 01:00 UTC
+  schedule: "0 1 * * *"
   # Keep last 7 successful and 3 failed jobs for debugging
   successfulJobsHistoryLimit: 7
   failedJobsHistoryLimit: 3

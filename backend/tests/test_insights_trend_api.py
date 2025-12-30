@@ -188,9 +188,11 @@ class TestEmptyResultsHandling:
 
         composite_trend = [
             TrendDataPoint(
-                date=s.get("date", "").strftime("%Y-%m-%d")
-                if hasattr(s.get("date"), "strftime")
-                else str(s.get("date", ""))[:10],
+                date=(
+                    s.get("date", "").strftime("%Y-%m-%d")
+                    if hasattr(s.get("date"), "strftime")
+                    else str(s.get("date", ""))[:10]
+                ),
                 score=s.get("composite_score", 0.0),
                 status=s.get("composite_status", "unknown"),
             )

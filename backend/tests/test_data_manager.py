@@ -9,8 +9,8 @@ Tests cover:
 - Cache hit/miss logging
 """
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pandas as pd
 import pytest
@@ -21,6 +21,8 @@ from src.services.data_manager import (
     DataManager,
     Granularity,
     OHLCVData,
+    OptionContract,
+    QuoteData,
     SharedDataContext,
     TreasuryData,
 )
@@ -69,6 +71,26 @@ class TestCacheKeys:
         key = CacheKeys.insights("ai_sector_risk", "trend")
         assert key == "insights:ai_sector_risk:trend"
 
+    def test_quote_key_format(self):
+        """Verify quote key format."""
+        key = CacheKeys.quote("NVDA")
+        assert key == "market:quote:NVDA"
+
+    def test_quote_key_normalizes_case(self):
+        """Verify symbol is uppercased."""
+        key = CacheKeys.quote("nvda")
+        assert key == "market:quote:NVDA"
+
+    def test_options_key_format(self):
+        """Verify options key format."""
+        key = CacheKeys.options("NVDA")
+        assert key == "market:options:NVDA"
+
+    def test_options_key_normalizes_case(self):
+        """Verify symbol is uppercased."""
+        key = CacheKeys.options("nvda")
+        assert key == "market:options:NVDA"
+
     def test_parse_key(self):
         """Verify key parsing."""
         parsed = CacheKeys.parse("market:daily:AAPL")
@@ -112,7 +134,7 @@ class TestDataTypes:
     def test_ohlcv_to_dict(self):
         """Verify OHLCV serialization."""
         data = OHLCVData(
-            date=datetime(2025, 1, 15, 10, 30, tzinfo=timezone.utc),
+            date=datetime(2025, 1, 15, 10, 30, tzinfo=UTC),
             open=150.0,
             high=151.5,
             low=149.5,
@@ -141,7 +163,7 @@ class TestDataTypes:
     def test_treasury_round_trip(self):
         """Verify Treasury data serialization round-trip."""
         original = TreasuryData(
-            date=datetime(2025, 1, 15, tzinfo=timezone.utc),
+            date=datetime(2025, 1, 15, tzinfo=UTC),
             yield_value=4.25,
             maturity="2y",
         )
@@ -149,6 +171,88 @@ class TestDataTypes:
         restored = TreasuryData.from_dict(d)
         assert restored.yield_value == original.yield_value
         assert restored.maturity == original.maturity
+
+    def test_quote_data_to_dict(self):
+        """Verify QuoteData serialization."""
+        data = QuoteData(
+            symbol="NVDA",
+            price=142.50,
+            volume=25000000,
+            latest_trading_day="2025-01-15",
+            previous_close=140.00,
+            change=2.50,
+            change_percent=1.79,
+            open=141.00,
+            high=143.00,
+            low=140.50,
+        )
+        d = data.to_dict()
+        assert d["symbol"] == "NVDA"
+        assert d["price"] == 142.50
+        assert d["change_percent"] == 1.79
+
+    def test_quote_data_from_dict(self):
+        """Verify QuoteData deserialization."""
+        d = {
+            "symbol": "NVDA",
+            "price": 142.50,
+            "volume": 25000000,
+            "latest_trading_day": "2025-01-15",
+            "previous_close": 140.00,
+            "change": 2.50,
+            "change_percent": 1.79,
+            "open": 141.00,
+            "high": 143.00,
+            "low": 140.50,
+        }
+        data = QuoteData.from_dict(d)
+        assert data.symbol == "NVDA"
+        assert data.price == 142.50
+        assert data.volume == 25000000
+
+    def test_option_contract_to_dict(self):
+        """Verify OptionContract serialization."""
+        data = OptionContract(
+            contract_id="NVDA250117C00150000",
+            symbol="NVDA",
+            expiration=datetime(2025, 1, 17, tzinfo=UTC),
+            strike=150.00,
+            option_type="call",
+            last_price=5.50,
+            bid=5.40,
+            ask=5.60,
+            volume=1500,
+            open_interest=8500,
+            implied_volatility=0.42,
+            delta=0.55,
+        )
+        d = data.to_dict()
+        assert d["contract_id"] == "NVDA250117C00150000"
+        assert d["strike"] == 150.00
+        assert d["option_type"] == "call"
+        assert d["open_interest"] == 8500
+
+    def test_option_contract_from_dict(self):
+        """Verify OptionContract deserialization."""
+        d = {
+            "contract_id": "NVDA250117P00150000",
+            "symbol": "NVDA",
+            "expiration": "2025-01-17T00:00:00+00:00",
+            "strike": 150.00,
+            "option_type": "put",
+            "last_price": 3.25,
+            "bid": 3.20,
+            "ask": 3.30,
+            "volume": 2000,
+            "open_interest": 12000,
+            "implied_volatility": 0.38,
+            "delta": -0.35,
+        }
+        data = OptionContract.from_dict(d)
+        assert data.contract_id == "NVDA250117P00150000"
+        assert data.option_type == "put"
+        assert data.open_interest == 12000
+        assert data.delta == -0.35
 
 
 class TestSharedDataContext:
@@ -159,7 +263,7 @@ class TestSharedDataContext:
         ctx = SharedDataContext()
         data = [
             OHLCVData(
-                date=datetime.now(timezone.utc),
+                date=datetime.now(UTC),
                 open=150,
                 high=151,
                 low=149,
@@ -176,11 +280,7 @@ class TestSharedDataContext:
     def test_get_treasury_by_maturity(self):
         """Verify treasury lookup by maturity."""
         ctx = SharedDataContext()
-        data = [
-            TreasuryData(
-                date=datetime.now(timezone.utc), yield_value=4.25, maturity="2y"
-            )
-        ]
+        data = [TreasuryData(date=datetime.now(UTC), yield_value=4.25, maturity="2y")]
         ctx.treasury["2y"] = data
 
         assert ctx.get_treasury("2y") == data
@@ -193,6 +293,51 @@ class TestSharedDataContext:
 
         ctx.errors["ohlcv:AAPL"] = "API timeout"
         assert ctx.has_errors() is True
+
+    def test_get_quote_by_symbol(self):
+        """Verify quote lookup by symbol."""
+        ctx = SharedDataContext()
+        quote = QuoteData(
+            symbol="NVDA",
+            price=142.50,
+            volume=25000000,
+            latest_trading_day="2025-01-15",
+            previous_close=140.00,
+            change=2.50,
+            change_percent=1.79,
+            open=141.00,
+            high=143.00,
+            low=140.50,
+        )
+        ctx.quotes["NVDA"] = quote
+
+        assert ctx.get_quote("NVDA") == quote
+        assert ctx.get_quote("nvda") == quote  # Case-insensitive
+        assert ctx.get_quote("MSFT") is None
+
+    def test_get_options_by_symbol(self):
+        """Verify options lookup by symbol."""
+        ctx = SharedDataContext()
+        options = [
+            OptionContract(
+                contract_id="NVDA250117C00150000",
+                symbol="NVDA",
+                expiration=datetime.now(UTC),
+                strike=150.00,
+                option_type="call",
+                last_price=5.50,
+                bid=5.40,
+                ask=5.60,
+                volume=1500,
+                open_interest=8500,
+                implied_volatility=0.42,
+            )
+        ]
+        ctx.options["NVDA"] = options
+
+        assert ctx.get_options("NVDA") == options
+        assert ctx.get_options("nvda") == options  # Case-insensitive
+        assert ctx.get_options("MSFT") is None
 
 
 class TestCacheOperations:
@@ -381,6 +526,8 @@ class TestCacheKeyConsistency:
             CacheKeys.ipo_calendar(),
             CacheKeys.insights("ai_sector_risk", "latest"),
             CacheKeys.etf_holdings("AIQ"),
+            CacheKeys.quote("NVDA"),
+            CacheKeys.options("NVDA"),
         ]
 
         for key in keys:

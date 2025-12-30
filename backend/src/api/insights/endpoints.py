@@ -291,9 +291,11 @@ async def get_category_trend(
         # Build composite trend
         composite_trend = [
             TrendDataPoint(
-                date=s.get("date", "").strftime("%Y-%m-%d")
-                if hasattr(s.get("date"), "strftime")
-                else str(s.get("date", ""))[:10],
+                date=(
+                    s.get("date", "").strftime("%Y-%m-%d")
+                    if hasattr(s.get("date"), "strftime")
+                    else str(s.get("date", ""))[:10]
+                ),
                 score=s.get("composite_score", 0.0),
                 status=s.get("composite_status", "unknown"),
             )
@@ -309,9 +311,11 @@ async def get_category_trend(
                     metric_trends[metric_id] = []
                 metric_trends[metric_id].append(
                     TrendDataPoint(
-                        date=s.get("date", "").strftime("%Y-%m-%d")
-                        if hasattr(s.get("date"), "strftime")
-                        else str(s.get("date", ""))[:10],
+                        date=(
+                            s.get("date", "").strftime("%Y-%m-%d")
+                            if hasattr(s.get("date"), "strftime")
+                            else str(s.get("date", ""))[:10]
+                        ),
                         score=metric_info.get("score", 0.0),
                         status=metric_info.get("status", "unknown"),
                     )

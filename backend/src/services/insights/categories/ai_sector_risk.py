@@ -1,16 +1,20 @@
 """AI Sector Risk category implementation.
 
-This category measures AI sector bubble risk using 6 quantitative
-indicators from Alpha Vantage data. The composite index provides
+This category measures AI sector bubble risk using 7 quantitative
+indicators from Alpha Vantage and FRED data. The composite index provides
 an overall risk assessment for AI-related investments.
 
 Metrics:
 1. AI Price Anomaly - Z-score of AI stocks vs 200 SMA
 2. News Sentiment - Normalized sentiment from NEWS_SENTIMENT
 3. Smart Money Flow - Smart Money Index (Last Hour - First Hour returns)
-4. IPO Heat - IPO count in 90-day window
-5. Yield Curve - 10Y-2Y spread analysis
-6. Fed Expectations - 2Y yield slope
+4. Options Put/Call Ratio - ATM Dollar-Weighted PCR (contrarian indicator)
+5. IPO Heat - IPO count in 90-day window
+6. Market Liquidity - FRED-based RRP balance, SOFR-EFFR spread (replaces yield_curve)
+7. Fed Expectations - 2Y yield slope
+
+Theory: "When capital is abundant, asset prices easily rise and bubbles can form.
+When capital is tight, even with high market sentiment, bubbles cannot easily form."
 
 Interpretation Zones:
 - 0-25: Low risk / Accumulation zone (Green)
@@ -49,7 +53,7 @@ AI_BASKET_CACHE_TTL = 86400  # 24 hours (ETF holdings change infrequently)
 class AISectorRiskCategory(InsightCategoryBase):
     """AI Sector Risk assessment category.
 
-    Measures bubble risk in the AI sector using 6 quantitative
+    Measures bubble risk in the AI sector using 7 quantitative
     indicators with weighted composite scoring.
     """
 
@@ -62,8 +66,8 @@ class AISectorRiskCategory(InsightCategoryBase):
         "Higher scores indicate elevated euphoria and potential correction risk."
     )
 
-    # Cache for 30 minutes (metrics change slowly)
-    CACHE_TTL_SECONDS = 1800
+    # Cache for 24 hours (synced with daily CronJob)
+    CACHE_TTL_SECONDS = 86400
 
     def get_metric_definitions(self) -> list[dict[str, Any]]:
         """Return metric definitions for AI Sector Risk."""
@@ -71,56 +75,74 @@ class AISectorRiskCategory(InsightCategoryBase):
             {
                 "id": "ai_price_anomaly",
                 "name": "AI Price Anomaly",
-                "weight": 0.20,
+                "weight": 0.17,
                 "data_sources": ["TIME_SERIES_DAILY"],
                 "description": "Z-score of AI stocks vs 200-day SMA",
             },
             {
                 "id": "news_sentiment",
                 "name": "News Sentiment",
-                "weight": 0.20,
+                "weight": 0.17,
                 "data_sources": ["NEWS_SENTIMENT"],
                 "description": "Normalized AI news sentiment (-0.35 to +0.35 → 0-100)",
             },
             {
                 "id": "smart_money_flow",
                 "name": "Smart Money Flow",
-                "weight": 0.20,
+                "weight": 0.17,
                 "data_sources": ["TIME_SERIES_INTRADAY"],
                 "description": "Smart Money Index: Last hour return minus first hour return",
             },
             {
+                "id": "options_put_call_ratio",
+                "name": "Options Put/Call Ratio",
+                "weight": 0.15,
+                "data_sources": ["HISTORICAL_OPTIONS", "GLOBAL_QUOTE"],
+                "description": "ATM Dollar-Weighted Put/Call Ratio (contrarian indicator)",
+            },
+            {
                 "id": "ipo_heat",
                 "name": "IPO Heat",
-                "weight": 0.10,
+                "weight": 0.09,
                 "data_sources": ["IPO_CALENDAR"],
                 "description": "Count of tech IPOs in next 90 days",
             },
             {
-                "id": "yield_curve",
-                "name": "Yield Curve",
-                "weight": 0.15,
-                "data_sources": ["TREASURY_YIELD"],
-                "description": "10Y-2Y spread (loose money indicator)",
+                "id": "market_liquidity",
+                "name": "Market Liquidity",
+                "weight": 0.13,
+                "data_sources": ["FRED_SOFR", "FRED_EFFR", "FRED_RRP"],
+                "description": "RRP balance + SOFR-EFFR spread (actual liquidity)",
             },
             {
                 "id": "fed_expectations",
                 "name": "Fed Expectations",
-                "weight": 0.15,
+                "weight": 0.12,
                 "data_sources": ["TREASURY_YIELD"],
                 "description": "2Y yield slope over 20 days",
             },
         ]
 
     def get_composite_weights(self) -> dict[str, float]:
-        """Return weights for composite score calculation."""
+        """Return weights for composite score calculation.
+
+        7 metrics totaling 100%:
+        - ai_price_anomaly: 17%
+        - news_sentiment: 17%
+        - smart_money_flow: 17%
+        - options_put_call_ratio: 15%
+        - ipo_heat: 9%
+        - market_liquidity: 13% (replaces yield_curve)
+        - fed_expectations: 12%
+        """
         return {
-            "ai_price_anomaly": 0.20,
-            "news_sentiment": 0.20,
-            "smart_money_flow": 0.20,
-            "ipo_heat": 0.10,
-            "yield_curve": 0.15,
-            "fed_expectations": 0.15,
+            "ai_price_anomaly": 0.17,
+            "news_sentiment": 0.17,
+            "smart_money_flow": 0.17,
+            "options_put_call_ratio": 0.15,
+            "ipo_heat": 0.09,
+            "market_liquidity": 0.13,
+            "fed_expectations": 0.12,
         }
 
     async def _get_ai_basket_symbols(self) -> tuple[list[str], str]:
@@ -197,7 +219,7 @@ class AISectorRiskCategory(InsightCategoryBase):
         return AI_BASKET_FALLBACK, "Static fallback basket"
 
     async def calculate_metrics(self) -> list[InsightMetric]:
-        """Calculate all 6 AI Sector Risk metrics.
+        """Calculate all 7 AI Sector Risk metrics.
 
         This method orchestrates the calculation of all metrics,
         handling partial failures gracefully. The AI basket is fetched
@@ -220,8 +242,12 @@ class AISectorRiskCategory(InsightCategoryBase):
                 self._calculate_news_sentiment,
             ),  # Uses topics=technology
             ("smart_money_flow", lambda: self._calculate_smart_money_flow(ai_basket)),
+            (
+                "options_put_call_ratio",
+                lambda: self._calculate_options_put_call_ratio(ai_basket),
+            ),
             ("ipo_heat", self._calculate_ipo_heat),
-            ("yield_curve", self._calculate_yield_curve),
+            ("market_liquidity", self._calculate_market_liquidity),
             ("fed_expectations", self._calculate_fed_expectations),
         ]
 
@@ -583,6 +609,208 @@ class AISectorRiskCategory(InsightCategoryBase):
                 f"Error: {str(e)}",
             )
 
+    async def _calculate_options_put_call_ratio(
+        self, ai_basket: tuple[list[str], str]
+    ) -> InsightMetric:
+        """Calculate Options Put/Call Ratio using ATM Dollar-Weighted methodology.
+
+        Uses HISTORICAL_OPTIONS and GLOBAL_QUOTE to calculate a quality-filtered,
+        ATM dollar-weighted put/call ratio. This is a CONTRARIAN indicator:
+        - Low PCR (< 0.5) = High Risk (too many calls, euphoria)
+        - High PCR (> 1.0) = Low Risk (too many puts, fear)
+
+        Methodology:
+        1. Get current price for each AI basket symbol
+        2. Get options chain for each symbol
+        3. Filter to ATM zone (strikes within ±15% of current price)
+        4. Apply quality filters (min premium $0.50, min OI 500)
+        5. Calculate notionals: OI × Price × 100
+        6. PCR = Σ(Put Notionals) / Σ(Call Notionals)
+
+        Args:
+            ai_basket: Tuple of (symbols list, source description)
+
+        Returns:
+            InsightMetric with PCR score (contrarian: low PCR = high risk)
+        """
+        if not self.market_service:
+            return self._create_placeholder_metric(
+                "options_put_call_ratio",
+                "Options Put/Call Ratio",
+                50.0,
+                "Market service not available",
+            )
+
+        # ATM zone and quality filter constants
+        ATM_ZONE_PCT = 0.15  # ±15% of current price
+        MIN_PREMIUM = 0.50  # Minimum $0.50 premium
+        MIN_OI = 500  # Minimum 500 open interest
+
+        # Use top 3 AI basket symbols for options analysis
+        ai_symbols, basket_source = ai_basket
+        symbols_to_analyze = ai_symbols[:3]
+
+        total_put_notional = 0.0
+        total_call_notional = 0.0
+        symbol_details = {}
+        contracts_analyzed = 0
+
+        for symbol in symbols_to_analyze:
+            try:
+                # Get current quote for ATM calculation
+                quote = await self.market_service.get_quote(symbol)
+                if not quote or "price" not in quote:
+                    logger.warning(
+                        "Quote not available for options analysis",
+                        symbol=symbol,
+                    )
+                    continue
+
+                current_price = float(quote.get("price", 0))
+                if current_price <= 0:
+                    continue
+
+                # Calculate ATM zone boundaries
+                atm_low = current_price * (1 - ATM_ZONE_PCT)
+                atm_high = current_price * (1 + ATM_ZONE_PCT)
+
+                # Get options chain
+                options_data = await self.market_service.get_historical_options(symbol)
+                contracts = options_data.get("data", [])
+
+                if not contracts:
+                    logger.warning("No options contracts found", symbol=symbol)
+                    continue
+
+                symbol_put_notional = 0.0
+                symbol_call_notional = 0.0
+                symbol_contracts = 0
+
+                for contract in contracts:
+                    try:
+                        strike = float(contract.get("strike", 0))
+                        option_type = contract.get("type", "").lower()
+                        last_price = float(contract.get("last", 0))
+                        open_interest = int(contract.get("open_interest", 0))
+
+                        # Apply filters:
+                        # 1. ATM zone filter
+                        if not (atm_low <= strike <= atm_high):
+                            continue
+
+                        # 2. Quality filters
+                        if last_price < MIN_PREMIUM:
+                            continue
+                        if open_interest < MIN_OI:
+                            continue
+
+                        # Calculate notional: OI × Price × 100
+                        notional = open_interest * last_price * 100
+
+                        if option_type == "put":
+                            symbol_put_notional += notional
+                        elif option_type == "call":
+                            symbol_call_notional += notional
+
+                        symbol_contracts += 1
+
+                    except (ValueError, TypeError):
+                        continue
+
+                total_put_notional += symbol_put_notional
+                total_call_notional += symbol_call_notional
+                contracts_analyzed += symbol_contracts
+
+                symbol_details[symbol] = {
+                    "current_price": round(current_price, 2),
+                    "atm_zone": f"${atm_low:.2f} - ${atm_high:.2f}",
+                    "put_notional": round(
+                        symbol_put_notional / 1_000_000, 2
+                    ),  # In millions
+                    "call_notional": round(symbol_call_notional / 1_000_000, 2),
+                    "contracts_used": symbol_contracts,
+                }
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to analyze options for symbol",
+                    symbol=symbol,
+                    error=str(e),
+                )
+
+        # Calculate PCR
+        if total_call_notional > 0:
+            pcr = total_put_notional / total_call_notional
+        else:
+            pcr = 1.0  # Neutral if no call data
+
+        # Normalize to score (CONTRARIAN/INVERTED):
+        # PCR 0.3 → Score 95 (High Risk - extreme call buying)
+        # PCR 0.7 → Score 60 (Elevated)
+        # PCR 1.0 → Score 30 (Normal)
+        # PCR 1.3 → Score 5 (Low Risk - extreme put buying)
+        # Using invert=True: higher PCR = lower score
+        score = self.normalize_score(pcr, 0.3, 1.3, invert=True)
+
+        status = ThresholdConfig().get_status(score)
+
+        # Generate interpretation
+        if pcr < 0.5:
+            pcr_interpretation = "Extreme call buying indicates euphoria"
+        elif pcr < 0.7:
+            pcr_interpretation = "Elevated call activity suggests optimism"
+        elif pcr < 1.0:
+            pcr_interpretation = "Near-neutral positioning"
+        else:
+            pcr_interpretation = "Put buying indicates caution/hedging"
+
+        return InsightMetric(
+            id="options_put_call_ratio",
+            name="Options Put/Call Ratio",
+            score=score,
+            status=status,
+            explanation=MetricExplanation(
+                summary=f"ATM Dollar-Weighted PCR is {pcr:.2f}. {pcr_interpretation}.",
+                detail=(
+                    f"Put/Call Ratio: {pcr:.2f} (Put Notional: ${total_put_notional / 1_000_000:.1f}M, "
+                    f"Call Notional: ${total_call_notional / 1_000_000:.1f}M). "
+                    f"Analyzed {contracts_analyzed} ATM contracts across {len(symbol_details)} symbols. "
+                    f"{'Low PCR indicates excessive optimism - contrarian bearish signal.' if pcr < 0.7 else 'PCR within normal range.'}"
+                ),
+                methodology=(
+                    "Calculates ATM Dollar-Weighted Put/Call Ratio from HISTORICAL_OPTIONS. "
+                    f"Filters: ATM zone (±{ATM_ZONE_PCT * 100:.0f}%), min premium ${MIN_PREMIUM}, "
+                    f"min OI {MIN_OI}. Notional = OI × Price × 100. "
+                    "CONTRARIAN: Low PCR (call-heavy) = High Risk."
+                ),
+                formula="PCR = Σ(Put Notionals) / Σ(Call Notionals)",
+                historical_context=(
+                    "PCR below 0.5 preceded corrections in 2000, 2007, 2021. "
+                    f"Current PCR: {pcr:.2f}"
+                ),
+                actionable_insight=(
+                    "Extreme call positioning suggests caution - consider hedging."
+                    if pcr < 0.5
+                    else "Options positioning within normal parameters."
+                ),
+            ),
+            data_sources=["HISTORICAL_OPTIONS", "GLOBAL_QUOTE"],
+            last_updated=datetime.now(UTC),
+            raw_data={
+                "pcr": round(pcr, 3),
+                "total_put_notional_mm": round(total_put_notional / 1_000_000, 2),
+                "total_call_notional_mm": round(total_call_notional / 1_000_000, 2),
+                "contracts_analyzed": contracts_analyzed,
+                "symbols_analyzed": list(symbol_details.keys()),
+                "symbol_details": symbol_details,
+                "filters": {
+                    "atm_zone_pct": ATM_ZONE_PCT,
+                    "min_premium": MIN_PREMIUM,
+                    "min_oi": MIN_OI,
+                },
+            },
+        )
+
     async def _calculate_ipo_heat(self) -> InsightMetric:
         """Calculate IPO Heat using IPO_CALENDAR endpoint."""
         if not self.market_service:
@@ -660,86 +888,153 @@ class AISectorRiskCategory(InsightCategoryBase):
                 f"Error: {str(e)}",
             )
 
-    async def _calculate_yield_curve(self) -> InsightMetric:
-        """Calculate Yield Curve metric using TREASURY_YIELD endpoint."""
-        if not self.market_service:
+    async def _calculate_market_liquidity(self) -> InsightMetric:
+        """Calculate Market Liquidity metric using FRED API data.
+
+        Uses three FRED indicators to measure actual market liquidity:
+        1. RRP Balance (50% weight): High RRP = abundant liquidity = HIGH bubble risk
+        2. SOFR-EFFR Spread (30% weight): Low spread = no stress = bubble can form
+        3. RRP 20-day Trend (20% weight): Rising RRP = increasing liquidity
+
+        Theory: "When capital is abundant, asset prices easily rise and bubbles can form.
+        When capital is tight, even with high market sentiment, bubbles cannot easily form."
+        """
+        if not self.fred_service:
             return self._create_placeholder_metric(
-                "yield_curve",
-                "Yield Curve",
-                70.0,
-                "Market service not available",
+                "market_liquidity",
+                "Market Liquidity",
+                50.0,
+                "FRED service not available",
             )
 
         try:
-            # Get 10Y and 2Y yields
-            yield_10y_df = await self.market_service.get_treasury_yield(
-                maturity="10year",
-                interval="daily",
-            )
-            yield_2y_df = await self.market_service.get_treasury_yield(
-                maturity="2year",
-                interval="daily",
-            )
+            # Fetch FRED data (60 days for trend calculation)
+            sofr_df = await self.fred_service.get_sofr(days=60)
+            effr_df = await self.fred_service.get_effr(days=60)
+            rrp_df = await self.fred_service.get_rrp_balance(days=60)
 
-            if yield_10y_df.empty or yield_2y_df.empty:
+            # Check data availability
+            if sofr_df.empty or effr_df.empty or rrp_df.empty:
                 return self._create_placeholder_metric(
-                    "yield_curve",
-                    "Yield Curve",
+                    "market_liquidity",
+                    "Market Liquidity",
                     50.0,
-                    "Treasury yield data unavailable",
+                    "Insufficient FRED data",
                 )
 
-            # Get most recent values
-            yield_10y = yield_10y_df["value"].iloc[-1]
-            yield_2y = yield_2y_df["value"].iloc[-1]
-            spread = yield_10y - yield_2y
+            # Extract latest values
+            sofr_current = float(sofr_df["value"].iloc[-1])
+            effr_current = float(effr_df["value"].iloc[-1])
+            rrp_current = float(rrp_df["value"].iloc[-1])
 
-            # Spread range: -1% (inverted) to +2% (steep)
-            # Inverted = 0 (deflationary), Steep = 100 (risk-on)
-            score = self.normalize_score(spread, -1.0, 2.0)
-            status = ThresholdConfig().get_status(score)
+            # --- Component 1: RRP Balance Score (50% weight) ---
+            # RRP ranges: 0 (tight) to 2500B (extreme liquidity peak Dec 2022)
+            # Higher RRP = more liquidity = higher bubble risk
+            # Current (Dec 2025): ~10-20B = near zero = tight liquidity
+            rrp_score = self.normalize_score(rrp_current, 0, 2500)
+
+            # --- Component 2: SOFR-EFFR Spread Score (30% weight) ---
+            # Normal: SOFR slightly above EFFR (5-15 bps)
+            # Stress: SOFR spikes above EFFR (>50 bps) = funding stress
+            # Inverted: SOFR below EFFR = unusual, indicates stress
+            sofr_effr_spread = (sofr_current - effr_current) * 100  # Convert to bps
+
+            # Spread 0-15 bps = normal, low risk for bubble → HIGH score
+            # Spread 50+ bps = stress → LOW score (no bubble risk)
+            # Inverted logic: Normal conditions (low spread) = bubble can form
+            spread_score = self.normalize_score(sofr_effr_spread, 50, 0)  # Inverted
+
+            # --- Component 3: RRP 20-day Trend Score (20% weight) ---
+            # Rising RRP = increasing liquidity = higher bubble risk
+            if len(rrp_df) >= 20:
+                rrp_20d_ago = float(rrp_df["value"].iloc[-20])
+                rrp_change = rrp_current - rrp_20d_ago
+                rrp_change_pct = (
+                    (rrp_change / rrp_20d_ago * 100) if rrp_20d_ago > 0 else 0
+                )
+            else:
+                rrp_change = 0.0
+                rrp_change_pct = 0.0
+                rrp_20d_ago = rrp_current
+
+            # Trend: -50% to +50% change → 0-100 score
+            trend_score = self.normalize_score(rrp_change_pct, -50, 50)
+
+            # --- Weighted Composite Score ---
+            # RRP Level: 50%, SOFR-EFFR Spread: 30%, RRP Trend: 20%
+            final_score = rrp_score * 0.5 + spread_score * 0.3 + trend_score * 0.2
+            final_score = round(final_score, 2)
+
+            status = ThresholdConfig().get_status(final_score)
+
+            # Generate interpretation
+            if rrp_current > 1000:
+                liquidity_level = "abundant"
+            elif rrp_current > 300:
+                liquidity_level = "moderate"
+            else:
+                liquidity_level = "tight"
 
             return InsightMetric(
-                id="yield_curve",
-                name="Yield Curve",
-                score=score,
+                id="market_liquidity",
+                name="Market Liquidity",
+                score=final_score,
                 status=status,
                 explanation=MetricExplanation(
-                    summary=f"10Y-2Y spread is {spread:.2f}% ({'steep' if spread > 0.5 else 'flat' if spread > -0.2 else 'inverted'}).",
+                    summary=f"Market liquidity is {liquidity_level}. RRP: ${rrp_current:.0f}B, SOFR-EFFR: {sofr_effr_spread:.0f}bps.",
                     detail=(
-                        f"10-year yield: {yield_10y:.2f}%, 2-year yield: {yield_2y:.2f}%. "
-                        f"Spread: {spread:.2f}%. "
-                        f"{'Steep curve supports risk assets but can fuel bubbles.' if spread > 0.5 else 'Flat/inverted curve signals caution.'}"
+                        f"Fed RRP Balance: ${rrp_current:.1f}B (vs peak $2,500B in Dec 2022). "
+                        f"SOFR: {sofr_current:.2f}%, EFFR: {effr_current:.2f}% (spread: {sofr_effr_spread:.0f}bps). "
+                        f"20-day RRP change: {rrp_change:+.1f}B ({rrp_change_pct:+.1f}%). "
+                        f"{'Abundant liquidity supports bubble formation.' if final_score > 60 else 'Tight liquidity constrains bubble risk.'}"
                     ),
                     methodology=(
-                        "Calculates the 10-year minus 2-year Treasury yield spread. "
-                        "Normalizes based on historical range: inverted = 0, +1.5% = 100."
+                        "Uses FRED API for actual liquidity metrics: "
+                        "RRP Balance (50% weight) measures excess system liquidity, "
+                        "SOFR-EFFR spread (30% weight) measures funding stress, "
+                        "RRP trend (20% weight) measures liquidity momentum. "
+                        "Theory: Bubbles require abundant capital to form."
                     ),
-                    formula="Score = max(0, (spread + 1.0) / 3.0 × 100)",
+                    formula="Score = 0.5×RRP_score + 0.3×Spread_score + 0.2×Trend_score",
                     historical_context=(
-                        "The curve inverted in 2022-2023 before steepening. "
-                        f"Current spread: {spread:.2f}%"
+                        f"Peak RRP: $2,500B (Dec 2022 - extreme liquidity). "
+                        f"Current RRP: ${rrp_current:.0f}B ({rrp_current / 2500 * 100:.1f}% of peak). "
+                        f"Low RRP historically coincides with market stress periods."
                     ),
                     actionable_insight=(
-                        "Steep yield curve indicates loose monetary conditions."
-                        if spread > 0.5
-                        else "Flat or inverted curve suggests defensive positioning."
+                        "Abundant liquidity supports risk assets - watch for euphoria."
+                        if final_score > 60
+                        else "Tight liquidity constrains bubble formation - stay vigilant for stress signals."
                     ),
                 ),
-                data_sources=["TREASURY_YIELD"],
+                data_sources=["FRED_SOFR", "FRED_EFFR", "FRED_RRP"],
                 last_updated=datetime.now(UTC),
                 raw_data={
-                    "yield_10y": round(yield_10y, 3),
-                    "yield_2y": round(yield_2y, 3),
-                    "spread": round(spread, 3),
+                    "sofr_current": round(sofr_current, 3),
+                    "effr_current": round(effr_current, 3),
+                    "sofr_effr_spread_bps": round(sofr_effr_spread, 1),
+                    "rrp_current_billions": round(rrp_current, 1),
+                    "rrp_20d_ago_billions": round(rrp_20d_ago, 1),
+                    "rrp_change_billions": round(rrp_change, 1),
+                    "rrp_change_pct": round(rrp_change_pct, 2),
+                    "component_scores": {
+                        "rrp_level": round(rrp_score, 2),
+                        "sofr_effr_spread": round(spread_score, 2),
+                        "rrp_trend": round(trend_score, 2),
+                    },
+                    "weights": {
+                        "rrp_level": 0.5,
+                        "sofr_effr_spread": 0.3,
+                        "rrp_trend": 0.2,
+                    },
                 },
             )
 
         except Exception as e:
-            logger.error("Yield curve calculation failed", error=str(e))
+            logger.error("Market liquidity calculation failed", error=str(e))
             return self._create_placeholder_metric(
-                "yield_curve",
-                "Yield Curve",
+                "market_liquidity",
+                "Market Liquidity",
                 50.0,
                 f"Error: {str(e)}",
             )

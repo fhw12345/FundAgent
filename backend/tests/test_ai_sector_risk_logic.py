@@ -1,10 +1,10 @@
 """Tests for AI Sector Risk logic with mocked data."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
-import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
+
+import pandas as pd
+import pytest
 import pytz
 
 from src.core.config import Settings
@@ -57,8 +57,12 @@ class TestAISectorRiskLogic:
         data = {
             "Open": open_prices,
             "Close": close_prices,
-            "High": [max(o, c) + 1 for o, c in zip(open_prices, close_prices)],
-            "Low": [min(o, c) - 1 for o, c in zip(open_prices, close_prices)],
+            "High": [
+                max(o, c) + 1 for o, c in zip(open_prices, close_prices, strict=False)
+            ],
+            "Low": [
+                min(o, c) - 1 for o, c in zip(open_prices, close_prices, strict=False)
+            ],
             "Volume": [1000000] * len(open_prices),
         }
 
@@ -270,3 +274,148 @@ class TestAISectorRiskLogic:
         # Positive SMI should result in lower risk score
         assert metric.score < 50
         assert len(metric.raw_data["symbols_analyzed"]) == 3
+
+
+class TestMarketLiquidityLogic:
+    """Tests for Market Liquidity metric calculation logic."""
+
+    @pytest.fixture
+    def mock_fred_service(self):
+        """Create a mock FRED service."""
+        service = MagicMock()
+        service.get_sofr = AsyncMock()
+        service.get_effr = AsyncMock()
+        service.get_rrp_balance = AsyncMock()
+        return service
+
+    @pytest.fixture
+    def category_with_fred(self, mock_fred_service):
+        """Create category instance with mock FRED service."""
+        settings = Settings()
+        return AISectorRiskCategory(
+            settings=settings,
+            fred_service=mock_fred_service,
+        )
+
+    def create_fred_df(self, values, days=30):
+        """Helper to create FRED-style DataFrame."""
+        dates = pd.date_range(end="2025-12-29", periods=len(values), freq="D")
+        return pd.DataFrame({"value": values}, index=dates)
+
+    @pytest.mark.asyncio
+    async def test_market_liquidity_tight(self, category_with_fred, mock_fred_service):
+        """
+        Test Market Liquidity when capital is tight (low bubble risk).
+
+        Scenario:
+        - RRP Balance: 10B (extremely low, near 0% of peak 2500B)
+        - SOFR-EFFR Spread: 50 bps (elevated, indicates funding stress)
+        - RRP Trend: Declining (liquidity draining)
+
+        Expected: LOW risk score (tight liquidity constrains bubbles)
+        """
+        # Mock FRED data
+        mock_fred_service.get_sofr.return_value = self.create_fred_df([3.77])
+        mock_fred_service.get_effr.return_value = self.create_fred_df(
+            [3.27]
+        )  # 50bps spread
+        mock_fred_service.get_rrp_balance.return_value = self.create_fred_df(
+            [50.0] * 20 + [10.0]  # Declining from 50B to 10B
+        )
+
+        metric = await category_with_fred._calculate_market_liquidity()
+
+        assert metric.id == "market_liquidity"
+        # Low RRP + high spread + declining trend = LOW risk
+        assert metric.score < 30
+        assert metric.status == MetricStatus.LOW
+        assert "tight" in metric.explanation.summary.lower()
+        assert metric.raw_data["rrp_current_billions"] == 10.0
+
+    @pytest.mark.asyncio
+    async def test_market_liquidity_abundant(
+        self, category_with_fred, mock_fred_service
+    ):
+        """
+        Test Market Liquidity when capital is abundant (high bubble risk).
+
+        Scenario:
+        - RRP Balance: 2000B (near peak, 80% of 2500B max)
+        - SOFR-EFFR Spread: 5 bps (normal, no stress)
+        - RRP Trend: Rising (liquidity flooding in)
+
+        Expected: HIGH risk score (abundant liquidity enables bubbles)
+        """
+        # Mock FRED data
+        mock_fred_service.get_sofr.return_value = self.create_fred_df([3.69])
+        mock_fred_service.get_effr.return_value = self.create_fred_df(
+            [3.64]
+        )  # 5bps spread
+        mock_fred_service.get_rrp_balance.return_value = self.create_fred_df(
+            [1500.0] * 20 + [2000.0]  # Rising from 1500B to 2000B
+        )
+
+        metric = await category_with_fred._calculate_market_liquidity()
+
+        assert metric.id == "market_liquidity"
+        # High RRP + low spread + rising trend = HIGH risk
+        assert metric.score > 70
+        assert metric.status in [MetricStatus.ELEVATED, MetricStatus.HIGH]
+        assert "abundant" in metric.explanation.summary.lower()
+        assert metric.raw_data["rrp_current_billions"] == 2000.0
+
+    @pytest.mark.asyncio
+    async def test_market_liquidity_no_fred_service(self):
+        """Test fallback when FRED service is not available."""
+        settings = Settings()
+        category = AISectorRiskCategory(settings=settings, fred_service=None)
+
+        metric = await category._calculate_market_liquidity()
+
+        # Should return placeholder with neutral score
+        assert metric.id == "market_liquidity"
+        assert metric.score == 50.0
+        assert "FRED service not available" in metric.explanation.summary
+
+    @pytest.mark.asyncio
+    async def test_market_liquidity_component_weights(
+        self, category_with_fred, mock_fred_service
+    ):
+        """
+        Test that component weights sum correctly.
+
+        Weights:
+        - RRP Level: 50%
+        - SOFR-EFFR Spread: 30%
+        - RRP Trend: 20%
+        """
+        # Mock moderate data
+        mock_fred_service.get_sofr.return_value = self.create_fred_df([3.69])
+        mock_fred_service.get_effr.return_value = self.create_fred_df([3.64])
+        mock_fred_service.get_rrp_balance.return_value = self.create_fred_df(
+            [500.0] * 25  # Stable at 500B
+        )
+
+        metric = await category_with_fred._calculate_market_liquidity()
+
+        # Verify weights are correct
+        weights = metric.raw_data["weights"]
+        assert weights["rrp_level"] == 0.5
+        assert weights["sofr_effr_spread"] == 0.3
+        assert weights["rrp_trend"] == 0.2
+        assert sum(weights.values()) == 1.0
+
+    @pytest.mark.asyncio
+    async def test_market_liquidity_data_sources(
+        self, category_with_fred, mock_fred_service
+    ):
+        """Test that data sources are correctly reported."""
+        mock_fred_service.get_sofr.return_value = self.create_fred_df([3.77])
+        mock_fred_service.get_effr.return_value = self.create_fred_df([3.64])
+        mock_fred_service.get_rrp_balance.return_value = self.create_fred_df([10.0])
+
+        metric = await category_with_fred._calculate_market_liquidity()
+
+        assert "FRED_SOFR" in metric.data_sources
+        assert "FRED_EFFR" in metric.data_sources
+        assert "FRED_RRP" in metric.data_sources

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-12-30
+
+### Added
+- feat(insights): Story 2.6 - Options Put/Call Ratio metric with ATM Dollar-Weighted methodology
+  - New OptionsMixin for Alpha Vantage HISTORICAL_OPTIONS endpoint
+  - DML support for quotes and options data with caching
+  - Contrarian scoring: Low PCR = High bubble risk (euphoria)
+- feat(insights): Story 2.7 - Market Liquidity metric using FRED API data
+  - New FREDService for SOFR, EFFR, and RRP Balance data
+  - Replaces yield_curve metric with actual liquidity measures
+  - Theory: "Bubbles require abundant capital to form"
+- AI Sector Risk now has 7 metrics (was 6):
+  1. AI Price Anomaly (17%)
+  2. News Sentiment (17%)
+  3. Smart Money Flow (17%)
+  4. Options Put/Call Ratio (15%) - NEW
+  5. IPO Heat (9%)
+  6. Market Liquidity (13%) - REPLACED yield_curve
+  7. Fed Expectations (12%)
+
+### Changed
+- Rebalanced composite weights for 7 metrics totaling 100%
+- Updated all insights tests to expect 7 metrics
+
 ## [0.8.10] - 2025-12-30
 
 ### Added

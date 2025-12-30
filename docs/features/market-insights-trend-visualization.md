@@ -54,9 +54,9 @@ Phase 2 of Market Insights adds historical trend visualization capabilities to t
 
 ### 1. Daily Automated Snapshots
 
-- **CronJob**: `insights-snapshot-trigger` runs at 14:30 UTC daily
+- **CronJob**: `insights-snapshot-trigger` runs at 01:00 UTC (9:00 AM Beijing/CST) daily
 - **Storage**: MongoDB `insight_snapshots` collection with compound index on `(category_id, date)`
-- **Cache**: Redis key `insights:{category_id}:latest` with 24hr TTL
+- **Cache**: Redis key `insights:{category_id}:full` with 24hr TTL (populated by CronJob, instant page load)
 
 ### 2. Trend API Endpoint
 

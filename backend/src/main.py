@@ -240,11 +240,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         # Initialize Market Insights registry (singleton for all requests)
         from .services.insights import InsightsCategoryRegistry
+        from .services.market_data import FREDService
+
+        # Create FRED service for liquidity metrics
+        fred_service = None
+        if settings.fred_api_key:
+            fred_service = FREDService(api_key=settings.fred_api_key)
+            logger.info("FRED service initialized for liquidity metrics")
 
         insights_registry = InsightsCategoryRegistry(
             settings=settings,
             redis_cache=redis_cache,
             market_service=market_service,
+            fred_service=fred_service,
         )
         app.state.insights_registry = insights_registry
         logger.info(

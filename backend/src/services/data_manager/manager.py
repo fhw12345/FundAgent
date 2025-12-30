@@ -29,6 +29,8 @@ from .types import (
     IPOData,
     NewsData,
     OHLCVData,
+    OptionContract,
+    QuoteData,
     SharedDataContext,
     TreasuryData,
 )
@@ -55,6 +57,8 @@ class DataManager:
     TTL_NEWS = 3600  # 1 hour
     TTL_IPO = 86400  # 24 hours
     TTL_INSIGHTS = 86400  # 24 hours
+    TTL_QUOTE = 300  # 5 minutes (real-time quotes)
+    TTL_OPTIONS = 3600  # 1 hour (options chains - daily data)
 
     def __init__(
         self,
@@ -457,6 +461,155 @@ class DataManager:
 
         except Exception as e:
             logger.error("news_fetch_failed", topic=topic, error=str(e))
+            raise DataFetchError(str(e), "alpha_vantage") from e
+
+    # =========================================================================
+    # Quotes and Options (Story 2.6: Put/Call Ratio)
+    # =========================================================================
+
+    async def get_quote(self, symbol: str) -> QuoteData:
+        """
+        Get real-time quote for a symbol.
+
+        Uses existing QuotesMixin.get_quote() from Alpha Vantage.
+        Short TTL since prices change frequently.
+
+        Args:
+            symbol: Stock symbol (e.g., "NVDA")
+
+        Returns:
+            QuoteData object with current price, volume, etc.
+
+        Raises:
+            DataFetchError: If fetch fails
+        """
+        symbol = symbol.upper()
+        cache_key = CacheKeys.quote(symbol)
+
+        async def fetch_func() -> dict[str, Any]:
+            data = await self._fetch_quote(symbol)
+            return data.to_dict()
+
+        cached = await self._cache.get_with_fetch(cache_key, fetch_func, self.TTL_QUOTE)
+
+        if cached is None:
+            raise DataFetchError(f"Failed to fetch quote for {symbol}", "market")
+
+        # Type assertion: cached is dict from get_with_fetch
+        if not isinstance(cached, dict):
+            raise DataFetchError(f"Invalid cache data for {symbol}", "cache")
+
+        return QuoteData.from_dict(cached)
+
+    async def _fetch_quote(self, symbol: str) -> QuoteData:
+        """Internal: Fetch quote from Alpha Vantage."""
+        try:
+            # Reuse existing get_quote() from QuotesMixin
+            data = await self._av_service.get_quote(symbol)
+            return QuoteData(
+                symbol=data["symbol"],
+                price=data["price"],
+                volume=data["volume"],
+                latest_trading_day=data["latest_trading_day"],
+                previous_close=data["previous_close"],
+                change=data["change"],
+                change_percent=float(data["change_percent"]),
+                open=data["open"],
+                high=data["high"],
+                low=data["low"],
+            )
+        except Exception as e:
+            logger.error("quote_fetch_failed", symbol=symbol, error=str(e))
+            raise DataFetchError(str(e), "alpha_vantage") from e
+
+    async def get_options(self, symbol: str) -> list[OptionContract]:
+        """
+        Get options chain for a symbol.
+
+        Fetches from Alpha Vantage HISTORICAL_OPTIONS endpoint.
+        Returns previous trading day's options data.
+
+        Args:
+            symbol: Stock symbol (e.g., "NVDA")
+
+        Returns:
+            List of OptionContract objects
+
+        Raises:
+            DataFetchError: If fetch fails
+        """
+        symbol = symbol.upper()
+        cache_key = CacheKeys.options(symbol)
+
+        async def fetch_func() -> list[dict[str, Any]]:
+            data = await self._fetch_options(symbol)
+            return [d.to_dict() for d in data]
+
+        cached = await self._cache.get_with_fetch(
+            cache_key, fetch_func, self.TTL_OPTIONS
+        )
+
+        if cached is None:
+            return []  # Options data may not be available
+
+        # Type assertion: cached is list from get_with_fetch
+        if not isinstance(cached, list):
+            return []
+
+        return [OptionContract.from_dict(d) for d in cached]
+
+    async def _fetch_options(self, symbol: str) -> list[OptionContract]:
+        """Internal: Fetch options chain from Alpha Vantage."""
+        try:
+            if not hasattr(self._av_service, "get_historical_options"):
+                logger.warning("options_endpoint_not_available")
+                return []
+
+            data = await self._av_service.get_historical_options(symbol)
+
+            if not data or "data" not in data:
+                return []
+
+            result = []
+            for item in data.get("data", []):
+                try:
+                    result.append(
+                        OptionContract(
+                            contract_id=item.get("contractID", ""),
+                            symbol=symbol,
+                            expiration=datetime.strptime(
+                                item.get("expiration", ""), "%Y-%m-%d"
+                            ),
+                            strike=float(item.get("strike", 0)),
+                            option_type=item.get("type", "").lower(),
+                            last_price=float(item.get("last", 0)),
+                            bid=float(item.get("bid", 0)),
+                            ask=float(item.get("ask", 0)),
+                            volume=int(item.get("volume", 0) or 0),
+                            open_interest=int(item.get("open_interest", 0) or 0),
+                            implied_volatility=float(
+                                item.get("implied_volatility", 0) or 0
+                            ),
+                            delta=(
+                                float(item.get("delta", 0))
+                                if item.get("delta")
+                                else None
+                            ),
+                        )
+                    )
+                except Exception as e:
+                    logger.debug("options_item_parse_error", error=str(e))
+                    continue
+
+            logger.info(
+                "options_fetched",
+                symbol=symbol,
+                contracts=len(result),
+            )
+            return result
+
+        except Exception as e:
+            logger.error("options_fetch_failed", symbol=symbol, error=str(e))
             raise DataFetchError(str(e), "alpha_vantage") from e
 
     # =========================================================================

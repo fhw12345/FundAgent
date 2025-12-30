@@ -75,6 +75,7 @@ class InsightsCategoryRegistry:
         settings: Settings,
         redis_cache: RedisCache | None = None,
         market_service: Any | None = None,
+        fred_service: Any | None = None,
     ) -> None:
         """Initialize registry with dependencies.
 
@@ -82,10 +83,12 @@ class InsightsCategoryRegistry:
             settings: Application settings
             redis_cache: Optional Redis cache
             market_service: AlphaVantageMarketDataService instance
+            fred_service: FREDService instance for liquidity metrics
         """
         self.settings = settings
         self.redis_cache = redis_cache
         self.market_service = market_service
+        self.fred_service = fred_service
         self._instances: dict[str, InsightCategoryBase] = {}
 
         # Auto-discover and load categories
@@ -115,6 +118,7 @@ class InsightsCategoryRegistry:
                     settings=self.settings,
                     redis_cache=self.redis_cache,
                     market_service=self.market_service,
+                    fred_service=self.fred_service,
                 )
                 self._instances[category_id] = instance
                 logger.info(
