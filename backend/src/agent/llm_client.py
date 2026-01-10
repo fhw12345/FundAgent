@@ -302,6 +302,26 @@ Risk: Based on 6-month data. Market weakness or company news could quickly inval
 
 Example - Follow-Up ("What about the P/E ratio?"):
 "The P/E is elevated at 28x, above the S&P 500's 20x average. This reflects premium valuation for AAPL's strong fundamentals and brand moat. Not a concern for quality growth, but means less margin for error if earnings disappoint."
+
+CRITICAL - Chat Title Generation:
+At the END of EVERY response, you MUST include a chat title in this exact format:
+[chat_title: Your Title Here]
+
+Title Rules:
+- Max 5 words, max 30 characters
+- Include primary stock symbol if discussed (e.g., "AAPL Technical Analysis")
+- Be specific and descriptive (e.g., "NVDA Earnings Review", "Market Overview Today")
+- For comparisons: "AAPL vs MSFT"
+- For general queries: "Portfolio Strategy", "Market Sentiment"
+- This line is ALWAYS the last line of your response
+- Do NOT include any text after the [chat_title: ...] line
+
+Example endings:
+"...consider accumulating on dips toward $185.
+[chat_title: AAPL Technical Setup]"
+
+"...the S&P shows strong momentum.
+[chat_title: Market Overview]"
 """
 
 

@@ -4,15 +4,12 @@ Fundamentals formatting for Alpha Vantage responses.
 Handles company overview, cash flow, and balance sheet formatting.
 """
 
-from datetime import datetime
 from typing import Any
 
 from .base import (
     calculate_qoq_growth,
-    extract_current_year_quarters,
     format_large_number,
     generate_metadata_header,
-    get_quarter_label,
     safe_float,
 )
 
@@ -149,19 +146,25 @@ class FundamentalsFormatter:
         return "\n".join(output)
 
     @staticmethod
-    def format_cash_flow(raw_data: dict[str, Any], symbol: str, invoked_at: str) -> str:
+    def format_cash_flow(
+        raw_data: dict[str, Any],
+        symbol: str,
+        invoked_at: str,
+        count: int = 3,
+        period: str = "quarter",
+    ) -> str:
         """
-        Format cash flow statement with trend analysis.
-
-        Shows latest annual + current year quarterly trends.
+        Format cash flow statement with configurable period selection.
 
         Args:
             raw_data: Raw Alpha Vantage CASH_FLOW response
             symbol: Stock symbol
             invoked_at: ISO timestamp
+            count: Number of periods to return (default: 3)
+            period: "quarter" for quarterly, "year" for annual (default: "quarter")
 
         Returns:
-            Rich markdown with cash flow trends
+            Rich markdown with cash flow data for specified periods
         """
         header = generate_metadata_header(
             tool_name="Cash Flow Analysis",
@@ -173,123 +176,108 @@ class FundamentalsFormatter:
         annual_reports = raw_data.get("annualReports", [])
         quarterly_reports = raw_data.get("quarterlyReports", [])
 
-        if not annual_reports:
+        # Select data based on period type
+        if period == "year":
+            reports = annual_reports[:count]
+            period_label = f"Latest {count} Annual" if count > 1 else "Latest Annual"
+        else:
+            reports = quarterly_reports[:count]
+            period_label = (
+                f"Latest {count} Quarters" if count > 1 else "Latest Quarter"
+            )
+
+        if not reports:
             return (
                 f"{header}\n## Cash Flow - {symbol}\n\n"
                 f"No cash flow data available for {symbol}"
             )
 
-        # Latest annual report
-        latest_annual = annual_reports[0]
-        fiscal_year = latest_annual.get("fiscalDateEnding", "N/A")
-
-        operating_cf = safe_float(latest_annual.get("operatingCashflow"))
-        capex = safe_float(latest_annual.get("capitalExpenditures"))
-        free_cf = operating_cf - abs(capex) if operating_cf and capex else None
-        dividend_payout = safe_float(latest_annual.get("dividendPayout"))
-
         output = [
             header,
             f"## Cash Flow - {symbol}",
             "",
-            f"### Latest Annual Report (FY {fiscal_year[:4]})",
+            f"### {period_label}",
             "",
-            "| Metric | Value |",
-            "|--------|-------|",
-            f"| Operating Cash Flow | {format_large_number(operating_cf)} |",
-            f"| Capital Expenditures | {format_large_number(abs(capex))} |",
-            f"| Free Cash Flow | {format_large_number(free_cf)} |",
         ]
 
-        if dividend_payout and dividend_payout > 0:
-            output.append(
-                f"| Dividend Payout | {format_large_number(dividend_payout)} |"
-            )
-
-        # Current year quarterly trend
-        current_year = datetime.now().year
-        current_year_quarters = extract_current_year_quarters(
-            quarterly_reports, current_year
-        )
-
-        if current_year_quarters:
+        # Multi-period table format
+        if period == "quarter":
             output.extend(
                 [
-                    "",
-                    f"### Current Year Quarterly Trend ({current_year})",
-                    "",
-                    "| Quarter | Operating CF | CapEx | Free CF | QoQ Growth |",
-                    "|---------|-------------|-------|---------|------------|",
+                    "| Quarter End | Operating CF | CapEx | Free CF | Net Income |",
+                    "|-------------|--------------|-------|---------|------------|",
+                ]
+            )
+        else:
+            output.extend(
+                [
+                    "| Fiscal Year | Operating CF | CapEx | Free CF | Net Income |",
+                    "|-------------|--------------|-------|---------|------------|",
                 ]
             )
 
-            previous_fcf = None
-            for q in current_year_quarters:
-                q_date = q.get("fiscalDateEnding", "")
-                q_label = get_quarter_label(q_date)
+        # Track for trend analysis
+        fcf_values = []
 
-                q_operating = safe_float(q.get("operatingCashflow"))
-                q_capex = safe_float(q.get("capitalExpenditures"))
-                q_free_cf = (
-                    q_operating - abs(q_capex) if q_operating and q_capex else None
-                )
+        for report in reports:
+            date_ending = report.get("fiscalDateEnding", "N/A")
+            operating_cf = safe_float(report.get("operatingCashflow"))
+            capex = safe_float(report.get("capitalExpenditures"))
+            net_income = safe_float(report.get("netIncome"))
+            free_cf = operating_cf - abs(capex) if operating_cf and capex else None
 
-                qoq_growth = calculate_qoq_growth(q_free_cf, previous_fcf)
+            fcf_values.append(free_cf)
 
-                output.append(
-                    f"| {q_label} | {format_large_number(q_operating)} | "
-                    f"{format_large_number(abs(q_capex))} | "
-                    f"{format_large_number(q_free_cf)} | {qoq_growth} |"
-                )
+            output.append(
+                f"| {date_ending} | {format_large_number(operating_cf)} | "
+                f"{format_large_number(abs(capex))} | "
+                f"{format_large_number(free_cf)} | "
+                f"{format_large_number(net_income)} |"
+            )
 
-                previous_fcf = q_free_cf
+        # Trend analysis for multi-period
+        if len(fcf_values) >= 2 and fcf_values[0] is not None and fcf_values[1] is not None:
+            latest_fcf = fcf_values[0]
+            prev_fcf = fcf_values[1]
+            growth = calculate_qoq_growth(latest_fcf, prev_fcf)
+            trend_label = "QoQ" if period == "quarter" else "YoY"
 
-            # Trend analysis
-            if len(current_year_quarters) >= 2:
-                latest_q = current_year_quarters[-1]
-                prev_q = current_year_quarters[-2]
+            output.extend(
+                [
+                    "",
+                    "### Trend Analysis",
+                    f"* Free Cash Flow {trend_label} change: {growth}",
+                ]
+            )
 
-                latest_fcf = safe_float(latest_q.get("operatingCashflow")) - abs(
-                    safe_float(latest_q.get("capitalExpenditures"))
-                )
-                prev_fcf = safe_float(prev_q.get("operatingCashflow")) - abs(
-                    safe_float(prev_q.get("capitalExpenditures"))
-                )
-
-                growth = calculate_qoq_growth(latest_fcf, prev_fcf)
-
-                output.extend(
-                    [
-                        "",
-                        "### Trend Analysis",
-                        f"* Free cash flow QoQ change: {growth}",
-                    ]
-                )
-
-                if operating_cf > 0 and capex != 0:
-                    capex_ratio = (abs(capex) / operating_cf) * 100
-                    output.append(
-                        f"* Capital efficiency: CapEx/Operating CF = {capex_ratio:.1f}%"
-                    )
+            # Calculate average FCF
+            valid_fcf = [f for f in fcf_values if f is not None]
+            if valid_fcf:
+                avg_fcf = sum(valid_fcf) / len(valid_fcf)
+                output.append(f"* Average Free Cash Flow: {format_large_number(avg_fcf)}")
 
         return "\n".join(output)
 
     @staticmethod
     def format_balance_sheet(
-        raw_data: dict[str, Any], symbol: str, invoked_at: str
+        raw_data: dict[str, Any],
+        symbol: str,
+        invoked_at: str,
+        count: int = 3,
+        period: str = "quarter",
     ) -> str:
         """
-        Format balance sheet with trend analysis.
-
-        Shows latest annual + current year quarterly trends.
+        Format balance sheet with configurable period selection.
 
         Args:
             raw_data: Raw Alpha Vantage BALANCE_SHEET response
             symbol: Stock symbol
             invoked_at: ISO timestamp
+            count: Number of periods to return (default: 3)
+            period: "quarter" for quarterly, "year" for annual (default: "quarter")
 
         Returns:
-            Rich markdown with balance sheet trends
+            Rich markdown with balance sheet data for specified periods
         """
         header = generate_metadata_header(
             tool_name="Balance Sheet Analysis",
@@ -301,94 +289,81 @@ class FundamentalsFormatter:
         annual_reports = raw_data.get("annualReports", [])
         quarterly_reports = raw_data.get("quarterlyReports", [])
 
-        if not annual_reports:
+        # Select data based on period type
+        if period == "year":
+            reports = annual_reports[:count]
+            period_label = f"Latest {count} Annual" if count > 1 else "Latest Annual"
+        else:
+            reports = quarterly_reports[:count]
+            period_label = (
+                f"Latest {count} Quarters" if count > 1 else "Latest Quarter"
+            )
+
+        if not reports:
             return (
                 f"{header}\n## Balance Sheet - {symbol}\n\n"
                 f"No balance sheet data available for {symbol}"
             )
 
-        # Latest annual report
-        latest_annual = annual_reports[0]
-        fiscal_year = latest_annual.get("fiscalDateEnding", "N/A")
-
-        total_assets = safe_float(latest_annual.get("totalAssets"))
-        total_liabilities = safe_float(latest_annual.get("totalLiabilities"))
-        equity = safe_float(latest_annual.get("totalShareholderEquity"))
-        current_assets = safe_float(latest_annual.get("currentAssets"))
-        current_liabilities = safe_float(latest_annual.get("currentLiabilities"))
-        cash = safe_float(latest_annual.get("cashAndCashEquivalentsAtCarryingValue"))
-
         output = [
             header,
             f"## Balance Sheet - {symbol}",
             "",
-            f"### Latest Annual Report (FY {fiscal_year[:4]})",
+            f"### {period_label}",
             "",
-            "| Metric | Value |",
-            "|--------|-------|",
-            f"| Total Assets | {format_large_number(total_assets)} |",
-            f"| Total Liabilities | {format_large_number(total_liabilities)} |",
-            f"| Shareholder Equity | {format_large_number(equity)} |",
-            f"| Current Assets | {format_large_number(current_assets)} |",
-            f"| Current Liabilities | {format_large_number(current_liabilities)} |",
-            f"| Cash & Equivalents | {format_large_number(cash)} |",
         ]
 
-        # Financial ratios
-        if current_assets > 0 and current_liabilities > 0:
-            current_ratio = current_assets / current_liabilities
+        # Multi-period table format
+        if period == "quarter":
             output.extend(
                 [
-                    "",
-                    "### Key Ratios",
-                    f"* **Current Ratio:** {current_ratio:.2f} (liquidity measure)",
+                    "| Quarter End | Total Assets | Total Liabilities | Equity | Current Ratio |",
+                    "|-------------|--------------|-------------------|--------|---------------|",
+                ]
+            )
+        else:
+            output.extend(
+                [
+                    "| Fiscal Year | Total Assets | Total Liabilities | Equity | Current Ratio |",
+                    "|-------------|--------------|-------------------|--------|---------------|",
                 ]
             )
 
-        if total_assets > 0 and total_liabilities > 0:
-            debt_to_assets = (total_liabilities / total_assets) * 100
+        for report in reports:
+            date_ending = report.get("fiscalDateEnding", "N/A")
+            total_assets = safe_float(report.get("totalAssets"))
+            total_liabilities = safe_float(report.get("totalLiabilities"))
+            equity = safe_float(report.get("totalShareholderEquity"))
+            current_assets = safe_float(report.get("currentAssets"))
+            current_liabilities = safe_float(report.get("currentLiabilities"))
+
+            current_ratio = (
+                current_assets / current_liabilities
+                if current_liabilities > 0
+                else 0
+            )
+
             output.append(
-                f"* **Debt-to-Assets:** {debt_to_assets:.1f}% (leverage measure)"
+                f"| {date_ending} | {format_large_number(total_assets)} | "
+                f"{format_large_number(total_liabilities)} | "
+                f"{format_large_number(equity)} | "
+                f"{current_ratio:.2f} |"
             )
 
-        # Current year quarterly trend
-        current_year = datetime.now().year
-        current_year_quarters = extract_current_year_quarters(
-            quarterly_reports, current_year
-        )
+        # Add key ratios from latest report
+        if reports:
+            latest = reports[0]
+            total_assets = safe_float(latest.get("totalAssets"))
+            total_liabilities = safe_float(latest.get("totalLiabilities"))
 
-        if current_year_quarters:
-            output.extend(
-                [
-                    "",
-                    f"### Current Year Quarterly Trend ({current_year})",
-                    "",
-                    "| Quarter | Total Assets | Total Liabilities | Equity | Current Ratio |",
-                    "|---------|-------------|-------------------|--------|---------------|",
-                ]
-            )
-
-            for q in current_year_quarters:
-                q_date = q.get("fiscalDateEnding", "")
-                q_label = get_quarter_label(q_date)
-
-                q_assets = safe_float(q.get("totalAssets"))
-                q_liabilities = safe_float(q.get("totalLiabilities"))
-                q_equity = safe_float(q.get("totalShareholderEquity"))
-                q_current_assets = safe_float(q.get("currentAssets"))
-                q_current_liabilities = safe_float(q.get("currentLiabilities"))
-
-                q_current_ratio = (
-                    q_current_assets / q_current_liabilities
-                    if q_current_liabilities > 0
-                    else 0
-                )
-
-                output.append(
-                    f"| {q_label} | {format_large_number(q_assets)} | "
-                    f"{format_large_number(q_liabilities)} | "
-                    f"{format_large_number(q_equity)} | "
-                    f"{q_current_ratio:.2f} |"
+            if total_assets > 0 and total_liabilities > 0:
+                debt_to_assets = (total_liabilities / total_assets) * 100
+                output.extend(
+                    [
+                        "",
+                        "### Key Ratios (Latest)",
+                        f"* **Debt-to-Assets:** {debt_to_assets:.1f}% (leverage measure)",
+                    ]
                 )
 
         return "\n".join(output)

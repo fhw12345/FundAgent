@@ -22,6 +22,7 @@ from ....agent.callbacks.tool_execution_callback import ToolExecutionCallback
 from ....agent.langgraph_react_agent import FinancialAnalysisReActAgent
 from ....core.utils import extract_token_usage_from_agent_result
 from ....core.utils.date_utils import utcnow
+from ....core.utils.title_utils import extract_title_from_response
 from ....database.repositories.message_repository import MessageRepository
 from ....services.chat_service import ChatService
 from ....services.context_window_manager import ContextWindowManager
@@ -379,13 +380,19 @@ async def stream_with_react_agent(
                 )
                 return
 
-            final_answer = result["final_answer"]
+            raw_answer = result["final_answer"]
             tool_executions = result.get("tool_executions", 0)
             trace_id = result.get("trace_id", "unknown")
+
+            # ===== EXTRACT LLM-GENERATED TITLE (Story 3.4) =====
+            # LLM includes title at end of response: [chat_title: Title Here]
+            # Extract it and clean the response for display/storage
+            llm_title, final_answer = extract_title_from_response(raw_answer)
             logger.info(
                 "Extracted result fields",
                 answer_len=len(final_answer),
                 trace_id=trace_id,
+                llm_title=llm_title,
             )
 
             # Extract token usage from agent result
@@ -528,6 +535,15 @@ async def stream_with_react_agent(
                     "Failed to complete transaction for v3 agent",
                     transaction_id=transaction.transaction_id,
                 )
+
+            # ===== AUTO-GENERATE CHAT TITLE (Story 3.4) =====
+            # Priority: LLM-generated title > Heuristic fallback
+            # LLM title extracted from response suffix: [chat_title: Title Here]
+            await chat_service.update_title_if_new(
+                chat_id=chat_id,
+                llm_title=llm_title,
+                user_message=request.message,
+            )
 
             # Emit final latency metric: stream complete (Story 1.4)
             total_duration_ms = get_elapsed_ms()

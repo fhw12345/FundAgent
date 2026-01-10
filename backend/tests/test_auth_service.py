@@ -442,6 +442,8 @@ class TestEdgeCases:
             await auth_service.verify_and_login("unsupported", "identifier", code="123")
 
     def test_token_expiry_configuration(self, auth_service):
-        """Test that token expiry is properly configured"""
-        assert AuthService.ACCESS_TOKEN_EXPIRE_MINUTES == 60 * 24 * 7  # 7 days
+        """Test that token expiry matches TokenService for consistent refresh behavior"""
+        # Must match TokenService.ACCESS_TOKEN_EXPIRE_MINUTES (30 min)
+        # See Story 3.2: Fix Session Auto-Refresh
+        assert AuthService.ACCESS_TOKEN_EXPIRE_MINUTES == 30  # 30 minutes
         assert AuthService.ALGORITHM == "HS256"

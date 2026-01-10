@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 import structlog
 from langchain_core.tools import tool
 
+from src.core.config import get_settings
 from src.services.alphavantage_market_data import AlphaVantageMarketDataService
 from src.services.alphavantage_response_formatter import AlphaVantageResponseFormatter
 
@@ -72,39 +73,59 @@ def create_fundamental_tools(
     async def get_financial_statements(
         symbol: str,
         statement_type: str = "cash_flow",
+        count: int = 3,
+        period: str = "quarter",
     ) -> str:
         """
         Get financial statements (Cash Flow or Balance Sheet) for a company.
 
-        Returns annual and quarterly financial data with key metrics.
-        Supports both cash flow and balance sheet statement types.
+        Returns annual and/or quarterly financial data with key metrics.
+        Supports configurable number of periods for trend analysis.
 
         Args:
-            symbol: Stock ticker symbol (e.g., "AAPL", "MSFT")
+            symbol: Stock ticker symbol (e.g., "AAPL", "MSFT", "MRVL")
             statement_type: Type of statement - "cash_flow" or "balance_sheet"
+            count: Number of periods to return (default: 3)
+            period: "quarter" for quarterly data, "year" for annual data (default: "quarter")
+
+        Limits:
+            - Quarterly: max 20 periods
+            - Annual: max 5 periods
 
         Returns:
-            Compressed financial statement summary (latest annual and quarterly)
+            Multi-period financial statement with trends and analysis
 
         Cash Flow Metrics:
             - Operating Cash Flow, Capital Expenditures
             - Free Cash Flow (Operating - CapEx)
-            - Dividend Payout, Cash Changes
+            - Dividend Payout, Net Income
 
         Balance Sheet Metrics:
             - Total Assets, Total Liabilities, Shareholder Equity
             - Current Assets/Liabilities, Cash, Debt
-            - Inventory, Goodwill, Intangible Assets
 
         Examples:
-            - symbol="AAPL", statement_type="cash_flow" → Apple cash flow
-            - symbol="MSFT", statement_type="balance_sheet" → Microsoft balance sheet
+            - get_financial_statements("MRVL") → Latest 3 quarters cash flow (default)
+            - get_financial_statements("AAPL", "cash_flow", 4, "quarter") → Last 4 quarters
+            - get_financial_statements("GOOGL", "cash_flow", 2, "year") → Last 2 years
+            - get_financial_statements("MSFT", "balance_sheet", 3, "quarter") → Last 3 quarters balance sheet
         """
         try:
             statement_type = statement_type.lower().strip()
+            period = period.lower().strip()
 
             if statement_type not in ["cash_flow", "balance_sheet"]:
                 return f"Invalid statement_type: {statement_type}. Use 'cash_flow' or 'balance_sheet'"
+
+            if period not in ["quarter", "year"]:
+                return f"Invalid period: {period}. Use 'quarter' or 'year'"
+
+            # Validate and cap count based on period type (limits from config)
+            settings = get_settings()
+            if period == "quarter":
+                count = min(max(1, count), settings.fundamentals_max_quarterly_periods)
+            else:
+                count = min(max(1, count), settings.fundamentals_max_annual_periods)
 
             # Fetch data based on type
             if statement_type == "cash_flow":
@@ -114,6 +135,8 @@ def create_fundamental_tools(
                     raw_data=data,
                     symbol=symbol,
                     invoked_at=datetime.now(UTC).isoformat(),
+                    count=count,
+                    period=period,
                 )
             else:
                 data = await service.get_balance_sheet(symbol)
@@ -122,6 +145,8 @@ def create_fundamental_tools(
                     raw_data=data,
                     symbol=symbol,
                     invoked_at=datetime.now(UTC).isoformat(),
+                    count=count,
+                    period=period,
                 )
 
         except Exception as e:

@@ -40,16 +40,30 @@ class AlphaVantageResponseFormatter:
         return self._fundamentals.format_company_overview(raw_data, symbol, invoked_at)
 
     def format_cash_flow(
-        self, raw_data: dict[str, Any], symbol: str, invoked_at: str
+        self,
+        raw_data: dict[str, Any],
+        symbol: str,
+        invoked_at: str,
+        count: int = 3,
+        period: str = "quarter",
     ) -> str:
-        """Format cash flow statement with trend analysis."""
-        return self._fundamentals.format_cash_flow(raw_data, symbol, invoked_at)
+        """Format cash flow statement with configurable period selection."""
+        return self._fundamentals.format_cash_flow(
+            raw_data, symbol, invoked_at, count, period
+        )
 
     def format_balance_sheet(
-        self, raw_data: dict[str, Any], symbol: str, invoked_at: str
+        self,
+        raw_data: dict[str, Any],
+        symbol: str,
+        invoked_at: str,
+        count: int = 3,
+        period: str = "quarter",
     ) -> str:
-        """Format balance sheet with trend analysis."""
-        return self._fundamentals.format_balance_sheet(raw_data, symbol, invoked_at)
+        """Format balance sheet with configurable period selection."""
+        return self._fundamentals.format_balance_sheet(
+            raw_data, symbol, invoked_at, count, period
+        )
 
     # Market methods (delegated)
     def format_news_sentiment(

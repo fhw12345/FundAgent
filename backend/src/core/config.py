@@ -121,6 +121,10 @@ class Settings(BaseSettings):
         86400  # AI insights (24 hours - synced with daily CronJob)
     )
 
+    # Alpha Vantage Fundamentals Tool Limits
+    fundamentals_max_quarterly_periods: int = 20  # Max quarterly periods for cash flow/balance sheet
+    fundamentals_max_annual_periods: int = 5  # Max annual periods for cash flow/balance sheet
+
     # Rate limiting
     rate_limit_requests: int = 100
     rate_limit_window: int = 60  # per minute

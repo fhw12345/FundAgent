@@ -25,8 +25,9 @@ class AuthService:
     """Service for user authentication and JWT management."""
 
     # JWT configuration
+    # NOTE: Must match TokenService.ACCESS_TOKEN_EXPIRE_MINUTES for consistent behavior
     ALGORITHM = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES = 30  # 30 minutes (matches TokenService)
 
     def __init__(self, user_repository: UserRepository, redis_cache: Any = None):
         """

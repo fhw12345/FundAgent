@@ -213,7 +213,7 @@ class TestAlphaVantageResponseFormatter:
     # ========================================
 
     def test_format_cash_flow_with_quarters(self, formatter, sample_invoked_at):
-        """Test cash flow formatting with annual + quarterly data."""
+        """Test cash flow formatting with quarterly data (default behavior)."""
         from datetime import datetime
 
         current_year = datetime.now().year
@@ -226,27 +226,32 @@ class TestAlphaVantageResponseFormatter:
                     "operatingCashflow": "100000000000",
                     "capitalExpenditures": "-30000000000",
                     "dividendPayout": "20000000000",
+                    "netIncome": "80000000000",
                 }
             ],
             "quarterlyReports": [
                 {
-                    "fiscalDateEnding": f"{current_year}-03-31",  # Use current year
+                    "fiscalDateEnding": f"{current_year}-03-31",
                     "operatingCashflow": "25000000000",
                     "capitalExpenditures": "-7500000000",
+                    "netIncome": "20000000000",
                 },
                 {
-                    "fiscalDateEnding": f"{current_year}-06-30",  # Use current year
+                    "fiscalDateEnding": f"{current_year}-06-30",
                     "operatingCashflow": "27000000000",
                     "capitalExpenditures": "-8000000000",
+                    "netIncome": "21000000000",
                 },
                 {
-                    "fiscalDateEnding": f"{current_year}-09-30",  # Use current year
+                    "fiscalDateEnding": f"{current_year}-09-30",
                     "operatingCashflow": "28000000000",
                     "capitalExpenditures": "-8500000000",
+                    "netIncome": "22000000000",
                 },
             ],
         }
 
+        # Test default behavior (quarterly, count=3)
         result = formatter.format_cash_flow(
             raw_data=raw_data,
             symbol="MSFT",
@@ -257,18 +262,48 @@ class TestAlphaVantageResponseFormatter:
         assert "**Tool:** Cash Flow Analysis" in result
         assert "**Symbol:** MSFT" in result
 
-        # Check annual data (formatter shows "FY 2023" not raw date)
-        assert "FY 2023" in result or "2023" in result
+        # Default period is "quarter" - should show quarterly data
+        assert "Latest 3 Quarters" in result
+        assert str(current_year) in result  # Should have current year quarterly data
+        assert "$25.00B" in result  # Q1 operating cash flow
+
+    def test_format_cash_flow_annual(self, formatter, sample_invoked_at):
+        """Test cash flow formatting with annual period."""
+        raw_data = {
+            "symbol": "MSFT",
+            "annualReports": [
+                {
+                    "fiscalDateEnding": "2023-12-31",
+                    "operatingCashflow": "100000000000",
+                    "capitalExpenditures": "-30000000000",
+                    "netIncome": "80000000000",
+                },
+                {
+                    "fiscalDateEnding": "2022-12-31",
+                    "operatingCashflow": "90000000000",
+                    "capitalExpenditures": "-28000000000",
+                    "netIncome": "75000000000",
+                },
+            ],
+            "quarterlyReports": [],
+        }
+
+        # Test annual period
+        result = formatter.format_cash_flow(
+            raw_data=raw_data,
+            symbol="MSFT",
+            invoked_at=sample_invoked_at,
+            count=2,
+            period="year",
+        )
+
+        # Check annual data
+        assert "Latest 2 Annual" in result
+        assert "2023-12-31" in result
         assert "$100.00B" in result  # Operating cash flow
 
-        # Check quarterly data exists (formatter shows current year quarters)
-        assert str(current_year) in result  # Should have current year quarterly data
-        assert (
-            "$25.00B" in result or "$27.00B" in result or "$28.00B" in result
-        )  # Q1, Q2, or Q3 data
-
     def test_format_cash_flow_no_quarters(self, formatter, sample_invoked_at):
-        """Test cash flow formatting with only annual data."""
+        """Test cash flow formatting when requesting quarterly but none available."""
         raw_data = {
             "symbol": "TSLA",
             "annualReports": [
@@ -276,29 +311,43 @@ class TestAlphaVantageResponseFormatter:
                     "fiscalDateEnding": "2023-12-31",
                     "operatingCashflow": "5000000000",
                     "capitalExpenditures": "-2000000000",
+                    "netIncome": "4000000000",
                 }
             ],
             "quarterlyReports": [],
         }
 
+        # Default behavior requests quarterly data - should show "no data" message
         result = formatter.format_cash_flow(
             raw_data=raw_data,
             symbol="TSLA",
             invoked_at=sample_invoked_at,
         )
 
-        # Should not crash with no quarterly data
+        # Should show message about no data available (default requests quarterly)
         assert "TSLA" in result
-        assert (
-            "FY 2023" in result or "2023" in result
-        )  # Formatter shows "FY 2023" not raw date
+        assert "No cash flow data available" in result
+
+        # Test with annual period - should work
+        result = formatter.format_cash_flow(
+            raw_data=raw_data,
+            symbol="TSLA",
+            invoked_at=sample_invoked_at,
+            count=1,
+            period="year",
+        )
+
+        # Should show annual data
+        assert "TSLA" in result
+        assert "2023-12-31" in result
+        assert "$5.00B" in result  # Operating cash flow
 
     # ========================================
     # Balance Sheet Tests
     # ========================================
 
     def test_format_balance_sheet_with_quarters(self, formatter, sample_invoked_at):
-        """Test balance sheet formatting with annual + quarterly data."""
+        """Test balance sheet formatting with quarterly data (default behavior)."""
         from datetime import datetime
 
         current_year = datetime.now().year
@@ -317,18 +366,33 @@ class TestAlphaVantageResponseFormatter:
             ],
             "quarterlyReports": [
                 {
-                    "fiscalDateEnding": f"{current_year}-03-31",  # Use current year
+                    "fiscalDateEnding": f"{current_year}-03-31",
                     "totalAssets": "410000000000",
                     "totalLiabilities": "125000000000",
+                    "totalShareholderEquity": "285000000000",
+                    "currentAssets": "155000000000",
+                    "currentLiabilities": "62000000000",
                 },
                 {
-                    "fiscalDateEnding": f"{current_year}-06-30",  # Use current year
+                    "fiscalDateEnding": f"{current_year}-06-30",
                     "totalAssets": "420000000000",
                     "totalLiabilities": "130000000000",
+                    "totalShareholderEquity": "290000000000",
+                    "currentAssets": "160000000000",
+                    "currentLiabilities": "65000000000",
+                },
+                {
+                    "fiscalDateEnding": f"{current_year}-09-30",
+                    "totalAssets": "430000000000",
+                    "totalLiabilities": "135000000000",
+                    "totalShareholderEquity": "295000000000",
+                    "currentAssets": "165000000000",
+                    "currentLiabilities": "68000000000",
                 },
             ],
         }
 
+        # Test default behavior (quarterly, count=3)
         result = formatter.format_balance_sheet(
             raw_data=raw_data,
             symbol="GOOGL",
@@ -339,13 +403,50 @@ class TestAlphaVantageResponseFormatter:
         assert "**Tool:** Balance Sheet Analysis" in result
         assert "**Symbol:** GOOGL" in result
 
+        # Default period is "quarter" - should show quarterly data
+        assert "Latest 3 Quarters" in result
+        assert str(current_year) in result  # Should have current year quarterly data
+        assert "$410.00B" in result  # Q1 total assets
+
+    def test_format_balance_sheet_annual(self, formatter, sample_invoked_at):
+        """Test balance sheet formatting with annual period."""
+        raw_data = {
+            "symbol": "GOOGL",
+            "annualReports": [
+                {
+                    "fiscalDateEnding": "2023-12-31",
+                    "totalAssets": "400000000000",
+                    "totalLiabilities": "120000000000",
+                    "totalShareholderEquity": "280000000000",
+                    "currentAssets": "150000000000",
+                    "currentLiabilities": "60000000000",
+                },
+                {
+                    "fiscalDateEnding": "2022-12-31",
+                    "totalAssets": "380000000000",
+                    "totalLiabilities": "110000000000",
+                    "totalShareholderEquity": "270000000000",
+                    "currentAssets": "140000000000",
+                    "currentLiabilities": "55000000000",
+                },
+            ],
+            "quarterlyReports": [],
+        }
+
+        # Test annual period
+        result = formatter.format_balance_sheet(
+            raw_data=raw_data,
+            symbol="GOOGL",
+            invoked_at=sample_invoked_at,
+            count=2,
+            period="year",
+        )
+
         # Check annual data
+        assert "Latest 2 Annual" in result
+        assert "2023-12-31" in result
         assert "$400.00B" in result  # Total assets
         assert "$280.00B" in result  # Equity
-
-        # Check quarterly data (formatter shows current year quarters)
-        assert str(current_year) in result  # Should have current year quarterly trend
-        assert "$410.00B" in result or "$420.00B" in result  # Q1 or Q2 assets
 
     def test_format_balance_sheet_financial_ratios(self, formatter, sample_invoked_at):
         """Test balance sheet includes calculated financial ratios."""
@@ -364,14 +465,18 @@ class TestAlphaVantageResponseFormatter:
             "quarterlyReports": [],
         }
 
+        # Use annual period since no quarterly data
         result = formatter.format_balance_sheet(
             raw_data=raw_data,
             symbol="FB",
             invoked_at=sample_invoked_at,
+            count=1,
+            period="year",
         )
 
         # Should include financial ratios like current ratio, debt-to-equity
         assert "FB" in result
+        assert "$200.00B" in result  # Total assets
         # Current ratio = current assets / current liabilities = 100/30 = 3.33
         # Debt-to-equity = total liabilities / equity = 40/160 = 0.25
 

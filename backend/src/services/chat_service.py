@@ -265,72 +265,85 @@ class ChatService:
 
         return updated_chat
 
-    async def generate_title_from_llm(
-        self, user_message: str, assistant_response: str
-    ) -> str:
+    def _generate_title_heuristic(self, user_message: str) -> str:
         """
-        Generate chat title using LLM structured output.
+        Generate chat title using heuristic (fallback when LLM doesn't provide title).
+
+        Uses regex symbol extraction + keyword matching.
 
         Args:
             user_message: User's first message
-            assistant_response: Assistant's first response
 
         Returns:
             Generated title (max 50 chars)
-
-        Note: This is a simplified implementation.
-        In production, you'd call the actual LLM with structured output.
         """
-        # TODO: Implement actual LLM call with structured output
-        # For now, use a simple heuristic
+        from ..core.utils.title_utils import generate_chat_title
 
-        # Extract symbols from user message
-        import re
+        return generate_chat_title(user_message)
 
-        symbols = re.findall(r"\b[A-Z]{1,5}\b", user_message)
-
-        # Detect analysis type
-        analysis_types = {
-            "fibonacci": ["fibonacci", "fib", "retracement"],
-            "stochastic": ["stochastic", "k%", "d%"],
-            "macro": ["macro", "sentiment", "vix"],
-        }
-
-        detected_type = "Analysis"
-        for analysis, keywords in analysis_types.items():
-            if any(keyword in user_message.lower() for keyword in keywords):
-                detected_type = analysis.capitalize()
-                break
-
-        # Build title
-        if symbols:
-            title = f"{symbols[0]} {detected_type}"
-        else:
-            title = f"Financial {detected_type}"
-
-        return title[:50]  # Truncate to max length
-
-    async def should_generate_title(self, chat_id: str) -> bool:
+    async def update_chat_title(self, chat_id: str, title: str) -> Chat | None:
         """
-        Check if title should be generated for chat.
-
-        Title is generated only once on first user message.
+        Update a chat's title.
 
         Args:
             chat_id: Chat identifier
+            title: New title
 
         Returns:
-            True if title should be generated
+            Updated chat or None if not found
         """
+        updated_chat = await self.chat_repo.update(chat_id, ChatUpdate(title=title))
+        if updated_chat:
+            logger.info("Chat title updated", chat_id=chat_id, title=title)
+        return updated_chat
+
+    async def update_title_if_new(
+        self, chat_id: str, llm_title: str | None, user_message: str
+    ) -> str | None:
+        """
+        Update chat title if it's still "New Chat".
+
+        Priority: LLM-generated title > Heuristic fallback
+
+        The LLM generates a title at the end of each response in format:
+        [chat_title: Your Title Here]
+
+        If LLM title is not available, falls back to heuristic extraction
+        using symbol detection and action keywords.
+
+        Args:
+            chat_id: Chat identifier
+            llm_title: Title extracted from LLM response (may be None)
+            user_message: User's first message (for heuristic fallback)
+
+        Returns:
+            Title that was set, or None if skipped
+        """
+        # Check if we should update the title
         chat = await self.chat_repo.get(chat_id)
+        if not chat or chat.title != "New Chat":
+            return None
 
-        if not chat:
-            return False
+        # Use LLM title if available, otherwise fall back to heuristic
+        if llm_title:
+            title = llm_title
+            source = "llm"
+        else:
+            title = self._generate_title_heuristic(user_message)
+            source = "heuristic"
 
-        # Generate title if it's still "New Chat" and has messages
-        message_count = await self.message_repo.count_by_chat(chat_id)
+        # Update chat title
+        await self.update_chat_title(chat_id, title)
 
-        return chat.title == "New Chat" and message_count > 0
+        logger.info(
+            "Auto-generated chat title",
+            chat_id=chat_id,
+            title=title,
+            source=source,
+            user_message_preview=user_message[:50] if user_message else "",
+        )
+
+        return title
 
     async def find_chat_by_symbol(self, user_id: str, symbol: str) -> Chat | None:
         """
