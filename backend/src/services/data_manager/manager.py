@@ -32,6 +32,7 @@ from .types import (
     OptionContract,
     QuoteData,
     SharedDataContext,
+    SymbolPCRData,
     TreasuryData,
 )
 
@@ -59,6 +60,7 @@ class DataManager:
     TTL_INSIGHTS = 86400  # 24 hours
     TTL_QUOTE = 300  # 5 minutes (real-time quotes)
     TTL_OPTIONS = 3600  # 1 hour (options chains - daily data)
+    TTL_PCR = 3600  # 1 hour (per-symbol Put/Call Ratio)
 
     def __init__(
         self,
@@ -611,6 +613,190 @@ class DataManager:
         except Exception as e:
             logger.error("options_fetch_failed", symbol=symbol, error=str(e))
             raise DataFetchError(str(e), "alpha_vantage") from e
+
+    # =========================================================================
+    # Put/Call Ratio (Per-Symbol, Cached)
+    # =========================================================================
+
+    async def get_symbol_pcr(
+        self,
+        symbol: str,
+        atm_zone_pct: float = 0.15,
+        min_premium: float = 0.50,
+        min_oi: int = 500,
+    ) -> SymbolPCRData | None:
+        """
+        Get Put/Call Ratio data for a symbol with caching.
+
+        Uses ATM Dollar-Weighted methodology:
+        - Filters options to ATM zone (±15% of current price)
+        - Requires minimum premium ($0.50) and open interest (500)
+        - Calculates notional as OI × Price × 100
+        - PCR = Σ(Put Notionals) / Σ(Call Notionals)
+
+        This method is shared between:
+        1. AI agent tools (get_put_call_ratio tool)
+        2. AI Sector Risk metric (aggregates multiple symbols)
+
+        Args:
+            symbol: Stock symbol (e.g., "NVDA")
+            atm_zone_pct: ATM zone range (default ±15%)
+            min_premium: Minimum option premium (default $0.50)
+            min_oi: Minimum open interest (default 500)
+
+        Returns:
+            SymbolPCRData with full details, or None if insufficient data
+        """
+        symbol = symbol.upper()
+        cache_key = CacheKeys.pcr_symbol(symbol)
+
+        async def fetch_func() -> dict[str, Any] | None:
+            data = await self._calculate_symbol_pcr(
+                symbol, atm_zone_pct, min_premium, min_oi
+            )
+            return data.to_dict() if data else None
+
+        cached = await self._cache.get_with_fetch(cache_key, fetch_func, self.TTL_PCR)
+
+        if cached is None:
+            return None
+
+        if not isinstance(cached, dict):
+            return None
+
+        return SymbolPCRData.from_dict(cached)
+
+    async def _calculate_symbol_pcr(
+        self,
+        symbol: str,
+        atm_zone_pct: float,
+        min_premium: float,
+        min_oi: int,
+    ) -> SymbolPCRData | None:
+        """
+        Internal: Calculate PCR for a single symbol.
+
+        Fetches quote and options data, filters to ATM zone,
+        and calculates dollar-weighted Put/Call Ratio.
+        """
+        try:
+            # Fetch quote and options concurrently
+            quote_task = self.get_quote(symbol)
+            options_task = self.get_options(symbol)
+
+            quote, options = await asyncio.gather(
+                quote_task, options_task, return_exceptions=True
+            )
+
+            # Handle errors
+            if isinstance(quote, Exception):
+                logger.warning("pcr_quote_failed", symbol=symbol, error=str(quote))
+                return None
+
+            if isinstance(options, Exception) or not options:
+                logger.warning(
+                    "pcr_options_failed",
+                    symbol=symbol,
+                    error=str(options) if isinstance(options, Exception) else "empty",
+                )
+                return None
+
+            # Get current price
+            current_price = quote.price
+            if current_price <= 0:
+                logger.warning("pcr_invalid_price", symbol=symbol, price=current_price)
+                return None
+
+            # Calculate ATM zone
+            atm_zone_low = current_price * (1 - atm_zone_pct)
+            atm_zone_high = current_price * (1 + atm_zone_pct)
+
+            # Filter options to ATM zone
+            put_notional = 0.0
+            call_notional = 0.0
+            contracts_analyzed = 0
+
+            for contract in options:
+                # Check ATM zone
+                if not (atm_zone_low <= contract.strike <= atm_zone_high):
+                    continue
+
+                # Check minimum premium
+                if contract.last_price < min_premium:
+                    continue
+
+                # Check minimum open interest
+                if contract.open_interest < min_oi:
+                    continue
+
+                # Calculate notional: OI × Price × 100 (options = 100 shares)
+                notional = contract.open_interest * contract.last_price * 100
+
+                if contract.option_type == "put":
+                    put_notional += notional
+                elif contract.option_type == "call":
+                    call_notional += notional
+
+                contracts_analyzed += 1
+
+            # Check for sufficient data
+            if contracts_analyzed == 0 or call_notional == 0:
+                logger.warning(
+                    "pcr_insufficient_data",
+                    symbol=symbol,
+                    contracts=contracts_analyzed,
+                    call_notional=call_notional,
+                )
+                return None
+
+            # Calculate PCR
+            pcr = put_notional / call_notional
+
+            # Generate interpretation
+            interpretation = self._interpret_pcr(pcr)
+
+            logger.info(
+                "pcr_calculated",
+                symbol=symbol,
+                price=current_price,
+                pcr=round(pcr, 2),
+                contracts=contracts_analyzed,
+            )
+
+            return SymbolPCRData(
+                symbol=symbol,
+                current_price=current_price,
+                atm_zone_low=round(atm_zone_low, 2),
+                atm_zone_high=round(atm_zone_high, 2),
+                put_notional_mm=round(put_notional / 1_000_000, 2),
+                call_notional_mm=round(call_notional / 1_000_000, 2),
+                contracts_analyzed=contracts_analyzed,
+                pcr=round(pcr, 2),
+                interpretation=interpretation,
+                calculated_at=datetime.now(UTC),
+                atm_zone_pct=atm_zone_pct,
+                min_premium=min_premium,
+                min_oi=min_oi,
+            )
+
+        except Exception as e:
+            logger.error("pcr_calculation_failed", symbol=symbol, error=str(e))
+            return None
+
+    def _interpret_pcr(self, pcr: float) -> str:
+        """Generate human-readable PCR interpretation."""
+        if pcr < 0.5:
+            return "Very low PCR - Extreme bullish sentiment (contrarian bearish)"
+        elif pcr < 0.7:
+            return "Low PCR - Bullish sentiment (contrarian cautious)"
+        elif pcr < 1.0:
+            return "Moderate PCR - Slightly bullish sentiment"
+        elif pcr < 1.3:
+            return "Moderate PCR - Slightly bearish sentiment"
+        elif pcr < 1.5:
+            return "High PCR - Bearish sentiment (contrarian optimistic)"
+        else:
+            return "Very high PCR - Extreme fear (contrarian bullish)"
 
     # =========================================================================
     # Insights (Computed Data)

@@ -122,6 +122,19 @@ class CacheKeys:
         return f"{CacheKeys.MARKET}:options:{symbol.upper()}"
 
     @staticmethod
+    def pcr_symbol(symbol: str) -> str:
+        """
+        Generate cache key for per-symbol Put/Call Ratio data.
+
+        Args:
+            symbol: Stock symbol (uppercase)
+
+        Returns:
+            Cache key like 'market:pcr:NVDA'
+        """
+        return f"{CacheKeys.MARKET}:pcr:{symbol.upper()}"
+
+    @staticmethod
     def insights(category_id: str, suffix: str = "latest") -> str:
         """
         Generate cache key for computed insight data.

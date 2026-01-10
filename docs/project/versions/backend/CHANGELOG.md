@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-12-31
+
+### Added
+- feat(agent): Story 2.8 - Reusable Put/Call Ratio (PCR) Service with AI Tool
+  - New `get_put_call_ratio` AI tool for per-symbol options sentiment analysis
+  - Shared `DataManager.get_symbol_pcr()` with Redis caching (1-hour TTL)
+  - ATM Dollar-Weighted methodology: ±15% price zone, $0.50 min premium, 500 OI
+  - Rich markdown output with sentiment emoji indicators
+  - Performance: Cache HIT 3ms vs Cache MISS 2528ms (843x improvement)
+  - AI Sector Risk metric refactored to reuse cached PCR calculations
+- Replace yield_curve with market_liquidity metric using FRED API (Story 2.7)
+
+
 ## [0.9.0] - 2025-12-30
 
 ### Added

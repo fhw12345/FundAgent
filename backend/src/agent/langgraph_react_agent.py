@@ -62,6 +62,7 @@ from ..core.localization import (
 )
 from ..core.utils import extract_token_usage_from_messages
 from ..services.alphavantage_response_formatter import AlphaVantageResponseFormatter
+from ..services.data_manager import DataManager
 from ..services.insights import InsightsCategoryRegistry
 from ..services.insights.snapshot_service import InsightsSnapshotService
 from ..services.market_data import FREDService
@@ -69,6 +70,7 @@ from ..services.tool_cache_wrapper import ToolCacheWrapper
 from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
 from .tools.insights_tools import create_insights_tools
+from .tools.pcr_tools import create_pcr_tools
 
 logger = structlog.get_logger()
 
@@ -202,10 +204,22 @@ class FinancialAnalysisReActAgent:
         )
         self.tools.extend(insights_tools)
 
+        # Add Put/Call Ratio tools (Story 2.8: Reusable PCR service)
+        # Uses DataManager for cached per-symbol PCR calculations
+        pcr_tools = []
+        if self.redis_cache:
+            data_manager = DataManager(
+                redis_cache=self.redis_cache,
+                alpha_vantage_service=market_service,
+            )
+            pcr_tools = create_pcr_tools(data_manager)
+            self.tools.extend(pcr_tools)
+
         # Track tool counts for logging
         base_tool_count = len(base_tools)
         alpha_vantage_tool_count = len(alpha_vantage_tools)
         insights_tool_count = len(insights_tools)
+        pcr_tool_count = len(pcr_tools)
 
         # Create ReAct agent with memory and custom system prompt
         self.checkpointer = MemorySaver()
@@ -222,6 +236,7 @@ class FinancialAnalysisReActAgent:
             base_tools=base_tool_count,
             alpha_vantage_tools=alpha_vantage_tool_count,
             insights_tools=insights_tool_count,
+            pcr_tools=pcr_tool_count,
             total_local_tools=len(self.tools),
         )
 

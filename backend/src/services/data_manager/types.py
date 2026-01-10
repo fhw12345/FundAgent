@@ -308,6 +308,68 @@ class TrendPoint:
 
 
 @dataclass
+class SymbolPCRData:
+    """
+    Put/Call Ratio data for a single symbol.
+
+    Cached per-symbol to enable reuse between AI tools and AI Sector Risk metric.
+    Uses ATM Dollar-Weighted methodology: Notional = OI × Price × 100.
+    """
+
+    symbol: str
+    current_price: float
+    atm_zone_low: float
+    atm_zone_high: float
+    put_notional_mm: float  # Put notional in millions
+    call_notional_mm: float  # Call notional in millions
+    contracts_analyzed: int
+    pcr: float  # Put/Call Ratio
+    interpretation: str  # Human-readable interpretation
+    calculated_at: datetime
+    # Filter parameters used for calculation
+    atm_zone_pct: float = 0.15  # ATM zone ±15%
+    min_premium: float = 0.50  # Minimum option premium
+    min_oi: int = 500  # Minimum open interest
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "symbol": self.symbol,
+            "current_price": self.current_price,
+            "atm_zone_low": self.atm_zone_low,
+            "atm_zone_high": self.atm_zone_high,
+            "put_notional_mm": self.put_notional_mm,
+            "call_notional_mm": self.call_notional_mm,
+            "contracts_analyzed": self.contracts_analyzed,
+            "pcr": self.pcr,
+            "interpretation": self.interpretation,
+            "calculated_at": self.calculated_at.isoformat(),
+            "atm_zone_pct": self.atm_zone_pct,
+            "min_premium": self.min_premium,
+            "min_oi": self.min_oi,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SymbolPCRData":
+        """Create from dictionary."""
+        return cls(
+            symbol=data["symbol"],
+            current_price=float(data["current_price"]),
+            atm_zone_low=float(data["atm_zone_low"]),
+            atm_zone_high=float(data["atm_zone_high"]),
+            put_notional_mm=float(data["put_notional_mm"]),
+            call_notional_mm=float(data["call_notional_mm"]),
+            contracts_analyzed=int(data["contracts_analyzed"]),
+            pcr=float(data["pcr"]),
+            interpretation=data["interpretation"],
+            calculated_at=datetime.fromisoformat(data["calculated_at"]),
+            atm_zone_pct=float(data.get("atm_zone_pct", 0.15)),
+            min_premium=float(data.get("min_premium", 0.50)),
+            min_oi=int(data.get("min_oi", 500)),
+        )
+
+
+@dataclass
 class SharedDataContext:
     """
     Container for pre-fetched shared data.

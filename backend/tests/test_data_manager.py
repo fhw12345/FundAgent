@@ -24,6 +24,7 @@ from src.services.data_manager import (
     OptionContract,
     QuoteData,
     SharedDataContext,
+    SymbolPCRData,
     TreasuryData,
 )
 
@@ -90,6 +91,16 @@ class TestCacheKeys:
         """Verify symbol is uppercased."""
         key = CacheKeys.options("nvda")
         assert key == "market:options:NVDA"
+
+    def test_pcr_symbol_key_format(self):
+        """Verify PCR symbol key format."""
+        key = CacheKeys.pcr_symbol("NVDA")
+        assert key == "market:pcr:NVDA"
+
+    def test_pcr_symbol_key_normalizes_case(self):
+        """Verify symbol is uppercased."""
+        key = CacheKeys.pcr_symbol("nvda")
+        assert key == "market:pcr:NVDA"
 
     def test_parse_key(self):
         """Verify key parsing."""
@@ -253,6 +264,104 @@ class TestDataTypes:
         assert data.option_type == "put"
         assert data.open_interest == 12000
         assert data.delta == -0.35
+
+    def test_symbol_pcr_data_to_dict(self):
+        """Verify SymbolPCRData serialization."""
+        data = SymbolPCRData(
+            symbol="NVDA",
+            current_price=142.50,
+            atm_zone_low=121.13,
+            atm_zone_high=163.88,
+            put_notional_mm=25.50,
+            call_notional_mm=42.30,
+            contracts_analyzed=156,
+            pcr=0.60,
+            interpretation="Bullish sentiment (contrarian bearish)",
+            calculated_at=datetime(2025, 1, 15, 14, 30, tzinfo=UTC),
+            atm_zone_pct=0.15,
+            min_premium=0.50,
+            min_oi=500,
+        )
+        d = data.to_dict()
+        assert d["symbol"] == "NVDA"
+        assert d["current_price"] == 142.50
+        assert d["atm_zone_low"] == 121.13
+        assert d["atm_zone_high"] == 163.88
+        assert d["put_notional_mm"] == 25.50
+        assert d["call_notional_mm"] == 42.30
+        assert d["contracts_analyzed"] == 156
+        assert d["pcr"] == 0.60
+        assert d["interpretation"] == "Bullish sentiment (contrarian bearish)"
+        assert "2025-01-15" in d["calculated_at"]
+        assert d["atm_zone_pct"] == 0.15
+        assert d["min_premium"] == 0.50
+        assert d["min_oi"] == 500
+
+    def test_symbol_pcr_data_from_dict(self):
+        """Verify SymbolPCRData deserialization."""
+        d = {
+            "symbol": "AAPL",
+            "current_price": 185.25,
+            "atm_zone_low": 157.46,
+            "atm_zone_high": 213.04,
+            "put_notional_mm": 18.20,
+            "call_notional_mm": 15.80,
+            "contracts_analyzed": 98,
+            "pcr": 1.15,
+            "interpretation": "Moderate bearish sentiment",
+            "calculated_at": "2025-01-15T10:00:00+00:00",
+            "atm_zone_pct": 0.15,
+            "min_premium": 0.50,
+            "min_oi": 500,
+        }
+        data = SymbolPCRData.from_dict(d)
+        assert data.symbol == "AAPL"
+        assert data.current_price == 185.25
+        assert data.pcr == 1.15
+        assert data.contracts_analyzed == 98
+        assert data.atm_zone_pct == 0.15
+        assert data.min_oi == 500
+
+    def test_symbol_pcr_data_round_trip(self):
+        """Verify SymbolPCRData serialization round-trip."""
+        original = SymbolPCRData(
+            symbol="TSLA",
+            current_price=250.00,
+            atm_zone_low=212.50,
+            atm_zone_high=287.50,
+            put_notional_mm=33.45,
+            call_notional_mm=28.90,
+            contracts_analyzed=210,
+            pcr=1.16,
+            interpretation="Moderate bearish",
+            calculated_at=datetime(2025, 1, 15, 12, 0, tzinfo=UTC),
+        )
+        d = original.to_dict()
+        restored = SymbolPCRData.from_dict(d)
+        assert restored.symbol == original.symbol
+        assert restored.current_price == original.current_price
+        assert restored.pcr == original.pcr
+        assert restored.interpretation == original.interpretation
+        assert restored.contracts_analyzed == original.contracts_analyzed
+
+    def test_symbol_pcr_data_defaults(self):
+        """Verify SymbolPCRData uses default filter values."""
+        data = SymbolPCRData(
+            symbol="GOOGL",
+            current_price=180.00,
+            atm_zone_low=153.00,
+            atm_zone_high=207.00,
+            put_notional_mm=10.00,
+            call_notional_mm=12.00,
+            contracts_analyzed=50,
+            pcr=0.83,
+            interpretation="Neutral",
+            calculated_at=datetime.now(UTC),
+        )
+        # Verify defaults are applied
+        assert data.atm_zone_pct == 0.15
+        assert data.min_premium == 0.50
+        assert data.min_oi == 500
 
 
 class TestSharedDataContext:
@@ -528,6 +637,7 @@ class TestCacheKeyConsistency:
             CacheKeys.etf_holdings("AIQ"),
             CacheKeys.quote("NVDA"),
             CacheKeys.options("NVDA"),
+            CacheKeys.pcr_symbol("NVDA"),
         ]
 
         for key in keys:

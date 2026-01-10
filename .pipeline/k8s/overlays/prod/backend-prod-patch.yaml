@@ -69,6 +69,13 @@ spec:
               name: backend-secrets
               key: alpha-vantage-api-key
 
+        # FRED API (Federal Reserve Economic Data)
+        - name: FRED_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: fred-api-key
+
         # Alibaba Cloud OSS (for feedback image uploads)
         - name: OSS_ACCESS_KEY
           valueFrom:

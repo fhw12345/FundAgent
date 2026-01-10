@@ -37,6 +37,7 @@ from .types import (
     OptionContract,
     QuoteData,
     SharedDataContext,
+    SymbolPCRData,
     TreasuryData,
     TrendPoint,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "TrendPoint",
     "QuoteData",
     "OptionContract",
+    "SymbolPCRData",
     "SharedDataContext",
     "DataFetchError",
     "Granularity",

@@ -23,12 +23,14 @@ Interpretation Zones:
 - 75-100: High risk / Euphoria (Red)
 """
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import numpy as np
 import structlog
 
+from ...data_manager import DataManager
 from ..base import InsightCategoryBase
 from ..models import InsightMetric, MetricExplanation, MetricStatus, ThresholdConfig
 from ..registry import register_category
@@ -47,6 +49,11 @@ AI_BASKET_TOP_N = 10
 # Cache key for ETF-derived basket
 AI_BASKET_CACHE_KEY = "insights:ai_basket_symbols"
 AI_BASKET_CACHE_TTL = 86400  # 24 hours (ETF holdings change infrequently)
+
+# Market Liquidity calculation constants (FRED-based)
+RRP_PEAK_BILLIONS = 2500  # Dec 2022 peak RRP balance
+SPREAD_STRESS_THRESHOLD_BPS = 50  # SOFR-EFFR spread indicating funding stress
+RRP_TREND_CHANGE_RANGE_PCT = 50  # Range for 20-day RRP change normalization
 
 
 @register_category
@@ -612,20 +619,17 @@ class AISectorRiskCategory(InsightCategoryBase):
     async def _calculate_options_put_call_ratio(
         self, ai_basket: tuple[list[str], str]
     ) -> InsightMetric:
-        """Calculate Options Put/Call Ratio using ATM Dollar-Weighted methodology.
+        """Calculate Options Put/Call Ratio using cached per-symbol PCR data.
 
-        Uses HISTORICAL_OPTIONS and GLOBAL_QUOTE to calculate a quality-filtered,
-        ATM dollar-weighted put/call ratio. This is a CONTRARIAN indicator:
+        Uses DataManager.get_symbol_pcr() for cached, reusable PCR calculations.
+        This is a CONTRARIAN indicator:
         - Low PCR (< 0.5) = High Risk (too many calls, euphoria)
         - High PCR (> 1.0) = Low Risk (too many puts, fear)
 
-        Methodology:
-        1. Get current price for each AI basket symbol
-        2. Get options chain for each symbol
-        3. Filter to ATM zone (strikes within ±15% of current price)
-        4. Apply quality filters (min premium $0.50, min OI 500)
-        5. Calculate notionals: OI × Price × 100
-        6. PCR = Σ(Put Notionals) / Σ(Call Notionals)
+        Story 2.8: Reusable PCR Service
+        - Uses DataManager for cached per-symbol PCR (1-hour TTL)
+        - Same calculation reused by AI agent tools
+        - Expands from 3 to 10 symbols for better market picture
 
         Args:
             ai_basket: Tuple of (symbols list, source description)
@@ -633,112 +637,65 @@ class AISectorRiskCategory(InsightCategoryBase):
         Returns:
             InsightMetric with PCR score (contrarian: low PCR = high risk)
         """
-        if not self.market_service:
+        if not self.market_service or not self.redis_cache:
             return self._create_placeholder_metric(
                 "options_put_call_ratio",
                 "Options Put/Call Ratio",
                 50.0,
-                "Market service not available",
+                "Market service or Redis cache not available",
             )
 
-        # ATM zone and quality filter constants
-        ATM_ZONE_PCT = 0.15  # ±15% of current price
-        MIN_PREMIUM = 0.50  # Minimum $0.50 premium
-        MIN_OI = 500  # Minimum 500 open interest
+        # Create DataManager for cached PCR calculations
+        data_manager = DataManager(
+            redis_cache=self.redis_cache,
+            alpha_vantage_service=self.market_service,
+        )
 
-        # Use top 3 AI basket symbols for options analysis
+        # Use top 10 AI basket symbols for broader market picture (Story 2.8)
         ai_symbols, basket_source = ai_basket
-        symbols_to_analyze = ai_symbols[:3]
+        symbols_to_analyze = ai_symbols[:10]
 
         total_put_notional = 0.0
         total_call_notional = 0.0
         symbol_details = {}
         contracts_analyzed = 0
+        successful_symbols = []
 
+        # Fetch PCR for each symbol using cached service
         for symbol in symbols_to_analyze:
             try:
-                # Get current quote for ATM calculation
-                quote = await self.market_service.get_quote(symbol)
-                if not quote or "price" not in quote:
-                    logger.warning(
-                        "Quote not available for options analysis",
+                pcr_data = await data_manager.get_symbol_pcr(symbol)
+
+                if pcr_data is None:
+                    logger.debug(
+                        "PCR data not available for symbol",
                         symbol=symbol,
                     )
                     continue
 
-                current_price = float(quote.get("price", 0))
-                if current_price <= 0:
-                    continue
-
-                # Calculate ATM zone boundaries
-                atm_low = current_price * (1 - ATM_ZONE_PCT)
-                atm_high = current_price * (1 + ATM_ZONE_PCT)
-
-                # Get options chain
-                options_data = await self.market_service.get_historical_options(symbol)
-                contracts = options_data.get("data", [])
-
-                if not contracts:
-                    logger.warning("No options contracts found", symbol=symbol)
-                    continue
-
-                symbol_put_notional = 0.0
-                symbol_call_notional = 0.0
-                symbol_contracts = 0
-
-                for contract in contracts:
-                    try:
-                        strike = float(contract.get("strike", 0))
-                        option_type = contract.get("type", "").lower()
-                        last_price = float(contract.get("last", 0))
-                        open_interest = int(contract.get("open_interest", 0))
-
-                        # Apply filters:
-                        # 1. ATM zone filter
-                        if not (atm_low <= strike <= atm_high):
-                            continue
-
-                        # 2. Quality filters
-                        if last_price < MIN_PREMIUM:
-                            continue
-                        if open_interest < MIN_OI:
-                            continue
-
-                        # Calculate notional: OI × Price × 100
-                        notional = open_interest * last_price * 100
-
-                        if option_type == "put":
-                            symbol_put_notional += notional
-                        elif option_type == "call":
-                            symbol_call_notional += notional
-
-                        symbol_contracts += 1
-
-                    except (ValueError, TypeError):
-                        continue
-
-                total_put_notional += symbol_put_notional
-                total_call_notional += symbol_call_notional
-                contracts_analyzed += symbol_contracts
+                # Aggregate notionals (convert from millions back to raw)
+                total_put_notional += pcr_data.put_notional_mm * 1_000_000
+                total_call_notional += pcr_data.call_notional_mm * 1_000_000
+                contracts_analyzed += pcr_data.contracts_analyzed
+                successful_symbols.append(symbol)
 
                 symbol_details[symbol] = {
-                    "current_price": round(current_price, 2),
-                    "atm_zone": f"${atm_low:.2f} - ${atm_high:.2f}",
-                    "put_notional": round(
-                        symbol_put_notional / 1_000_000, 2
-                    ),  # In millions
-                    "call_notional": round(symbol_call_notional / 1_000_000, 2),
-                    "contracts_used": symbol_contracts,
+                    "current_price": pcr_data.current_price,
+                    "atm_zone": f"${pcr_data.atm_zone_low:.2f} - ${pcr_data.atm_zone_high:.2f}",
+                    "put_notional_mm": pcr_data.put_notional_mm,
+                    "call_notional_mm": pcr_data.call_notional_mm,
+                    "contracts_used": pcr_data.contracts_analyzed,
+                    "symbol_pcr": pcr_data.pcr,
                 }
 
             except Exception as e:
                 logger.warning(
-                    "Failed to analyze options for symbol",
+                    "Failed to get PCR for symbol",
                     symbol=symbol,
                     error=str(e),
                 )
 
-        # Calculate PCR
+        # Calculate aggregate PCR
         if total_call_notional > 0:
             pcr = total_put_notional / total_call_notional
         else:
@@ -749,7 +706,6 @@ class AISectorRiskCategory(InsightCategoryBase):
         # PCR 0.7 → Score 60 (Elevated)
         # PCR 1.0 → Score 30 (Normal)
         # PCR 1.3 → Score 5 (Low Risk - extreme put buying)
-        # Using invert=True: higher PCR = lower score
         score = self.normalize_score(pcr, 0.3, 1.3, invert=True)
 
         status = ThresholdConfig().get_status(score)
@@ -774,13 +730,13 @@ class AISectorRiskCategory(InsightCategoryBase):
                 detail=(
                     f"Put/Call Ratio: {pcr:.2f} (Put Notional: ${total_put_notional / 1_000_000:.1f}M, "
                     f"Call Notional: ${total_call_notional / 1_000_000:.1f}M). "
-                    f"Analyzed {contracts_analyzed} ATM contracts across {len(symbol_details)} symbols. "
+                    f"Analyzed {contracts_analyzed} ATM contracts across {len(successful_symbols)} symbols. "
                     f"{'Low PCR indicates excessive optimism - contrarian bearish signal.' if pcr < 0.7 else 'PCR within normal range.'}"
                 ),
                 methodology=(
-                    "Calculates ATM Dollar-Weighted Put/Call Ratio from HISTORICAL_OPTIONS. "
-                    f"Filters: ATM zone (±{ATM_ZONE_PCT * 100:.0f}%), min premium ${MIN_PREMIUM}, "
-                    f"min OI {MIN_OI}. Notional = OI × Price × 100. "
+                    "Calculates ATM Dollar-Weighted Put/Call Ratio using cached per-symbol PCR data. "
+                    "Filters: ATM zone (±15%), min premium $0.50, min OI 500. "
+                    "Notional = OI × Price × 100. "
                     "CONTRARIAN: Low PCR (call-heavy) = High Risk."
                 ),
                 formula="PCR = Σ(Put Notionals) / Σ(Call Notionals)",
@@ -801,13 +757,9 @@ class AISectorRiskCategory(InsightCategoryBase):
                 "total_put_notional_mm": round(total_put_notional / 1_000_000, 2),
                 "total_call_notional_mm": round(total_call_notional / 1_000_000, 2),
                 "contracts_analyzed": contracts_analyzed,
-                "symbols_analyzed": list(symbol_details.keys()),
+                "symbols_analyzed": successful_symbols,
                 "symbol_details": symbol_details,
-                "filters": {
-                    "atm_zone_pct": ATM_ZONE_PCT,
-                    "min_premium": MIN_PREMIUM,
-                    "min_oi": MIN_OI,
-                },
+                "basket_source": basket_source,
             },
         )
 
@@ -908,10 +860,12 @@ class AISectorRiskCategory(InsightCategoryBase):
             )
 
         try:
-            # Fetch FRED data (60 days for trend calculation)
-            sofr_df = await self.fred_service.get_sofr(days=60)
-            effr_df = await self.fred_service.get_effr(days=60)
-            rrp_df = await self.fred_service.get_rrp_balance(days=60)
+            # Fetch FRED data concurrently (60 days for trend calculation)
+            sofr_df, effr_df, rrp_df = await asyncio.gather(
+                self.fred_service.get_sofr(days=60),
+                self.fred_service.get_effr(days=60),
+                self.fred_service.get_rrp_balance(days=60),
+            )
 
             # Check data availability
             if sofr_df.empty or effr_df.empty or rrp_df.empty:
@@ -928,21 +882,20 @@ class AISectorRiskCategory(InsightCategoryBase):
             rrp_current = float(rrp_df["value"].iloc[-1])
 
             # --- Component 1: RRP Balance Score (50% weight) ---
-            # RRP ranges: 0 (tight) to 2500B (extreme liquidity peak Dec 2022)
+            # RRP ranges: 0 (tight) to peak (extreme liquidity)
             # Higher RRP = more liquidity = higher bubble risk
-            # Current (Dec 2025): ~10-20B = near zero = tight liquidity
-            rrp_score = self.normalize_score(rrp_current, 0, 2500)
+            rrp_score = self.normalize_score(rrp_current, 0, RRP_PEAK_BILLIONS)
 
             # --- Component 2: SOFR-EFFR Spread Score (30% weight) ---
             # Normal: SOFR slightly above EFFR (5-15 bps)
             # Stress: SOFR spikes above EFFR (>50 bps) = funding stress
-            # Inverted: SOFR below EFFR = unusual, indicates stress
             sofr_effr_spread = (sofr_current - effr_current) * 100  # Convert to bps
 
-            # Spread 0-15 bps = normal, low risk for bubble → HIGH score
-            # Spread 50+ bps = stress → LOW score (no bubble risk)
-            # Inverted logic: Normal conditions (low spread) = bubble can form
-            spread_score = self.normalize_score(sofr_effr_spread, 50, 0)  # Inverted
+            # Inverted: Low spread (normal conditions) = bubble can form = HIGH score
+            # High spread (stress) = no bubble risk = LOW score
+            spread_score = self.normalize_score(
+                sofr_effr_spread, 0, SPREAD_STRESS_THRESHOLD_BPS, invert=True
+            )
 
             # --- Component 3: RRP 20-day Trend Score (20% weight) ---
             # Rising RRP = increasing liquidity = higher bubble risk
@@ -957,8 +910,10 @@ class AISectorRiskCategory(InsightCategoryBase):
                 rrp_change_pct = 0.0
                 rrp_20d_ago = rrp_current
 
-            # Trend: -50% to +50% change → 0-100 score
-            trend_score = self.normalize_score(rrp_change_pct, -50, 50)
+            # Trend: Rising RRP = higher risk
+            trend_score = self.normalize_score(
+                rrp_change_pct, -RRP_TREND_CHANGE_RANGE_PCT, RRP_TREND_CHANGE_RANGE_PCT
+            )
 
             # --- Weighted Composite Score ---
             # RRP Level: 50%, SOFR-EFFR Spread: 30%, RRP Trend: 20%
@@ -997,8 +952,8 @@ class AISectorRiskCategory(InsightCategoryBase):
                     ),
                     formula="Score = 0.5×RRP_score + 0.3×Spread_score + 0.2×Trend_score",
                     historical_context=(
-                        f"Peak RRP: $2,500B (Dec 2022 - extreme liquidity). "
-                        f"Current RRP: ${rrp_current:.0f}B ({rrp_current / 2500 * 100:.1f}% of peak). "
+                        f"Peak RRP: ${RRP_PEAK_BILLIONS:,}B (Dec 2022 - extreme liquidity). "
+                        f"Current RRP: ${rrp_current:.0f}B ({rrp_current / RRP_PEAK_BILLIONS * 100:.1f}% of peak). "
                         f"Low RRP historically coincides with market stress periods."
                     ),
                     actionable_insight=(
