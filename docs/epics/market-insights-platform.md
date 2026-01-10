@@ -2,9 +2,9 @@
 
 > **Epic Type**: Brownfield Enhancement
 > **Created**: 2025-12-20
-> **Updated**: 2025-12-30
-> **Status**: In Progress
-> **Estimated Stories**: 12 (6 original + 5 trend/DML + 1 Put/Call Ratio)
+> **Updated**: 2025-01-10
+> **Status**: ✅ Complete
+> **Estimated Stories**: 13 | **Completed**: 13
 
 ---
 
@@ -199,10 +199,12 @@ interface MetricExplanation {
 - Redis caching with category-level TTL
 
 **Acceptance Criteria**:
-- [ ] Abstract base class defines metric interface
-- [ ] New categories can be added by creating single file
-- [ ] All metrics return full explanation objects
-- [ ] Registry auto-discovers categories on startup
+- [x] Abstract base class defines metric interface
+- [x] New categories can be added by creating single file
+- [x] All metrics return full explanation objects
+- [x] Registry auto-discovers categories on startup
+
+**Implementation**: Story 2.1 ✅
 
 ---
 
@@ -230,9 +232,11 @@ interface MetricExplanation {
 
 **Acceptance Criteria**:
 - [x] All 7 metrics return valid 0-100 scores (v0.9.0)
-- [ ] Each metric has complete explanation object
-- [ ] Rate limiting prevents API quota exhaustion
-- [ ] Graceful degradation on partial API failure
+- [x] Each metric has complete explanation object
+- [x] Rate limiting prevents API quota exhaustion
+- [x] Graceful degradation on partial API failure
+
+**Implementation**: Stories 2.1, 2.2, 2.6, 2.7, 2.8 ✅
 
 ---
 
@@ -252,10 +256,12 @@ interface MetricExplanation {
 - Error responses with helpful messages
 
 **Acceptance Criteria**:
-- [ ] All endpoints return proper JSON with explanations
-- [ ] Swagger docs show example responses
-- [ ] 404 for invalid category/metric IDs
-- [ ] Refresh endpoint invalidates cache correctly
+- [x] All endpoints return proper JSON with explanations
+- [x] Swagger docs show example responses
+- [x] 404 for invalid category/metric IDs
+- [x] Refresh endpoint invalidates cache correctly
+
+**Implementation**: Story 2.1, 2.3 ✅
 
 ---
 
@@ -287,6 +293,8 @@ interface MetricExplanation {
 - [x] Explanations visible by default (not hidden)
 - [x] Mobile responsive layout works
 
+**Implementation**: Story 2.4 ✅
+
 ---
 
 ### Story 5: Frontend - Explanation UX & Interactivity
@@ -308,11 +316,13 @@ interface MetricExplanation {
 - Error states with retry
 
 **Acceptance Criteria**:
-- [ ] All explanation sections render correctly
-- [ ] "Ask AI" opens chat with correct context
-- [ ] Sparkline shows 30-day history
-- [ ] Threshold zones visually distinguished
-- [ ] Loading states don't flash
+- [x] All explanation sections render correctly
+- [x] "Ask AI" opens chat with correct context
+- [x] Sparkline shows 30-day history
+- [x] Threshold zones visually distinguished
+- [x] Loading states don't flash
+
+**Implementation**: Stories 2.4, 2.5 ✅
 
 ---
 
@@ -335,10 +345,12 @@ interface MetricExplanation {
 - Example prompts for CLAUDE.md
 
 **Acceptance Criteria**:
-- [ ] "What's the AI bubble risk?" returns formatted insights
-- [ ] "Explain the yield curve indicator" gives methodology
-- [ ] "How has sentiment changed this week?" gives trend
-- [ ] Tool responses cached appropriately
+- [x] "What's the AI bubble risk?" returns formatted insights
+- [x] "Explain the yield curve indicator" gives methodology
+- [x] "How has sentiment changed this week?" gives trend
+- [x] Tool responses cached appropriately
+
+**Implementation**: Story 2.5 ✅
 
 ---
 
@@ -373,15 +385,17 @@ backend/src/services/data_manager/
 - Pre-fetch shared data pattern to eliminate duplicate API calls
 
 **Acceptance Criteria**:
-- [ ] `DataManager.get_ohlcv()` returns cached data for daily+ granularity
-- [ ] `DataManager.get_ohlcv()` returns fresh data for intraday (no cache)
-- [ ] Key convention: `market:{granularity}:{symbol}` consistently applied
-- [ ] Existing AI tools migrated to use DML
-- [ ] Existing chart APIs migrated to use DML
-- [ ] `AlphaVantageMarketDataService` marked deprecated
-- [ ] No direct Alpha Vantage calls outside DML
-- [ ] Treasury 2Y data used by fed_expectations metric
-- [ ] FRED data (RRP, SOFR, EFFR) used by market_liquidity metric
+- [x] `DataManager.get_ohlcv()` returns cached data for daily+ granularity
+- [x] `DataManager.get_ohlcv()` returns fresh data for intraday (no cache)
+- [x] Key convention: `market:{granularity}:{symbol}` consistently applied
+- [x] Existing AI tools migrated to use DML
+- [x] Existing chart APIs migrated to use DML
+- [x] `AlphaVantageMarketDataService` marked deprecated
+- [x] No direct Alpha Vantage calls outside DML
+- [x] Treasury 2Y data used by fed_expectations metric
+- [x] FRED data (RRP, SOFR, EFFR) used by market_liquidity metric
+
+**Implementation**: Story 2.1 ✅
 
 **Verification**:
 ```bash
@@ -439,6 +453,8 @@ PHASE 3: Batch persist
 - [x] Redis key `insights:ai_sector_risk:latest` updated with 24hr TTL
 - [x] Graceful handling of partial API failures (return_exceptions=True)
 
+**Implementation**: Story 2.2 ✅
+
 **Verification**:
 ```bash
 # Manual trigger
@@ -492,12 +508,14 @@ MONGO=$(mongosh --eval "db.insight_snapshots.find().sort({date:-1}).limit(1)" | 
 ```
 
 **Acceptance Criteria**:
-- [ ] Endpoint returns 30 days by default
-- [ ] Supports `?days=7|14|30|60|90` query parameter
-- [ ] Each datapoint includes date, score, status
-- [ ] Includes both composite and individual metric trends
-- [ ] Returns empty array gracefully if < requested days of data
-- [ ] Response time < 500ms for 30-day query
+- [x] Endpoint returns 30 days by default
+- [x] Supports `?days=7|14|30|60|90` query parameter
+- [x] Each datapoint includes date, score, status
+- [x] Includes both composite and individual metric trends
+- [x] Returns empty array gracefully if < requested days of data
+- [x] Response time < 500ms for 30-day query
+
+**Implementation**: Story 2.3 ✅
 
 ---
 
@@ -539,12 +557,14 @@ frontend/src/components/insights/
 ```
 
 **Acceptance Criteria**:
-- [ ] Sparkline shows 30-day trend in each metric card
-- [ ] Today's datapoint highlighted with distinct color/marker
-- [ ] Swipe left gesture loads more history (60, 90 days)
-- [ ] Pinch/zoom scales chart to show more/fewer datapoints
-- [ ] Loading skeleton while fetching trend data
-- [ ] Mobile responsive layout
+- [x] Sparkline shows 30-day trend in each metric card
+- [x] Today's datapoint highlighted with distinct color/marker
+- [x] Swipe left gesture loads more history (60, 90 days)
+- [x] Pinch/zoom scales chart to show more/fewer datapoints
+- [x] Loading skeleton while fetching trend data
+- [x] Mobile responsive layout
+
+**Implementation**: Story 2.4 ✅
 
 ---
 
@@ -580,11 +600,13 @@ async def get_insight_trend(category_id: str, days: int = 30) -> str:
 ```
 
 **Acceptance Criteria**:
-- [ ] `get_insight_category()` reads from Redis via DML (no API calls)
-- [ ] `get_insight_trend()` returns formatted 30-day history
-- [ ] Tool response time < 100ms when data is cached
-- [ ] Graceful fallback if cache miss (trigger calculation or return stale)
-- [ ] Rich markdown formatting with trend direction indicators (↑↓→)
+- [x] `get_insight_category()` reads from Redis via DML (no API calls)
+- [x] `get_insight_trend()` returns formatted 30-day history
+- [x] Tool response time < 100ms when data is cached
+- [x] Graceful fallback if cache miss (trigger calculation or return stale)
+- [x] Rich markdown formatting with trend direction indicators (↑↓→)
+
+**Implementation**: Story 2.5 ✅
 
 **Verification**:
 ```bash
@@ -619,13 +641,15 @@ curl -X POST /api/chat -d '{"message": "How has AI sector risk changed this mont
 - Complements existing metrics with options market sentiment
 
 **Acceptance Criteria**:
-- [ ] `options_put_call_ratio` metric added as 7th indicator
-- [ ] Uses Alpha Vantage HISTORICAL_OPTIONS (Premium) endpoint
-- [ ] Calculates aggregate PCR across top 5 AI basket symbols
-- [ ] Score inverted: Low PCR → High Risk Score (contrarian)
-- [ ] Graceful placeholder if Premium API unavailable
-- [ ] Weights rebalanced to 100% across 7 metrics
-- [ ] Unit tests with mocked API responses
+- [x] `options_put_call_ratio` metric added as 7th indicator
+- [x] Uses Alpha Vantage HISTORICAL_OPTIONS (Premium) endpoint
+- [x] Calculates aggregate PCR across top 5 AI basket symbols
+- [x] Score inverted: Low PCR → High Risk Score (contrarian)
+- [x] Graceful placeholder if Premium API unavailable
+- [x] Weights rebalanced to 100% across 7 metrics
+- [x] Unit tests with mocked API responses
+
+**Implementation**: Stories 2.6, 2.8 ✅
 
 **Verification**:
 ```bash
@@ -672,11 +696,11 @@ market_liquidity = (
 - [x] `yield_curve` metric removed from AI Sector Risk
 - [x] `market_liquidity` metric added with 13% weight
 - [x] High liquidity → High risk score (bubble CAN form)
-- [ ] FRED API key added to K8s secrets *(deployment pending)*
+- [x] FRED API key added to K8s secrets
 - [x] Graceful fallback if FRED unavailable
 - [x] Unit tests with mocked FRED responses
 
-**Status**: ✅ Implementation Complete (2025-12-30) - Pending deployment
+**Implementation**: Story 2.7 ✅
 
 **Verification**:
 ```bash
@@ -808,25 +832,27 @@ db.insight_snapshots.createIndex({ "category_id": 1, "date": -1 })
 ## Definition of Done
 
 ### Phase 1 (Stories 1-6)
-- [ ] All 6 stories completed with acceptance criteria
-- [ ] Insights page accessible at `/insights`
-- [ ] All 6 AI Risk metrics functional
-- [ ] Explanations clear and helpful
-- [ ] LLM can discuss any metric
+- [x] All 6 stories completed with acceptance criteria
+- [x] Insights page accessible at `/insights`
+- [x] All 7 AI Risk metrics functional (v0.9.0)
+- [x] Explanations clear and helpful
+- [x] LLM can discuss any metric
 
-### Phase 2 (Stories 7-11)
-- [ ] Data Manager Layer (DML) is single source of truth
-- [ ] All data consumers migrated to DML
-- [ ] Daily cron job populates snapshots
-- [ ] Trend API returns 30-day history
-- [ ] Frontend sparklines show trend with today highlighted
-- [ ] AI tools respond < 100ms from cache
-- [ ] Swipe gesture loads more history
+### Phase 2 (Stories 7-13)
+- [x] Data Manager Layer (DML) is single source of truth
+- [x] All data consumers migrated to DML
+- [x] Daily cron job populates snapshots
+- [x] Trend API returns 30-day history
+- [x] Frontend sparklines show trend with today highlighted
+- [x] AI tools respond < 100ms from cache
+- [x] Swipe gesture loads more history
+- [x] Put/Call Ratio metric with reusable service
+- [x] Market Liquidity metric via FRED API
 
 ### Overall
-- [ ] Documentation complete
-- [ ] No regression in existing features
-- [ ] Performance verified (< 10s cron, < 100ms cached reads)
+- [x] Documentation complete
+- [x] No regression in existing features
+- [x] Performance verified (< 10s cron, < 100ms cached reads)
 
 ---
 
@@ -871,8 +897,17 @@ Story 7 (DML) ──┬──► Story 8 (Cron) ──┬──► Story 9 (Tren
                 └──► Story 11 (AI Tools) ◄─┘
 ```
 
-The epic delivers a **Market Insights Platform** with:
+## Epic Summary
+
+**✅ EPIC COMPLETE** (2025-01-10)
+
+The epic delivered a **Market Insights Platform** with:
 - AI Sector Risk category with 7 metrics (v0.9.0)
 - 30-day trend visualization with swipe/scale UX
 - Data Manager Layer for unified, high-performance data access
 - AI tools with < 100ms response time from cache
+- Put/Call Ratio with reusable service and AI tool (Story 2.8)
+- Market Liquidity metric via FRED API (Story 2.7)
+
+**Stories Completed**: 2.1 → 2.8 (all 8 stories)
+**Production URL**: https://klinecubic.cn/insights
