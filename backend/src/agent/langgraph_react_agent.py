@@ -245,7 +245,8 @@ class FinancialAnalysisReActAgent:
         """
         Create compressed Fibonacci analysis tool.
 
-        Returns tool that outputs 2-3 line summary instead of full result dict.
+        Returns tool that outputs actionable golden zone analysis.
+        Focus: 61.5%-61.8% golden ratio zone (the key Fibonacci level).
         """
         analyzer = self.fibonacci_analyzer
 
@@ -257,19 +258,19 @@ class FinancialAnalysisReActAgent:
             end_date: str | None = None,
         ) -> str:
             """
-            Analyze stock using Fibonacci retracement levels.
+            Analyze stock using Fibonacci retracement with focus on golden ratio zone.
 
-            Detects swing points, calculates Fibonacci pressure zones (0.382, 0.5, 0.618),
-            and provides trend analysis with golden ratio zones.
+            Detects major trends and calculates the 61.5%-61.8% golden pressure zone,
+            which is the most significant Fibonacci level for trading decisions.
 
             Args:
                 symbol: Stock ticker symbol (e.g., "AAPL", "TSLA")
-                timeframe: Time interval - "1h", "1d", "1w", "1M" (default: "1d")
+                timeframe: Time interval - "1d", "1w", "1M" (default: "1d")
                 start_date: Start date in YYYY-MM-DD format (optional)
                 end_date: End date in YYYY-MM-DD format (optional)
 
             Returns:
-                Compressed 2-3 line Fibonacci analysis summary
+                Actionable Fibonacci analysis with golden zone context
             """
             try:
                 result = await analyzer.analyze(
@@ -279,16 +280,51 @@ class FinancialAnalysisReActAgent:
                     end_date=end_date,
                 )
 
-                # Compress to 2-3 lines
-                key_levels = [
-                    f"{lv.percentage} (${lv.price:.2f})"
-                    for lv in result.fibonacci_levels[:3]
-                    if lv.is_key_level
-                ]
+                # Extract trend info
+                top_trends = result.raw_data.get("top_trends", [])
+                if not top_trends:
+                    return f"Fibonacci: {symbol} - No significant trends detected"
 
-                return f"""Fibonacci Analysis: {symbol} @ ${result.current_price:.2f}
-Key Levels: {", ".join(key_levels) if key_levels else "N/A"}
-Trend Strength: {result.trend_strength}, Confidence: {result.confidence_score * 100:.0f}%"""
+                trend = top_trends[0]
+                trend_type = trend["type"]
+                is_uptrend = "Uptrend" in trend_type
+                high, low = trend["high"], trend["low"]
+                period = trend.get("period", "N/A")
+
+                # Golden zone (61.5%-61.8%) - the key level
+                pz = result.pressure_zone
+                current = result.current_price
+                zone_upper = pz["upper_bound"]
+                zone_lower = pz["lower_bound"]
+
+                # Determine price position relative to golden zone
+                # For uptrend: golden zone is SUPPORT (price retraces down to it)
+                # For downtrend: golden zone is RESISTANCE (price bounces up to it)
+                if current > zone_upper:
+                    if is_uptrend:
+                        zone_status = (
+                            f"above golden zone → ${zone_upper:.2f} is support"
+                        )
+                    else:
+                        zone_status = (
+                            "above golden zone → broke resistance, trend may reverse"
+                        )
+                elif current < zone_lower:
+                    if is_uptrend:
+                        zone_status = (
+                            "below golden zone → support broken, trend weakening"
+                        )
+                    else:
+                        zone_status = (
+                            f"below golden zone → ${zone_lower:.2f} is resistance"
+                        )
+                else:
+                    zone_status = "⚠️ IN GOLDEN ZONE - key decision area"
+
+                return f"""Fibonacci: {symbol} | {timeframe} | {period}
+Trend: {trend_type} ${low:.2f}→${high:.2f}
+Golden Zone (61.5%-61.8%): ${zone_lower:.2f}-${zone_upper:.2f}
+Current ${current:.2f} → {zone_status}"""
 
             except Exception as e:
                 logger.error("Fibonacci tool failed", symbol=symbol, error=str(e))
