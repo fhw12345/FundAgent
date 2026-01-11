@@ -113,3 +113,5 @@ dump.rdb
 .playwright-mcp/
 
 .bmad-core/
+# HarshJudge E2E test scenarios (local)
+.harshJudge/

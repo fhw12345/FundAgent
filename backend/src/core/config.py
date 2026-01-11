@@ -122,8 +122,12 @@ class Settings(BaseSettings):
     )
 
     # Alpha Vantage Fundamentals Tool Limits
-    fundamentals_max_quarterly_periods: int = 20  # Max quarterly periods for cash flow/balance sheet
-    fundamentals_max_annual_periods: int = 5  # Max annual periods for cash flow/balance sheet
+    fundamentals_max_quarterly_periods: int = (
+        20  # Max quarterly periods for cash flow/balance sheet
+    )
+    fundamentals_max_annual_periods: int = (
+        5  # Max annual periods for cash flow/balance sheet
+    )
 
     # Rate limiting
     rate_limit_requests: int = 100

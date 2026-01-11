@@ -182,9 +182,7 @@ class FundamentalsFormatter:
             period_label = f"Latest {count} Annual" if count > 1 else "Latest Annual"
         else:
             reports = quarterly_reports[:count]
-            period_label = (
-                f"Latest {count} Quarters" if count > 1 else "Latest Quarter"
-            )
+            period_label = f"Latest {count} Quarters" if count > 1 else "Latest Quarter"
 
         if not reports:
             return (
@@ -236,7 +234,11 @@ class FundamentalsFormatter:
             )
 
         # Trend analysis for multi-period
-        if len(fcf_values) >= 2 and fcf_values[0] is not None and fcf_values[1] is not None:
+        if (
+            len(fcf_values) >= 2
+            and fcf_values[0] is not None
+            and fcf_values[1] is not None
+        ):
             latest_fcf = fcf_values[0]
             prev_fcf = fcf_values[1]
             growth = calculate_qoq_growth(latest_fcf, prev_fcf)
@@ -254,7 +256,9 @@ class FundamentalsFormatter:
             valid_fcf = [f for f in fcf_values if f is not None]
             if valid_fcf:
                 avg_fcf = sum(valid_fcf) / len(valid_fcf)
-                output.append(f"* Average Free Cash Flow: {format_large_number(avg_fcf)}")
+                output.append(
+                    f"* Average Free Cash Flow: {format_large_number(avg_fcf)}"
+                )
 
         return "\n".join(output)
 
@@ -295,9 +299,7 @@ class FundamentalsFormatter:
             period_label = f"Latest {count} Annual" if count > 1 else "Latest Annual"
         else:
             reports = quarterly_reports[:count]
-            period_label = (
-                f"Latest {count} Quarters" if count > 1 else "Latest Quarter"
-            )
+            period_label = f"Latest {count} Quarters" if count > 1 else "Latest Quarter"
 
         if not reports:
             return (
@@ -338,9 +340,7 @@ class FundamentalsFormatter:
             current_liabilities = safe_float(report.get("currentLiabilities"))
 
             current_ratio = (
-                current_assets / current_liabilities
-                if current_liabilities > 0
-                else 0
+                current_assets / current_liabilities if current_liabilities > 0 else 0
             )
 
             output.append(

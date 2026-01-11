@@ -126,7 +126,7 @@ def _format_pcr_output(pcr_data: "SymbolPCRData") -> str:
         f"📊 *{pcr_data.interpretation}*",
         "",
         "### Methodology",
-        f"- ATM Zone: +/- {pcr_data.atm_zone_pct*100:.0f}% of current price",
+        f"- ATM Zone: +/- {pcr_data.atm_zone_pct * 100:.0f}% of current price",
         f"- Min Premium: ${pcr_data.min_premium:.2f}",
         f"- Min Open Interest: {pcr_data.min_oi:,} contracts",
         "",
