@@ -168,10 +168,11 @@ class FinancialAnalysisReActAgent:
             request_timeout=30,
         )
 
-        # Create compressed local tools (Fibonacci + Stochastic)
+        # Create compressed local tools (Fibonacci + Stochastic + Historical Prices)
         base_tools = [
             self._create_fibonacci_tool(),
             self._create_stochastic_tool(),
+            self._create_historical_prices_tool(),
         ]
         self.tools = base_tools.copy()
 
@@ -348,6 +349,115 @@ Summary: {result.analysis_summary}"""
                 return f"Stochastic analysis error for {symbol}: {str(e)}"
 
         return stochastic_analysis_tool
+
+    def _create_historical_prices_tool(self) -> Any:
+        """
+        Create historical OHLC prices tool.
+
+        Returns actual historical prices with specific dates to prevent LLM hallucination.
+        Uses existing market_service.get_daily_bars() for data.
+        """
+        market_service = self.market_service
+
+        @tool
+        async def get_historical_prices(
+            symbol: str,
+            period: str = "1mo",
+            interval: str = "daily",
+        ) -> str:
+            """
+            Get historical OHLC prices with specific dates.
+
+            Use this tool when users ask about specific price history, date ranges,
+            or when you need to verify/cite actual historical prices.
+
+            Args:
+                symbol: Stock ticker symbol (e.g., "AAPL", "TSLA")
+                period: Lookback period - "1wk", "2wk", "1mo", "3mo" (default: "1mo")
+                interval: Data interval - "daily", "weekly", "monthly" (default: "daily")
+
+            Returns:
+                Table of recent OHLC prices with dates (max 30 data points)
+            """
+            try:
+                # Map period to number of days
+                period_days = {
+                    "1wk": 7,
+                    "2wk": 14,
+                    "1mo": 30,
+                    "3mo": 90,
+                }
+                days = period_days.get(period, 30)
+
+                # Fetch data based on interval using existing service methods
+                if interval == "weekly":
+                    df = await market_service.get_weekly_bars(
+                        symbol, outputsize="compact"
+                    )
+                elif interval == "monthly":
+                    df = await market_service.get_monthly_bars(
+                        symbol, outputsize="compact"
+                    )
+                else:  # daily (default)
+                    df = await market_service.get_daily_bars(
+                        symbol, outputsize="compact"
+                    )
+
+                if df.empty:
+                    return f"No historical data available for {symbol}"
+
+                # Filter to requested period and limit to 30 data points
+                from datetime import datetime, timedelta
+
+                import pandas as pd
+
+                cutoff_date = datetime.now() - timedelta(days=days)
+                df_filtered = df[df.index >= pd.Timestamp(cutoff_date)]
+
+                # Limit to max 30 data points (most recent)
+                df_limited = df_filtered.head(30)
+
+                if df_limited.empty:
+                    return f"No data in the requested period for {symbol}"
+
+                # Format as readable table for the agent
+                lines = [f"Historical Prices for {symbol} ({interval}, last {period}):"]
+                lines.append(
+                    "Date        | Open    | High    | Low     | Close   | Volume"
+                )
+                lines.append(
+                    "------------|---------|---------|---------|---------|----------"
+                )
+
+                for date, row in df_limited.iterrows():
+                    date_str = date.strftime("%Y-%m-%d")
+                    lines.append(
+                        f"{date_str} | ${row['Open']:7.2f} | ${row['High']:7.2f} | "
+                        f"${row['Low']:7.2f} | ${row['Close']:7.2f} | {int(row['Volume']):,}"
+                    )
+
+                # Add summary stats
+                latest = df_limited.iloc[0]
+                high_in_period = df_limited["High"].max()
+                low_in_period = df_limited["Low"].min()
+
+                lines.append("")
+                lines.append(f"Period Summary ({len(df_limited)} trading days):")
+                lines.append(f"- Period High: ${high_in_period:.2f}")
+                lines.append(f"- Period Low: ${low_in_period:.2f}")
+                lines.append(
+                    f"- Latest Close: ${latest['Close']:.2f} ({latest.name.strftime('%Y-%m-%d')})"
+                )
+
+                return "\n".join(lines)
+
+            except Exception as e:
+                logger.error(
+                    "Historical prices tool failed", symbol=symbol, error=str(e)
+                )
+                return f"Historical prices error for {symbol}: {str(e)}"
+
+        return get_historical_prices
 
     def _get_langfuse_handler(self) -> "CallbackHandler | None":
         """

@@ -252,6 +252,7 @@ class ToolExecutionCallback(AsyncCallbackHandler):
             "get_market_movers": "📈",
             "fibonacci_analysis_tool": "📐",
             "stochastic_analysis_tool": "📉",
+            "get_historical_prices": "📅",
             "get_stock_price": "💹",
             "get_earnings": "💰",
             "get_cash_flow": "💵",

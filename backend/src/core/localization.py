@@ -143,6 +143,10 @@ TOOL_DISPLAY_NAMES: dict[str, dict[str, str]] = {
         "zh-CN": "随机指标分析",
         "en": "Stochastic Analysis",
     },
+    "get_historical_prices": {
+        "zh-CN": "历史价格查询",
+        "en": "Historical Prices",
+    },
     "get_stock_price": {
         "zh-CN": "获取股票价格",
         "en": "Get Stock Price",
