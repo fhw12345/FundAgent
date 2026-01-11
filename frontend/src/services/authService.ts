@@ -170,10 +170,11 @@ export async function resetPassword(
  * Get current user from token
  */
 export async function getCurrentUser(token: string): Promise<User> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/me?token=${token}`, {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
     },
   });
 
@@ -232,15 +233,13 @@ export async function logout(refreshToken: string): Promise<void> {
  * Logout from all devices
  */
 export async function logoutAll(accessToken: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/auth/logout-all?token=${accessToken}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+  const response = await fetch(`${API_BASE_URL}/api/auth/logout-all`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
     },
-  );
+  });
 
   if (!response.ok) {
     const error = await response.json();

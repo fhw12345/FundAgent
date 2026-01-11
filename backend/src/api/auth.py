@@ -4,7 +4,7 @@ Provides email/phone verification and JWT token generation.
 """
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from ..database.mongodb import MongoDB
 from ..database.redis import RedisCache
@@ -336,21 +336,39 @@ async def reset_password(
 
 
 @router.get("/me", response_model=User)
-async def get_current_user(
-    token: str,
+async def get_current_user_endpoint(
+    authorization: str | None = Header(None),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
     """
     Get current authenticated user.
 
-    Requires Bearer token in Authorization header or token query param.
+    Requires Bearer token in Authorization header.
     """
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Extract token from "Bearer <token>"
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format. Expected: Bearer <token>",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = parts[1]
     user = await auth_service.get_current_user(token)
 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return user
@@ -426,17 +444,35 @@ async def logout(
 
 @router.post("/logout-all")
 async def logout_all_devices(
-    token: str,
+    authorization: str | None = Header(None),
     auth_service: AuthService = Depends(get_auth_service),
     token_service: TokenService = Depends(get_token_service),
 ) -> dict[str, str]:
     """
     Logout from all devices by revoking all refresh tokens.
 
-    Requires access token to identify user.
+    Requires Bearer token in Authorization header.
     All active refresh tokens will be revoked.
     """
     try:
+        if not authorization:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Extract token from "Bearer <token>"
+        parts = authorization.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authorization header format. Expected: Bearer <token>",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        token = parts[1]
+
         # Get current user from access token
         user = await auth_service.get_current_user(token)
 
@@ -444,6 +480,7 @@ async def logout_all_devices(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
             )
 
         # Revoke all refresh tokens for this user

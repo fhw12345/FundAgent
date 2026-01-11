@@ -2,11 +2,18 @@
 Refresh token models for JWT token refresh mechanism.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.core.utils.date_utils import utcnow
+
+
+def ensure_timezone_aware(dt: datetime) -> datetime:
+    """Ensure datetime is timezone-aware (UTC). MongoDB returns naive datetimes."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt
 
 
 class RefreshToken(BaseModel):
@@ -16,12 +23,20 @@ class RefreshToken(BaseModel):
     user_id: str = Field(..., description="User this token belongs to")
     token_hash: str = Field(..., description="SHA256 hash of the refresh token")
     expires_at: datetime = Field(..., description="Token expiration timestamp")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_used_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
+    last_used_at: datetime = Field(default_factory=utcnow)
     revoked: bool = Field(False, description="Token revocation status")
     revoked_at: datetime | None = Field(None, description="Revocation timestamp")
     user_agent: str | None = Field(None, description="Browser/device user agent")
     ip_address: str | None = Field(None, description="IP address for security logging")
+
+    @field_validator("expires_at", "created_at", "last_used_at", mode="before")
+    @classmethod
+    def make_timezone_aware(cls, v: datetime | None) -> datetime | None:
+        """Ensure datetime fields are timezone-aware."""
+        if v is None:
+            return v
+        return ensure_timezone_aware(v)
 
     @property
     def is_expired(self) -> bool:

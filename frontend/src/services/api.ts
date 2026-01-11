@@ -14,7 +14,11 @@ import type {
   CreditAdjustmentRequest,
   CreditAdjustmentResponse,
 } from "../types/credits";
-import { refreshTokenIfNeeded, retryWithRefreshToken } from "./tokenRefresh";
+import {
+  refreshTokenIfNeeded,
+  retryWithRefreshToken,
+  performTokenRefresh,
+} from "./tokenRefresh";
 
 // Configure axios with base URL
 // In production, use empty string for relative URLs (nginx proxy)
@@ -56,7 +60,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
-      const newToken = await retryWithRefreshToken(originalRequest);
+      const newToken = await retryWithRefreshToken();
 
       if (newToken) {
         // Retry original request with new token
@@ -242,120 +246,155 @@ export const chatService = {
     const url = `${baseURL}/api/chat/stream`;
     const controller = new AbortController();
 
-    fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(localStorage.getItem("access_token")
-          ? { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
-          : {}),
-        ...(options?.debug_enabled ? { "X-Debug": "true" } : {}),
-      },
-      body: JSON.stringify({
-        message,
-        chat_id: chatId,
-        title: options?.title,
-        role: options?.role ?? "user",
-        source: options?.source ?? "user",
-        metadata: options?.metadata,
-        tool_call: options?.tool_call,
-        // Agent Configuration
-        agent_version: options?.agent_version ?? "v3", // Default to v3 (ReAct agent)
-        // LLM Configuration
-        model: options?.model ?? "qwen-plus",
-        thinking_enabled: options?.thinking_enabled ?? false,
-        max_tokens: options?.max_tokens ?? 3000,
-        // Language Configuration
-        language: options?.language ?? "zh-CN",
-        // Symbol Context (priority over DB ui_state)
-        current_symbol: options?.current_symbol,
-      }),
-      signal: controller.signal,
-    })
-      .then(async (response) => {
+    // Helper to make the streaming request
+    const makeStreamRequest = async (accessToken: string | null) => {
+      return fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(options?.debug_enabled ? { "X-Debug": "true" } : {}),
+        },
+        body: JSON.stringify({
+          message,
+          chat_id: chatId,
+          title: options?.title,
+          role: options?.role ?? "user",
+          source: options?.source ?? "user",
+          metadata: options?.metadata,
+          tool_call: options?.tool_call,
+          // Agent Configuration
+          agent_version: options?.agent_version ?? "v3", // Default to v3 (ReAct agent)
+          // LLM Configuration
+          model: options?.model ?? "qwen-plus",
+          thinking_enabled: options?.thinking_enabled ?? false,
+          max_tokens: options?.max_tokens ?? 3000,
+          // Language Configuration
+          language: options?.language ?? "zh-CN",
+          // Symbol Context (priority over DB ui_state)
+          current_symbol: options?.current_symbol,
+        }),
+        signal: controller.signal,
+      });
+    };
+
+    // Helper to process the stream response
+    const processStream = async (response: Response) => {
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Response body is not readable");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const messages = buffer.split("\n\n");
+        buffer = messages.pop() || "";
+
+        for (const message of messages) {
+          if (message.startsWith("data: ")) {
+            const data: StreamEvent = JSON.parse(message.slice(6));
+
+            if (
+              data.type === "chat_created" &&
+              onChatCreated &&
+              data.chat_id
+            ) {
+              onChatCreated(data.chat_id);
+            } else if (data.type === "chunk" && data.content) {
+              onChunk(data.content);
+            } else if (
+              data.type === "title_generated" &&
+              onTitleGenerated &&
+              data.title
+            ) {
+              onTitleGenerated(data.title);
+            } else if (data.type === "done" && onDone && data.chat_id) {
+              onDone(data.chat_id, data.message_count || 0);
+            } else if (data.type === "error" && onError) {
+              console.error("SSE error:", data.error);
+              onError(data.error || "Unknown error");
+            } else if (data.type === "tool_start" && onToolStart) {
+              onToolStart({
+                tool_name: data.tool_name,
+                display_name: data.display_name,
+                icon: data.icon,
+                symbol: data.symbol,
+                run_id: data.run_id,
+                inputs: data.inputs,
+              });
+            } else if (data.type === "tool_end" && onToolEnd) {
+              onToolEnd({
+                tool_name: data.tool_name,
+                output: data.output,
+                duration_ms: data.duration_ms,
+                run_id: data.run_id,
+                status: "success",
+              });
+            } else if (data.type === "tool_error" && onToolError) {
+              onToolError({
+                tool_name: data.tool_name,
+                error: data.error,
+                duration_ms: data.duration_ms,
+                run_id: data.run_id,
+                status: "error",
+              });
+            }
+          }
+        }
+      }
+    };
+
+    // Main request flow with 401 retry
+    void (async () => {
+      try {
+        let response = await makeStreamRequest(
+          localStorage.getItem("access_token"),
+        );
+
+        // Handle 401 - try refresh token and retry
+        if (response.status === 401) {
+          console.log(
+            "[Streaming] Got 401, attempting token refresh and retry...",
+          );
+          const newToken = await performTokenRefresh();
+
+          if (newToken) {
+            // Retry with new token
+            response = await makeStreamRequest(newToken);
+          } else {
+            // Refresh failed - redirect to login
+            console.log(
+              "[Streaming] Token refresh failed, redirecting to login",
+            );
+            window.location.href = "/login";
+            return;
+          }
+        }
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error("Response body is not readable");
+        await processStream(response);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.name !== "AbortError" &&
+          onError
+        ) {
+          onError(error.message);
         }
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) {
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const messages = buffer.split("\n\n");
-          buffer = messages.pop() || "";
-
-          for (const message of messages) {
-            if (message.startsWith("data: ")) {
-              const data: StreamEvent = JSON.parse(message.slice(6));
-
-              if (
-                data.type === "chat_created" &&
-                onChatCreated &&
-                data.chat_id
-              ) {
-                onChatCreated(data.chat_id);
-              } else if (data.type === "chunk" && data.content) {
-                onChunk(data.content);
-              } else if (
-                data.type === "title_generated" &&
-                onTitleGenerated &&
-                data.title
-              ) {
-                onTitleGenerated(data.title);
-              } else if (data.type === "done" && onDone && data.chat_id) {
-                onDone(data.chat_id, data.message_count || 0);
-              } else if (data.type === "error" && onError) {
-                console.error("SSE error:", data.error);
-                onError(data.error || "Unknown error");
-              } else if (data.type === "tool_start" && onToolStart) {
-                onToolStart({
-                  tool_name: data.tool_name,
-                  display_name: data.display_name,
-                  icon: data.icon,
-                  symbol: data.symbol,
-                  run_id: data.run_id,
-                  inputs: data.inputs,
-                });
-              } else if (data.type === "tool_end" && onToolEnd) {
-                onToolEnd({
-                  tool_name: data.tool_name,
-                  output: data.output,
-                  duration_ms: data.duration_ms,
-                  run_id: data.run_id,
-                  status: "success",
-                });
-              } else if (data.type === "tool_error" && onToolError) {
-                onToolError({
-                  tool_name: data.tool_name,
-                  error: data.error,
-                  duration_ms: data.duration_ms,
-                  run_id: data.run_id,
-                  status: "error",
-                });
-              }
-            }
-          }
-        }
-      })
-      .catch((error) => {
-        if (error.name !== "AbortError" && onError) {
-          onError(
-            error instanceof Error ? error.message : "Unknown streaming error",
-          );
-        }
-      });
+      }
+    })();
 
     return () => {
       controller.abort();
