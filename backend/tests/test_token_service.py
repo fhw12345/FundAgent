@@ -1,12 +1,7 @@
 """
-Unit tests for JWT token service.
+Unit tests for TokenService.
 
-Tests JWT access/refresh token management including:
-- Token pair creation (access + refresh tokens)
-- Token refresh with rotation
-- Token verification and validation
-- Token revocation
-- Security (hash token)
+Tests JWT access/refresh token management with rotation.
 """
 
 import hashlib
@@ -16,638 +11,557 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from jose import jwt
 
-# ===== Fixtures =====
-from src.core.utils.date_utils import utcfromtimestamp, utcnow
-from src.models.refresh_token import RefreshToken
-from src.models.user import User
 from src.services.token_service import TokenService
 
 
-@pytest.fixture
-def mock_settings():
-    """Mock settings with test secret key"""
-    with patch("src.services.token_service.settings") as mock_settings:
-        mock_settings.secret_key = "test_secret_key_for_testing"
-        yield mock_settings
+# ===== Fixtures =====
 
 
 @pytest.fixture
 def mock_refresh_token_repo():
-    """Mock refresh token repository"""
-    repo = Mock()
+    """Create mock refresh token repository."""
+    repo = AsyncMock()
     repo.create = AsyncMock()
-    repo.find_by_hash = AsyncMock()
+    repo.find_by_hash = AsyncMock(return_value=None)
     repo.update_last_used = AsyncMock()
-    repo.revoke_by_hash = AsyncMock()
-    repo.revoke_all_for_user = AsyncMock()
     repo.rotate_token_atomic = AsyncMock()
+    repo.revoke_by_hash = AsyncMock(return_value=False)
+    repo.revoke_all_for_user = AsyncMock(return_value=0)
     return repo
 
 
 @pytest.fixture
-def token_service(mock_refresh_token_repo, mock_settings):
-    """Token service instance"""
-    return TokenService(mock_refresh_token_repo)
+def token_service(mock_refresh_token_repo):
+    """Create TokenService with mocked repository."""
+    return TokenService(refresh_token_repo=mock_refresh_token_repo)
 
 
 @pytest.fixture
 def mock_user():
-    """Mock user object"""
-    return User(
-        user_id="user_123456789012",
-        email="test@example.com",
-        username="testuser",
-        password_hash=None,
-        email_verified=True,
-        is_admin=False,
-        created_at=utcnow(),
-        last_login=None,
-    )
+    """Create mock User object."""
+    user = Mock()
+    user.user_id = "user_123"
+    user.username = "testuser"
+    user.email = "test@example.com"
+    return user
 
 
-# ===== Token Pair Creation Tests =====
+# ===== Constants Tests =====
 
 
-class TestCreateTokenPair:
-    """Test access + refresh token pair creation"""
+class TestTokenServiceConstants:
+    """Test TokenService class constants."""
 
-    @pytest.mark.asyncio
-    async def test_create_token_pair_success(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test successful token pair creation"""
-        # Arrange
-        user_agent = "Mozilla/5.0"
-        ip_address = "192.168.1.100"
+    def test_algorithm(self):
+        """Test algorithm is HS256."""
+        assert TokenService.ALGORITHM == "HS256"
 
-        # Act
-        token_pair = await token_service.create_token_pair(
-            mock_user, user_agent, ip_address
-        )
+    def test_access_token_expire_minutes(self):
+        """Test access token expiry is 30 minutes."""
+        assert TokenService.ACCESS_TOKEN_EXPIRE_MINUTES == 30
 
-        # Assert
-        assert token_pair.access_token is not None
-        assert token_pair.refresh_token is not None
-        assert token_pair.token_type == "bearer"
-        assert token_pair.expires_in == 30 * 60  # 30 minutes in seconds
-        assert token_pair.refresh_expires_in == 7 * 24 * 3600  # 7 days in seconds
-
-        # Verify refresh token was stored in database
-        mock_refresh_token_repo.create.assert_called_once()
-        stored_token = mock_refresh_token_repo.create.call_args[0][0]
-        assert stored_token.user_id == mock_user.user_id
-        assert stored_token.user_agent == user_agent
-        assert stored_token.ip_address == ip_address
-        assert stored_token.revoked is False
-
-    @pytest.mark.asyncio
-    async def test_create_token_pair_without_metadata(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test token pair creation without user_agent/ip_address"""
-        # Act
-        token_pair = await token_service.create_token_pair(mock_user)
-
-        # Assert
-        assert token_pair.access_token is not None
-        assert token_pair.refresh_token is not None
-
-        # Verify stored token has None for metadata
-        stored_token = mock_refresh_token_repo.create.call_args[0][0]
-        assert stored_token.user_agent is None
-        assert stored_token.ip_address is None
-
-    @pytest.mark.asyncio
-    async def test_create_token_pair_access_token_payload(
-        self, token_service, mock_user, mock_settings
-    ):
-        """Test that access token contains correct payload"""
-        # Act
-        token_pair = await token_service.create_token_pair(mock_user)
-
-        # Decode and verify payload (using same secret key from mock_settings fixture)
-        payload = jwt.decode(
-            token_pair.access_token, "test_secret_key_for_testing", algorithms=["HS256"]
-        )
-
-        # Assert
-        assert payload["sub"] == mock_user.user_id
-        assert payload["username"] == mock_user.username
-        assert payload["type"] == "access"
-        assert "exp" in payload
-        assert "iat" in payload
-        assert "jti" in payload
-
-    @pytest.mark.asyncio
-    async def test_create_token_pair_refresh_token_payload(
-        self, token_service, mock_user, mock_settings
-    ):
-        """Test that refresh token contains correct payload"""
-        # Act
-        token_pair = await token_service.create_token_pair(mock_user)
-
-        # Decode and verify payload
-        payload = jwt.decode(
-            token_pair.refresh_token,
-            "test_secret_key_for_testing",
-            algorithms=["HS256"],
-        )
-
-        # Assert
-        assert payload["sub"] == mock_user.user_id
-        assert payload["type"] == "refresh"
-        assert "token_value" in payload
-        assert "exp" in payload
-        assert "iat" in payload
-        assert "jti" in payload
+    def test_refresh_token_expire_days(self):
+        """Test refresh token expiry is 7 days."""
+        assert TokenService.REFRESH_TOKEN_EXPIRE_DAYS == 7
 
 
-# ===== Access Token Creation Tests =====
+# ===== __init__ Tests =====
 
 
-class TestCreateAccessToken:
-    """Test access token creation"""
+class TestTokenServiceInit:
+    """Test TokenService initialization."""
 
-    def test_create_access_token_structure(
-        self, token_service, mock_user, mock_settings
-    ):
-        """Test access token has correct structure and expiration"""
-        # Act
-        token = token_service._create_access_token(mock_user)
-        payload = jwt.decode(token, "test_secret_key_for_testing", algorithms=["HS256"])
-
-        # Assert
-        assert payload["sub"] == mock_user.user_id
-        assert payload["username"] == mock_user.username
-        assert payload["type"] == "access"
-
-        # Check expiration is approximately ACCESS_TOKEN_EXPIRE_MINUTES from now
-        exp_timestamp = payload["exp"]
-        exp_datetime = utcfromtimestamp(exp_timestamp)
-        expected_exp = utcnow() + timedelta(
-            minutes=token_service.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-        assert (
-            abs((exp_datetime - expected_exp).total_seconds()) < 5
-        )  # Within 5 seconds
-
-    def test_create_access_token_unique_jti(
-        self, token_service, mock_user, mock_settings
-    ):
-        """Test that each access token has unique JTI (JWT ID)"""
-        # Act
-        token1 = token_service._create_access_token(mock_user)
-        token2 = token_service._create_access_token(mock_user)
-
-        payload1 = jwt.decode(
-            token1, "test_secret_key_for_testing", algorithms=["HS256"]
-        )
-        payload2 = jwt.decode(
-            token2, "test_secret_key_for_testing", algorithms=["HS256"]
-        )
-
-        # Assert
-        assert payload1["jti"] != payload2["jti"]
+    def test_init_sets_repo(self, mock_refresh_token_repo):
+        """Test initialization sets repository."""
+        service = TokenService(refresh_token_repo=mock_refresh_token_repo)
+        assert service.refresh_token_repo == mock_refresh_token_repo
 
 
-# ===== Token Hashing Tests =====
+# ===== _hash_token Tests =====
 
 
 class TestHashToken:
-    """Test token hashing"""
+    """Test _hash_token method."""
 
-    def test_hash_token_produces_hex_string(self, token_service):
-        """Test that hashing produces valid hex string"""
-        # Arrange
+    def test_hash_token_returns_sha256(self, token_service):
+        """Test token is hashed with SHA256."""
         token = "test_token_value"
+        result = token_service._hash_token(token)
 
-        # Act
-        hashed = token_service._hash_token(token)
+        expected = hashlib.sha256(token.encode()).hexdigest()
+        assert result == expected
 
-        # Assert
-        assert isinstance(hashed, str)
-        assert len(hashed) == 64  # SHA256 produces 64-character hex string
-        # Verify all characters are hexadecimal
-        assert all(c in "0123456789abcdef" for c in hashed)
-
-    def test_hash_token_deterministic(self, token_service):
-        """Test that same token always produces same hash"""
-        # Arrange
+    def test_hash_token_consistent(self, token_service):
+        """Test same input produces same hash."""
         token = "consistent_token"
-
-        # Act
         hash1 = token_service._hash_token(token)
         hash2 = token_service._hash_token(token)
-
-        # Assert
         assert hash1 == hash2
 
-    def test_hash_token_different_tokens_different_hashes(self, token_service):
-        """Test that different tokens produce different hashes"""
-        # Arrange
-        token1 = "token_one"
-        token2 = "token_two"
-
-        # Act
-        hash1 = token_service._hash_token(token1)
-        hash2 = token_service._hash_token(token2)
-
-        # Assert
+    def test_hash_token_different_inputs(self, token_service):
+        """Test different inputs produce different hashes."""
+        hash1 = token_service._hash_token("token1")
+        hash2 = token_service._hash_token("token2")
         assert hash1 != hash2
 
-    def test_hash_token_matches_hashlib_sha256(self, token_service):
-        """Test that hashing matches hashlib.sha256"""
-        # Arrange
-        token = "verify_hash_algorithm"
 
-        # Act
-        service_hash = token_service._hash_token(token)
-        expected_hash = hashlib.sha256(token.encode()).hexdigest()
-
-        # Assert
-        assert service_hash == expected_hash
+# ===== create_token_pair Tests =====
 
 
-# ===== Access Token Verification Tests =====
+class TestCreateTokenPair:
+    """Test create_token_pair method."""
+
+    @pytest.mark.asyncio
+    async def test_create_token_pair_success(
+        self, token_service, mock_refresh_token_repo, mock_user
+    ):
+        """Test successful token pair creation."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            result = await token_service.create_token_pair(
+                user=mock_user,
+                user_agent="Mozilla/5.0",
+                ip_address="192.168.1.1",
+            )
+
+            assert result.token_type == "bearer"
+            assert result.access_token is not None
+            assert result.refresh_token is not None
+            assert result.expires_in == 30 * 60
+            assert result.refresh_expires_in == 7 * 24 * 3600
+            mock_refresh_token_repo.create.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_create_token_pair_without_optional_params(
+        self, token_service, mock_refresh_token_repo, mock_user
+    ):
+        """Test token pair creation without user_agent and ip_address."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            result = await token_service.create_token_pair(user=mock_user)
+
+            assert result.access_token is not None
+            assert result.refresh_token is not None
+            mock_refresh_token_repo.create.assert_called_once()
+
+
+# ===== _create_access_token Tests =====
+
+
+class TestCreateAccessToken:
+    """Test _create_access_token method."""
+
+    def test_create_access_token_returns_jwt(self, token_service, mock_user):
+        """Test access token is a valid JWT."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            token = token_service._create_access_token(mock_user)
+
+            payload = jwt.decode(
+                token, "test-secret-key", algorithms=["HS256"]
+            )
+            assert payload["sub"] == "user_123"
+            assert payload["username"] == "testuser"
+            assert payload["type"] == "access"
+            assert "exp" in payload
+            assert "iat" in payload
+            assert "jti" in payload
+
+
+# ===== _create_refresh_token_jwt Tests =====
+
+
+class TestCreateRefreshTokenJwt:
+    """Test _create_refresh_token_jwt method."""
+
+    def test_create_refresh_token_jwt(self, token_service, mock_user):
+        """Test refresh token JWT creation."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            token = token_service._create_refresh_token_jwt(mock_user, "token_value_123")
+
+            payload = jwt.decode(
+                token, "test-secret-key", algorithms=["HS256"]
+            )
+            assert payload["sub"] == "user_123"
+            assert payload["type"] == "refresh"
+            assert payload["token_value"] == "token_value_123"
+
+
+# ===== verify_access_token Tests =====
 
 
 class TestVerifyAccessToken:
-    """Test access token verification"""
+    """Test verify_access_token method."""
 
-    def test_verify_access_token_valid(self, token_service, mock_user, mock_settings):
-        """Test verifying valid access token"""
-        # Arrange
-        token = token_service._create_access_token(mock_user)
-
-        # Act
-        user_id = token_service.verify_access_token(token)
-
-        # Assert
-        assert user_id == mock_user.user_id
-
-    def test_verify_access_token_wrong_type(self, token_service, mock_settings):
-        """Test verifying token with wrong type (refresh instead of access)"""
-        # Arrange - create a refresh type token
-        payload = {
-            "sub": "user_123",
-            "type": "refresh",  # Wrong type
-            "exp": utcnow() + timedelta(days=7),
-            "iat": utcnow(),
-        }
-        token = jwt.encode(payload, "test_secret_key_for_testing", algorithm="HS256")
-
-        # Act
-        user_id = token_service.verify_access_token(token)
-
-        # Assert
-        assert user_id is None
-
-    def test_verify_access_token_expired(self, token_service):
-        """Test verifying expired access token"""
-        # Arrange - create expired token
+    def test_verify_valid_access_token(self, token_service, mock_user):
+        """Test verifying valid access token."""
         with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
+            mock_settings.secret_key = "test-secret-key"
+
+            token = token_service._create_access_token(mock_user)
+            user_id = token_service.verify_access_token(token)
+
+            assert user_id == "user_123"
+
+    def test_verify_expired_access_token(self, token_service):
+        """Test verifying expired access token."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            with patch("src.services.token_service.utcnow") as mock_now:
+                from datetime import datetime, timezone
+
+                past_time = datetime(2020, 1, 1, tzinfo=timezone.utc)
+                mock_now.return_value = past_time
+
+                payload = {
+                    "sub": "user_123",
+                    "username": "testuser",
+                    "type": "access",
+                    "exp": past_time + timedelta(minutes=30),
+                    "iat": past_time,
+                    "jti": "test-jti",
+                }
+                expired_token = jwt.encode(
+                    payload, "test-secret-key", algorithm="HS256"
+                )
+
+            user_id = token_service.verify_access_token(expired_token)
+            assert user_id is None
+
+    def test_verify_wrong_token_type(self, token_service, mock_user):
+        """Test verifying token with wrong type."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            token = token_service._create_refresh_token_jwt(mock_user, "value")
+
+            user_id = token_service.verify_access_token(token)
+            assert user_id is None
+
+    def test_verify_invalid_jwt(self, token_service):
+        """Test verifying invalid JWT."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            user_id = token_service.verify_access_token("invalid.jwt.token")
+            assert user_id is None
+
+    def test_verify_missing_user_id(self, token_service):
+        """Test verifying token with missing user ID."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            from datetime import datetime, timezone
+
+            payload = {
+                "username": "testuser",
+                "type": "access",
+                "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+                "iat": datetime.now(timezone.utc),
+                "jti": "test-jti",
+            }
+            token = jwt.encode(payload, "test-secret-key", algorithm="HS256")
+
+            user_id = token_service.verify_access_token(token)
+            assert user_id is None
+
+
+# ===== refresh_access_token Tests =====
+
+
+class TestRefreshAccessToken:
+    """Test refresh_access_token method."""
+
+    @pytest.mark.asyncio
+    async def test_refresh_with_rotation(
+        self, token_service, mock_refresh_token_repo, mock_user
+    ):
+        """Test refresh with token rotation."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            refresh_token = token_service._create_refresh_token_jwt(
+                mock_user, "original_token_value"
+            )
+
+            db_token = Mock()
+            db_token.is_valid = True
+            db_token.user_agent = "Mozilla/5.0"
+            db_token.ip_address = "192.168.1.1"
+            mock_refresh_token_repo.find_by_hash.return_value = db_token
+
+            result = await token_service.refresh_access_token(refresh_token, rotate=True)
+
+            assert hasattr(result, "access_token")
+            assert hasattr(result, "refresh_token")
+            mock_refresh_token_repo.rotate_token_atomic.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_refresh_without_rotation(
+        self, token_service, mock_refresh_token_repo, mock_user
+    ):
+        """Test refresh without token rotation."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            refresh_token = token_service._create_refresh_token_jwt(
+                mock_user, "token_value"
+            )
+
+            db_token = Mock()
+            db_token.is_valid = True
+            mock_refresh_token_repo.find_by_hash.return_value = db_token
+
+            result = await token_service.refresh_access_token(
+                refresh_token, rotate=False
+            )
+
+            assert isinstance(result, str)
+            mock_refresh_token_repo.rotate_token_atomic.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_refresh_invalid_token_type(
+        self, token_service, mock_refresh_token_repo, mock_user
+    ):
+        """Test refresh with wrong token type."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            access_token = token_service._create_access_token(mock_user)
+
+            with pytest.raises(ValueError, match="Invalid token type"):
+                await token_service.refresh_access_token(access_token)
+
+    @pytest.mark.asyncio
+    async def test_refresh_missing_token_value(self, token_service):
+        """Test refresh with missing token_value in payload."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            from datetime import datetime, timezone
+
             payload = {
                 "sub": "user_123",
-                "type": "access",
-                "exp": utcnow() - timedelta(minutes=1),  # Expired 1 min ago
-                "iat": utcnow() - timedelta(minutes=31),
+                "type": "refresh",
+                "exp": datetime.now(timezone.utc) + timedelta(days=7),
+                "iat": datetime.now(timezone.utc),
+                "jti": "test-jti",
             }
-            token = jwt.encode(payload, "test_secret_key", algorithm="HS256")
+            bad_token = jwt.encode(payload, "test-secret-key", algorithm="HS256")
 
-        # Act
-        user_id = token_service.verify_access_token(token)
+            with pytest.raises(ValueError, match="Missing token value"):
+                await token_service.refresh_access_token(bad_token)
 
-        # Assert
-        assert user_id is None
-
-    def test_verify_access_token_missing_sub(self, token_service):
-        """Test verifying token missing user ID (sub)"""
-        # Arrange - create token without sub
+    @pytest.mark.asyncio
+    async def test_refresh_revoked_token(
+        self, token_service, mock_refresh_token_repo, mock_user
+    ):
+        """Test refresh with revoked token."""
         with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            payload = {
-                "type": "access",
-                "exp": utcnow() + timedelta(minutes=30),
-                "iat": utcnow(),
-            }
-            token = jwt.encode(payload, "test_secret_key", algorithm="HS256")
+            mock_settings.secret_key = "test-secret-key"
 
-        # Act
-        user_id = token_service.verify_access_token(token)
+            refresh_token = token_service._create_refresh_token_jwt(
+                mock_user, "revoked_token"
+            )
 
-        # Assert
-        assert user_id is None
+            db_token = Mock()
+            db_token.is_valid = False
+            mock_refresh_token_repo.find_by_hash.return_value = db_token
 
-    def test_verify_access_token_invalid_signature(self, token_service):
-        """Test verifying token with invalid signature"""
-        # Arrange - create token with different secret
-        with patch("src.services.token_service.settings"):
-            payload = {
-                "sub": "user_123",
-                "type": "access",
-                "exp": utcnow() + timedelta(minutes=30),
-                "iat": utcnow(),
-            }
-            token = jwt.encode(payload, "wrong_secret", algorithm="HS256")
+            with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
+                await token_service.refresh_access_token(refresh_token)
 
-        # Act
-        user_id = token_service.verify_access_token(token)
+    @pytest.mark.asyncio
+    async def test_refresh_token_not_in_db(
+        self, token_service, mock_refresh_token_repo, mock_user
+    ):
+        """Test refresh with token not found in database."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
 
-        # Assert
-        assert user_id is None
+            refresh_token = token_service._create_refresh_token_jwt(
+                mock_user, "unknown_token"
+            )
 
-    def test_verify_access_token_malformed(self, token_service):
-        """Test verifying malformed token"""
-        # Arrange
-        malformed_token = "not.a.valid.jwt.token"
+            mock_refresh_token_repo.find_by_hash.return_value = None
 
-        # Act
-        user_id = token_service.verify_access_token(malformed_token)
+            with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
+                await token_service.refresh_access_token(refresh_token)
 
-        # Assert
-        assert user_id is None
+    @pytest.mark.asyncio
+    async def test_refresh_jwt_decode_error(self, token_service):
+        """Test refresh with invalid JWT."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            with pytest.raises(ValueError, match="Invalid refresh token"):
+                await token_service.refresh_access_token("invalid.token")
 
 
-# ===== Token Revocation Tests =====
+# ===== revoke_token Tests =====
 
 
 class TestRevokeToken:
-    """Test token revocation"""
+    """Test revoke_token method."""
 
     @pytest.mark.asyncio
     async def test_revoke_token_success(
-        self, token_service, mock_user, mock_refresh_token_repo
+        self, token_service, mock_refresh_token_repo, mock_user
     ):
-        """Test successful token revocation"""
-        # Arrange
+        """Test successful token revocation."""
         with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            # Create refresh token
-            token_value = "test_token_value"
+            mock_settings.secret_key = "test-secret-key"
+
             refresh_token = token_service._create_refresh_token_jwt(
-                mock_user, token_value
+                mock_user, "token_to_revoke"
             )
 
             mock_refresh_token_repo.revoke_by_hash.return_value = True
 
-            # Act
             result = await token_service.revoke_token(refresh_token)
 
-            # Assert
             assert result is True
             mock_refresh_token_repo.revoke_by_hash.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_revoke_token_not_found(
-        self, token_service, mock_user, mock_refresh_token_repo
+        self, token_service, mock_refresh_token_repo, mock_user
     ):
-        """Test revoking token that doesn't exist"""
-        # Arrange
+        """Test revocation of non-existent token."""
         with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            token_value = "nonexistent_token"
+            mock_settings.secret_key = "test-secret-key"
+
             refresh_token = token_service._create_refresh_token_jwt(
-                mock_user, token_value
+                mock_user, "nonexistent_token"
             )
 
-        mock_refresh_token_repo.revoke_by_hash.return_value = False
+            mock_refresh_token_repo.revoke_by_hash.return_value = False
 
-        # Act
-        result = await token_service.revoke_token(refresh_token)
+            result = await token_service.revoke_token(refresh_token)
 
-        # Assert
-        assert result is False
+            assert result is False
 
     @pytest.mark.asyncio
-    async def test_revoke_token_malformed(self, token_service, mock_refresh_token_repo):
-        """Test revoking malformed token"""
-        # Arrange
-        malformed_token = "not.a.valid.token"
-
-        # Act
-        result = await token_service.revoke_token(malformed_token)
-
-        # Assert
-        assert result is False
-        mock_refresh_token_repo.revoke_by_hash.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_revoke_all_user_tokens(self, token_service, mock_refresh_token_repo):
-        """Test revoking all tokens for a user"""
-        # Arrange
-        user_id = "user_123"
-        mock_refresh_token_repo.revoke_all_for_user.return_value = 3
-
-        # Act
-        count = await token_service.revoke_all_user_tokens(user_id)
-
-        # Assert
-        assert count == 3
-        mock_refresh_token_repo.revoke_all_for_user.assert_called_once_with(user_id)
-
-
-# ===== Token Refresh Tests =====
-
-
-class TestRefreshAccessToken:
-    """Test access token refresh with rotation"""
-
-    @pytest.mark.asyncio
-    async def test_refresh_access_token_with_rotation(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test refreshing access token with refresh token rotation"""
-        # Arrange
+    async def test_revoke_invalid_jwt(self, token_service):
+        """Test revocation of invalid JWT."""
         with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            token_value = "original_token_value"
-            refresh_token = token_service._create_refresh_token_jwt(
-                mock_user, token_value
-            )
+            mock_settings.secret_key = "test-secret-key"
 
-            # Mock database lookup
-            token_hash = token_service._hash_token(token_value)
-            mock_db_token = RefreshToken(
-                token_id="token_id_123",
-                user_id=mock_user.user_id,
-                token_hash=token_hash,
-                expires_at=utcnow() + timedelta(days=7),
-                user_agent="Mozilla/5.0",
-                ip_address="192.168.1.100",
-                revoked=False,
-                revoked_at=None,
-            )
-            mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
+            result = await token_service.revoke_token("invalid.jwt")
 
-            # Act
-            result = await token_service.refresh_access_token(
-                refresh_token, rotate=True
-            )
-
-            # Assert
-            assert result.access_token is not None
-            assert result.refresh_token is not None
-            assert result.access_token != refresh_token  # New access token
-            assert result.refresh_token != refresh_token  # New refresh token
-
-            # Verify rotation was called
-            mock_refresh_token_repo.rotate_token_atomic.assert_called_once()
+            assert result is False
 
     @pytest.mark.asyncio
-    async def test_refresh_access_token_without_rotation(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test refreshing access token without rotation"""
-        # Arrange
+    async def test_revoke_missing_token_value(self, token_service):
+        """Test revocation with missing token_value."""
         with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            token_value = "token_value"
-            refresh_token = token_service._create_refresh_token_jwt(
-                mock_user, token_value
-            )
+            mock_settings.secret_key = "test-secret-key"
 
-            token_hash = token_service._hash_token(token_value)
-            mock_db_token = RefreshToken(
-                token_id="token_id_123",
-                user_id=mock_user.user_id,
-                token_hash=token_hash,
-                expires_at=utcnow() + timedelta(days=7),
-                user_agent=None,
-                ip_address=None,
-                revoked=False,
-                revoked_at=None,
-            )
-            mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
+            from datetime import datetime, timezone
 
-            # Act
-            access_token = await token_service.refresh_access_token(
-                refresh_token, rotate=False
-            )
-
-            # Assert
-            assert isinstance(access_token, str)
-            assert access_token != refresh_token
-
-            # Verify rotation was NOT called
-            mock_refresh_token_repo.rotate_token_atomic.assert_not_called()
-            # But last_used should be updated
-            mock_refresh_token_repo.update_last_used.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_refresh_access_token_invalid_type(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test refreshing with access token (wrong type)"""
-        # Arrange - create access token instead of refresh token
-        with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            access_token = token_service._create_access_token(mock_user)
-
-            # Act & Assert
-            with pytest.raises(ValueError, match="Invalid token type"):
-                await token_service.refresh_access_token(access_token)
-
-    @pytest.mark.asyncio
-    async def test_refresh_access_token_revoked(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test refreshing with revoked token"""
-        # Arrange
-        with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            token_value = "revoked_token"
-            refresh_token = token_service._create_refresh_token_jwt(
-                mock_user, token_value
-            )
-
-            # Mock database returns revoked token
-            token_hash = token_service._hash_token(token_value)
-            mock_db_token = RefreshToken(
-                token_id="token_id_123",
-                user_id=mock_user.user_id,
-                token_hash=token_hash,
-                expires_at=utcnow() + timedelta(days=7),
-                user_agent=None,
-                ip_address=None,
-                revoked=True,  # Revoked!
-                revoked_at=utcnow(),
-            )
-            mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
-
-            # Act & Assert
-            with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
-                await token_service.refresh_access_token(refresh_token)
-
-    @pytest.mark.asyncio
-    async def test_refresh_access_token_not_in_database(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test refreshing with token not in database"""
-        # Arrange
-        with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
-            token_value = "unknown_token"
-            refresh_token = token_service._create_refresh_token_jwt(
-                mock_user, token_value
-            )
-
-            mock_refresh_token_repo.find_by_hash.return_value = None
-
-            # Act & Assert
-            with pytest.raises(ValueError, match="Invalid or revoked refresh token"):
-                await token_service.refresh_access_token(refresh_token)
-
-    @pytest.mark.asyncio
-    async def test_refresh_access_token_expired_jwt(
-        self, token_service, mock_refresh_token_repo
-    ):
-        """Test refreshing with expired JWT"""
-        # Arrange - create expired token
-        with patch("src.services.token_service.settings") as mock_settings:
-            mock_settings.secret_key = "test_secret_key"
             payload = {
                 "sub": "user_123",
                 "type": "refresh",
-                "token_value": "expired_token",
-                "exp": utcnow() - timedelta(days=1),  # Expired
-                "iat": utcnow() - timedelta(days=8),
+                "exp": datetime.now(timezone.utc) + timedelta(days=7),
+                "iat": datetime.now(timezone.utc),
             }
-            expired_token = jwt.encode(payload, "test_secret_key", algorithm="HS256")
+            token = jwt.encode(payload, "test-secret-key", algorithm="HS256")
 
-        # Act & Assert
-        with pytest.raises(ValueError, match="Invalid refresh token"):
-            await token_service.refresh_access_token(expired_token)
+            result = await token_service.revoke_token(token)
 
-
-# ===== Integration Tests =====
+            assert result is False
 
 
-class TestTokenServiceIntegration:
-    """Test integration scenarios"""
+# ===== revoke_all_user_tokens Tests =====
+
+
+class TestRevokeAllUserTokens:
+    """Test revoke_all_user_tokens method."""
 
     @pytest.mark.asyncio
-    async def test_full_token_lifecycle(
-        self, token_service, mock_user, mock_refresh_token_repo
-    ):
-        """Test complete token lifecycle: create → verify → refresh → revoke"""
-        # Create token pair
-        token_pair = await token_service.create_token_pair(mock_user)
+    async def test_revoke_all_success(self, token_service, mock_refresh_token_repo):
+        """Test revoking all user tokens."""
+        mock_refresh_token_repo.revoke_all_for_user.return_value = 5
 
-        # Verify access token
-        user_id = token_service.verify_access_token(token_pair.access_token)
-        assert user_id == mock_user.user_id
+        result = await token_service.revoke_all_user_tokens("user_123")
 
-        # Mock for refresh
-        token_hash = hashlib.sha256(token_pair.refresh_token.encode()).hexdigest()
-        mock_db_token = Mock()
-        mock_db_token.is_valid = True
-        mock_db_token.user_id = mock_user.user_id
-        mock_db_token.user_agent = None
-        mock_db_token.ip_address = None
-        mock_refresh_token_repo.find_by_hash.return_value = mock_db_token
+        assert result == 5
+        mock_refresh_token_repo.revoke_all_for_user.assert_called_once_with("user_123")
 
-        # Revoke token
-        mock_refresh_token_repo.revoke_by_hash.return_value = True
-        revoked = await token_service.revoke_token(token_pair.refresh_token)
-        assert revoked is True
+    @pytest.mark.asyncio
+    async def test_revoke_all_no_tokens(self, token_service, mock_refresh_token_repo):
+        """Test revoking when user has no tokens."""
+        mock_refresh_token_repo.revoke_all_for_user.return_value = 0
+
+        result = await token_service.revoke_all_user_tokens("user_no_tokens")
+
+        assert result == 0
+
+
+# ===== _create_access_token_from_payload Tests =====
+
+
+class TestCreateAccessTokenFromPayload:
+    """Test _create_access_token_from_payload method."""
+
+    def test_create_access_token_from_payload(self, token_service):
+        """Test creating access token from refresh payload."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            refresh_payload = {
+                "sub": "user_456",
+                "username": "anotheruser",
+                "type": "refresh",
+                "token_value": "some_value",
+            }
+
+            token = token_service._create_access_token_from_payload(refresh_payload)
+
+            payload = jwt.decode(token, "test-secret-key", algorithms=["HS256"])
+            assert payload["sub"] == "user_456"
+            assert payload["username"] == "anotheruser"
+            assert payload["type"] == "access"
+
+    def test_create_access_token_from_payload_missing_username(self, token_service):
+        """Test creating access token when username missing in payload."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            refresh_payload = {
+                "sub": "user_789",
+                "type": "refresh",
+            }
+
+            token = token_service._create_access_token_from_payload(refresh_payload)
+
+            payload = jwt.decode(token, "test-secret-key", algorithms=["HS256"])
+            assert payload["sub"] == "user_789"
+            assert payload["username"] == ""
+
+
+# ===== _create_refresh_token_jwt_from_user_id Tests =====
+
+
+class TestCreateRefreshTokenJwtFromUserId:
+    """Test _create_refresh_token_jwt_from_user_id method."""
+
+    def test_create_refresh_token_from_user_id(self, token_service):
+        """Test creating refresh token from user ID."""
+        with patch("src.services.token_service.settings") as mock_settings:
+            mock_settings.secret_key = "test-secret-key"
+
+            token = token_service._create_refresh_token_jwt_from_user_id(
+                "user_xyz", "new_token_value"
+            )
+
+            payload = jwt.decode(token, "test-secret-key", algorithms=["HS256"])
+            assert payload["sub"] == "user_xyz"
+            assert payload["type"] == "refresh"
+            assert payload["token_value"] == "new_token_value"

@@ -101,9 +101,7 @@ class StockAnalyzer:
             pe_interpretation = (
                 "expensive"
                 if pe_ratio > 25
-                else "reasonable"
-                if pe_ratio > 15
-                else "cheap"
+                else "reasonable" if pe_ratio > 15 else "cheap"
             )
             key_metrics.append(f"P/E Ratio: {pe_ratio:.1f} ({pe_interpretation})")
             summary += (

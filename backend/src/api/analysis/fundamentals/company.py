@@ -196,9 +196,7 @@ async def stock_fundamentals(
             pe_interpretation = (
                 "expensive"
                 if pe_ratio > 25
-                else "reasonable"
-                if pe_ratio > 15
-                else "cheap"
+                else "reasonable" if pe_ratio > 15 else "cheap"
             )
             key_metrics.append(f"P/E Ratio (TTM): {pe_ratio:.2f} ({pe_interpretation})")
             summary += (
@@ -218,9 +216,7 @@ async def stock_fundamentals(
             peg_interpretation = (
                 "attractive"
                 if peg_ratio < 1
-                else "fair"
-                if peg_ratio < 2
-                else "expensive"
+                else "fair" if peg_ratio < 2 else "expensive"
             )
             key_metrics.append(f"PEG Ratio: {peg_ratio:.2f} ({peg_interpretation})")
 
@@ -235,9 +231,7 @@ async def stock_fundamentals(
             margin_quality = (
                 "excellent"
                 if profit_margin > 20
-                else "good"
-                if profit_margin > 10
-                else "moderate"
+                else "good" if profit_margin > 10 else "moderate"
             )
             key_metrics.append(
                 f"Profit Margin: {profit_margin:.1f}% ({margin_quality})"
@@ -275,9 +269,7 @@ async def stock_fundamentals(
             div_quality = (
                 "high income"
                 if dividend_yield > 4
-                else "moderate income"
-                if dividend_yield > 2
-                else "low income"
+                else "moderate income" if dividend_yield > 2 else "low income"
             )
             key_metrics.append(f"Dividend Yield: {dividend_yield:.2f}% ({div_quality})")
             if dividend_yield > 4:

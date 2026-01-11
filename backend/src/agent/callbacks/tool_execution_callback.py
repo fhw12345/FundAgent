@@ -57,9 +57,9 @@ class ToolExecutionCallback(AsyncCallbackHandler):
         super().__init__()
         self.event_queue = event_queue
         self.language = language
-        self.active_tools: dict[
-            UUID, dict[str, Any]
-        ] = {}  # run_id -> {name, start_time, inputs}
+        self.active_tools: dict[UUID, dict[str, Any]] = (
+            {}
+        )  # run_id -> {name, start_time, inputs}
 
         logger.info("ToolExecutionCallback initialized", language=language)
 
