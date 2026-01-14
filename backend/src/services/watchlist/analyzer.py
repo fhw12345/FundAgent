@@ -36,6 +36,7 @@ class WatchlistAnalyzer:
         agent=None,  # LLM agent for analysis
         trading_service=None,  # Alpaca trading service for order placement
         order_repository=None,  # Repository for persisting orders to MongoDB
+        data_manager=None,  # Singleton DataManager for cached OHLCV access
     ):
         """Initialize watchlist analyzer."""
         self.watchlist_repo = WatchlistRepository(watchlist_collection)
@@ -47,6 +48,7 @@ class WatchlistAnalyzer:
         self.agent = agent
         self.trading_service = trading_service
         self.order_repository = order_repository
+        self.data_manager = data_manager
         self.is_running = False
         self._task = None
 
@@ -56,7 +58,7 @@ class WatchlistAnalyzer:
         # Initialize helper components
         self.chat_manager = ChatManager(self.chat_repo)
 
-        # Initialize analysis engine
+        # Initialize analysis engine with singleton DataManager
         self.analysis_engine = AnalysisEngine(
             watchlist_repo=self.watchlist_repo,
             message_repo=self.message_repo,
@@ -64,6 +66,7 @@ class WatchlistAnalyzer:
             context_manager=self.context_manager,
             market_service=self.market_service,
             settings=self.settings,
+            data_manager=self.data_manager,
             agent=self.agent,
             trading_service=self.trading_service,
             order_repository=self.order_repository,

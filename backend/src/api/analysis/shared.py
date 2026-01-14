@@ -12,6 +12,7 @@ import structlog
 
 from ...services.alphavantage_market_data import AlphaVantageMarketDataService
 from ...services.alphavantage_response_formatter import AlphaVantageResponseFormatter
+from ...services.data_manager import DataManager
 from ..models import ToolCall
 
 logger = structlog.get_logger()
@@ -59,6 +60,14 @@ def get_market_service() -> AlphaVantageMarketDataService:
 
     market_service: AlphaVantageMarketDataService = app.state.market_service
     return market_service
+
+
+def get_data_manager() -> DataManager:
+    """Dependency to get singleton DataManager from app state."""
+    from ...main import app
+
+    data_manager: DataManager = app.state.data_manager
+    return data_manager
 
 
 def get_formatter() -> AlphaVantageResponseFormatter:

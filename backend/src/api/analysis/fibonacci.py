@@ -14,11 +14,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from ...core.config import get_settings
 from ...core.financial_analysis import FibonacciAnalyzer
 from ...database.redis import RedisCache
-from ...services.alphavantage_market_data import AlphaVantageMarketDataService
+from ...services.data_manager import DataManager
 from ..dependencies.auth import get_current_user_id
 from ..health import get_redis
 from ..models import FibonacciAnalysisRequest, FibonacciAnalysisResponse
-from .shared import get_market_service, validate_date_range
+from .shared import get_data_manager, validate_date_range
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -29,7 +29,7 @@ async def fibonacci_analysis(
     request: FibonacciAnalysisRequest,
     user_id: str = Depends(get_current_user_id),
     redis_cache: RedisCache = Depends(get_redis),
-    market_service: AlphaVantageMarketDataService = Depends(get_market_service),
+    data_manager: DataManager = Depends(get_data_manager),
 ) -> FibonacciAnalysisResponse:
     """
     Perform Fibonacci retracement analysis on a stock symbol.
@@ -123,7 +123,8 @@ async def fibonacci_analysis(
             ).days,
         )
 
-        analyzer = FibonacciAnalyzer(market_service)
+        # Use singleton DataManager for cached OHLCV access
+        analyzer = FibonacciAnalyzer(data_manager)
         result = await analyzer.analyze(
             symbol=request.symbol,
             start_date=request.start_date,

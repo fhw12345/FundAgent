@@ -35,7 +35,7 @@ import asyncio
 import random
 import time
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -67,7 +67,7 @@ from ..services.insights import InsightsCategoryRegistry
 from ..services.insights.snapshot_service import InsightsSnapshotService
 from ..services.market_data import FREDService
 from ..services.tool_cache_wrapper import ToolCacheWrapper
-from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT
+from .llm_client import get_financial_agent_system_prompt
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
 from .tools.insights_tools import create_insights_tools
 from .tools.pcr_tools import create_pcr_tools
@@ -111,6 +111,9 @@ class FinancialAnalysisReActAgent:
         snapshot_service: (
             InsightsSnapshotService | None
         ) = None,  # Story 2.5: Cache-first insights
+        data_manager: (
+            DataManager | None
+        ) = None,  # Singleton DataManager for cached OHLCV
     ):
         """
         Initialize ReAct agent with SDK and MCP tools.
@@ -122,6 +125,7 @@ class FinancialAnalysisReActAgent:
             tool_cache_wrapper: Optional wrapper for tool caching + tracking
             redis_cache: Optional Redis cache for insights caching (30min TTL)
             snapshot_service: Optional InsightsSnapshotService for cache-first reads (Story 2.5)
+            data_manager: Singleton DataManager for cached OHLCV access (created in main.py)
         """
         self.settings = settings
         self.market_service = market_service
@@ -155,9 +159,21 @@ class FinancialAnalysisReActAgent:
                     error=str(e),
                 )
 
-        # Initialize analysis tools (both use AlphaVantage for reliable data)
-        self.fibonacci_analyzer = FibonacciAnalyzer(market_service)
-        self.stochastic_analyzer = StochasticAnalyzer(market_service)
+        # Use singleton DataManager from main.py for cached data access
+        # DataManager is the single source of truth for market data with Redis caching
+        self.data_manager = data_manager
+
+        # Initialize analysis tools using DataManager for cached OHLCV access
+        if self.data_manager:
+            self.fibonacci_analyzer = FibonacciAnalyzer(self.data_manager)
+            self.stochastic_analyzer = StochasticAnalyzer(self.data_manager)
+        else:
+            # Fallback: Create analyzers without caching (legacy mode)
+            logger.warning(
+                "DataManager not available - analysis tools will not use cache"
+            )
+            self.fibonacci_analyzer = None
+            self.stochastic_analyzer = None
 
         # Initialize LLM with centralized configuration
         self.llm = ChatTongyi(
@@ -169,11 +185,13 @@ class FinancialAnalysisReActAgent:
         )
 
         # Create compressed local tools (Fibonacci + Stochastic + Historical Prices)
-        base_tools = [
-            self._create_fibonacci_tool(),
-            self._create_stochastic_tool(),
-            self._create_historical_prices_tool(),
-        ]
+        # Only create analysis tools if DataManager is available
+        base_tools = []
+        if self.fibonacci_analyzer:
+            base_tools.append(self._create_fibonacci_tool())
+        if self.stochastic_analyzer:
+            base_tools.append(self._create_stochastic_tool())
+        base_tools.append(self._create_historical_prices_tool())
         self.tools = base_tools.copy()
 
         # Create formatter for Alpha Vantage responses
@@ -206,14 +224,10 @@ class FinancialAnalysisReActAgent:
         self.tools.extend(insights_tools)
 
         # Add Put/Call Ratio tools (Story 2.8: Reusable PCR service)
-        # Uses DataManager for cached per-symbol PCR calculations
+        # Reuse shared DataManager for cached per-symbol PCR calculations
         pcr_tools = []
-        if self.redis_cache:
-            data_manager = DataManager(
-                redis_cache=self.redis_cache,
-                alpha_vantage_service=market_service,
-            )
-            pcr_tools = create_pcr_tools(data_manager)
+        if self.data_manager:
+            pcr_tools = create_pcr_tools(self.data_manager)
             self.tools.extend(pcr_tools)
 
         # Track tool counts for logging
@@ -228,7 +242,7 @@ class FinancialAnalysisReActAgent:
             self.llm,
             self.tools,
             checkpointer=self.checkpointer,
-            prompt=FINANCIAL_AGENT_SYSTEM_PROMPT,
+            prompt=get_financial_agent_system_prompt(),
         )
 
         logger.info(
@@ -263,11 +277,15 @@ class FinancialAnalysisReActAgent:
             Detects major trends and calculates the 61.5%-61.8% golden pressure zone,
             which is the most significant Fibonacci level for trading decisions.
 
+            IMPORTANT: Use the current date from system prompt to calculate dates.
+            For "past 6 months": end_date = today, start_date = today - 180 days.
+            Always use YYYY-MM-DD format for dates.
+
             Args:
                 symbol: Stock ticker symbol (e.g., "AAPL", "TSLA")
-                timeframe: Time interval - "1d", "1w", "1M" (default: "1d")
-                start_date: Start date in YYYY-MM-DD format (optional)
-                end_date: End date in YYYY-MM-DD format (optional)
+                timeframe: Time interval - "1d" (daily), "1w" (weekly), "1M" (monthly)
+                start_date: Start date in YYYY-MM-DD format (calculate from current date)
+                end_date: End date in YYYY-MM-DD format (usually today's date)
 
             Returns:
                 Actionable Fibonacci analysis with golden zone context
@@ -355,13 +373,16 @@ Current ${current:.2f} → {zone_status}"""
             Identifies overbought/oversold conditions, bullish/bearish crossovers,
             and divergence patterns using %K and %D lines.
 
+            IMPORTANT: Use the current date from system prompt to calculate dates.
+            For recent analysis, use end_date = today. Always use YYYY-MM-DD format.
+
             Args:
                 symbol: Stock ticker symbol (e.g., "AAPL", "TSLA")
                 timeframe: Time interval - "1h", "1d", "1w", "1M" (default: "1d")
                 k_period: Period for %K calculation (default: 14)
                 d_period: Period for %D calculation (default: 3)
-                start_date: Start date in YYYY-MM-DD format (optional)
-                end_date: End date in YYYY-MM-DD format (optional)
+                start_date: Start date in YYYY-MM-DD format (calculate from current date)
+                end_date: End date in YYYY-MM-DD format (usually today's date)
 
             Returns:
                 Compressed 2-3 line Stochastic analysis summary
@@ -391,8 +412,9 @@ Summary: {result.analysis_summary}"""
         Create historical OHLC prices tool.
 
         Returns actual historical prices with specific dates to prevent LLM hallucination.
-        Uses existing market_service.get_daily_bars() for data.
+        Uses DataManager for cached OHLCV access, falls back to market_service if unavailable.
         """
+        data_manager = self.data_manager
         market_service = self.market_service
 
         @tool
@@ -415,6 +437,10 @@ Summary: {result.analysis_summary}"""
             Returns:
                 Table of recent OHLC prices with dates (max 30 data points)
             """
+            from datetime import datetime, timedelta
+
+            import pandas as pd
+
             try:
                 # Map period to number of days
                 period_days = {
@@ -424,34 +450,64 @@ Summary: {result.analysis_summary}"""
                     "3mo": 90,
                 }
                 days = period_days.get(period, 30)
+                cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
-                # Fetch data based on interval using existing service methods
-                if interval == "weekly":
-                    df = await market_service.get_weekly_bars(
-                        symbol, outputsize="compact"
+                # Use DataManager for cached access if available
+                if data_manager:
+                    granularity_map = {
+                        "daily": "daily",
+                        "weekly": "weekly",
+                        "monthly": "monthly",
+                    }
+                    granularity = granularity_map.get(interval, "daily")
+
+                    ohlcv_list = await data_manager.get_ohlcv(
+                        symbol=symbol,
+                        granularity=granularity,
+                        outputsize="compact",
                     )
-                elif interval == "monthly":
-                    df = await market_service.get_monthly_bars(
-                        symbol, outputsize="compact"
+
+                    if not ohlcv_list:
+                        return f"No historical data available for {symbol}"
+
+                    # Convert to DataFrame
+                    df = pd.DataFrame(
+                        [
+                            {
+                                "Open": d.open,
+                                "High": d.high,
+                                "Low": d.low,
+                                "Close": d.close,
+                                "Volume": d.volume,
+                            }
+                            for d in ohlcv_list
+                        ],
+                        index=pd.DatetimeIndex([d.date for d in ohlcv_list]),
                     )
-                else:  # daily (default)
-                    df = await market_service.get_daily_bars(
-                        symbol, outputsize="compact"
-                    )
+                    df = df.sort_index()
+                else:
+                    # Fallback to direct market_service
+                    if interval == "weekly":
+                        df = await market_service.get_weekly_bars(
+                            symbol, outputsize="compact"
+                        )
+                    elif interval == "monthly":
+                        df = await market_service.get_monthly_bars(
+                            symbol, outputsize="compact"
+                        )
+                    else:
+                        df = await market_service.get_daily_bars(
+                            symbol, outputsize="compact"
+                        )
 
                 if df.empty:
                     return f"No historical data available for {symbol}"
 
-                # Filter to requested period and limit to 30 data points
-                from datetime import datetime, timedelta
-
-                import pandas as pd
-
-                cutoff_date = datetime.now() - timedelta(days=days)
+                # Filter to requested period
                 df_filtered = df[df.index >= pd.Timestamp(cutoff_date)]
 
                 # Limit to max 30 data points (most recent)
-                df_limited = df_filtered.head(30)
+                df_limited = df_filtered.tail(30)
 
                 if df_limited.empty:
                     return f"No data in the requested period for {symbol}"
@@ -473,7 +529,7 @@ Summary: {result.analysis_summary}"""
                     )
 
                 # Add summary stats
-                latest = df_limited.iloc[0]
+                latest = df_limited.iloc[-1]  # Most recent
                 high_in_period = df_limited["High"].max()
                 low_in_period = df_limited["Low"].min()
 

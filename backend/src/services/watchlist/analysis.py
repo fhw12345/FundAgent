@@ -35,6 +35,7 @@ class AnalysisEngine:
         context_manager: ContextWindowManager,
         market_service,
         settings,
+        data_manager=None,
         agent=None,
         trading_service=None,
         order_repository=None,
@@ -49,6 +50,7 @@ class AnalysisEngine:
             context_manager: Context window manager for history management
             market_service: Market data service (e.g., AlphaVantage)
             settings: Application settings
+            data_manager: Singleton DataManager for cached OHLCV access
             agent: Optional LLM agent for analysis
             trading_service: Optional trading service for order placement
             order_repository: Optional repository for persisting orders
@@ -59,6 +61,7 @@ class AnalysisEngine:
         self.context_manager = context_manager
         self.market_service = market_service
         self.settings = settings
+        self.data_manager = data_manager
         self.agent = agent
         self.trading_service = trading_service
         self.order_repository = order_repository
@@ -312,7 +315,11 @@ REASONING: [your analysis]
             True if analysis succeeded, False otherwise
         """
         try:
-            analyzer = FibonacciAnalyzer(self.market_service)
+            if not self.data_manager:
+                logger.error("DataManager not available for Fibonacci analysis")
+                return False
+
+            analyzer = FibonacciAnalyzer(self.data_manager)
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=180)
 

@@ -4,7 +4,7 @@ Provides technical analysis using the Stochastic Oscillator to identify overboug
 crossover signals, and potential reversals in stock price movements.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 import pandas as pd
@@ -14,7 +14,7 @@ from scipy.signal import find_peaks
 from ...api.models import StochasticAnalysisResponse, StochasticLevel
 
 if TYPE_CHECKING:
-    from ...services.alphavantage_market_data import AlphaVantageMarketDataService
+    from ...services.data_manager import DataManager
 
 logger = structlog.get_logger()
 
@@ -22,14 +22,14 @@ logger = structlog.get_logger()
 class StochasticAnalyzer:
     """Stochastic Oscillator technical analysis engine."""
 
-    def __init__(self, market_service: "AlphaVantageMarketDataService"):
+    def __init__(self, data_manager: "DataManager"):
         """
-        Initialize analyzer with AlphaVantage market data service.
+        Initialize analyzer with DataManager for cached OHLCV access.
 
         Args:
-            market_service: AlphaVantage service for fetching market data
+            data_manager: DataManager for all market data (uses Redis caching for daily+)
         """
-        self.market_service = market_service
+        self.data_manager = data_manager
         self.data: pd.DataFrame | None = None
         self.symbol: str = ""
         self.timeframe: str = "1d"
@@ -151,46 +151,75 @@ class StochasticAnalyzer:
         self, start_date: str | None = None, end_date: str | None = None
     ) -> pd.DataFrame:
         """
-        Fetch stock data using AlphaVantageMarketDataService.
+        Fetch stock data via DataManager (with Redis caching for daily+).
 
-        Uses AlphaVantage for reliable data access, matching Fibonacci analyzer.
+        DataManager handles all granularities:
+        - Intraday (1min-15min): No cache, always fresh
+        - 30min-60min: Short TTL (5-15 min)
+        - Daily+: Standard TTL (1-4 hours)
         """
         try:
-            # Map frontend timeframe to AlphaVantage interval
-            interval_map = {
-                "1h": "60min",  # Intraday hourly
-                "1d": "1d",  # Daily
-                "1w": "1wk",  # Weekly
-                "1M": "1mo",  # Monthly
+
+            # Map timeframe to DataManager granularity
+            granularity_map = {
+                "1h": "60min",
+                "1d": "daily",
+                "1w": "weekly",
+                "1M": "monthly",
             }
-            interval = interval_map.get(self.timeframe, "1d")
-
-            # Fetch bars from Alpha Vantage via market service
-            # Note: For intraday intervals, AlphaVantage returns ~1 day of data automatically
-            # with extended_hours=True (includes pre/post market)
-            bars = await self.market_service.get_price_bars(
-                symbol=self.symbol,
-                interval=interval,
-                period="6mo",  # Only used for daily/weekly/monthly
-                start_date=start_date,
-                end_date=end_date,
-            )
-
-            if bars.empty:
-                logger.error("No data returned for symbol", symbol=self.symbol)
-                return pd.DataFrame()
-
-            # bars is already a properly formatted DataFrame
-            data = bars
+            granularity = granularity_map.get(self.timeframe, "daily")
 
             logger.info(
-                "Fetched stock data via AlphaVantageMarketDataService",
+                "Fetching OHLCV via DataManager",
+                symbol=self.symbol,
+                granularity=granularity,
+            )
+
+            ohlcv_list = await self.data_manager.get_ohlcv(
+                symbol=self.symbol,
+                granularity=granularity,
+                outputsize="compact",  # 6 months is sufficient for stochastic
+            )
+
+            if not ohlcv_list:
+                logger.error("No data returned from DataManager", symbol=self.symbol)
+                return pd.DataFrame()
+
+            # Convert OHLCVData list to DataFrame
+            data = pd.DataFrame(
+                [
+                    {
+                        "Open": d.open,
+                        "High": d.high,
+                        "Low": d.low,
+                        "Close": d.close,
+                        "Volume": d.volume,
+                    }
+                    for d in ohlcv_list
+                ],
+                index=pd.DatetimeIndex([d.date for d in ohlcv_list]),
+            )
+
+            # Sort by date ascending (oldest first) for stochastic calculation
+            data = data.sort_index()
+
+            # Apply date filters if provided
+            if start_date:
+                start_dt = pd.Timestamp(start_date, tz=UTC)
+                data = data[data.index >= start_dt]
+
+            if end_date:
+                end_dt = pd.Timestamp(end_date, tz=UTC)
+                data = data[data.index <= end_dt]
+
+            logger.info(
+                "Fetched stock data via DataManager",
                 symbol=self.symbol,
                 timeframe=self.timeframe,
-                interval=interval,
+                granularity=granularity,
                 data_points=len(data),
-                start=data.index[0],
-                end=data.index[-1],
+                start=data.index[0] if len(data) > 0 else None,
+                end=data.index[-1] if len(data) > 0 else None,
             )
 
             return data.dropna()

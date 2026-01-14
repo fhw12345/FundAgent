@@ -3,7 +3,7 @@ Main Fibonacci analysis engine with modular architecture.
 Orchestrates trend detection, level calculation, and pressure zone analysis using specialized components.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -15,7 +15,7 @@ from .level_calculator import LevelCalculator
 from .trend_detector import TrendDetector
 
 if TYPE_CHECKING:
-    from ....services.alphavantage_market_data import AlphaVantageMarketDataService
+    from ....services.data_manager import DataManager
 
 logger = structlog.get_logger()
 
@@ -23,9 +23,14 @@ logger = structlog.get_logger()
 class FibonacciAnalyzer:
     """Advanced Fibonacci pressure level analyzer with modular architecture."""
 
-    def __init__(self, market_service: "AlphaVantageMarketDataService") -> None:
-        """Initialize analyzer with modular components."""
-        self.market_service = market_service
+    def __init__(self, data_manager: "DataManager") -> None:
+        """
+        Initialize analyzer with DataManager for cached OHLCV access.
+
+        Args:
+            data_manager: DataManager for all market data (uses Redis caching for daily+)
+        """
+        self.data_manager = data_manager
         self.data: pd.DataFrame | None = None
         self.symbol: str = ""
         self.timeframe: str = "1d"
@@ -187,59 +192,88 @@ class FibonacciAnalyzer:
     async def _fetch_stock_data(
         self, start_date: str | None = None, end_date: str | None = None
     ) -> pd.DataFrame:
-        """Fetch stock data with timeframe-appropriate interval using AlphaVantageMarketDataService."""
+        """
+        Fetch stock data via DataManager (with Redis caching for daily+).
+
+        DataManager handles all granularities:
+        - Intraday (1min-15min): No cache, always fresh
+        - 30min-60min: Short TTL (5-15 min)
+        - Daily+: Standard TTL (1-4 hours)
+        """
         try:
-            from datetime import datetime, timedelta
+            from datetime import datetime as dt
+            from datetime import timedelta
 
-            # Map timeframe to Alpha Vantage interval format
-            # For intraday (1m, 1h, 4h, etc.), AlphaVantage returns intraday data
-            interval_map = {
-                "1m": "1m",  # Intraday: 1 minute bars
-                "1h": "60m",  # Intraday: 1 hour bars (will get 1 trading day)
-                "4h": "60m",  # Intraday: 1 hour bars (will get 1 trading day, can aggregate)
-                "1d": "1d",  # Daily
-                "1w": "1wk",  # Weekly
-                "1M": "1mo",  # Monthly
+            # Map timeframe to DataManager granularity
+            granularity_map = {
+                "1m": "1min",
+                "1h": "60min",
+                "4h": "60min",  # Use 60min and aggregate if needed
+                "1d": "daily",
+                "1w": "weekly",
+                "1M": "monthly",
             }
-            interval = interval_map.get(self.timeframe, "1d")
+            granularity = granularity_map.get(self.timeframe, "daily")
 
-            # Default to 1 year lookback for daily timeframe if no start_date provided
-            # This limits analysis to recent market conditions and avoids irrelevant historical trends
-            if start_date is None and self.timeframe == "1d":
-                one_year_ago = datetime.now() - timedelta(days=365)
-                start_date = one_year_ago.strftime("%Y-%m-%d")
+            logger.info(
+                "Fetching OHLCV via DataManager",
+                symbol=self.symbol,
+                granularity=granularity,
+            )
+
+            ohlcv_list = await self.data_manager.get_ohlcv(
+                symbol=self.symbol,
+                granularity=granularity,
+                outputsize="full",  # Need full data for trend detection
+            )
+
+            if not ohlcv_list:
+                logger.error("No data returned from DataManager", symbol=self.symbol)
+                return pd.DataFrame()
+
+            # Convert OHLCVData list to DataFrame
+            data = pd.DataFrame(
+                [
+                    {
+                        "Open": d.open,
+                        "High": d.high,
+                        "Low": d.low,
+                        "Close": d.close,
+                        "Volume": d.volume,
+                    }
+                    for d in ohlcv_list
+                ],
+                index=pd.DatetimeIndex([d.date for d in ohlcv_list]),
+            )
+
+            # Sort by date ascending (oldest first) for trend detection
+            data = data.sort_index()
+
+            # Apply date filters if provided
+            if start_date:
+                start_dt = pd.Timestamp(start_date, tz=UTC)
+                data = data[data.index >= start_dt]
+            elif self.timeframe == "1d":
+                # Default to 1 year lookback for daily timeframe
+                one_year_ago = dt.now(UTC) - timedelta(days=365)
+                data = data[data.index >= pd.Timestamp(one_year_ago)]
                 logger.info(
                     "Defaulting to 1-year lookback for daily Fibonacci analysis",
                     symbol=self.symbol,
-                    start_date=start_date,
                 )
 
-            # Fetch bars from Alpha Vantage via market service
-            # Note: For intraday intervals, AlphaVantage returns ~1 day of data automatically
-            # with extended_hours=True (includes pre/post market)
-            bars = await self.market_service.get_price_bars(
-                symbol=self.symbol,
-                interval=interval,
-                period="1y",  # Default period (only used if start_date not set)
-                start_date=start_date,
-                end_date=end_date,
-            )
-
-            if bars.empty:
-                logger.error("No data returned for symbol", symbol=self.symbol)
-                return pd.DataFrame()
-
-            # bars is already a properly formatted DataFrame
-            data = bars
+            if end_date:
+                end_dt = pd.Timestamp(end_date, tz=UTC)
+                data = data[data.index <= end_dt]
 
             logger.info(
-                "Fetched stock data via AlphaVantageMarketDataService",
+                "Fetched stock data via DataManager",
                 symbol=self.symbol,
                 timeframe=self.timeframe,
-                interval=interval,
+                granularity=granularity,
                 data_points=len(data),
-                start=data.index[0],
-                end=data.index[-1],
+                start=data.index[0] if len(data) > 0 else None,
+                end=data.index[-1] if len(data) > 0 else None,
             )
 
             return data.dropna()

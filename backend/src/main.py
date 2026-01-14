@@ -197,6 +197,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 tool_cache_wrapper=tool_cache_wrapper,
                 redis_cache=redis_cache,  # Enable 30min caching for AI Sector Risk
                 snapshot_service=snapshot_service,  # Story 2.5: Cache-first insights
+                data_manager=data_manager,  # Singleton DataManager for cached OHLCV
             )
 
             # Store in app state for use in dependencies
@@ -223,6 +224,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             agent=react_agent,  # Pass agent for LLM-based analysis
             trading_service=alpaca_trading_service,  # Pass trading service for order placement
             order_repository=order_repo,  # Pass order repository for MongoDB persistence
+            data_manager=data_manager,  # Singleton DataManager for cached OHLCV access
         )
 
         # Store in app state for manual triggering via API

@@ -140,9 +140,13 @@ def get_react_agent(
             reason="app.state.react_agent not found",
         )
 
+        # Get market_service from app state for fallback agent
+        market_service = app.state.market_service
+
         _react_agent_singleton = FinancialAnalysisReActAgent(
             settings=settings,
             ticker_data_service=ticker_service,
+            market_service=market_service,  # Required for agent tools
             # NOTE: tool_cache_wrapper not passed - no execution tracking in fallback mode
             redis_cache=redis_cache,  # Enable insights caching even in fallback mode
         )

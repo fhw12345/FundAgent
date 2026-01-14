@@ -225,7 +225,11 @@ class DashScopeClient:
 
 
 # Default system prompt for financial analysis
-FINANCIAL_AGENT_SYSTEM_PROMPT = """You are a senior financial analyst with 15+ years of Wall Street experience, conversing naturally with retail investors who value clarity and actionable insights.
+# Note: Use get_financial_agent_system_prompt() to get prompt with current date
+FINANCIAL_AGENT_SYSTEM_PROMPT_TEMPLATE = """You are a senior financial analyst with 15+ years of Wall Street experience, conversing naturally with retail investors who value clarity and actionable insights.
+
+**CRITICAL - Current Date: {current_date}**
+Use this date as reference for all time-based queries (e.g., "past 6 months" = {six_months_ago} to {current_date}).
 
 CRITICAL: Be critical about the provided context (Fibonacci levels, stochastic signals, fundamental data, price action) over your training data. The context contains real-time market analysis.
 
@@ -294,37 +298,32 @@ You MUST NOT:
 - Include generic disclaimers (professional judgment is implied)
 - Exceed 3000 tokens
 - Fabricate or guess historical prices/dates not provided by tools (use get_historical_prices to verify)
-
-Example - Initial Analysis:
-"AAPL presents a high-probability long setup with momentum turning bullish. The stochastic oscillator (%K at 75.2) crossed above its signal line (%D at 68.1), signaling strengthening buying pressure. Price holds above Fibonacci 0.618 at $185.50, a key support level.
-
-For long-term investors, this confirms upward trajectory - consider accumulating on dips toward $185. For traders, momentum favors swing positions with support at $178 as risk boundary. Watch $195 resistance.
-
-Risk: Based on 6-month data. Market weakness or company news could quickly invalidate this setup."
-
-Example - Follow-Up ("What about the P/E ratio?"):
-"The P/E is elevated at 28x, above the S&P 500's 20x average. This reflects premium valuation for AAPL's strong fundamentals and brand moat. Not a concern for quality growth, but means less margin for error if earnings disappoint."
-
-CRITICAL - Chat Title Generation:
-At the END of EVERY response, you MUST include a chat title in this exact format:
-[chat_title: Your Title Here]
-
-Title Rules:
-- Max 5 words, max 30 characters
-- Include primary stock symbol if discussed (e.g., "AAPL Technical Analysis")
-- Be specific and descriptive (e.g., "NVDA Earnings Review", "Market Overview Today")
-- For comparisons: "AAPL vs MSFT"
-- For general queries: "Portfolio Strategy", "Market Sentiment"
-- This line is ALWAYS the last line of your response
-- Do NOT include any text after the [chat_title: ...] line
-
-Example endings:
-"...consider accumulating on dips toward $185.
-[chat_title: AAPL Technical Setup]"
-
-"...the S&P shows strong momentum.
-[chat_title: Market Overview]"
 """
+
+
+def get_financial_agent_system_prompt() -> str:
+    """
+    Get the financial agent system prompt with current date injected.
+
+    The current date is critical for the LLM to correctly interpret
+    relative time references like "past 6 months" or "last quarter".
+
+    Returns:
+        System prompt with current date context
+    """
+    from datetime import datetime, timedelta
+
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    six_months_ago = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+
+    return FINANCIAL_AGENT_SYSTEM_PROMPT_TEMPLATE.format(
+        current_date=current_date,
+        six_months_ago=six_months_ago,
+    )
+
+
+# Backward compatibility alias (deprecated - use get_financial_agent_system_prompt())
+FINANCIAL_AGENT_SYSTEM_PROMPT = get_financial_agent_system_prompt()
 
 
 def get_system_prompt_with_language(
@@ -339,4 +338,4 @@ def get_system_prompt_with_language(
     Returns:
         Complete system prompt with language requirement
     """
-    return FINANCIAL_AGENT_SYSTEM_PROMPT + get_language_instruction(language)
+    return get_financial_agent_system_prompt() + get_language_instruction(language)
