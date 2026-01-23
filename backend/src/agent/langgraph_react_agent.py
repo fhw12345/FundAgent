@@ -67,7 +67,7 @@ from ..services.insights import InsightsCategoryRegistry
 from ..services.insights.snapshot_service import InsightsSnapshotService
 from ..services.market_data import FREDService
 from ..services.tool_cache_wrapper import ToolCacheWrapper
-from .llm_client import get_financial_agent_system_prompt
+from .llm_client import FINANCIAL_AGENT_SYSTEM_PROMPT_TEMPLATE
 from .tools.alpha_vantage_tools import create_alpha_vantage_tools
 from .tools.insights_tools import create_insights_tools
 from .tools.pcr_tools import create_pcr_tools
@@ -236,13 +236,38 @@ class FinancialAnalysisReActAgent:
         insights_tool_count = len(insights_tools)
         pcr_tool_count = len(pcr_tools)
 
-        # Create ReAct agent with memory and custom system prompt
+        # Create ReAct agent with memory and DYNAMIC system prompt
+        # The prompt is a callable that generates fresh date context on each invocation
+        # This fixes the bug where date was frozen at service startup time
         self.checkpointer = MemorySaver()
+
+        def _dynamic_system_prompt(state: dict) -> str:
+            """Generate system prompt with current date on each agent invocation.
+
+            This callable is invoked by LangGraph before each LLM call, ensuring
+            the date context is always fresh (not frozen at service startup).
+
+            Args:
+                state: LangGraph state dict (contains messages, etc.)
+
+            Returns:
+                System prompt string with current date injected
+            """
+            from datetime import timedelta
+
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            six_months_ago = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+
+            return FINANCIAL_AGENT_SYSTEM_PROMPT_TEMPLATE.format(
+                current_date=current_date,
+                six_months_ago=six_months_ago,
+            )
+
         self.agent = create_react_agent(
             self.llm,
             self.tools,
             checkpointer=self.checkpointer,
-            prompt=get_financial_agent_system_prompt(),
+            prompt=_dynamic_system_prompt,  # Callable for dynamic date injection
         )
 
         logger.info(
