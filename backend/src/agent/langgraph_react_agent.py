@@ -82,8 +82,9 @@ class FinancialAnalysisReActAgent:
 
         # Fund data tools via AkShare
         from .tools.akshare_fund_tools import create_akshare_fund_tools
+        from .tools.eastmoney_tools import create_eastmoney_tools
 
-        self.tools: list[Any] = create_akshare_fund_tools()
+        self.tools: list[Any] = create_akshare_fund_tools() + create_eastmoney_tools()
 
         self.checkpointer = MemorySaver()
 
