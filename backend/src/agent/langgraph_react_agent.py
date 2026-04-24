@@ -80,8 +80,10 @@ class FinancialAnalysisReActAgent:
             temperature=settings.default_llm_temperature,
         )
 
-        # Tools list — fund-specific tools will be added in M1-3 (AkShare) and M1-4
-        self.tools: list[Any] = []
+        # Fund data tools via AkShare
+        from .tools.akshare_fund_tools import create_akshare_fund_tools
+
+        self.tools: list[Any] = create_akshare_fund_tools()
 
         self.checkpointer = MemorySaver()
 
