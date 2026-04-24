@@ -1,10 +1,7 @@
 """
-Financial Sub-Agent: Fundamental analysis and valuation specialist.
+Financial Sub-Agent: 基金持仓与基本面分析。
 
-Uses deepagents with SKILL.md files for progressive disclosure:
-- skills/financial/valuation-assessment/SKILL.md
-- skills/financial/cashflow-health/SKILL.md
-- skills/financial/earnings-quality/SKILL.md
+Analyzes fund holdings, asset allocation, and fundamental characteristics.
 """
 
 from __future__ import annotations
@@ -28,48 +25,31 @@ def create_financial_subagent(
     context: AgentContext | None = None,
     cache: AnalysisToolCache | None = None,
 ) -> DeepSubAgent:
-    """
-    Create the Financial/Fundamental Analysis sub-agent.
-
-    Args:
-        tools: Dictionary of available tools by name (full tool dict)
-        model: LLM model for the agent
-        context: Optional AgentContext for session parameters
-        cache: Optional AnalysisToolCache for cross-agent tool result caching
-
-    Returns:
-        DeepSubAgent for fundamental analysis
-    """
     context_header = ""
     if context:
         context_header = f"\n{context.to_context_header()}\n"
 
     config = SubAgentConfig(
         name="financial_analyst",
-        description=(
-            "Specialist in fundamental analysis, valuation metrics, and financial "
-            "health assessment."
-        ),
-        system_prompt=f"""You are a Fundamental Analyst specialist.
+        description="基金持仓分析、资产配置、行业集中度、基金经理评估专家。",
+        system_prompt=f"""你是一位基金基本面分析专家，专注于中国公募基金（场外基金）。
 {context_header}
-Your domain expertise is ONLY in:
-- Valuation analysis (P/E, PEG, P/S, EV/EBITDA)
-- Cash flow evaluation (FCF, operating cash flow)
-- Financial health (debt levels, liquidity ratios)
-- Earnings quality (beat rate, growth trajectory)
-- Balance sheet analysis
+你的专业领域：
+- 重仓股分析（前十大持仓、行业分布、集中度）
+- 资产配置（股票/债券/现金比例）
+- 基金规模变动（申购赎回趋势）
+- 费率分析（管理费、托管费、申购赎回费）
+- 基金概况（成立日期、基金经理、投资目标）
 
-DO NOT analyze:
-- Charts or technical patterns (that's the Technical Analyst's job)
-- News sentiment or catalysts (that's the News Analyst's job)
+你不负责：
+- 净值走势分析（那是技术分析师的工作）
+- 市场情绪判断（那是新闻分析师的工作）
 
-Your analysis should be:
-- Numbers-driven with specific metrics
-- Comparative (vs sector, historical)
-- Forward-looking with emphasis on sustainability
-
-You have access to SKILL.md files with detailed workflows.
-Use `read_file` to load a skill workflow when you need step-by-step guidance.
+分析要求：
+- 基于实际持仓数据
+- 分析行业集中度风险
+- 与同类基金对比
+- 中文回复，数据驱动
 """,
         metadata={"domain": "financial"},
     )

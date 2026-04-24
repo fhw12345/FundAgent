@@ -1,10 +1,7 @@
 """
-News Sub-Agent: Sentiment and market mood analysis specialist.
+News Sub-Agent: 基金舆情与市场情绪分析。
 
-Uses deepagents with SKILL.md files for progressive disclosure:
-- skills/news/sentiment-analysis/SKILL.md
-- skills/news/catalyst-identification/SKILL.md
-- skills/news/market-mood/SKILL.md
+Analyzes fund manager reputation, market sentiment, and sector news.
 """
 
 from __future__ import annotations
@@ -28,48 +25,31 @@ def create_news_subagent(
     context: AgentContext | None = None,
     cache: AnalysisToolCache | None = None,
 ) -> DeepSubAgent:
-    """
-    Create the News/Sentiment Analysis sub-agent.
-
-    Args:
-        tools: Dictionary of available tools by name (full tool dict)
-        model: LLM model for the agent
-        context: Optional AgentContext for session parameters
-        cache: Optional AnalysisToolCache for cross-agent tool result caching
-
-    Returns:
-        DeepSubAgent for news/sentiment analysis
-    """
     context_header = ""
     if context:
         context_header = f"\n{context.to_context_header()}\n"
 
     config = SubAgentConfig(
         name="news_analyst",
-        description=(
-            "Specialist in news sentiment analysis, market drivers, and catalyst "
-            "identification."
-        ),
-        system_prompt=f"""You are a News and Sentiment Analyst specialist.
+        description="基金舆情分析、市场情绪、基金经理口碑、行业动态专家。",
+        system_prompt=f"""你是一位基金舆情与市场情绪分析专家，专注于中国公募基金（场外基金）。
 {context_header}
-Your domain expertise is ONLY in:
-- News sentiment analysis and aggregation
-- Catalyst identification (earnings, product launches, events)
-- Market mood assessment (risk-on vs risk-off)
-- Sector performance and trends
-- Qualitative factors affecting stock prices
+你的专业领域：
+- 基金经理口碑与任职稳定性
+- 基金公司信誉与治理
+- 行业/板块热度与轮动
+- 监管政策变化对基金的影响
+- 同类基金对比排名与评级
 
-DO NOT analyze:
-- Charts or technical patterns (that's the Technical Analyst's job)
-- Financial statements or valuation (that's the Financial Analyst's job)
+你不负责：
+- 净值走势分析（那是技术分析师的工作）
+- 具体持仓分析（那是财务分析师的工作）
 
-Your analysis should be:
-- Timely with focus on recent developments
-- Balanced showing both positive and negative news
-- Contextual within broader market environment
-
-You have access to SKILL.md files with detailed workflows.
-Use `read_file` to load a skill workflow when you need step-by-step guidance.
+分析要求：
+- 关注近期基金经理变动、规模异常变化
+- 评估行业/板块配置的时效性
+- 结合市场环境给出定性判断
+- 中文回复，平衡正反面信息
 """,
         metadata={"domain": "news"},
     )
