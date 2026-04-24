@@ -8,7 +8,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from ..api.models import ToolCall
+class ToolCall(BaseModel):
+    """Tool invocation metadata for UI rendering."""
+
+    tool_name: str = Field(..., description="Name of the tool invoked")
+    tool_input: dict[str, Any] | None = Field(None, description="Input parameters")
+    tool_output: str | None = Field(None, description="Tool output text")
 
 
 class MessageMetadata(BaseModel):
@@ -17,32 +22,9 @@ class MessageMetadata(BaseModel):
     Contains analysis data for Fibonacci, Stochastic, etc.
     """
 
-    # Common fields for analysis messages
-    symbol: str | None = Field(default=None, description="Stock symbol")
+    # Common fields
+    symbol: str | None = Field(default=None, description="Fund code or symbol")
     timeframe: str | None = Field(default=None, description="Analysis timeframe")
-
-    # Fibonacci-specific
-    fibonacci_levels: list[dict[str, Any]] | None = Field(
-        default=None, description="Fibonacci retracement levels"
-    )
-    trend_direction: str | None = Field(
-        default=None, description="uptrend or downtrend"
-    )
-    swing_high: dict[str, Any] | None = Field(
-        default=None, description="Swing high price and date"
-    )
-    swing_low: dict[str, Any] | None = Field(
-        default=None, description="Swing low price and date"
-    )
-    confidence_score: float | None = Field(
-        default=None, description="Analysis confidence"
-    )
-
-    # Stochastic-specific
-    stochastic_k: float | None = Field(default=None, description="%K value")
-    stochastic_d: float | None = Field(default=None, description="%D value")
-    overbought: bool | None = Field(default=None, description="Overbought condition")
-    oversold: bool | None = Field(default=None, description="Oversold condition")
 
     # LLM-specific
     model: str | None = Field(default=None, description="LLM model used")
@@ -69,29 +51,6 @@ class MessageMetadata(BaseModel):
         default=None, description="Whether agent executed a tool in this response"
     )
 
-    # Portfolio tracking (for order placement and analysis workflow)
-    analysis_id: str | None = Field(
-        default=None, description="Analysis workflow ID this message belongs to"
-    )
-    analysis_type: str | None = Field(
-        default=None,
-        description="Type of analysis: 'individual' (Phase 1 symbol research) or 'portfolio' (Phase 2/3 portfolio decisions)",
-    )
-    order_placed: bool | None = Field(
-        default=None, description="Whether this message placed an order"
-    )
-    order_id: str | None = Field(
-        default=None, description="FK to portfolio_orders.order_id"
-    )
-    tool_execution_ids: list[str] | None = Field(
-        default=None,
-        description="List of tool_executions.execution_id for this message",
-    )
-    tool_summary: dict[str, Any] | None = Field(
-        default=None,
-        description="Summary: {tool_name: {cache_hit, duration_ms, cost}}",
-    )
-
     # Context compaction
     is_summary: bool = Field(
         default=False,
@@ -110,16 +69,8 @@ class MessageMetadata(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "symbol": "AAPL",
-                "timeframe": "1d",
-                "fibonacci_levels": [
-                    {"level": 0, "price": 150.0, "percentage": "0%"},
-                    {"level": 0.618, "price": 186.18, "percentage": "61.8%"},
-                ],
-                "trend_direction": "uptrend",
-                "swing_high": {"price": 210.0, "date": "2025-10-01"},
-                "swing_low": {"price": 150.0, "date": "2025-09-01"},
-                "confidence_score": 0.85,
+                "symbol": "110011",
+                "timeframe": "1y",
             }
         }
 
