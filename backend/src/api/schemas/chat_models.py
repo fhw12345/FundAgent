@@ -6,10 +6,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from ...api.models import ToolCall  # Import ToolCall for tool wrapper UI
 from ...core.localization import SupportedLanguage
 from ...models.chat import Chat, UIState
-from ...models.message import Message, MessageMetadata
+from ...models.message import Message, MessageMetadata, ToolCall
 
 # ===== Request Models =====
 

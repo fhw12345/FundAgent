@@ -1,22 +1,13 @@
 """
-Debater Sub-Agent: Adversarial analysis using INDEPENDENT data sources.
+Debater Sub-Agent: Adversarial analysis using independent sources.
 
-Uses yfinance + Exa (NOT Alpha Vantage) for genuine cross-verification.
-Outputs structured JSON concerns for programmatic fact tracking.
-
-Skills:
-- skills/debater/fact-checking/SKILL.md
-- skills/debater/counter-evidence/SKILL.md
-- skills/debater/risk-assessment/SKILL.md
-- skills/debater/assumption-testing/SKILL.md
+Placeholder — fund-specific independent verification tools added in M1-4.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..tools.exa_tools import create_exa_tools
-from ..tools.yfinance_tools import create_yfinance_tools
 from . import _SKILLS_ROOT, DeepSubAgent, SubAgentConfig, create_deep_subagent
 
 if TYPE_CHECKING:
@@ -44,7 +35,7 @@ RESPONSE FORMAT: You MUST include a JSON block in your response with this exact 
 }}
 ```
 
-List 3-5 concerns. Each concern MUST cite evidence from your tools (Yahoo Finance or web search).
+List 3-5 concerns. Each concern MUST cite evidence.
 If you genuinely have no concerns after thorough review, respond with exactly: "{termination}"
 """
 
@@ -54,19 +45,9 @@ def create_debater_subagent(
     context: AgentContext | None = None,
     exa_api_key: str = "",
 ) -> DeepSubAgent:
-    """Create the Debater sub-agent with independent verification tools.
+    """Create the Debater sub-agent.
 
-    The debater uses Yahoo Finance and Exa web search — NOT the same
-    Alpha Vantage API used by research sub-agents. This ensures genuine
-    cross-verification rather than circular validation.
-
-    Args:
-        model: LLM model for the agent
-        context: Optional AgentContext for session parameters
-        exa_api_key: Exa API key for web search
-
-    Returns:
-        DeepSubAgent for adversarial analysis
+    Independent verification tools will be added in M1-4 (fund domain refactor).
     """
     context_header = ""
     if context:
@@ -75,31 +56,12 @@ def create_debater_subagent(
     config = SubAgentConfig(
         name="debater",
         description=(
-            "Contrarian analyst who challenges investment theses using "
-            "independent data sources (Yahoo Finance, web search). "
-            "Verifies claims against sources different from the research."
+            "Contrarian analyst who challenges investment theses. "
+            "Verifies claims against independent sources."
         ),
-        system_prompt=f"""You are a Short Seller and Contrarian Debater.
+        system_prompt=f"""You are a Contrarian Debater for Chinese mutual fund analysis.
 {context_header}
-Your role is to CHALLENGE investment theses and find weaknesses.
-You are NOT trying to help the thesis — you are trying to break it.
-
-CRITICAL: You have INDEPENDENT data sources (Yahoo Finance, web search).
-These are DIFFERENT from the APIs used to produce the research.
-Use them to cross-verify claims — don't trust the research at face value.
-
-Your tools:
-- fetch_yfinance_news: Get news and financial stats from Yahoo Finance
-- search_web_exa: Search the web for lawsuits, regulation, analyst reports
-
-Your skills allow you to:
-- FACT CHECK: Verify if claims are actually true against independent data
-- FIND COUNTER-EVIDENCE: Search for contradicting information
-- ASSESS RISKS: Identify what the thesis ignored
-- TEST ASSUMPTIONS: Challenge what the thesis takes for granted
-
-You have access to SKILL.md files with detailed workflows.
-Use `read_file` to load a skill workflow when you need step-by-step guidance.
+Your role is to CHALLENGE fund investment theses and find weaknesses.
 
 {STRUCTURED_OUTPUT_INSTRUCTION.format(termination=TERMINATION_SIGNAL)}
 
@@ -110,14 +72,9 @@ respond with exactly: "{TERMINATION_SIGNAL}"
         metadata={"domain": "debater", "termination_signal": TERMINATION_SIGNAL},
     )
 
-    # Independent tools only — NOT Alpha Vantage
-    debater_tools = create_yfinance_tools()
-    if exa_api_key:
-        debater_tools.extend(create_exa_tools(api_key=exa_api_key))
-
     return create_deep_subagent(
         config=config,
         model=model,
-        tools=debater_tools,
+        tools=[],
         skills_dir=str(_SKILLS_ROOT / "debater"),
     )
