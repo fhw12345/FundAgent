@@ -1,8 +1,8 @@
 {
-  "name": "financial-agent-frontend",
+  "name": "fund-agent-frontend",
   "version": "0.11.6",
   "type": "module",
-  "description": "AI-Enhanced Financial Analysis Platform Frontend",
+  "description": "FundAgent - AI-Powered Chinese Mutual Fund Analysis Frontend",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
