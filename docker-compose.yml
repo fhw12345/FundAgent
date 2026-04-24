@@ -5,17 +5,19 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
-      - ./backend/.env.development  # Load all config from gitignored file
+      - ./backend/.env.development
     environment:
       - ENVIRONMENT=development
+      - AGENT_MAESTRO_BASE_URL=http://host.docker.internal:23333
     depends_on:
       - mongodb
       - redis
-      - langfuse-server  # Langfuse observability (v3.x with ClickHouse)
     volumes:
-      - ./backend:/app  # Mount full backend directory
-      - backend_deps:/home/app/.local  # Persist pip user install packages
+      - ./backend:/app
+      - backend_deps:/home/app/.local
     restart: unless-stopped
 
   frontend:

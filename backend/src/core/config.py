@@ -47,109 +47,42 @@ class Settings(BaseSettings):
     ]  # Allow all hosts (override via ALLOWED_HOSTS env var)
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
-    # Langfuse observability configuration (Factor 2: Own Your Prompts)
+    # Langfuse observability (optional - disabled by default)
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
-    langfuse_host: str = "http://langfuse-server:3000"
+    langfuse_host: str = ""
 
-    # External APIs - LLM
-    openai_api_key: str = ""
-    qwen_api_key: str = ""  # Legacy - use dashscope_api_key instead
-    dashscope_api_key: str = ""  # Alibaba Cloud DashScope API key
+    # Agent Maestro LLM proxy
+    agent_maestro_base_url: str = "http://localhost:23333"
+    openai_api_key: str = ""  # Not used - Agent Maestro handles auth
 
     # LLM Configuration
-    default_llm_model: str = "qwen-plus-latest"  # Default model for agents
-    default_llm_temperature: float = 0.7  # Default temperature for LLM calls
+    default_llm_model: str = "claude-opus-4.7"
+    default_llm_temperature: float = 0.7
 
-    # Context Window Management (Portfolio Agent History)
+    # Context Window Management
     llm_context_limits: dict[str, int] = {
-        "qwen-plus": 100_000,
-        "qwen-plus-latest": 100_000,
-        "qwen-max": 30_000,
-        "qwen-max-latest": 30_000,
-        "qwen-turbo": 8_000,
-        "qwen-turbo-latest": 8_000,
-        "qwen-flash": 8_000,
-        "deepseek-chat": 64_000,
+        "claude-opus-4.7": 200_000,
+        "gpt-5.4": 128_000,
+        "gemini-3.1-pro-preview": 1_000_000,
+        "claude-haiku-4.5": 200_000,
     }
-    compact_threshold_ratio: float = 0.75  # Trigger compaction at 75% of context limit
-    compact_target_ratio: float = 0.25  # Compress history to 25% of context limit
-    tail_messages_keep: int = 3  # Keep last 3 exchanges in tail
-    summarization_model: str = "qwen-flash"  # Fast, cheap model for summarization
+    compact_threshold_ratio: float = 0.75
+    compact_target_ratio: float = 0.25
+    tail_messages_keep: int = 3
+    summarization_model: str = "claude-haiku-4.5"
 
-    # External APIs - Market Data & Trading
-    alpha_vantage_api_key: str = ""  # Alpha Vantage API key (premium: 75 calls/min)
-    fred_api_key: str = ""  # FRED API key (free, for liquidity metrics)
-    alpaca_api_key: str = ""  # Alpaca Paper Trading API key
-    alpaca_secret_key: str = ""  # Alpaca Paper Trading secret key
-    alpaca_base_url: str = "https://paper-api.alpaca.markets"  # Paper trading endpoint
-    polygon_api_key: str = ""  # Polygon.io API key for extended hours data
-    exa_api_key: str = ""  # Exa web search API key (debater independent verification)
-
-    # Email configuration (Tencent Cloud SES)
-    tencent_secret_id: str = ""  # Tencent Cloud API SecretID
-    tencent_secret_key: str = ""  # Tencent Cloud API SecretKey (from Azure Key Vault)
-    tencent_ses_region: str = "ap-guangzhou"  # ap-guangzhou or ap-hongkong
-    tencent_ses_from_email: str = "noreply@klinematrix.com"
-    tencent_ses_from_name: str = "KlineMatrix"
-    tencent_ses_template_id: int = 37066  # Template ID for verification emails
-    email_verification_subject: str = "Your KlineMatrix Verification Code"
-    email_code_ttl_seconds: int = 300  # 5 minutes
-
-    # Development mode settings
-    dev_bypass_email_verification: bool = False  # Skip actual email sending in dev mode
-    dev_bypass_verification_code: str = "888888"  # Fixed code for dev bypass (6-digit)
-    dev_analysis_symbols: str = (
-        ""  # Comma-separated symbols to analyze in dev mode (empty = all)
-    )
-
-    # Cloud storage (Alibaba OSS)
-    oss_access_key: str = ""
-    oss_secret_key: str = ""
-    oss_bucket: str = "klinecubic-financialagent-oss"
-    oss_endpoint: str = "oss-cn-shanghai.aliyuncs.com"
-
-    # Cache settings - TTL values in seconds by data category
-    # These values are optimized based on data freshness requirements
-    redis_ttl_seconds: int = 3600  # 1 hour default cache TTL
-    cache_ttl_realtime: int = 60  # Real-time quotes (1 min)
-    cache_ttl_price_data: int = 300  # Price data (5 min)
-    cache_ttl_analysis: int = 1800  # Analysis results (30 min)
-    cache_ttl_news: int = 3600  # News/sentiment (1 hour)
-    cache_ttl_historical: int = 7200  # Historical data (2 hours)
-    cache_ttl_fundamentals: int = 86400  # Company fundamentals (24 hours)
-    cache_ttl_insights: int = (
-        86400  # AI insights (24 hours - synced with daily CronJob)
-    )
-
-    # Alpha Vantage Fundamentals Tool Limits
-    fundamentals_max_quarterly_periods: int = (
-        20  # Max quarterly periods for cash flow/balance sheet
-    )
-    fundamentals_max_annual_periods: int = (
-        5  # Max annual periods for cash flow/balance sheet
-    )
+    # Cache settings
+    redis_ttl_seconds: int = 3600
+    cache_ttl_fund_nav: int = 86400  # Fund NAV data (24 hours)
+    cache_ttl_fund_holdings: int = 604800  # Fund holdings (7 days)
+    cache_ttl_fund_ranking: int = 86400  # Fund rankings (24 hours)
+    cache_ttl_macro: int = 86400  # Macro data (24 hours)
+    cache_ttl_news: int = 3600  # News (1 hour)
 
     # Rate limiting
     rate_limit_requests: int = 100
-    rate_limit_window: int = 60  # per minute
-
-    # Token budget limits per request type (Story 1.4: Token Usage Optimization)
-    # Limits help control costs and ensure predictable response times
-    token_budget_chat: int = 8000  # Regular chat messages
-    token_budget_analysis: int = 16000  # Analysis requests with tool calls
-    token_budget_portfolio: int = 32000  # Portfolio analysis (multi-symbol)
-    token_budget_summary: int = 4000  # Context summarization
-    token_warning_threshold: float = 0.8  # Warn at 80% of budget
-
-    # Kubernetes configuration
-    kubernetes_namespace: str = "default"  # K8s namespace for metrics collection
-
-    # Portfolio Analysis settings
-    portfolio_analysis_batch_size: int = 5  # Concurrent symbol analysis batch size
-    portfolio_analysis_min_success_rate: float = (
-        0.7  # Min Phase 1 success rate for Phase 2
-    )
+    rate_limit_window: int = 60
 
     @property
     def database_name(self) -> str:

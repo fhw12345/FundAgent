@@ -40,12 +40,6 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
-# Patch DashScope error handling BEFORE importing ChatTongyi
-from ..core.utils.dashscope_fix import patch_tongyi_check_response
-
-patch_tongyi_check_response()
-
-from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
@@ -176,13 +170,13 @@ class FinancialAnalysisReActAgent:
             self.fibonacci_analyzer = None
             self.stochastic_analyzer = None
 
-        # Initialize LLM with centralized configuration
-        self.llm = ChatTongyi(
-            model_name=settings.default_llm_model,
-            dashscope_api_key=settings.dashscope_api_key,
+        # Initialize LLM via Agent Maestro
+        from .llm_client import get_chat_model
+
+        self.llm = get_chat_model(
+            role="main_analyst",
+            settings=settings,
             temperature=settings.default_llm_temperature,
-            model_kwargs={"result_format": "message"},
-            request_timeout=30,
         )
 
         # Create compressed local tools (Fibonacci + Stochastic + Historical Prices)

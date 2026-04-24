@@ -14,7 +14,6 @@ from collections.abc import Callable
 from typing import Annotated, Any, TypedDict
 
 import structlog
-from langchain_community.chat_models import ChatTongyi
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -103,13 +102,13 @@ class DeepReActAgent:
         # Exa API key for debater's independent web search
         self.exa_api_key: str = getattr(settings, "exa_api_key", "")
 
-        # Initialize LLM
-        self.llm = ChatTongyi(
-            model_name=settings.default_llm_model,
-            dashscope_api_key=settings.dashscope_api_key,
+        # Initialize LLM via Agent Maestro multi-provider factory
+        from .llm_client import get_chat_model
+
+        self.llm = get_chat_model(
+            role="main_analyst",
+            settings=settings,
             temperature=settings.default_llm_temperature,
-            model_kwargs={"result_format": "message"},
-            request_timeout=30,
         )
 
         logger.info(
@@ -124,19 +123,26 @@ class DeepReActAgent:
         context: AgentContext,
         cache: AnalysisToolCache | None = None,
     ) -> dict[str, Any]:
-        """Create all sub-agents with context and optional tool cache."""
+        """Create all sub-agents with per-role model routing."""
+        from .llm_client import get_chat_model
+
+        technical_llm = get_chat_model(role="technical", settings=self.settings)
+        news_llm = get_chat_model(role="news", settings=self.settings)
+        financial_llm = get_chat_model(role="fundamentals", settings=self.settings)
+        debater_llm = get_chat_model(role="debater", settings=self.settings)
+
         return {
             "technical": create_technical_subagent(
-                self.tools_dict, self.llm, context, cache=cache
+                self.tools_dict, technical_llm, context, cache=cache
             ),
             "news": create_news_subagent(
-                self.tools_dict, self.llm, context, cache=cache
+                self.tools_dict, news_llm, context, cache=cache
             ),
             "financial": create_financial_subagent(
-                self.tools_dict, self.llm, context, cache=cache
+                self.tools_dict, financial_llm, context, cache=cache
             ),
             "debater": create_debater_subagent(
-                model=self.llm, context=context, exa_api_key=self.exa_api_key
+                model=debater_llm, context=context, exa_api_key=self.exa_api_key
             ),
         }
 
