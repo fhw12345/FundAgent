@@ -19,6 +19,7 @@ from .api.dependencies.rate_limit import limiter
 from .api.dependencies.timing_middleware import TimingMiddleware
 from .api.health import router as health_router
 from .api.llm_models import router as llm_models_router
+from .api.portfolio import router as portfolio_router
 from .core.config import get_settings
 from .core.exceptions import AppError
 from .database.mongodb import MongoDB
@@ -52,6 +53,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         chat_repo = ChatRepository(mongodb.get_collection("chats"))
         await chat_repo.ensure_indexes()
+
+        from .database.repositories.portfolio_repository import PortfolioRepository
+
+        portfolio_repo = PortfolioRepository(mongodb.get_collection("portfolios"))
+        await portfolio_repo.ensure_indexes()
 
         # Initialize ReAct agent
         react_agent = None
@@ -129,6 +135,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(chat_router)
     app.include_router(llm_models_router)
+    app.include_router(portfolio_router)
 
     @app.get("/")
     async def root() -> dict[str, str]:
