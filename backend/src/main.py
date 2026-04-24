@@ -20,6 +20,7 @@ from .api.dependencies.timing_middleware import TimingMiddleware
 from .api.health import router as health_router
 from .api.llm_models import router as llm_models_router
 from .api.portfolio import router as portfolio_router
+from .api.quarterly_report import router as quarterly_report_router
 from .core.config import get_settings
 from .core.exceptions import AppError
 from .database.mongodb import MongoDB
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(llm_models_router)
     app.include_router(portfolio_router)
+    app.include_router(quarterly_report_router)
 
     @app.get("/")
     async def root() -> dict[str, str]:
