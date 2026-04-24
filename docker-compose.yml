@@ -98,7 +98,7 @@ services:
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_DATABASE=financial_agent
+      - MONGO_INITDB_DATABASE=fund_agent
     volumes:
       - mongodb_data:/data/db
     restart: unless-stopped

@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
 
     # Database connections
-    mongodb_url: str = "mongodb://localhost:27017/financial_agent"
+    mongodb_url: str = "mongodb://localhost:27017/fund_agent"
     redis_url: str = "redis://localhost:6379"
 
     # Security

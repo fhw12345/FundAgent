@@ -1,205 +1,78 @@
-# Financial Agent Platform
+# FundAgent - 智能基金分析助手
 
-AI-Enhanced Financial Analysis Platform with market insights, technical analysis, portfolio management, and conversational AI interfaces.
+AI-powered personal assistant for Chinese onshore mutual funds (场外基金) with multi-vendor LLM debate architecture.
 
-## Architecture
+## Features
 
-Production-ready web platform built on **12-Factor Agent** principles with hybrid cloud deployment.
+- **Multi-Vendor LLM Debate**: Cross-vendor AI debate (Claude + GPT + Gemini) for higher quality analysis
+- **Fund Analysis**: NAV trends, holdings analysis, sector exposure via AkShare
+- **Screenshot Import**: Upload Alipay/天天基金 screenshots to import portfolio holdings (GPT-5.4 vision)
+- **Daily Analysis**: Manual-trigger analysis with explicit 买入/持有/卖出 recommendations
+- **Quarterly Reports**: PDF interpretation of fund quarterly reports (Gemini long context)
+- **Conversational AI**: Natural language queries about your funds via streaming chat
 
-### Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | **Backend** | Python 3.12 + FastAPI, MongoDB, Redis, LangChain + LangGraph |
 | **Frontend** | React 18 + TypeScript 5, Vite, TailwindCSS |
-| **Deployment** | Kubernetes (ACK), GitHub Actions CI/CD, Azure ACR |
-| **AI/LLM** | Alibaba DashScope Qwen with streaming |
-| **Observability** | Langfuse (https://monitor.klinecubic.cn) |
-
-> See [System Design](docs/architecture/system-design.md) for complete architecture details
+| **LLM** | Agent Maestro proxy → GPT-5.4 / Claude Opus 4.7 / Gemini 3.1 Pro |
+| **Data** | AkShare + 天天基金 crawler |
+| **Deployment** | Docker Compose |
 
 ## Quick Start
 
-### Environments
-
-| Environment | Platform | URL | Status |
-|------------|----------|-----|--------|
-| **Dev/Local** | Docker Compose | http://localhost:3000 | Active |
-| **Production** | Alibaba Cloud ACK | https://klinecubic.cn | Active |
-
-### Local Development
-
 ```bash
+# Prerequisites: Agent Maestro running in VS Code on localhost:23333
+
+# Start all services
 make dev
+
+# Services:
+# Frontend:  http://localhost:3000
+# Backend:   http://localhost:8000
+# MongoDB:   localhost:27017
+# Redis:     localhost:6379
 ```
 
-This starts:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **Langfuse**: http://localhost:3001 (LLM tracing)
-- **MongoDB**: localhost:27017
-- **Redis**: localhost:6379
+## Architecture
 
-### Production URLs
-- Application: https://klinecubic.cn
-- API Docs: https://klinecubic.cn/api/docs
-- LLM Monitoring: https://monitor.klinecubic.cn
+See [Design Spec](docs/specs/2026-04-24-fundagent-design.md) for complete architecture.
 
-## Features
+### LLM Routing (Cross-Vendor Debate)
 
-### Market Insights Dashboard
-- **7 Market Metrics**: AI Price Anomaly, News Sentiment, Smart Money Flow, Put/Call Ratio, IPO Heat, Market Liquidity, Fed Expectations
-- **Trend Visualization**: Sparklines and expanded 30-day trend charts
-- **Composite Score**: Aggregated market sentiment tracking
-- **Daily Snapshots**: Automated CronJob captures at 14:30 UTC
-
-### Technical Analysis
-- **Fibonacci Retracement**: Multi-trend detection with confidence scoring and golden zone highlighting
-- **Stochastic Oscillator**: K%/D% signals with overbought/oversold detection
-- **Market Structure**: Swing point detection and trend analysis
-- **Interactive Charts**: Lightweight Charts with date range selection
-
-### AI-Powered Analysis
-- **Conversational Interface**: Natural language financial queries
-- **Real-Time Streaming**: Token-by-token LLM responses via SSE
-- **Wall Street Analyst Persona**: Expert insights with structured analysis
-- **Agent Tools**: PCR lookup, sector risk, historical prices, fundamentals
-
-### Portfolio Management
-- **Watchlist Analysis**: Symbol-specific AI chat sessions
-- **Automated Analysis**: CronJob-triggered portfolio reviews
-- **Trading Integration**: Alpaca API for order management
-
-### Platform
-- **Authentication**: JWT with refresh token rotation (30-min access, 7-day refresh)
-- **Credit System**: Token-based billing with transaction tracking
-- **Health Monitoring**: Real-time status of all services
+| Role | Default Model | Vendor |
+|------|--------------|--------|
+| Main Analyst | claude-opus-4.7 | Anthropic |
+| Fundamentals | gpt-5.4 | OpenAI |
+| News | gemini-3.1-pro-preview | Google |
+| Debater | gemini-3.1-pro-preview | Google |
+| Vision | gpt-5.4 | OpenAI |
+| PDF Reader | gemini-3.1-pro-preview | Google |
 
 ## Development
 
-### Commands
-
 ```bash
-# Development
-make dev          # Start all services
-make up           # Start services
-make down         # Stop services
-make logs         # View logs
-
-# Code Quality
-make fmt          # Format code (Black, Prettier)
-make lint         # Lint code (Ruff, ESLint)
-make test         # Run tests (1693 tests, 57% coverage)
-
-# Building
-make build        # Build Docker images
-```
-
-### Code Standards
-- **Python**: Black formatting, Ruff linting, mypy type checking
-- **TypeScript**: Prettier formatting, ESLint with security plugins
-- **Pre-commit**: Automated hooks for formatting, linting, version validation
-- **File limits**: Max 500 lines per file
-
-## Deployment
-
-### CI/CD Pipeline (GitHub Actions)
-
-```
-PR to main → Unit Tests → Review → Merge → Auto-deploy to Production
-```
-
-**Workflows**:
-- **PR Workflow**: Runs unit tests on every pull request
-- **Deploy Workflow**: Builds images and deploys to ACK on merge to main
-- **Manual Trigger**: Available via GitHub Actions UI
-
-See [Deployment Workflow](docs/deployment/workflow.md) for details.
-
-### Manual Deployment
-
-```bash
-# 1. Bump version
-./scripts/bump-version.sh backend patch
-
-# 2. Build image
-BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-az acr build --registry financialAgent \
-  --image klinecubic/backend:prod-v${BACKEND_VERSION} \
-  --file backend/Dockerfile backend/
-
-# 3. Deploy
-export KUBECONFIG=~/.kube/config-ack-prod
-kubectl apply -k .pipeline/k8s/overlays/prod/
-kubectl rollout restart deployment/backend -n klinematrix-prod
+cd backend && make test && make lint
+docker compose exec frontend npm run lint
 ```
 
 ## Project Structure
 
 ```
-financial_agent/
-├── backend/                 # FastAPI backend
+fund-agent/
+├── backend/               # FastAPI backend
 │   ├── src/
-│   │   ├── api/            # REST endpoints
-│   │   ├── agent/          # LangGraph AI agent
-│   │   ├── services/       # Business logic
-│   │   ├── database/       # MongoDB/Redis
-│   │   └── workers/        # Background tasks
-│   └── tests/              # 1693 unit tests
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── services/       # API clients
-│   │   └── types/          # TypeScript types
-├── docs/                   # Documentation
-│   ├── architecture/       # System design
-│   ├── features/           # Feature specs
-│   ├── deployment/         # Deploy guides
-│   └── stories/            # User stories
-├── .pipeline/              # CI/CD & K8s configs
-└── docker-compose.yml      # Local development
+│   │   ├── api/           # REST endpoints
+│   │   ├── agent/         # LangGraph AI agent
+│   │   ├── services/      # Business logic + data sources
+│   │   └── database/      # MongoDB/Redis
+│   └── tests/
+├── frontend/              # React frontend
+│   └── src/
+│       ├── components/    # React components
+│       └── services/      # API clients
+├── docs/                  # Documentation
+└── docker-compose.yml     # Local development
 ```
-
-## Current Status
-
-**Versions** (January 2026):
-- Backend: v0.10.1
-- Frontend: v0.11.5
-- Test Coverage: 57% (1693 tests)
-
-**Recent Releases**:
-- **v0.10.x**: Comprehensive unit test coverage (57%), auth token consolidation
-- **v0.9.0**: Market Insights Platform - PCR, FRED Liquidity, trend visualization
-- **v0.8.x**: Performance monitoring, LangGraph latency tracking
-- **v0.7.x**: Langfuse observability deployment
-
-**Production Features**:
-- [x] Market Insights Dashboard with 7 metrics
-- [x] AI Chat with DashScope Qwen streaming
-- [x] Technical Analysis (Fibonacci, Stochastic, Market Structure)
-- [x] Portfolio Analysis with automated CronJob
-- [x] Credit-based billing system
-- [x] JWT auth with refresh token rotation
-- [x] Langfuse LLM observability
-- [x] GitHub Actions CI/CD
-
-## Documentation
-
-- [Complete Documentation](docs/README.md)
-- [System Design](docs/architecture/system-design.md)
-- [Deployment Workflow](docs/deployment/workflow.md)
-- [Feature Specs](docs/features/)
-- [Development Guide](CONTRIBUTING.md)
-- [API Documentation](https://klinecubic.cn/api/docs)
-
-## Contributing
-
-1. Create feature branch from `main`
-2. Run `make fmt && make lint && make test`
-3. Bump version: `./scripts/bump-version.sh [component] patch`
-4. Create Pull Request
-5. CI runs tests → Review → Merge → Auto-deploy
-
----
-
-**AI-powered financial analysis platform** | [Production](https://klinecubic.cn) | [Monitoring](https://monitor.klinecubic.cn)
