@@ -1,401 +1,329 @@
 /**
- * Portfolio Dashboard - Clean Robinhood-style portfolio chart.
- *
- * Shows portfolio value over time with order execution markers.
- * Includes sidebar chat showing portfolio agent's analysis history.
+ * Portfolio Dashboard — Fund holdings management with screenshot import.
  */
 
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { usePortfolioSummary, usePortfolioHistory, useHoldings } from "../hooks/usePortfolio";
-import { usePortfolioChatDetail } from "../hooks/usePortfolioChatDetail";
-import { PortfolioChart } from "../components/portfolio/PortfolioChart";
-import { PortfolioSummaryTable } from "../components/portfolio/PortfolioSummaryTable";
-import { WatchlistPanel } from "../components/portfolio/WatchlistPanel";
-import { CronController } from "../components/portfolio/CronController";
-import { RecentTransactions } from "../components/portfolio/RecentTransactions";
-import { MarketMovers } from "../components/MarketMovers";
-import { ChatSidebar } from "../components/chat/ChatSidebar";
-import { ChatMessages } from "../components/chat/ChatMessages";
-import { formatPL, getPLColor } from "../services/portfolioApi";
+import { useState, useCallback, useRef } from "react";
+import { Upload, Camera, Trash2, RefreshCw, Plus, TrendingUp } from "lucide-react";
 import { authStorage } from "../services/authService";
 
-type Period = "1D" | "1M" | "1Y" | "All";
+interface Holding {
+  fund_code: string;
+  fund_name: string;
+  shares: number | null;
+  nav: number | null;
+  market_value: number | null;
+  return_pct: number | null;
+}
 
-interface AnalysisMarker {
-  timestamp: string;
-  symbol: string;
-  recommendation: string | null;
-  summary: string;
+interface Portfolio {
+  holdings: Holding[];
+  source: string | null;
+  updated_at: string | null;
+}
+
+const API_BASE =
+  import.meta.env.VITE_API_URL !== undefined
+    ? import.meta.env.VITE_API_URL
+    : import.meta.env.MODE === "production"
+      ? ""
+      : "http://localhost:8000";
+
+function authHeaders() {
+  const token = authStorage.getToken();
+  return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 }
 
 export default function PortfolioDashboard() {
-  const { t } = useTranslation(['portfolio', 'common']);
-  const [period, setPeriod] = useState<Period>("1D");
-  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [symbolAnalyses, setSymbolAnalyses] = useState<AnalysisMarker[]>([]);
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [manualCode, setManualCode] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Chat sidebar state
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Start open
-  const [selectedDate, setSelectedDate] = useState<string | null>(null); // Date filter for chat history
-  const [messageSortOrder, setMessageSortOrder] = useState<"newest" | "oldest">("newest"); // Sort order for messages in modal
-  const [analysisType, setAnalysisType] = useState<string>(""); // Analysis type filter ("individual" or "portfolio")
+  const fetchPortfolio = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/portfolio`, { headers: authHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setPortfolio(data);
+    } catch (e: unknown) {
+      setError(`加载持仓失败: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  // Admin check - only admin (allenpan) can see cron controller
-  const currentUser = authStorage.getUser();
-  const isAdmin = currentUser?.is_admin || currentUser?.username === "allenpan";
+  // Auto-load on first render
+  useState(() => { void fetchPortfolio(); });
 
-  const {
-    data: summary,
-    isLoading: isLoadingSummary,
-    error: summaryError,
-  } = usePortfolioSummary();
+  const handleScreenshotUpload = async (file: File) => {
+    setImporting(true);
+    setError(null);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-  const {
-    data: holdings,
-    isLoading: isLoadingHoldings,
-  } = useHoldings();
+      const res = await fetch(`${API_BASE}/api/portfolio/import-screenshot`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ image_base64: base64 }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setPortfolio(data.portfolio);
+      setAnalysisResult(`成功导入 ${data.imported_count} 只基金`);
+    } catch (e: unknown) {
+      setError(`截图导入失败: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setImporting(false);
+    }
+  };
 
-  const {
-    data: historyData,
-    isLoading: isLoadingHistory,
-    error: historyError,
-    refetch,
-  } = usePortfolioHistory(period);
+  const handleAddManual = async () => {
+    if (!manualCode.match(/^\d{6}$/)) {
+      setError("请输入6位基金代码");
+      return;
+    }
+    const existing = portfolio?.holdings || [];
+    if (existing.some((h) => h.fund_code === manualCode)) {
+      setError("该基金已在持仓中");
+      return;
+    }
+    const newHoldings = [...existing, { fund_code: manualCode, fund_name: "", shares: null, nav: null, market_value: null, return_pct: null }];
+    try {
+      const res = await fetch(`${API_BASE}/api/portfolio`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ holdings: newHoldings }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setPortfolio(data);
+      setManualCode("");
+      setError(null);
+    } catch (e: unknown) {
+      setError(`添加失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
-  // Transform API data to chart format
-  const chartData =
-    historyData?.data_points.map((point) => ({
-      time: Math.floor(new Date(point.timestamp).getTime() / 1000), // Convert to Unix seconds
-      value: point.value,
-    })) || [];
+  const handleRemove = async (code: string) => {
+    const newHoldings = (portfolio?.holdings || []).filter((h) => h.fund_code !== code);
+    try {
+      const res = await fetch(`${API_BASE}/api/portfolio`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify({ holdings: newHoldings }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setPortfolio(data);
+    } catch (e: unknown) {
+      setError(`删除失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
 
-  // Group markers by symbol - show only one marker per symbol
-  const markersBySymbol = new Map<string, AnalysisMarker[]>();
-  historyData?.markers.forEach((marker) => {
-    const existing = markersBySymbol.get(marker.symbol) || [];
-    markersBySymbol.set(marker.symbol, [...existing, marker]);
-  });
+  const handleDailyAnalysis = async () => {
+    setAnalyzing(true);
+    setAnalysisResult(null);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/portfolio/daily-analysis`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setAnalysisResult(`已启动分析 ${data.fund_count} 只基金，请稍后在对话中查看结果`);
+    } catch (e: unknown) {
+      setError(`分析启动失败: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
-  // Create one marker per symbol (using latest timestamp)
-  const chartMarkers = Array.from(markersBySymbol.entries()).map(([symbol, analyses]) => {
-    // Sort by timestamp to get latest
-    const sortedAnalyses = [...analyses].sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-    const latestAnalysis = sortedAnalyses[0];
-
-    return {
-      time: Math.floor(new Date(latestAnalysis.timestamp).getTime() / 1000),
-      position: "aboveBar" as const,
-      color: "#3B82F6", // blue-500
-      shape: "circle" as const,
-      text: `${symbol} (${analyses.length})`, // Show count of analyses
-      symbol, // Keep for click handler
-      analyses: sortedAnalyses, // All analyses for this symbol
-    };
-  });
-
-  const currentValue = historyData?.current_value || summary?.total_market_value || 0;
-  const totalPL = summary?.total_unrealized_pl || null;
-  const totalPLPct = summary?.total_unrealized_pl_pct || null;
-  const plColor = getPLColor(totalPL);
-
-  const isLoading = isLoadingSummary || isLoadingHistory;
-  const error = summaryError || historyError;
+  const holdings = portfolio?.holdings || [];
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="flex h-screen">
-        {/* Left Sidebar - Market Movers & Transactions */}
-        <div className="w-96 border-r border-gray-200 overflow-y-auto bg-gray-50 flex-shrink-0">
-          <div className="p-3 space-y-4">
-            {/* Market Movers */}
-            <MarketMovers
-              onTickerClick={(ticker) => {
-                console.log("Clicked ticker:", ticker);
-              }}
-            />
-
-            {/* Recent Transactions */}
-            <RecentTransactions />
-          </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-6xl mx-auto px-3 py-6">
-            {/* Error Message */}
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">
-                  {error.message || t('portfolio:errors.loadFailed')}
-                </p>
-              </div>
-            )}
-
-        {/* Portfolio Value Header */}
-        <div className="mb-6">
-          <div className="text-4xl font-bold text-gray-900 mb-2">
-            {isLoading ? (
-              <div className="h-10 w-48 bg-gray-200 animate-pulse rounded" />
-            ) : (
-              `$${currentValue.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}`
-            )}
-          </div>
-
-          {/* P/L Display */}
-          {!isLoading && totalPL !== null && (
-            <div
-              className={`text-lg font-medium ${
-                plColor === "green"
-                  ? "text-green-600"
-                  : plColor === "red"
-                  ? "text-red-600"
-                  : "text-gray-500"
-              }`}
-            >
-              {formatPL(totalPL, totalPLPct)}
-            </div>
-          )}
-        </div>
-
-        {/* Time Period Buttons */}
-        <div className="mb-6 flex gap-2">
-          {(["1D", "1M", "1Y", "All"] as Period[]).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                period === p
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {p}
-            </button>
-          ))}
-
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">我的基金持仓</h2>
+        <div className="flex gap-2">
           <button
-            onClick={() => {
-              void refetch();
-            }}
-            className="ml-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+            onClick={() => void fetchPortfolio()}
+            disabled={loading}
+            className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50"
           >
-            {t('common:buttons.refresh')}
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            刷新
+          </button>
+          <button
+            onClick={() => void handleDailyAnalysis()}
+            disabled={analyzing || holdings.length === 0}
+            className="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg flex items-center gap-1 hover:shadow-lg transition-all disabled:opacity-50"
+          >
+            <TrendingUp className="w-4 h-4" />
+            {analyzing ? "分析中..." : "一键分析"}
           </button>
         </div>
+      </div>
 
-        {/* Chart */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          {isLoadingHistory ? (
-            <div className="h-96 flex items-center justify-center">
-              <div className="text-gray-500">{t('portfolio:chart.loadingChart')}</div>
-            </div>
-          ) : chartData.length > 0 ? (
-            <PortfolioChart
-              data={chartData}
-              markers={chartMarkers}
-              onMarkerClick={(marker: any) => {
-                // Open modal with all analyses for this symbol
-                setSelectedSymbol(marker.symbol);
-                setSymbolAnalyses(marker.analyses);
+      {/* Error / Success messages */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+      {analysisResult && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+          {analysisResult}
+        </div>
+      )}
+
+      {/* Import section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">导入持仓</h3>
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Screenshot upload */}
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleScreenshotUpload(file);
               }}
             />
-          ) : (
-            <div className="h-96 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <p>{t('portfolio:chart.noData')}</p>
-                <p className="text-sm mt-2">{t('portfolio:chart.addHoldings')}</p>
+            {importing ? (
+              <div className="flex flex-col items-center gap-2">
+                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+                <span className="text-sm text-gray-600">AI 识别中...</span>
               </div>
-            </div>
-          )}
-        </div>
-
-            {/* Portfolio Holdings Table */}
-            {summary && holdings && holdings.length > 0 && (
-              <div className="mt-8">
-                <PortfolioSummaryTable holdings={holdings} summary={summary} />
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <Camera className="w-8 h-8 text-gray-400" />
+                <span className="text-sm text-gray-600">上传持仓截图</span>
+                <span className="text-xs text-gray-400">支持支付宝/天天基金/蛋卷截图</span>
               </div>
             )}
-
-            {/* Watchlist Panel */}
-            <div className="mt-8">
-              <WatchlistPanel />
-            </div>
-
-            {/* Cron Controller (Admin Only) - Global System CronJob */}
-            {isAdmin && (
-              <div className="mt-8">
-                <CronController />
-              </div>
-            )}
-
-            {/* Footer */}
-            <div className="mt-8 text-center text-xs text-gray-400">
-              <p>{t('portfolio:footer.dataUpdates')}</p>
-            </div>
           </div>
-        </div>
 
-        {/* Sidebar - Analysis History (Reused Chat Component) */}
-        <div className={`flex-shrink-0 transition-all duration-300 ${isSidebarCollapsed ? "w-12" : "w-96"} flex flex-col`}>
-          <div className="flex-1 overflow-hidden">
-            <ChatSidebar
-              activeChatId={activeChatId}
-              onChatSelect={setActiveChatId}
-              onNewChat={() => {}} // No-op for read-only
-              isCollapsed={isSidebarCollapsed}
-              onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              filterUserId="portfolio_agent"
-              readOnly={true}
-              selectedDate={selectedDate}
-              onDateChange={setSelectedDate}
-              messageSortOrder={messageSortOrder}
-              onMessageSortOrderChange={setMessageSortOrder}
-              analysisType={analysisType}
-              onAnalysisTypeChange={setAnalysisType}
-            />
+          {/* Manual add */}
+          <div className="flex-1 flex flex-col gap-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="输入基金代码 (如 110011)"
+                maxLength={6}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={() => void handleAddManual()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                添加
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">手动添加基金代码到持仓列表</p>
           </div>
         </div>
       </div>
 
-      {/* Chat Messages Modal - Show when a chat is selected */}
-      {activeChatId && !isSidebarCollapsed && <ChatMessagesModal chatId={activeChatId} onClose={() => setActiveChatId(null)} sortOrder={messageSortOrder} />}
-
-      {/* Analysis Modal (legacy - now replaced by sidebar) */}
-      {selectedSymbol && (
-          <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-            onClick={() => setSelectedSymbol(null)}
-          >
-            <div
-              className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">{t('portfolio:modal.analysisTitle', { symbol: selectedSymbol })}</h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {symbolAnalyses.length === 1
-                      ? t('portfolio:modal.analysisCount', { count: symbolAnalyses.length })
-                      : t('portfolio:modal.analysisCountPlural', { count: symbolAnalyses.length })}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedSymbol(null)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="overflow-y-auto max-h-[calc(80vh-8rem)] px-6 py-4">
-                <div className="space-y-4">
-                  {symbolAnalyses.map((analysis, index) => (
-                    <div
-                      key={`${analysis.timestamp}-${index}`}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-                    >
-                      {/* Analysis Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {new Date(analysis.timestamp).toLocaleString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                          </div>
-                          {analysis.recommendation && (
-                            <div className="mt-1">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  analysis.recommendation.includes("uptrend")
-                                    ? "bg-green-100 text-green-800"
-                                    : analysis.recommendation.includes("downtrend")
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
-                              >
-                                {analysis.recommendation}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Analysis Summary */}
-                      <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                        {analysis.summary}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="border-t border-gray-200 px-6 py-4">
-                <button
-                  onClick={() => setSelectedSymbol(null)}
-                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors font-medium"
-                >
-                  {t('common:buttons.close')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-    </div>
-  );
-}
-
-// Separate component to handle chat messages modal with data fetching
-function ChatMessagesModal({ chatId, onClose, sortOrder }: { chatId: string; onClose: () => void; sortOrder: "newest" | "oldest" }) {
-  const { t } = useTranslation(['portfolio', 'common']);
-  const { data: chatDetail, isLoading } = usePortfolioChatDetail(chatId);
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {chatDetail?.chat?.title || t('portfolio:modal.analysisMessages')}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-2"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-gray-500">{t('portfolio:modal.loadingMessages')}</div>
-            </div>
-          ) : chatDetail?.messages ? (
-            <ChatMessages messages={chatDetail.messages} isAnalysisPending={false} chatId={chatId} sortOrder={sortOrder} />
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-gray-500">{t('portfolio:modal.noMessages')}</div>
-            </div>
+      {/* Holdings table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-800">
+            持仓列表
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              ({holdings.length} 只基金)
+            </span>
+          </h3>
+          {portfolio?.source && (
+            <span className="text-xs text-gray-400">
+              来源: {portfolio.source === "screenshot" ? "截图导入" : "手动添加"}
+              {portfolio.updated_at && ` · ${new Date(portfolio.updated_at).toLocaleString("zh-CN")}`}
+            </span>
           )}
         </div>
+
+        {holdings.length === 0 ? (
+          <div className="p-12 text-center text-gray-400">
+            <Upload className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p className="text-lg font-medium">暂无持仓</p>
+            <p className="text-sm mt-1">上传截图或手动添加基金代码</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-600">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">基金代码</th>
+                  <th className="px-4 py-3 text-left font-medium">基金名称</th>
+                  <th className="px-4 py-3 text-right font-medium">持有份额</th>
+                  <th className="px-4 py-3 text-right font-medium">最新净值</th>
+                  <th className="px-4 py-3 text-right font-medium">持仓市值</th>
+                  <th className="px-4 py-3 text-right font-medium">收益率</th>
+                  <th className="px-4 py-3 text-center font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {holdings.map((h) => (
+                  <tr key={h.fund_code} className="hover:bg-gray-50/50">
+                    <td className="px-4 py-3 font-mono text-blue-600">{h.fund_code}</td>
+                    <td className="px-4 py-3">{h.fund_name || "-"}</td>
+                    <td className="px-4 py-3 text-right">{h.shares?.toFixed(2) ?? "-"}</td>
+                    <td className="px-4 py-3 text-right">{h.nav?.toFixed(4) ?? "-"}</td>
+                    <td className="px-4 py-3 text-right">{h.market_value?.toFixed(2) ?? "-"}</td>
+                    <td className={`px-4 py-3 text-right font-medium ${
+                      h.return_pct != null
+                        ? h.return_pct >= 0
+                          ? "text-red-600"
+                          : "text-green-600"
+                        : ""
+                    }`}>
+                      {h.return_pct != null ? `${h.return_pct >= 0 ? "+" : ""}${h.return_pct.toFixed(2)}%` : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => void handleRemove(h.fund_code)}
+                        className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors"
+                        title="移除"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
