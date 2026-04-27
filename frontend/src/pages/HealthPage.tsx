@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { authStorage } from "../services/authService";
+import BackgroundJobsPanel from "../components/BackgroundJobsPanel";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -102,27 +102,13 @@ export default function HealthPage() {
 
   const fetchMetrics = async () => {
     try {
-      const token = authStorage.getAccessToken();
-      if (!token) {
-        setError("Not authenticated");
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch(`${API_BASE_URL}/api/admin/health`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(`${API_BASE_URL}/api/admin/health`);
 
       if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error("Admin access required");
-        }
         throw new Error("Failed to fetch system metrics");
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as SystemMetrics;
 
       // Use mock data for local dev when K8s is not available
       if (!data.kubernetes_available) {
@@ -190,6 +176,8 @@ export default function HealthPage() {
             Last updated: {new Date(metrics.timestamp).toLocaleString()}
           </p>
         </div>
+
+        <BackgroundJobsPanel />
 
         {/* Health Status */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
