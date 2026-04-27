@@ -1,91 +1,48 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { HelpCircle } from "lucide-react";
 import { EnhancedChatInterface } from "./components/EnhancedChatInterface";
-import { LoginPage } from "./components/LoginPage";
 import HealthPage from "./pages/HealthPage";
 import PortfolioDashboard from "./pages/PortfolioDashboard";
-import { authStorage, logout } from "./services/authService";
+import TransactionsPage from "./pages/TransactionsPage";
+import FundDetailPage from "./pages/FundDetailPage";
 import HelpModal from "./components/HelpModal";
 
 function App() {
-  const [activeTab, setActiveTab] = useState<"health" | "chat" | "portfolio">(
-    "chat"
-  );
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    "health" | "chat" | "portfolio" | "transactions"
+  >("portfolio");
+  const [detailFundCode, setDetailFundCode] = useState<string | null>(null);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
-  useEffect(() => {
-    const token = authStorage.getToken();
-    const user = authStorage.getUser();
-    if (token && user) {
-      setIsAuthenticated(true);
-      setUsername(user.username);
-      setIsAdmin(user.is_admin || user.username === "allenpan");
-    }
-  }, []);
-
-  const handleLoginSuccess = () => {
-    const user = authStorage.getUser();
-    if (user) {
-      setUsername(user.username);
-      setIsAdmin(user.is_admin || user.username === "allenpan");
-    }
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = async () => {
-    const refreshToken = authStorage.getRefreshToken();
-    if (refreshToken) {
-      try {
-        await logout(refreshToken);
-      } catch (error) {
-        console.error("Logout error:", error);
-      }
-    }
-    authStorage.clear();
-    setIsAuthenticated(false);
-    setUsername("");
-    setIsAdmin(false);
-  };
-
-  if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  const navItems: { key: typeof activeTab; label: string; adminOnly?: boolean }[] = [
-    ...(isAdmin ? [{ key: "health" as const, label: "系统状态", adminOnly: true }] : []),
-    { key: "chat", label: "AI 对话" },
+  const navItems: { key: typeof activeTab; label: string }[] = [
     { key: "portfolio", label: "我的持仓" },
+    { key: "transactions", label: "交易记录" },
+    { key: "chat", label: "AI 对话" },
+    { key: "health", label: "系统状态" },
   ];
+
+  // Make navigation function available globally so child components can call it
+  // (avoid prop drilling — works fine for personal app)
+  if (typeof window !== "undefined") {
+    (window as unknown as { openFundDetail: (code: string) => void }).openFundDetail = (code: string) => setDetailFundCode(code);
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-gray-200/50 shadow-sm">
         <div className="mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2 gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-9 h-9 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 ring-2 ring-white/50">
-                  <span className="text-xl sm:text-2xl">📊</span>
-                </div>
-                <div>
-                  <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent tracking-tight">
-                    FundAgent
-                  </h1>
-                  <span className="text-xs font-medium text-gray-500 hidden sm:inline">
-                    AI 基金分析助手
-                  </span>
-                </div>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 ring-2 ring-white/50">
+                <span className="text-xl sm:text-2xl">📊</span>
               </div>
-              <div className="flex items-center gap-2 sm:hidden">
-                <button
-                  onClick={() => void handleLogout()}
-                  className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100/80 rounded-lg transition-all"
-                >
-                  退出
-                </button>
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent tracking-tight">
+                  FundAgent
+                </h1>
+                <span className="text-xs font-medium text-gray-500 hidden sm:inline">
+                  AI 基金分析助手
+                </span>
               </div>
             </div>
 
@@ -103,40 +60,28 @@ function App() {
                   {item.label}
                 </button>
               ))}
-              <div className="hidden sm:flex items-center gap-3 pl-4 border-l border-gray-200">
-                <span className="text-sm text-gray-700">👤 {username}</span>
-                <button
-                  onClick={() => void handleLogout()}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100/80 rounded-lg transition-all"
-                >
-                  退出
-                </button>
-              </div>
             </nav>
           </div>
         </div>
       </header>
 
       <main className="flex-1 mx-auto w-full">
-        {activeTab === "health" && isAdmin && <HealthPage />}
-        {activeTab === "chat" && <EnhancedChatInterface />}
-        {activeTab === "portfolio" && <PortfolioDashboard />}
+        {detailFundCode ? (
+          <FundDetailPage fundCode={detailFundCode} onBack={() => setDetailFundCode(null)} />
+        ) : (
+          <>
+            {activeTab === "health" && <HealthPage />}
+            {activeTab === "chat" && <EnhancedChatInterface />}
+            {activeTab === "portfolio" && <PortfolioDashboard />}
+            {activeTab === "transactions" && <TransactionsPage />}
+          </>
+        )}
       </main>
 
       <footer className="bg-white border-t">
         <div className="mx-auto py-3 px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500">
             FundAgent - AI 基金分析助手
-          </p>
-          <p className="text-center text-sm text-gray-400 mt-2">
-            <a
-              href="https://beian.miit.gov.cn/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-gray-600 transition-colors"
-            >
-              苏ICP备2025219095号-1
-            </a>
           </p>
         </div>
       </footer>

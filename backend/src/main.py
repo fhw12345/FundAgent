@@ -13,7 +13,6 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from .api.admin import router as admin_router
-from .api.auth import router as auth_router
 from .api.chat import router as chat_router
 from .api.dependencies.rate_limit import limiter
 from .api.dependencies.timing_middleware import TimingMiddleware
@@ -21,6 +20,9 @@ from .api.health import router as health_router
 from .api.llm_models import router as llm_models_router
 from .api.portfolio import router as portfolio_router
 from .api.quarterly_report import router as quarterly_report_router
+from .api.transactions import dca_router, router as transactions_router
+from .api.fund_detail import router as fund_detail_router
+from .api.jobs import router as jobs_router
 from .core.config import get_settings
 from .core.exceptions import AppError
 from .database.mongodb import MongoDB
@@ -44,10 +46,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         from .database.repositories.chat_repository import ChatRepository
         from .database.repositories.message_repository import MessageRepository
-        from .database.repositories.refresh_token_repository import RefreshTokenRepository
-
-        refresh_token_repo = RefreshTokenRepository(mongodb.get_collection("refresh_tokens"))
-        await refresh_token_repo.ensure_indexes()
 
         message_repo = MessageRepository(mongodb.get_collection("messages"))
         await message_repo.ensure_indexes()
@@ -59,6 +57,39 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         portfolio_repo = PortfolioRepository(mongodb.get_collection("portfolios"))
         await portfolio_repo.ensure_indexes()
+
+        from .database.repositories.transaction_repository import (
+            DCAPlanRepository,
+            TransactionRepository,
+        )
+        from .database.repositories.job_run_repository import JobRunRepository
+
+        tx_repo = TransactionRepository(mongodb.get_collection("transactions"))
+        await tx_repo.ensure_indexes()
+
+        dca_repo = DCAPlanRepository(mongodb.get_collection("dca_plans"))
+        await dca_repo.ensure_indexes()
+
+        job_repo = JobRunRepository(mongodb.get_collection("job_runs"))
+        await job_repo.ensure_indexes()
+        app.state.job_repo = job_repo
+
+        from .database.repositories.fund_sector_repository import FundSectorRepository
+        sector_repo = FundSectorRepository(mongodb.get_collection("fund_sector_mapping"))
+        await sector_repo.ensure_indexes()
+        app.state.sector_repo = sector_repo
+
+        # Start DCA scheduler in background
+        import asyncio as _asyncio
+        from .services.dca_scheduler import dca_scheduler_loop
+        from .services.confirmation_scheduler import confirmation_loop
+
+        dca_task = _asyncio.create_task(dca_scheduler_loop(dca_repo, tx_repo, job_repo))
+        app.state.dca_task = dca_task
+
+        confirm_task = _asyncio.create_task(confirmation_loop(tx_repo, job_repo))
+        app.state.confirm_task = confirm_task
+        app.state.tx_repo = tx_repo
 
         # Initialize ReAct agent
         react_agent = None
@@ -81,6 +112,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         yield
 
     finally:
+        dca_task = getattr(app.state, "dca_task", None)
+        if dca_task:
+            dca_task.cancel()
+        confirm_task = getattr(app.state, "confirm_task", None)
+        if confirm_task:
+            confirm_task.cancel()
         await mongodb.disconnect()
         await redis_cache.disconnect()
         logger.info("Database connections stopped")
@@ -133,11 +170,14 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router, prefix="/api", tags=["health"])
     app.include_router(admin_router)
-    app.include_router(auth_router)
     app.include_router(chat_router)
     app.include_router(llm_models_router)
     app.include_router(portfolio_router)
     app.include_router(quarterly_report_router)
+    app.include_router(transactions_router)
+    app.include_router(dca_router)
+    app.include_router(fund_detail_router)
+    app.include_router(jobs_router)
 
     @app.get("/")
     async def root() -> dict[str, str]:

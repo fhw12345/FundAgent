@@ -79,13 +79,7 @@ jobs:
         run: |
           cd backend
           pip install -e ".[dev]"
-          # Debug: Check package structure
-          echo "=== Checking package structure ==="
-          ls -la src/services/
-          ls -la src/services/market_data/ || echo "market_data not found"
-          python -c "import src; print('src imported:', src.__file__)"
-          python -c "import src.services; print('src.services imported:', src.services.__file__)"
-          python -c "from src.services.market_data import AlphaVantageMarketDataService; print('market_data imported successfully')"
+          python -c "import src; print('src package OK')"
 
       - name: Install Frontend Dependencies
         run: |
