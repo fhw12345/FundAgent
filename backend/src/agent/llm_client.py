@@ -73,6 +73,18 @@ def get_chat_model(
     vendor = infer_vendor(model_name)
     base_url = settings.agent_maestro_base_url + VENDOR_URL_PATHS[vendor]
 
+    # Google (Gemini) via Agent Maestro returns SSE `event: error` frames that
+    # langchain-google-genai cannot parse, breaking roles like news_analyst.
+    # Forcing non-streaming makes Agent Maestro return a plain JSON response,
+    # which the wrapper handles correctly. Other vendors keep streaming default.
+    if vendor == "google" and streaming:
+        logger.info(
+            "Disabling streaming for Google vendor to avoid SSE parse error",
+            role=role,
+            model=model_name,
+        )
+        streaming = False
+
     # Use docker URL if running inside container
     if "host.docker.internal" in settings.agent_maestro_base_url:
         pass  # Already configured for docker

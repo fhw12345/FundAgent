@@ -556,18 +556,26 @@ If after thorough review you genuinely have no concerns, respond with:
 
 ## Your Task
 
-For EACH concern raised by the Debater, categorize it:
-- ✅ **VERIFIED**: [concern] — [1-sentence reasoning citing specific data]
-- ⚠️ **NEEDS MORE EVIDENCE**: [concern] — [what data is missing]
-- ❌ **CONTRADICTED**: [concern] — [evidence that disproves it]
+Output a bilingual report. For every section, give Chinese first, then English on the next line, prefixed with `EN:`. Keep both versions concise; do not repeat data unnecessarily.
 
-Then provide your final verdict:
+For EACH concern raised by the Debater, categorize it as one of:
+- ✅ **VERIFIED / 已证实**
+- ⚠️ **NEEDS MORE EVIDENCE / 证据不足**
+- ❌ **CONTRADICTED / 已反驳**
 
-### Final Verdict
-- **Action**: Buy / Hold / Sell
-- **Conviction**: High / Medium / Low
-- **Risk Level**: HIGH / MODERATE / LOW
-- **Key Insight**: 1-2 sentences on the most important takeaway
+Format per concern:
+- {{icon}} **{{中文标签}}**: 中文一句话说明，引用具体数据
+  EN: One sentence in English citing the same data.
+
+Then provide the final verdict in this exact bilingual format:
+
+### 最终判决 / Final Verdict
+- **操作建议 / Action**: 买入 / 持有 / 卖出  (Buy / Hold / Sell)
+- **信心 / Conviction**: 高 / 中 / 低  (High / Medium / Low)
+- **风险等级 / Risk Level**: 高 / 中 / 低  (HIGH / MODERATE / LOW)
+- **核心观点 / Key Insight**:
+  中文 1-2 句最关键的结论。
+  EN: 1-2 English sentences with the same takeaway.
 
 Be decisive. Use the evidence from both sides. Do not hedge excessively."""
 
