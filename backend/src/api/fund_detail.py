@@ -44,11 +44,11 @@ async def get_fund_detail(
         result["basic_info"] = {}
         result["fund_name"] = ""
 
-    # NAV history (last 90 days)
+    # NAV history (~1 year of trading days; frontend slices for week/month/year toggle)
     try:
         df = await _run_sync(lambda: ak.fund_open_fund_info_em(symbol=fund_code, indicator="单位净值走势"))
         if not df.empty:
-            tail = df.tail(90)
+            tail = df.tail(250)
             result["nav_history"] = [
                 {
                     "date": str(row["净值日期"]),
