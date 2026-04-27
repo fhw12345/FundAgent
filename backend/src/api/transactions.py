@@ -175,9 +175,9 @@ async def get_summary(
 
             # Today's estimation
             est = est_map.get(code, {})
-            today_pct = est.get("est_pct")
+            today_pct = est.get("published_pct")
             if today_pct is None:
-                today_pct = est.get("published_pct")
+                today_pct = est.get("est_pct")
             summary["today_est_pct"] = today_pct
             mv = summary.get("market_value")
             if today_pct is not None and mv:

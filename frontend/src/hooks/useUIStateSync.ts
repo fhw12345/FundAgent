@@ -5,8 +5,10 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { useUpdateUIState } from "./useChats";
-import type { TimeInterval } from "../services/market";
 import type { UIState } from "../types/api";
+
+// Inert vestige from the pre-rebrand chart UI.
+type TimeInterval = string;
 
 interface UIStateSyncProps {
   activeChatId: string | null;

@@ -1,15 +1,18 @@
 """Portfolio service — screenshot import + daily analysis orchestrator."""
 
-import base64
 import json
 import re
+from datetime import datetime, timezone
 from typing import Any
+from uuid import uuid4
 
 import structlog
+from motor.motor_asyncio import AsyncIOMotorCollection
 
 from ..agent.llm_client import VisionClient
 from ..core.config import Settings
 from ..database.repositories.portfolio_repository import PortfolioRepository
+from .chat_service import ChatService
 
 logger = structlog.get_logger()
 
@@ -59,19 +62,66 @@ async def import_portfolio_from_screenshot(
     return valid
 
 
+def _to_jsonable(obj: Any) -> Any:
+    """Recursively coerce objects (datetime, Pydantic, etc.) into JSON-safe primitives."""
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {str(k): _to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_to_jsonable(v) for v in obj]
+    if hasattr(obj, "model_dump"):
+        try:
+            return _to_jsonable(obj.model_dump())
+        except Exception:
+            pass
+    if hasattr(obj, "__dict__"):
+        try:
+            return _to_jsonable(vars(obj))
+        except Exception:
+            pass
+    return str(obj)
+
+
 async def run_daily_analysis(
     user_id: str,
     portfolio_repo: PortfolioRepository,
     settings: Settings,
-    on_event=None,
+    chat_service: ChatService | None = None,
+    job_runs_collection: AsyncIOMotorCollection | None = None,
+    on_event: Any = None,
 ) -> dict[str, Any]:
     """Run analysis for all funds in user's portfolio.
 
-    Returns a dict with per-fund summaries from the deep agent.
+    Persists each successful analysis as an assistant message in the
+    symbol-per-chat conversation owned by ``user_id``. Tracks run metadata
+    in ``job_runs`` when a collection is provided.
     """
     fund_codes = await portfolio_repo.get_fund_codes(user_id)
     if not fund_codes:
         return {"status": "empty", "message": "持仓为空，请先导入持仓"}
+
+    # ── job_runs: start ──
+    run_id: str | None = None
+    if job_runs_collection is not None:
+        run_id = str(uuid4())
+        try:
+            await job_runs_collection.insert_one(
+                {
+                    "run_id": run_id,
+                    "job_type": "daily_analysis",
+                    "user_id": user_id,
+                    "started_at": datetime.now(timezone.utc),
+                    "finished_at": None,
+                    "status": "running",
+                    "fund_codes": fund_codes,
+                    "fund_results": {},
+                }
+            )
+        except Exception as e:  # pragma: no cover - logging only
+            logger.warning("job_runs start insert failed", error=str(e))
 
     from ..agent.deep_react_agent import DeepReActAgent
     from ..agent.tools.akshare_fund_tools import create_akshare_fund_tools
@@ -84,7 +134,13 @@ async def run_daily_analysis(
         max_debate_rounds=1,
     )
 
+    # Determine model id (best-effort) for metadata.
+    role_models = getattr(settings, "role_models", None) or {}
+    model_id = role_models.get("main_analyst") or role_models.get("default")
+
     results: dict[str, Any] = {}
+    fund_results_status: dict[str, str] = {}
+
     for code in fund_codes:
         try:
             logger.info("Daily analysis starting", fund_code=code, user_id=user_id)
@@ -93,13 +149,97 @@ async def run_daily_analysis(
                 user_id=user_id,
                 on_event=on_event,
             )
+            report = result.get("research_report", "") if isinstance(result, dict) else ""
             results[code] = {
                 "status": "ok",
-                "report": result.get("research_report", "")[:2000],
-                "duration_ms": result.get("agent_duration_ms", 0),
+                "report": report[:2000] if report else "",
+                "duration_ms": result.get("agent_duration_ms", 0) if isinstance(result, dict) else 0,
             }
+            fund_results_status[code] = "ok"
+
+            # Persist as assistant message in the symbol chat.
+            if chat_service is not None:
+                try:
+                    chat = await chat_service.get_or_create_symbol_chat(
+                        user_id=user_id, symbol=code
+                    )
+                    await chat_service.add_message(
+                        chat_id=chat.chat_id,
+                        user_id=user_id,
+                        role="assistant",
+                        source="llm",
+                        content=report or "(无报告内容)",
+                        metadata={
+                            "symbol": code,
+                            "model": model_id,
+                            "raw_data": _to_jsonable(result),
+                        },
+                    )
+                except Exception as persist_err:
+                    logger.error(
+                        "Failed to persist analysis message",
+                        fund_code=code,
+                        user_id=user_id,
+                        error=str(persist_err),
+                    )
+
         except Exception as e:
             logger.error("Daily analysis failed for fund", fund_code=code, error=str(e))
             results[code] = {"status": "error", "message": str(e)}
+            fund_results_status[code] = "error"
 
-    return {"status": "ok", "fund_count": len(fund_codes), "results": results}
+            if chat_service is not None:
+                try:
+                    chat = await chat_service.get_or_create_symbol_chat(
+                        user_id=user_id, symbol=code
+                    )
+                    await chat_service.add_message(
+                        chat_id=chat.chat_id,
+                        user_id=user_id,
+                        role="assistant",
+                        source="llm",
+                        content=f"分析失败: {str(e)}",
+                        metadata={
+                            "symbol": code,
+                            "model": model_id,
+                            "raw_data": {"status": "error", "message": str(e)},
+                        },
+                    )
+                except Exception as persist_err:
+                    logger.error(
+                        "Failed to persist error message",
+                        fund_code=code,
+                        user_id=user_id,
+                        error=str(persist_err),
+                    )
+
+    # Determine overall status.
+    statuses = set(fund_results_status.values())
+    if not statuses or statuses == {"error"}:
+        overall = "error"
+    elif "error" in statuses:
+        overall = "partial"
+    else:
+        overall = "ok"
+
+    # ── job_runs: finish ──
+    if job_runs_collection is not None and run_id:
+        try:
+            await job_runs_collection.update_one(
+                {"run_id": run_id},
+                {
+                    "$set": {
+                        "finished_at": datetime.now(timezone.utc),
+                        "status": overall,
+                        "fund_results": fund_results_status,
+                    }
+                },
+            )
+        except Exception as e:  # pragma: no cover - logging only
+            logger.warning("job_runs finish update failed", error=str(e))
+
+    return {
+        "status": overall,
+        "fund_count": len(fund_codes),
+        "results": results,
+    }

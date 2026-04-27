@@ -275,11 +275,20 @@ async def invoke_subagent(
     # Extract final response and actual tool count
     all_messages = result.get("messages", [])
     final_message = all_messages[-1]
-    response_content = (
+    raw_content = (
         final_message.content
         if hasattr(final_message, "content")
         else str(final_message)
     )
+    # Gemini (and some Anthropic responses) return content as a list of blocks
+    # like [{"type": "text", "text": "..."}]. Downstream parsers expect str.
+    if isinstance(raw_content, list):
+        response_content = "".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in raw_content
+        )
+    else:
+        response_content = raw_content
     tool_count = sum(1 for m in all_messages if m.__class__.__name__ == "ToolMessage")
 
     logger.debug(

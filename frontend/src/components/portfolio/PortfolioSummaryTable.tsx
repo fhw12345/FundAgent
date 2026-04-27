@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Holding, PortfolioSummary } from '../../types/portfolio';
 
 interface PortfolioSummaryTableProps {
