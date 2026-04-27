@@ -1,11 +1,41 @@
 # Frontend Changelog
 
-All notable changes to the Financial Agent Frontend will be documented in this file.
+All notable changes to the Fund Agent Frontend will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.13.1] - 2026-04-27
+
+### Changed
+- chore(i18n): Update English chat locale strings from "Financial Agent" to "Fund Agent" (welcome + help titles)
+- Companion to backend v0.12.2 documentation overhaul — see backend CHANGELOG for full repository-wide doc cleanup details
+
+## [0.13.0] - 2026-04-27
+
+### Changed
+- feat(ui): Portfolio overview + fund detail page redesign (Alipay-style)
+  - **Portfolio dashboard** restructured with new components:
+    - `HeroCard.tsx` — total assets / today's estimate / total return with collapsible P&L breakdown
+    - `FundCard.tsx` — restyled 3-column holding card (today's estimate, return %, sector chips)
+    - `AddHoldingModal.tsx` — extracted from inline page code into its own modal component
+    - `PortfolioDashboard.tsx` slimmed from ~700 to ~290 lines after extraction
+  - **Fund detail page** rebuilt with tabbed layout:
+    - `MyHoldingTab.tsx` — personal holding summary (shares / cost / return) + NAV chart + per-fund transaction list
+    - `FundInfoTab.tsx` — NAV chart + top holdings + basic info
+    - `NavChart.tsx` — single shared chart component with week/month/year toggle (slices client-side)
+    - `TransactionList.tsx` — per-fund transaction history filtered via existing `/api/transactions?fund_code=` endpoint
+  - All existing features (sector chips, top holdings, basic info, DCA/sell/buy actions) preserved
+- Spec: [docs/superpowers/specs/2026-04-27-portfolio-fund-detail-redesign-design.md](../../../superpowers/specs/2026-04-27-portfolio-fund-detail-redesign-design.md)
+- Plan: [docs/superpowers/plans/2026-04-27-portfolio-fund-detail-redesign.md](../../../superpowers/plans/2026-04-27-portfolio-fund-detail-redesign.md)
+
+## [0.12.0] - 2026-04-26
+
+### Added
+- feat(frontend): Chinese UI for fund portfolio with screenshot upload (Alipay/天天基金 portfolio import)
+- feat(portfolio): Screenshot import flow + daily analysis orchestrator UI
 
 ## [0.11.5] - 2025-12-29
 

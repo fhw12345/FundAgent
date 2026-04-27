@@ -1,11 +1,11 @@
-# Financial Agent Development Makefile
+# Fund Agent Development Makefile
 # Following the coding guide requirements for fmt, test, lint commands
 
 .PHONY: help dev build test lint fmt clean up down logs
 
 # Default target
 help:
-	@echo "Financial Agent Development Commands"
+	@echo "Fund Agent Development Commands"
 	@echo ""
 	@echo "Development:"
 	@echo "  dev          Start development environment with hot reload"

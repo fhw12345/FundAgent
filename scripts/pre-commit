@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pre-commit hook for Financial Agent
+# Pre-commit hook for Fund Agent
 # Runs both backend and frontend unit tests before allowing commit
 
 echo "🔍 Pre-commit hook: Running tests..."

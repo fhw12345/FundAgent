@@ -1,325 +1,134 @@
-# Financial Agent System Design
+# Fund Agent — System Design
 
 ## Executive Summary
 
-AI-Enhanced Financial Analysis Platform that provides on-demand Fibonacci and market structure analysis for financial symbols. The platform generates chart images and supplements them with AI-powered interpretations using a decoupled, cloud-native architecture.
+Fund Agent is a single-user, docker-compose application. The backend is a FastAPI service that talks to MongoDB and Redis, calls AkShare / eastmoney for fund data, and routes all LLM calls through a local Agent Maestro proxy. The frontend is a React + Vite SPA in 中文.
 
-## Overall Direction
+There is no Kubernetes deployment, no CDN, no message queue, no managed cloud infra. Everything runs on the user's machine.
 
-The project transforms a sophisticated CLI financial analysis tool into a modern, cloud-native, AI-enhanced web application. The architecture is designed to be scalable, secure, and observable from the ground up, prioritizing managed services to reduce operational overhead while maintaining focus on core financial analysis features.
+## High-Level Topology
 
-## Technology Stack
-
-### Cloud Platform
-**Hybrid Cloud Strategy**
-- **Production Platform**: Alibaba Cloud
-  - Container orchestration (ACK - Shanghai)
-  - AI/LLM (Qwen-VL Model via DashScope)
-  - Object Storage (OSS for charts)
-
-- **Shared Services**: Microsoft Azure
-  - Container Registry (ACR)
-  - Secrets management (Key Vault)
-  - Database (Cosmos DB with MongoDB API)
-
-- **Test Platform**: Azure AKS (Planned)
-
-> **Environment details**: See [CLAUDE.md](../../CLAUDE.md#-environment-rules)
-
-### Backend
-- **Framework**: Python 3.12 with FastAPI
-- **Rationale**: High performance, asynchronous capabilities, automatic API documentation
-- **Features**:
-  - RESTful API endpoints
-  - OAuth2/OIDC Bearer JWTs for authentication
-  - Scope-based authorization
-  - Automatic OpenAPI documentation
-
-### Frontend
-- **Framework**: React 18 with TypeScript 5.x
-- **Build Tool**: Vite
-- **Styling**: TailwindCSS
-- **State Management**: React Query for server state
-- **Features**:
-  - Secure login flow using OIDC Authorization Code + PKCE
-  - Conversational chat interface with quick actions
-  - Chart visualization and AI-generated summaries
-  - Historical request dashboard
-
-### Compute & Orchestration
-- **Platform**: Azure Kubernetes Service (AKS)
-- **Container Runtime**: Docker
-- **Node Configuration**: 3 nodes across 3 pools (agentpool, userpool, userpoolv2)
-  - agentpool: 1 × Standard_D2ls_v5 (System mode, 2 vCPU, 4GB)
-  - userpool: 1 × Standard_D2ls_v5 (User mode, 2 vCPU, 4GB)
-  - userpoolv2: 1 × Standard_E2_v3 (User mode, 2 vCPU, 16GB, memory-optimized)
-- **Deployment Pattern**: Separate pods for each service (frontend, backend, redis)
-- **Rationale**:
-  - Independent scaling (frontend: 3-5 replicas, backend: 2-3 replicas, redis: 1 replica)
-  - Independent updates (update backend without frontend downtime)
-  - Failure isolation (backend crash doesn't affect frontend)
-  - Fine-grained resource allocation per service
-- **Scaling**: Horizontal Pod Autoscaler (HPA) based on CPU load, autoscaler capped at max-count=1 per pool
-- **Pod Distribution**: Kubernetes scheduler distributes pods across nodes based on resource requests
-- **Features**:
-  - Automated scaling per component (with cost guardrails)
-  - Self-healing deployments
-  - Zero-downtime rolling updates
-  - Independent service lifecycle management
-
-### Data Layer
-
-#### Primary Database
-- **Service**: Azure Cosmos DB (MongoDB API)
-- **Rationale**: Flexible document-based structure ideal for complex analysis results
-- **Usage**: Analysis results, user requests, metadata
-
-#### Chat Storage
-- **Service**: Alibaba Cloud Tablestore (planned)
-- **Rationale**: Optimized for time-series data like chat messages
-- **Features**: Automatic scaling, fast conversation thread retrieval
-
-#### Caching
-- **Service**: Redis (in-cluster for dev, ApsaraDB for Redis in production)
-- **Purpose**: Distributed cache for external data sources (yfinance)
-- **Benefits**: Reduced latency and API calls across horizontally scaled replicas
-
-#### Object Storage
-- **Service**: Alibaba Cloud OSS
-- **Purpose**: Chart image storage
-- **Access**: Temporary pre-signed URLs for secure client access
-
-### AI & Analytics
-- **Service**: Alibaba Cloud Model Studio (Bailian)
-- **Model**: Qwen-VL-Max (multimodal vision-language model)
-- **Agent Framework**: LangGraph SDK ReAct Agent
-  - `create_react_agent` with autonomous tool chaining
-  - Flexible, context-driven routing
-  - Compressed tool results for efficiency
-- **Use Cases**:
-  1. Chart interpretation and analysis
-  2. Natural language query processing with tool calling
-  3. Automated report generation
-  4. Autonomous financial analysis with multi-tool chaining
-
-### Infrastructure & DevOps
-
-#### API Management
-- **Service**: Nginx Ingress Controller
-- **Features**:
-  - Traffic management
-  - Rate limiting
-  - SSL termination
-  - Reverse proxy
-
-#### CI/CD
-- **Platform**: GitHub Actions
-- **Pipeline Stages**:
-  1. Lint, test, and build application code
-  2. Build and scan Docker images (Trivy)
-  3. Push to Azure Container Registry (ACR)
-  4. Deploy to staging
-  5. Manual approval for production
-  6. Progressive rollout with health checks
-
-#### Observability
-- **Logging**: Structured JSON logs
-- **Metrics**: Application performance monitoring
-- **Tracing**: Langfuse (self-hosted) for agent execution traces and LLM observability
-- **Monitoring**: Azure Monitor with custom dashboards
-- **Alerting**: Automated alerts for critical conditions
-
-## Architecture Patterns
-
-### Walking Skeleton Methodology
-1. **Milestone 1**: End-to-end connectivity (Frontend → API → DB → Cache)
-2. **Milestone 2**: Authentication + core business logic
-3. **Milestone 3+**: Layer features incrementally
-
-### 12-Factor Agent Principles
-See [Agent 12-Factors](agent-12-factors.md) for the complete philosophy and [Agent Architecture](agent-architecture.md) for implementation details.
-
-## Financial Analysis Features
-
-### Current CLI Capabilities
-- **Fibonacci Analysis**: Retracement levels with confidence scoring
-- **Market Structure**: Swing point detection and trend analysis
-- **Macro Analysis**: VIX sentiment, sector rotation, Buffett Indicator
-- **Chart Generation**: Professional matplotlib visualizations
-- **Fundamentals**: Stock metrics and valuation data
-
-### Web Platform Enhancements
-- **Conversational Interface**: Natural language financial queries
-- **AI Chart Interpretation**: Qwen-VL model for visual analysis
-- **Real-time Updates**: Live data streaming and caching
-- **User Management**: Authentication and session persistence
-- **Cloud Storage**: Chart images with global CDN delivery
-
-## Security & Compliance
-
-### Authentication & Authorization
-- **Current Implementation**: Local JWT-based authentication
-  - Username/password with bcrypt hashing (cost factor 12)
-  - Email verification for registration and password reset
-  - JWT tokens (7-day expiry) signed with SECRET_KEY
-  - Session management via localStorage
-- **Planned Enhancements**:
-  - Add OAuth2/OIDC providers (Microsoft, Google) for social login
-  - Support multiple auth providers based on user region
-  - Add MFA (TOTP) for enhanced security
-  - Implement refresh tokens for better session management
-- **Design Decision**: Separate pods architecture chosen over multi-container pods
-  - Avoids OAuth complexity for MVP phase
-  - Allows independent scaling and updates
-  - Provides adequate security for initial user base (<10K users)
-
-### Network Security
-- HTTPS/TLS encryption (Let's Encrypt)
-- Azure CNI networking
-- Network policies
-- VPN for cross-cloud communication
-
-### Data Security
-- Encryption at rest (Cosmos DB, OSS)
-- Encryption in transit (TLS 1.3)
-- Secrets management via Azure Key Vault
-- External Secrets Operator for K8s integration
-
-### Compliance
-- No hardcoded secrets in manifests
-- Audit logging
-- RBAC with minimal permissions
-- Signed container images
-
-## Scalability & Performance
-
-### Horizontal Scaling
-- Stateless application design
-- Kubernetes HPA for automatic scaling
-- Load balancing via Nginx Ingress
-- Distributed caching with Redis
-
-### Performance Optimization
-- CDN for static assets
-- Redis caching for market data
-- Async/await throughout backend
-- Connection pooling for databases
-- Image optimization for charts
-
-### Cost Optimization
-- Auto-scaling based on demand
-- Managed services reduce operational overhead
-- Development environment with minimal resources
-- CDN reduces bandwidth costs
-
-## Deployment Topology
-
-### Pod Architecture (All Environments)
 ```
-┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-│  Frontend   │   │  Backend    │   │   Redis     │
-│    Pod      │   │    Pod      │   │    Pod      │
-│             │   │             │   │             │
-│  Replicas:  │   │  Replicas:  │   │  Replicas:  │
-│   3-5       │   │   2-3       │   │   1         │
-└─────────────┘   └─────────────┘   └─────────────┘
-      ↓                 ↓                  ↓
-  Service           Service            Service
-   (ClusterIP)       (ClusterIP)       (ClusterIP)
+                      ┌─────────────────────┐
+                      │  VS Code            │
+                      │  Agent Maestro      │  ← user's API keys live here
+                      │  localhost:23333    │
+                      └──────────▲──────────┘
+                                 │  HTTPS (multi-vendor: Claude / GPT / Gemini)
+                                 │
+┌─────────────┐     HTTP    ┌────┴───────────┐    Motor    ┌────────────┐
+│  Browser    │◀───────────▶│  Backend       │◀───────────▶│  MongoDB   │
+│  React SPA  │   :3000     │  FastAPI       │             │  fund_agent│
+│  (Vite)     │             │  :8000         │             └────────────┘
+└─────────────┘             │                │    redis-py ┌────────────┐
+                            │                │◀───────────▶│  Redis     │
+                            │                │             └────────────┘
+                            │                │   AkShare / eastmoney HTTP
+                            │                │◀──────────────────────────▶ data sources
+                            └────────────────┘
 ```
 
-**Why Separate Pods?**
-1. **Independent Scaling**: Frontend scales 3-5x during market hours, backend 2-3x for LLM load, Redis stays at 1
-2. **Zero-Downtime Updates**: Update backend without restarting frontend/Redis
-3. **Failure Isolation**: Backend crash doesn't affect frontend UI or Redis cache
-4. **Resource Efficiency**: Fine-grained CPU/memory limits per service
-5. **Monitoring**: Easy to identify which component is unhealthy
+## Backend Layout
 
-**Not Using Multi-Container Pods Because:**
-- ❌ All containers restart when any one fails
-- ❌ Can't scale components independently
-- ❌ Updates require full pod restart (Redis cache lost)
-- ❌ Resource limits shared across all containers
+```
+backend/src/
+├── api/                    HTTP routes
+│   ├── admin.py              /api/admin/* — health, db stats, cache
+│   ├── chat/                 /api/chat/*  — SSE streaming chat
+│   ├── fund_detail.py        /api/funds/{code} — NAV / holdings / info
+│   ├── health.py             /api/health/*
+│   ├── jobs.py               /api/jobs/* — background job runs
+│   ├── llm_models.py         /api/models — list available models
+│   ├── portfolio.py          /api/portfolio — holdings, screenshot import, daily analysis
+│   ├── quarterly_report.py   /api/quarterly-report — PDF / text analysis
+│   ├── transactions.py       /api/transactions, /api/dca-plans
+│   ├── dependencies/         FastAPI deps (auth, repos)
+│   └── schemas/              request / response models
+│
+├── agent/                  LLM orchestration
+│   ├── chat_agent.py         simple chat agent
+│   ├── langgraph_react_agent.py  primary ReAct loop
+│   ├── deep_react_agent.py   debate-enabled flow
+│   ├── deep_agent_adapter.py adapter for deepagents lib
+│   ├── debate_types.py       structured concern/rebuttal types
+│   ├── llm_client.py         Agent Maestro routing (per-role model picks)
+│   ├── subagents/            financial / technical / news / debater
+│   ├── tools/                akshare_fund_tools, eastmoney_tools, analysis_cache, categorization
+│   └── skills/               markdown SKILL.md files for sub-agents
+│
+├── services/               domain logic
+│   ├── auth_service.py       single-user JWT
+│   ├── chat_service.py
+│   ├── portfolio_service.py
+│   ├── cost_basis.py
+│   ├── eastmoney_crawler.py  polite rate-limited fetcher
+│   ├── sector_classifier.py
+│   ├── confirmation_scheduler.py
+│   ├── dca_scheduler.py
+│   ├── settlement.py
+│   ├── token_service.py
+│   ├── quarterly_report_service.py
+│   ├── portfolio_enrichment.py
+│   ├── market_data.py
+│   ├── context_window_manager.py
+│   └── database_stats_service.py
+│
+├── database/
+│   ├── mongodb.py            Motor connection (config-driven db name)
+│   ├── redis.py              redis-py async cache
+│   └── repositories/         one file per collection
+│
+├── models/                 Pydantic models (chat, message, transaction, user, refresh_token)
+└── main.py                 FastAPI app + lifespan
+```
 
-### Environments
+## Frontend Layout
 
-| Environment | Platform | URL | Status |
-|-------------|----------|-----|--------|
-| **Local Dev** | Docker Compose | http://localhost:3000 | Active |
-| **Test** | Azure AKS | https://klinematrix.com | Planned |
-| **Prod** | Alibaba ACK (Shanghai) | https://klinecubic.cn | Active |
+```
+frontend/src/
+├── pages/
+│   ├── PortfolioDashboard.tsx   landing — hero + holdings cards
+│   ├── FundDetailPage.tsx       per-fund page with tabs
+│   ├── TransactionHistory.tsx
+│   ├── TransactionsPage.tsx
+│   ├── HealthPage.tsx
+│   ├── InsightsPage.tsx         (legacy, low-traffic)
+│   └── FeedbackPage.tsx         (legacy, low-traffic)
+│
+├── components/
+│   ├── portfolio/   HeroCard, FundCard, AddHoldingModal
+│   ├── fund/        NavChart, TransactionList, MyHoldingTab, FundInfoTab
+│   ├── chat/        SSE streaming chat UI
+│   └── ...
+│
+└── public/locales/  i18n (en / zh-CN)
+```
 
-> **Full environment configuration**: See [CLAUDE.md](../../CLAUDE.md#-environment-rules)
+See the recent redesign: [docs/superpowers/specs/2026-04-27-portfolio-fund-detail-redesign-design.md](../superpowers/specs/2026-04-27-portfolio-fund-detail-redesign-design.md).
 
-## Integration Points
+## Data Flow: Daily Analysis
 
-### Cross-Cloud Integration
-1. **Authentication Flow**: JWT → AKS → Services
-2. **Data Flow**: Azure Cosmos DB ↔ Application ↔ Alibaba OSS
-3. **AI Processing**: Application → Qwen-VL Model → Response
-4. **Monitoring**: Azure Monitor + custom metrics from Alibaba services
+1. User clicks "Analyze" in PortfolioDashboard.
+2. `POST /api/portfolio/daily-analysis` → background task in `portfolio_service`.
+3. For each holding: `agent/langgraph_react_agent` runs with tools from `agent/tools/akshare_fund_tools`.
+4. The deep variant (`deep_react_agent`) adds debate: main analyst → debater (different vendor) → rebuttal → verdict.
+5. Result persisted to MongoDB; UI polls `/api/jobs/recent` for status, then renders the verdict.
 
-### External APIs
-- yfinance for market data
-- Alibaba DashScope for AI inference
-- Azure Cosmos DB for persistence
-- Redis for caching
+## Data Flow: Screenshot Import
 
-## Agent Architecture
+1. User uploads Alipay / 天天基金 screenshot via `AddHoldingModal`.
+2. `POST /api/portfolio/import-screenshot` → GPT-5.4 vision (via Agent Maestro) parses fund codes + amounts.
+3. `portfolio_service` upserts into `portfolios` / `holdings`.
+4. `eastmoney_crawler` enriches each new fund with metadata.
 
-The platform uses **LangGraph's SDK ReAct Agent** for autonomous financial analysis.
+## Storage
 
-**Endpoint**: `/api/chat/stream-react`
+- **MongoDB** (`fund_agent` database, configurable). Collections owned by repositories under `backend/src/database/repositories/`. See [database-schema.md](database-schema.md).
+- **Redis**. Caching layer for AkShare results, sector lookups, and analysis. TTLs vary by data type.
+- **No object storage**. Screenshot uploads are processed in-memory and discarded.
 
-**Approach**: LangGraph SDK-based with autonomous tool chaining
+## Deployment
 
-**Key Features**:
-- Auto-loop pattern with `create_react_agent`
-- LLM-driven tool selection and chaining
-- Compressed tool results (99.5% size reduction)
-- Built-in message history with `MemorySaver`
-- ~300 lines of implementation code
-- Flexible, context-driven routing
+Local docker-compose only. See [CLAUDE.md → Environment](../../CLAUDE.md#-environment).
 
-**Capabilities**:
-- Autonomous multi-tool chaining (LLM decides sequence)
-- Adapts to complex queries dynamically
-- Compressed tool results reduce tokens by 99.5%
-- Thread-based conversation isolation
-- Streaming responses with Server-Sent Events
-
-**See**: [Agent Architecture Details](agent-architecture.md) | [SDK ReAct Agent Feature Spec](../features/langgraph-sdk-react-agent.md)
-
-**Current Deployment**: Production at https://klinecubic.cn (ACK)
-
----
-
-## Roadmap
-
-### Phase 1: Foundation (✅ COMPLETED)
-- ✅ Infrastructure setup and walking skeleton
-- ✅ Basic health monitoring and logging
-- ✅ End-to-end connectivity verification
-
-### Phase 2: Agent Core (✅ COMPLETED)
-- ✅ LangGraph SDK ReAct Agent implementation
-  - Autonomous tool chaining with flexible routing
-  - Compressed tool results (99.5% token reduction)
-  - Built-in state management with MemorySaver
-- ✅ Financial analysis tool integration
-- ✅ Conversational interface with streaming responses
-- ✅ Thread-based conversation persistence
-
-### Phase 3: Production (🚧 IN PROGRESS)
-- ✅ Authentication and authorization
-- ✅ SDK ReAct Agent deployed to Test environment
-- ⏳ Frontend integration for agent chat interface
-- ⏳ AI chart interpretation
-- ✅ Cloud deployment automation
-- ✅ Monitoring and alerting (Langfuse)
-
-### Phase 4: Scale (PLANNED)
-- Advanced analytics and insights
-- Multi-user support
-- Performance optimization
-- Geographic distribution
+There is no production cluster. The `.pipeline/` directory contains legacy K8s manifests retained for reference but unused.

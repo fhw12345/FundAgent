@@ -1,4 +1,4 @@
-# Financial Agent - Comprehensive Research Summary
+# Fund Agent - Comprehensive Research Summary
 
 ## 1. LOGIN CREDENTIALS
 

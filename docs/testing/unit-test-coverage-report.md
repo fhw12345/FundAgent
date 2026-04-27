@@ -1,5 +1,5 @@
 # Unit Test Coverage Report - Week 3
-**Financial Agent Project**
+**Fund Agent Project**
 **Generated**: 2025-11-22
 **Status**: ✅ Complete
 

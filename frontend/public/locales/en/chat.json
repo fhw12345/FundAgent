@@ -234,7 +234,7 @@
     "statusFailed": "Failed"
   },
   "welcome": {
-    "title": "🎯 Welcome to Financial Agent!",
+    "title": "🎯 Welcome to Fund Agent!",
     "firstTime": "✨ **First Time Here?**",
     "firstTimeHint": "Click the **❓** button in the bottom-right corner for a quick interactive guide!",
     "modesTitle": "🚀 **Three Powerful Modes to Explore:**",
@@ -244,7 +244,7 @@
     "proTip": "💡 **Pro Tip:** Start by asking a question or searching for a stock symbol to see the magic happen!"
   },
   "help": {
-    "title": "How to Use Financial Agent",
+    "title": "How to Use Fund Agent",
     "agentMode": {
       "title": "🤖 Agent Mode",
       "subtitle": "Intelligent automated analysis",

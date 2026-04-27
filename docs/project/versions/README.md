@@ -2,7 +2,7 @@
 
 ## Overview
 
-Financial Agent uses **independent semantic versioning** for backend and frontend components, enabling separate deployment cycles while maintaining compatibility tracking.
+Fund Agent uses **independent semantic versioning** for backend and frontend components, enabling separate deployment cycles while maintaining compatibility tracking.
 
 ## Version Format
 

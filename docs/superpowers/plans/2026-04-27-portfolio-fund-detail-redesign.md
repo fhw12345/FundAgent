@@ -1,5 +1,7 @@
 # Portfolio Dashboard & Fund Detail Page Redesign — Implementation Plan
 
+> **Status:** ✅ Completed — shipped via commit `422fd4d` on 2026-04-27. All file-map items merged into `main`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Match the two reference screenshots — restyle holding cards, make hero P&L collapsible, add tabs to the fund detail page with personal holding view (summary + transaction history) and a NAV chart with week/month/year toggle.

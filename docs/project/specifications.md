@@ -1,435 +1,170 @@
-# Financial Agent - Project Specifications
+# Fund Agent — Project Specifications
 
-## Executive Summary
+> **Reflects backend v0.12.1 / frontend v0.13.0.**
 
-**Project Goal**: Build a full-stack, cloud-native web application that provides on-demand Fibonacci and market structure analysis for financial symbols. The platform generates chart images and supplements them with AI-powered interpretations.
+This is the canonical "what is this project" document. For the higher-level product framing, see [`prd.md`](prd.md). For architecture, see [`architecture/system-design.md`](architecture/system-design.md).
 
-**Core Architecture**: Decoupled application with a Python backend, React frontend, NoSQL database, and multimodal AI model.
+## Project Goal
 
-**Technology Ecosystem**: Hybrid cloud deployment on Azure (primary) and Alibaba Cloud (specialized services).
+A private, single-user AI assistant for managing a personal portfolio of Chinese onshore mutual funds (场外基金), with multi-vendor LLM debate to reduce single-model bias.
 
-## Project Structure
+## Project Layout
 
 ```
-financials/
+FundAgent/
 ├── README.md
+├── CLAUDE.md                              development rules
 ├── CONTRIBUTING.md
-├── LICENSE
 ├── Makefile
-├── .editorconfig
-├── .gitignore
-├── .env.example
+├── docker-compose.yml
 ├── backend/
 │   ├── pyproject.toml
-│   ├── README.md
 │   ├── src/
-│   ├── tests/
-│   │   ├── unit/
-│   │   ├── api/
-│   │   └── integration/
-│   ├── scripts/
-│   │   ├── dev_run.sh
-│   │   └── lint.sh
-│   └── Dockerfile
+│   │   ├── api/                           FastAPI routes
+│   │   ├── agent/                         LangGraph + sub-agents + tools
+│   │   ├── services/                      domain logic
+│   │   ├── database/                      Motor + redis-py + repositories
+│   │   ├── models/                        Pydantic models
+│   │   └── main.py
+│   └── tests/
 ├── frontend/
 │   ├── package.json
-│   ├── pnpm-lock.yaml
-│   ├── tsconfig.json
 │   ├── vite.config.ts
 │   └── src/
-├── docs/
-│   ├── architecture/
-│   ├── deployment/
-│   ├── development/
-│   └── project/
-├── .pipeline/
-│   ├── k8s/
-│   │   ├── base/
-│   │   └── overlays/
-│   ├── workflows/
-│   └── scripts/
-├── .github/
-│   └── workflows/
-│       ├── backend-ci.yml
-│       ├── frontend-ci.yml
-│       ├── build-and-push-images.yml
-│       └── deploy-ack.yml
-└── tools/
-    ├── schema/
-    └── openapi/
+│       ├── pages/
+│       ├── components/
+│       └── public/locales/                i18n (en / zh-CN)
+├── docs/                                  documentation
+├── scripts/                               version bump, pre-commit, etc.
+├── .pipeline/                             legacy K8s manifests (unused)
+└── .github/workflows/                     PR checks only (no deploy)
 ```
 
-## Backend Service
+## Backend
 
 ### Framework
-- **Language**: Python 3.12
-- **Framework**: FastAPI
-- **Architecture**: Asynchronous, RESTful API
+Python 3.12, FastAPI (async), Motor (MongoDB), redis-py.
 
-### API Endpoints
-- `POST /api/charts/fibonacci`: Request Fibonacci chart generation
-- `POST /api/chat`: Conversational AI interface
-- `GET /api/market/search`: Symbol search with validation
-- `GET /api/analysis/history`: User analysis history
-- `GET /api/health`: Comprehensive system health check
-- `GET /api/health/ready`: Kubernetes readiness probe
-- `GET /api/health/live`: Kubernetes liveness probe
+### Routes (under `backend/src/api/`)
 
-### Authentication
-- **Method**: OAuth2 / OIDC Bearer JWTs
-- **Provider**: Azure AD B2C (planned)
-- **Scopes**: `charts:read`, `charts:write`, `analysis:read`
+| Prefix | Source | Notes |
+|---|---|---|
+| `/api/health/*` | `health.py` | Liveness, readiness, mongodb, redis |
+| `/api/admin/*` | `admin.py` | DB stats, cache, timing metrics |
+| `/api/funds/{fund_code}` | `fund_detail.py` | NAV history, holdings, basic info |
+| `/api/portfolio` | `portfolio.py` | Holdings CRUD, screenshot import, daily analysis |
+| `/api/transactions` | `transactions.py` | 买入 / 卖出 / 分红再投, supports `fund_code` filter |
+| `/api/dca-plans` | `transactions.py` | 定投 plan management |
+| `/api/jobs/*` | `jobs.py` | Background analysis run records |
+| `/api/quarterly-report/*` | `quarterly_report.py` | PDF / text fund quarterly report analysis |
+| `/api/models` | `llm_models.py` | List Agent Maestro-routed models |
+| `/api/chat/*` | `chat/` | SSE streaming chat |
 
-### Database (Data Persistence)
-- **Primary**: Azure Cosmos DB (MongoDB API)
-- **Purpose**: Analysis results, user requests, metadata
-- **Features**: Multi-region, auto-scaling, encryption at rest
+### Agent Layer (under `backend/src/agent/`)
 
-### Chat Message Storage
-- **Service**: Alibaba Cloud Tablestore (planned)
-- **Purpose**: Chat conversation history and messages
-- **Features**: Time-series optimization, fast retrieval, automatic scaling
+- **Orchestrators**: `chat_agent.py`, `langgraph_react_agent.py`, `deep_react_agent.py`
+- **Sub-agents**: `subagents/financial.py`, `subagents/technical.py`, `subagents/news.py`, `subagents/debater.py`
+- **Tools**: `tools/akshare_fund_tools.py`, `tools/eastmoney_tools.py`, `tools/analysis_cache.py`, `tools/categorization.py`
+- **Routing**: `llm_client.py` → Agent Maestro proxy at `localhost:23333`
 
-### Caching
-- **Service**: Redis
-  - Development: In-cluster Redis
-  - Production: ApsaraDB for Redis
-- **Purpose**: Cache external data sources (yfinance), reduce latency
-- **TTL**: 1 hour for market data, 24 hours for fundamentals
+### Auth
+Simplified single-user JWT (access + refresh). No OIDC, no multi-tenant.
 
-### File Storage
-- **Service**: Alibaba Cloud OSS (Object Storage Service)
-- **Purpose**: Generated chart images
-- **Access**: Temporary pre-signed URLs for secure client access
-- **Features**: Multi-region replication, CDN integration
+### Storage
+- **MongoDB** (`fund_agent` db, configurable). Collections: `users`, `refresh_tokens`, `chats`, `messages`, `portfolios` (embedded `holdings[]`), `transactions`, `dca_plans`, `job_runs`, `fund_sector_mapping`. See [`architecture/database-schema.md`](architecture/database-schema.md).
+- **Redis**. Caching for AkShare results, sector lookups, analysis memoization. TTL per data type.
 
 ### Containerization
-- **Technology**: Docker with multi-stage builds
-- **Image Size**: Optimized for small, secure runtime
-- **Registry**: Azure Container Registry (ACR)
+Multi-stage Dockerfile. Image registered in Azure ACR for users who choose to push (project itself does not auto-deploy).
 
-## Frontend Application
+## Frontend
 
-### Framework
-- **Library**: React 18
-- **Language**: TypeScript 5.x
-- **Build Tool**: Vite
-- **Styling**: TailwindCSS
+React 18 + TypeScript 5 + Vite + TailwindCSS. Pages under `frontend/src/pages/`, components under `frontend/src/components/{portfolio,fund,chat,...}/`, i18n under `public/locales/`.
 
-### Key Features
-1. **Authentication Flow**
-   - Secure login using OIDC Authorization Code + PKCE
-   - Token refresh and session management
-   - Role-based UI rendering
+State: React Query (TanStack Query) for server state.
 
-2. **Conversational Interface**
-   - Modern chat UI with message history
-   - Quick action buttons for common analyses
-   - Symbol search with autocomplete
-   - Timeframe selection
+Build output is served by the dev container in dev. There is no separate static-hosting deploy.
 
-3. **Analysis Dashboard**
-   - Chart visualization with AI interpretations
-   - Historical analysis list
-   - Filter and search capabilities
-   - Export functionality
+## LLM
 
-4. **User Experience**
-   - Responsive design (mobile, tablet, desktop)
-   - Loading states and error handling
-   - Real-time updates via WebSocket (planned)
-   - Accessibility compliance (WCAG 2.1)
+All calls funnel through **Agent Maestro** (VS Code extension running locally on `localhost:23333`). Per-role default models:
 
-### State Management
-- **Library**: React Query (TanStack Query)
-- **Features**:
-  - Server state caching
-  - Optimistic updates
-  - Automatic refetching
-  - Mutation state management
+| Role | Model | Vendor |
+|---|---|---|
+| Main analyst | claude-opus-4-7 | Anthropic |
+| Vision (screenshot import) | gpt-5.4 | OpenAI |
+| Fundamentals | gpt-5.4 | OpenAI |
+| News | gemini-3.1-pro-preview | Google |
+| Debater | gemini-3.1-pro-preview | Google |
+| PDF / quarterly report | gemini-3.1-pro-preview | Google |
 
-### Deployment
-- **Build**: Static assets via Vite
-- **Hosting**: Alibaba Cloud OSS (planned) or nginx in Kubernetes
-- **CDN**: Alibaba Cloud CDN for global delivery
-- **SSL**: Let's Encrypt via cert-manager
+Debater must use a different vendor than the main analyst.
 
-## AI & Advanced Analytics
+## Data Sources
 
-### Service
-- **Provider**: Alibaba Cloud Model Studio (Bailian)
-- **API**: DashScope API
-- **Region**: cn-hangzhou
+- **AkShare** — primary. Fund NAV, rankings, holdings, manager info, sector exposure, macro indicators.
+- **EastMoney (天天基金) crawler** — supplementary, polite/rate-limited (`backend/src/services/eastmoney_crawler.py`).
 
-### Model
-- **Name**: Qwen-VL-Max (or latest Vision-Language model)
-- **Type**: Multimodal (text + image)
-- **Capabilities**: Chart interpretation, natural language understanding
+No Alpha Vantage, Alpaca, yfinance, EXA, FRED — all removed in the rebrand (`c6e45f3 refactor(backend): delete US market modules and simplify to fund-only architecture`).
 
-### Use Cases
+## Infrastructure
 
-#### 1. Chart Interpretation
-Backend sends generated chart image to Qwen-VL model for analysis:
-```python
-interpretation = await ai_service.interpret_chart(
-    chart_url=chart_url,
-    context={
-        "symbol": "AAPL",
-        "timeframe": "6mo",
-        "analysis_type": "fibonacci",
-        "key_levels": [150.0, 165.0, 180.0]
-    }
-)
-```
+**Local docker-compose only.** No production cluster, no test cluster, no auto-deploy.
 
-#### 2. Natural Language Querying
-Chat interface allows natural language requests:
-- "Show me the 3-month chart for Tesla and highlight key support levels"
-- "Analyze AAPL fibonacci retracements for the past 6 months"
-- "What's the macro sentiment right now?"
+`docker-compose.yml` services:
+- `backend` (uvicorn)
+- `frontend` (Vite dev server)
+- `mongodb`
+- `redis`
+- Optional `langfuse-*` profile for LLM tracing during development
 
-#### 3. Automated Report Generation
-Each analysis automatically includes AI-generated summary:
-- Key observations
-- Support/resistance levels
-- Trend analysis
-- Risk assessment
-- Trading suggestions (informational only)
+The `.pipeline/` directory contains legacy Kubernetes manifests retained for reference but unused in the current workflow.
 
-## Infrastructure & DevOps
+## CI/CD
 
-### Cloud Provider
-**Hybrid Cloud Strategy:**
-- **Azure**: Primary platform (AKS, Cosmos DB, monitoring)
-- **Alibaba Cloud**: Specialized services (AI, OSS)
+`.github/workflows/` runs PR checks only:
+- Branch name policy (`users/{user}/{feature}`)
+- Backend pytest
+- Frontend tests
+- Linting (Ruff, Black, ESLint, mypy, TypeScript)
+- Pre-commit version-bump validation
 
-### Compute
-- **Service**: Azure Kubernetes Service (AKS)
-- **Cluster**: FinancialAgent-AKS
-- **Region**: Korea Central
-- **Scaling**: Horizontal Pod Autoscaler (HPA) based on CPU
-- **Node Count**: 1-3 nodes (auto-scaling)
+There is no deploy workflow.
 
-### API Management
-- **Service**: Nginx Ingress Controller
-- **Features**:
-  - Traffic routing
-  - Rate limiting
-  - SSL/TLS termination
-  - Load balancing
+## Observability
 
-### CI/CD
-- **Platform**: GitHub Actions
-- **Pipeline Stages**:
-  1. **Lint & Test**: Run all quality checks
-  2. **Build**: Create Docker images
-  3. **Scan**: Security scanning with Trivy
-  4. **Push**: Push to Azure Container Registry
-  5. **Deploy Staging**: Automatic deployment to staging
-  6. **Manual Approval**: Required for production
-  7. **Deploy Production**: Progressive rollout
-  8. **Smoke Tests**: Verify deployment health
+- **Structured logs** via `structlog` on the backend. Output to stdout (Docker captures it).
+- **Optional Langfuse** dev tool. Activate with `docker compose --profile observability up -d`. Not required.
 
-### Observability
+No production metrics, alerts, or aggregated logging. This is a single-user project running on the user's machine.
 
-#### Logging
-- **Format**: Structured JSON logs
-- **Fields**: Correlation IDs, user context, timing
-- **Aggregation**: Azure Monitor Log Analytics
+## Security
 
-#### Metrics
-- **Export**: Prometheus format
-- **Scraping**: Azure Monitor for Prometheus
-- **Custom Metrics**: Request latency, error rates, analysis duration
+- All secrets in untracked `.env` / `backend/.env` files (gitignored).
+- LLM API keys live in Agent Maestro's VS Code config — backend never sees them.
+- Single-user JWT for the local app.
+- No external network exposure intended; bind only to `localhost`.
 
-#### Tracing
-- **Service**: Langfuse (self-hosted) for agent execution
-- **Coverage**: Complete agent workflow visibility
-- **Integration**: Correlation with application logs
+## Out of Scope
 
-#### Alerting
-- **Platform**: Azure Monitor Alerts
-- **Conditions**:
-  - High error rate (> 5% for 5 minutes)
-  - Increased latency (p95 > 2s for 5 minutes)
-  - Pod failures or restarts
-  - Database connection issues
-  - API quota approaching limits
+- Real trading
+- Multi-user / SaaS
+- US-stock technical analysis (Fibonacci / Stochastic / Market Structure) — removed in rebrand
+- Credit / billing
+- Public feedback platform
 
-## Financial Analysis Features
+## Roadmap (informal)
 
-### Current CLI Capabilities (Being Transformed)
+This is a personal project; the roadmap is whatever the user wants to ship next. Current themes:
 
-#### 1. Fibonacci Analysis
-- Automatic swing point detection
-- Retracement levels: 0%, 23.6%, 38.2%, 50%, 61.8%, 78.6%, 100%
-- Extension levels: 127.2%, 161.8%, 261.8%
-- Confidence scoring based on price action
-- Multiple timeframe support
+- Quarterly report PDF interpretation (M3) — landed in `feat(quarterly-report): add PDF quarterly report analysis module`
+- Polite eastmoney crawler — landed in `feat(crawler): add eastmoney polite crawler + agent tools`
+- Portfolio + fund detail UI redesign — landed in commit `422fd4d` (Apr 2026)
 
-#### 2. Market Structure
-- Swing high/low identification
-- Trend detection and classification
-- Support/resistance zones
-- Breakout/breakdown analysis
-- Volume confirmation
+## References
 
-#### 3. Macro Analysis
-- VIX sentiment (fear index)
-- Sector rotation analysis
-- Buffett Indicator (market cap to GDP)
-- Treasury yield analysis
-- Economic indicators integration
-
-#### 4. Chart Generation
-- Professional matplotlib visualizations
-- Candlestick charts
-- Volume bars
-- Indicator overlays
-- Annotation support
-
-#### 5. Fundamentals
-- Stock metrics (P/E, P/B, ROE, etc.)
-- Valuation ratios
-- Financial statement data
-- Analyst ratings
-- Dividend information
-
-### Web Platform Enhancements
-
-#### 1. Conversational Interface
-- Natural language query processing
-- Context-aware responses
-- Multi-turn conversations
-- Session persistence
-
-#### 2. AI Chart Interpretation
-- Automated chart analysis via Qwen-VL
-- Pattern recognition
-- Trend identification
-- Risk assessment
-- Trading insights
-
-#### 3. Real-time Updates
-- Live price data streaming (planned)
-- Real-time indicator calculations
-- Push notifications for alerts
-- WebSocket integration
-
-#### 4. User Management
-- Multi-user support
-- Role-based access control
-- Analysis history tracking
-- Saved preferences
-- Watchlists
-
-#### 5. Cloud Storage
-- Chart images in Alibaba OSS
-- Global CDN delivery
-- Secure access via pre-signed URLs
-- Automatic cleanup of old charts
-
-## Security & Compliance
-
-### Authentication & Authorization
-- OAuth2/OIDC via Azure AD B2C
-- JWT token validation
-- Scope-based access control
-- Session management with refresh tokens
-
-### Data Security
-- Encryption in transit (TLS 1.3)
-- Encryption at rest (Cosmos DB, OSS)
-- Secrets in Azure Key Vault
-- No hardcoded credentials
-
-### Network Security
-- Azure CNI networking
-- Network policies
-- Private endpoints for databases
-- WAF protection (planned)
-
-### Compliance
-- GDPR considerations (data retention, right to deletion)
-- Financial data handling best practices
-- Audit logging
-- Access control policies
-
-## Deployment Topology
-
-### Development Environment
-- **Local**: Docker Compose for infrastructure (MongoDB, Redis), native Python/Node.js for code
-- **Cloud (Test)**: AKS test namespace (`klinematrix-test`)
-- **Database**: Local MongoDB (dev) or Azure Cosmos DB (test)
-- **Cache**: Local Redis (dev) or in-cluster Redis (test, non-persistent)
-- **Authentication**: Bypass mode (local) or JWT with email verification (test)
-- **Resources**: Minimal (1 replica per pod in test, cost optimization)
-
-### Staging Environment
-- **Platform**: AKS dedicated namespace
-- **Database**: Cosmos DB (separate from production)
-- **Cache**: Redis (development tier)
-- **Authentication**: Azure AD B2C (test tenant)
-- **Resources**: Production-like configuration
-
-### Production Environment
-- **Platform**: AKS multi-region (planned)
-- **Database**: Cosmos DB (multi-region, auto-scaling)
-- **Cache**: ApsaraDB for Redis (managed)
-- **Authentication**: Azure AD B2C (production tenant)
-- **Deployment**: Blue-green or canary
-- **Monitoring**: Full observability stack
-
-## Roadmap
-
-### Phase 1: Foundation (Complete)
-- ✅ Infrastructure setup (AKS, Cosmos DB, ACR)
-- ✅ Walking skeleton (end-to-end connectivity)
-- ✅ Basic health monitoring
-- ✅ Docker Compose development environment
-
-### Phase 2: Agent Core (In Progress)
-- LangChain agent implementation
-- Financial analysis tool integration
-- Conversational interface
-- State management with LangGraph
-- Langfuse observability
-
-### Phase 3: Production (Planned)
-- Azure AD B2C authentication
-- AI chart interpretation via Qwen-VL
-- Cloud deployment automation
-- Monitoring and alerting
-- Performance optimization
-
-### Phase 4: Scale (Future)
-- Advanced analytics and insights
-- Multi-user support with collaboration
-- Real-time data streaming
-- Mobile application
-- Geographic distribution
-- Advanced caching strategies
-- Machine learning for pattern detection
-
-## Success Metrics
-
-### Technical Metrics
-- API response time: p95 < 2s
-- Chart generation time: < 5s
-- Availability: 99.9% uptime
-- Error rate: < 1%
-- Test coverage: > 95%
-
-### Business Metrics
-- User engagement (analyses per user)
-- Session duration
-- Feature adoption rates
-- User retention
-- Chart sharing/export frequency
-
-### Performance Metrics
-- Concurrent users supported
-- Requests per second capacity
-- Database query performance
-- Cache hit rate (> 80%)
-- CDN cache hit rate (> 90%)
+- [PRD](prd.md)
+- [System Design](architecture/system-design.md)
+- [Agent Architecture](architecture/agent-architecture.md)
+- [Database Schema](architecture/database-schema.md)
+- [Rebrand spec](specs/2026-04-24-fundagent-design.md)

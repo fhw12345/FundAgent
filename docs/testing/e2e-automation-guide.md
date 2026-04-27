@@ -1,9 +1,9 @@
-# E2E Testing Guide - Financial Agent
+# E2E Testing Guide - Fund Agent
 
 **Last Updated**: 2025-11-10
 **Test Status**: ✅ 4/4 PASSING (100%)
 
-This guide documents the **proven, working approach** for E2E testing all 4 major workflows in the Financial Agent application.
+This guide documents the **proven, working approach** for E2E testing all 4 major workflows in the Fund Agent application.
 
 ---
 

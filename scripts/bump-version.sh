@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Financial Agent Version Bumping Script
+# Fund Agent Version Bumping Script
 # Usage: ./scripts/bump-version.sh [backend|frontend] [major|minor|patch]
 
 COMPONENT=$1

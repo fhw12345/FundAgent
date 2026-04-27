@@ -1,11 +1,37 @@
 # Backend Changelog
 
-All notable changes to the Financial Agent Backend will be documented in this file.
+All notable changes to the Fund Agent Backend will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.12.2] - 2026-04-27
+
+### Changed
+- docs: Repository-wide documentation overhaul to reflect Fund Agent reality
+  - Removed ~50 stale documents describing deleted features (Fibonacci, Stochastic, credit system, feedback platform, K8s production deployment, performance baselines, US-stock stories/epics)
+  - Rewrote core docs: `CLAUDE.md`, `prd.md`, `architecture/{system-design,agent-architecture,database-schema}.md`, `development/getting-started.md`, `project/specifications.md`, `project/versions/VERSION_MATRIX.md`, `troubleshooting/README.md`, `CONTRIBUTING.md`
+  - Updated package docstrings (`backend/src/__init__.py`, `backend/src/agent/__init__.py`) and tool comments (Makefile, scripts/, .pre-commit-config.yaml) from "Financial Agent" to "Fund Agent"
+  - Project framing now reflects actual state: single-user, docker-compose-only, Agent Maestro multi-vendor LLM routing, AkShare + EastMoney data sources
+
+## [0.12.1] - 2026-04-27
+
+### Changed
+- feat(fund-detail): Extend NAV history window from 90 to 250 trading days in `backend/src/api/fund_detail.py` so the frontend NAV chart can slice client-side for the new week/month/year toggle without an extra round-trip.
+
+## [0.12.0] - 2026-04-26
+
+### Added
+- feat(platform): Fund platform foundation
+  - Transactions API with `fund_code` filter (`/api/transactions`)
+  - DCA (定投) plan management
+  - Background jobs runner for portfolio analysis
+  - Fund sector exposure tracking
+  - Simplified auth flow for personal-use deployment
+- feat(crawler): Eastmoney polite crawler + agent tools for fund metadata enrichment
+- feat(quarterly-report): PDF quarterly report analysis module (Gemini long-context interpretation)
 
 ## [0.11.0] - 2026-02-23
 

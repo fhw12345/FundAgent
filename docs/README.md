@@ -1,143 +1,81 @@
-# Financial Agent Documentation
+# Fund Agent Documentation
 
-AI-Enhanced Financial Analysis Platform documentation hub.
+Personal-use AI assistant for Chinese onshore mutual funds (场外基金).
 
 ---
 
 ## Current Status
 
-| Component | Version | Environment | URL |
-|-----------|---------|-------------|-----|
-| Backend | v0.8.8 | Prod (ACK) | https://klinecubic.cn |
-| Frontend | v0.11.4 | Prod (ACK) | https://klinecubic.cn |
-| Test | Planned | AKS | https://klinematrix.com |
-| Local Dev | Docker | Compose | http://localhost:3000 |
+| Component | Version | Environment |
+|---|---|---|
+| Backend | v0.12.1 | Local docker-compose |
+| Frontend | v0.13.0 | Local docker-compose |
 
-> **Environment details**: See [CLAUDE.md](../CLAUDE.md#-environment-rules) for complete environment configuration.
+> Single-user, runs on your own machine. No production cluster. See [CLAUDE.md → Environment](../CLAUDE.md#-environment).
 
 ---
 
-## Quick Navigation
+## Start Here
 
-### Essential Links
-- [PRD (Product Requirements)](prd.md) - Complete product specification
-- [Getting Started](development/getting-started.md) - Local development setup
-- [System Design](architecture/system-design.md) - Architecture overview
-- [Deployment Workflow](deployment/workflow.md) - Deploy to cloud
-- [CLAUDE.md](../CLAUDE.md) - Development guidelines & quick commands
+- [CLAUDE.md](../CLAUDE.md) — development rules, quick commands, env-var gotcha
+- [Getting Started](development/getting-started.md) — clone → `make dev` → first login
+- [PRD](prd.md) — what Fund Agent does, in one page
+- [System Design](architecture/system-design.md) — backend + frontend layout
+- [Agent Architecture](architecture/agent-architecture.md) — LangGraph, sub-agents, tools
+- [Database Schema](architecture/database-schema.md) — MongoDB collections
 
-### By Category
+## By Category
 
-#### Architecture
-System design and architectural decisions.
+### Architecture
+- [System Design](architecture/system-design.md)
+- [Agent Architecture](architecture/agent-architecture.md)
+- [Database Schema](architecture/database-schema.md)
 
-- [System Design](architecture/system-design.md) - Tech stack, patterns, overview
-- [Agent Architecture](architecture/agent-architecture.md) - 12-factor agent implementation
-- [Database Schema](architecture/database-schema.md) - MongoDB collections
-- [React Agent Integration](architecture/react-agent-integration.md) - LangGraph agent flow
-- [React Agent Debugging](architecture/react-agent-debugging.md) - Components, patterns, debugging
+### Development
+- [Getting Started](development/getting-started.md)
+- [Coding Standards](development/coding-standards.md)
+- [Testing Strategy](development/testing-strategy.md)
+- [Verification](development/verification.md)
+- [Error Handling](development/error-handling.md)
 
-#### Deployment
-Cloud infrastructure and deployment procedures.
+### Deployment
+- [Cosmos DB / MongoDB API Compatibility](deployment/cosmos-db-mongodb-compatibility.md) — kept in case you point `MONGODB_URL` at Cosmos
 
-- [Deployment Workflow](deployment/workflow.md) - Build, deploy, verify, rollback
-- [ACK Architecture](deployment/ack-architecture.md) - Alibaba Cloud production
-- [Cloud Setup](deployment/cloud-setup.md) - Azure/Alibaba hybrid setup
-- [Infrastructure](deployment/infrastructure.md) - K8s resources, networking
-- [SLS Logging](deployment/sls-logging.md) - Application log collection to Alibaba Cloud SLS
-- [Cost Optimization](deployment/cost-optimization.md) - Resource management
+### Features
+- [Feature Specs Guide](features/README.md)
+- [Admin Health Dashboard](features/admin-health-dashboard.md)
 
-#### Development
-Local development and coding practices.
+### Testing
+- [E2E Automation Guide](testing/e2e-automation-guide.md)
+- [E2E Reference](testing/e2e-reference.md)
+- [Unit Test Coverage Report](testing/unit-test-coverage-report.md)
+- [TestSprite Setup](testing/testsprite-setup.md)
 
-- [Getting Started](development/getting-started.md) - Environment setup
-- [Coding Standards](development/coding-standards.md) - Python/TypeScript patterns
-- [Testing Strategy](development/testing-strategy.md) - Unit, integration, E2E
-- [Verification](development/verification.md) - Health checks, validation
+### Troubleshooting
+- [Troubleshooting Index](troubleshooting/README.md)
+- [Docker Env Reload Issue](troubleshooting/docker-env-reload-issue.md) — 🚨 read this once
+- [CORS / API Connectivity](troubleshooting/cors-api-connectivity.md)
+- [Frontend Issues](troubleshooting/frontend-issues.md)
+- [MongoDB / Cosmos DB](troubleshooting/mongodb-cosmos-db.md)
+- [Streaming Issues](troubleshooting/streaming-issues.md)
+- [Data Validation Issues](troubleshooting/data-validation-issues.md)
+- [Transaction Reconciliation Datetime Fix](troubleshooting/transaction-reconciliation-datetime-fix.md)
 
-#### Features
-Feature specifications (create before implementing).
+### Project
+- [Version Management](project/versions/README.md)
+- [Backend CHANGELOG](project/versions/backend/CHANGELOG.md)
+- [Frontend CHANGELOG](project/versions/frontend/CHANGELOG.md)
+- [Specifications](project/specifications.md)
 
-- [Feature Specs Guide](features/README.md) - How to write feature specs
-- [Market Insights Trend Visualization](features/market-insights-trend-visualization.md) - Phase 2 trend charts & sparklines
-- [Backend API Module Restructure](features/backend-api-module-restructure.md) - v0.8.8 modular architecture
-- [Portfolio Agent Architecture](features/portfolio-agent-architecture-refactor.md) - 3-phase analysis
-- [Langfuse Observability](features/langfuse-observability.md) - LLM trace visualization
-- Browse `features/` for more specifications
-
-#### Testing
-End-to-end testing guides.
-
-- [E2E Automation Guide](testing/e2e-automation-guide.md) - Playwright testing
-- [E2E Reference](testing/e2e-reference.md) - Selectors, endpoints
-
-#### Performance
-System performance baselines and optimization.
-
-- [Performance Overview](performance/README.md) - Bottleneck analysis, success metrics
-- [API Baseline](performance/api-baseline.md) - Endpoint response times
-- [Redis Baseline](performance/redis-baseline.md) - Cache hit rates, memory usage
-- [LLM Baseline](performance/llm-baseline.md) - Agent performance, token usage
-- [Frontend Baseline](performance/frontend-baseline.md) - Bundle size, Core Web Vitals
-- [Infrastructure Baseline](performance/infrastructure-baseline.md) - K8s resource utilization
-
-#### Troubleshooting
-Issue resolution and debugging.
-
-- [Troubleshooting Index](troubleshooting/README.md) - All issues
-- [Deployment Issues](troubleshooting/deployment-issues.md) - K8s problems
-- [Docker Env Reload Issue](troubleshooting/docker-env-reload-issue.md) - 🚨 Critical: Container env vars
-- [Known Bugs](troubleshooting/known-bugs.md) - Current issues
-
-#### Project
-Version history and specifications.
-
-- [Version Management](project/versions/README.md) - Release notes, changelogs
-- [Specifications](project/specifications.md) - Full project specs
-
----
-
-## Key Features
-
-### Financial Analysis
-- Fibonacci retracement with confidence scoring
-- Stochastic oscillator analysis
-- Market structure detection
-- Macro sentiment (VIX, sectors)
-- Fundamental analysis (overview, balance sheet, cash flow)
-- News sentiment analysis
-- Market movers (gainers, losers)
-
-### Market Insights (NEW - Phase 2)
-- AI-powered sector risk analysis (AI Sector Risk Index)
-- Multi-metric composite scoring with transparent breakdowns
-- Historical trend visualization with sparklines
-- Daily automated snapshots via CronJob
-- Expandable metric cards with methodology explanations
-
-> **Note**: Technical analysis available for daily/weekly/monthly intervals only. Intraday (1min) is price-only.
-
-### AI Capabilities
-- Natural language chat interface
-- Multimodal chart interpretation (Qwen-VL)
-- Autonomous tool chaining (LangGraph ReAct agent)
-- Context-aware responses
+### Specs / Plans
+- [2026-04-24 — FundAgent rebrand spec](specs/2026-04-24-fundagent-design.md)
+- [2026-04-27 — Portfolio + Fund Detail Redesign spec](superpowers/specs/2026-04-27-portfolio-fund-detail-redesign-design.md)
+- [2026-04-27 — Portfolio + Fund Detail Redesign plan](superpowers/plans/2026-04-27-portfolio-fund-detail-redesign.md)
 
 ---
 
 ## Documentation Standards
 
-- **Max 500 lines** per file
-- Link to CLAUDE.md for development workflows
-- Keep content current - update when making changes
-- Archive deprecated content in `docs/archive/`
-  - `archive/versions/` - Historical version release notes
-  - `archive/troubleshooting-history/` - Resolved issues reference
-
----
-
-## Additional Resources
-
-- [Project README](../README.md) - Repository overview
-- [CLAUDE.md](../CLAUDE.md) - Development guidelines
-- [API Docs](http://localhost:8000/docs) - OpenAPI (local)
+- Max 500 lines per file.
+- Active docs live under top-level `docs/` subdirectories. Historical snapshots go under `docs/archive/`.
+- When you delete a feature in code, delete (or archive) its docs in the same PR.

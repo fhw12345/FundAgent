@@ -4,7 +4,7 @@
 > **Last Updated:** 2025-11-16
 > **Applies To:** Frontend v0.10.1+
 
-This guide covers common frontend issues in the Financial Agent platform.
+This guide covers common frontend issues in the Fund Agent platform.
 
 ---
 

@@ -1,6 +1,6 @@
 # Testing Documentation
 
-This directory contains comprehensive testing documentation for the Financial Agent application.
+This directory contains comprehensive testing documentation for the Fund Agent application.
 
 ---
 

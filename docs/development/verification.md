@@ -3,7 +3,7 @@
 > **Platform**: Kubernetes (AKS) + Azure + Alibaba Cloud
 > **Last Updated**: 2025-10-08
 
-This guide helps you verify the Financial Agent platform is working correctly in Kubernetes test environment.
+This guide helps you verify the Fund Agent platform is working correctly in Kubernetes test environment.
 
 ## Prerequisites
 
@@ -215,7 +215,7 @@ Open browser: **https://klinematrix.com**
 
 **Expected**:
 - ✅ Page loads over HTTPS (valid certificate)
-- ✅ "Financial Agent" header visible
+- ✅ "Fund Agent" header visible
 - ✅ Login/signup options available
 - ✅ Modern UI with TailwindCSS styling
 

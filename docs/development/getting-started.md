@@ -1,456 +1,108 @@
-# Getting Started - Financial Agent Development
+# Getting Started — Fund Agent Development
 
-## Quick Start
+A single-user, docker-compose-only setup. Everything runs on your machine.
 
-> **Recommended**: Use Docker Compose for local development. See [CLAUDE.md](../../CLAUDE.md) for environment details.
+## Prerequisites
 
-### Prerequisites
-- **Docker & Docker Compose** (recommended for local dev)
-- **Python 3.12+** (for backend development)
-- **Node.js 18+** (for frontend development)
-- **Git**
+- **Docker Desktop** (Compose v2). Verify: `docker compose version`.
+- **Python 3.12** (only needed for running tests / linters outside the container).
+- **Node 20+** (only for IDE tooling — runtime lives in the frontend container).
+- **VS Code with the Agent Maestro extension running on `localhost:23333`** — the backend routes every LLM call through it. Without Agent Maestro running, the app starts but chat / analysis / screenshot import will fail.
 
-For cloud deployments only:
-- **kubectl** configured with ACK cluster access
-- **Azure CLI** (az) authenticated (for ACR image builds)
+Verify Agent Maestro: `curl http://localhost:23333/health` should return 200.
 
-### 1. Clone Repository
+## Clone and run
 
 ```bash
-git clone <repository>
-cd financial_agent
+git clone https://github.com/<you>/FundAgent.git
+cd FundAgent
+make dev          # docker compose up
 ```
 
-### 2. Local Development (Recommended)
+After ~30 seconds:
 
-**Using Docker Compose** (easiest):
-```bash
-make dev  # Starts all services with hot reload
-```
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| Backend OpenAPI docs | http://localhost:8000/docs |
+| MongoDB | localhost:27017 (db: `fund_agent`) |
+| Redis | localhost:6379 |
 
-Access points:
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Langfuse UI**: http://localhost:3001
-
-### 3. Access Production (Read-Only)
-
-**Production URLs** (ACK - Alibaba Cloud):
-- **Frontend**: https://klinecubic.cn
-- **Backend API**: https://klinecubic.cn/api/health
-- **Langfuse**: https://monitor.klinecubic.cn
-
-**Verify production:**
-```bash
-# Health check (may need proxy bypass in China)
-HTTP_PROXY="" HTTPS_PROXY="" curl -s https://klinecubic.cn/api/health
-```
-
-**Production K8s access:**
-```bash
-# Set kubeconfig for ACK
-export KUBECONFIG=~/.kube/config-ack-prod
-
-# Check pod status
-kubectl get pods -n klinematrix-prod
-
-# View backend logs
-kubectl logs -f deployment/backend -n klinematrix-prod
-```
-
-### 4. Manual Local Development (Without Docker)
-
-For running services directly (not recommended):
-
-**Backend:**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -e ".[dev]"
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev  # Starts on http://localhost:5173
-```
-
-**Note**: Manual setup requires MongoDB and Redis running locally or via Docker:
-```bash
-# Start only database services
-docker compose up -d mongodb redis
-```
-
-### 5. Verify Walking Skeleton
-
-**Via local Docker Compose:**
-```bash
-curl http://localhost:8000/api/health | python3 -m json.tool
-```
-
-**Via production:**
-```bash
-HTTP_PROXY="" HTTPS_PROXY="" curl https://klinecubic.cn/api/health | python3 -m json.tool
-```
-
-Expected response:
-```json
-{
-  "status": "ok",
-  "environment": "test",
-  "dependencies": {
-    "mongodb": {"connected": true},
-    "redis": {"connected": true}
-  }
-}
-```
-
-## Development Commands
+### Optional: Langfuse (LLM tracing dev tool)
 
 ```bash
-# Code Quality (REQUIRED before commits)
-make fmt          # Format all code
-make lint         # Lint all code
-make test         # Run all tests
-
-# Backend-specific
-cd backend
-make test-backend # Run Python tests
-make lint-backend # Lint Python code
-
-# Frontend-specific
-cd frontend
-npm test          # Run React tests
-npm run lint      # Lint TypeScript code
-
-# Version Management
-./scripts/bump-version.sh backend patch   # Increment backend version
-./scripts/bump-version.sh frontend minor  # Increment frontend version
+docker compose --profile observability up -d
+# Langfuse UI: http://localhost:3001
+# MinIO console: http://localhost:9003
 ```
 
-**Note**: Every commit must increment at least one component version. Pre-commit hooks enforce this.
+Langfuse is **not required**. It captures traces of LLM calls when you want to debug agent behavior; turn it off otherwise.
 
-## Project Structure
+## First login
 
-```
-financial_agent/
-├── backend/                 # FastAPI backend
-│   ├── src/
-│   │   ├── api/            # REST API endpoints
-│   │   ├── core/           # Configuration and utilities
-│   │   ├── database/       # MongoDB and Redis connections
-│   │   └── main.py         # Application entry point
-│   ├── pyproject.toml      # Python dependencies and tools
-│   └── Dockerfile          # Backend container
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── services/       # API client services
-│   │   ├── types/          # TypeScript type definitions
-│   │   └── App.tsx         # Main application
-│   ├── package.json        # Node.js dependencies
-│   └── Dockerfile          # Frontend container
-├── docs/                   # Documentation
-├── .pipeline/              # Kubernetes and CI/CD
-│   └── k8s/               # Kubernetes manifests
-├── scripts/               # Utility scripts
-├── Makefile              # Development commands
-└── README.md             # Project overview
-```
+The app is single-user. Default credentials are seeded on first run by the auth service — check `backend/.env` (`SEED_USERNAME` / `SEED_PASSWORD`) or look at the backend logs on first start. Change them by editing `.env` and recreating the backend container (see env-vars rule below).
 
-## Tech Stack Overview
-
-### Backend
-- **Python 3.12** with modern syntax
-- **FastAPI** for async API framework
-- **MongoDB** for document storage
-- **Redis** for caching
-- **LangChain + LangGraph** for AI agent orchestration
-- **Langfuse (self-hosted)** for observability
-
-### Frontend
-- **React 18** with TypeScript 5.x
-- **Vite** for fast build tooling
-- **TailwindCSS** for styling
-- **React Query** for state management
-- Modern chat interface
-
-### Infrastructure
-- **Kubernetes (AKS)** for all deployments (test and production)
-- **kubectl port-forward** for local access to cloud services (MongoDB, Redis)
-- **GitHub Actions** for CI/CD
-- **Azure** for cloud hosting (compute, container registry)
-- **Alibaba Cloud** for specialized services (AI models)
-
-## Local Development Workflow
-
-### Backend Development
+## Daily Development Loop
 
 ```bash
-# Option 1: Direct Python execution (fastest hot reload)
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -e ".[dev]"
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+# Make code changes — hot reload covers most of them
+# Backend hot reload: uvicorn watches ./backend/src
+# Frontend hot reload: Vite dev server inside the frontend container
+
+# Run tests + linters
+cd backend && make test && make lint
+docker compose exec frontend npm run lint && npm test
+
+# Format
+make fmt
+
+# Tail logs
+docker compose logs -f backend
+docker compose logs -f frontend
 ```
 
-**Backend Hot Reload:**
-- Function/method changes: Auto-reload ✅
-- New routes/endpoints: Auto-reload ✅
-- New dependencies: Restart required ❌
-- Global/module-level changes: Restart required ❌
+## 🚨 Env Var Rule (the bug that bites everyone)
 
-**Testing backend directly:**
-```bash
-curl http://localhost:8000/api/health
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-npm install
-npm run dev  # Starts on http://localhost:5173
-```
-
-**Frontend Hot Reload:**
-- Component changes: Auto-reload ✅
-- CSS/styling changes: Auto-reload ✅
-- New dependencies: Restart required ❌
-
-**Testing frontend:**
-Visit http://localhost:5173 in your browser.
-
-### Database Access
-
-**MongoDB:**
-```bash
-# Via port-forward to Kubernetes
-kubectl port-forward -n klinematrix-test svc/mongodb-service 27017:27017
-
-# Then connect locally
-mongosh mongodb://localhost:27017/klinematrix_test
-```
-
-**Redis:**
-```bash
-# Via port-forward to Kubernetes
-kubectl port-forward -n klinematrix-test svc/redis-service 6379:6379
-
-# Then connect locally
-redis-cli -h localhost -p 6379
-```
-
-**Or access directly in pods:**
-```bash
-# MongoDB shell in pod
-kubectl exec -it deployment/mongodb -n klinematrix-test -- mongosh
-
-# Redis CLI in pod
-kubectl exec -it deployment/redis -n klinematrix-test -- redis-cli
-```
-
-## Code Standards
-
-### Python
-- Use modern syntax: `|` unions, `match/case`, f-strings, `@dataclass`
-- Type hints required
-- Black for formatting
-- Ruff for linting
-- MyPy for type checking
-- Maximum 500 lines per file
-
-### TypeScript
-- ES modules
-- Optional chaining
-- `satisfies` operator
-- ESLint for linting
-- Prettier for formatting
-- Maximum 500 lines per file
-
-### Documentation
-- Descriptive docstrings at top of every file
-- Rich comments for key business logic (explain "why", not "what")
-- No code duplication (DRY principle)
-
-## Quality Gates
-
-Before committing, always run:
+`docker compose restart` does **not** reload `.env`. Containers bake env vars at create time.
 
 ```bash
-make fmt && make test && make lint
+# After editing .env or backend/.env
+docker compose up -d --force-recreate <service>
+docker compose exec <service> printenv | grep <VAR_PREFIX>     # verify
 ```
 
-This ensures:
-- ✅ Code is properly formatted
-- ✅ All tests pass
-- ✅ No linting violations
+See [docs/troubleshooting/docker-env-reload-issue.md](../troubleshooting/docker-env-reload-issue.md).
 
-## Common Development Tasks
-
-### Adding a New API Endpoint
-
-1. Create endpoint in `backend/src/api/`
-2. Add tests in `backend/tests/api/`
-3. Update API client in `frontend/src/services/`
-4. Run quality gates: `make fmt && make test && make lint`
-
-### Adding a New React Component
-
-1. Create component in `frontend/src/components/`
-2. Add TypeScript types in `frontend/src/types/`
-3. Write tests
-4. Run quality gates
-
-### Adding a New Database Model
-
-1. Create Pydantic model in `backend/src/models/`
-2. Add database operations in `backend/src/database/`
-3. Write tests
-4. Ensure TypeScript types match in frontend
-
-## Environment Variables
-
-### Backend (Kubernetes Deployment)
-Environment variables are configured in Kubernetes deployments and ConfigMaps:
-
-**Key Variables:**
-```yaml
-ENVIRONMENT: test
-MONGODB_URL: mongodb://mongodb-service:27017/klinematrix_test
-REDIS_URL: redis://redis-service:6379
-CORS_ORIGINS: '["https://klinematrix.com"]'
-EMAIL_BYPASS_MODE: true  # Test environment only
-```
-
-See `.pipeline/k8s/base/backend/deployment.yaml` for complete configuration.
-
-### Frontend (Local Development)
-Create `frontend/.env.local` for local development:
-```env
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-For production builds, API URL is auto-detected from window.location.
-
-## Troubleshooting
-
-### Backend Not Responding
+## Adding a Python dependency
 
 ```bash
-# Check pod status
-kubectl get pods -n klinematrix-test -l app=backend
-
-# Check pod logs
-kubectl logs -f deployment/backend -n klinematrix-test
-
-# Restart backend pods
-kubectl rollout restart deployment/backend -n klinematrix-test
-
-# Check service endpoints
-kubectl get endpoints backend-service -n klinematrix-test
+docker compose run --rm backend pip install <pkg>
+# Then add it to backend/pyproject.toml dependencies = [...]
+# Next make dev rebuild will pick it up.
 ```
 
-### Frontend Shows 503 Error
+## Adding a frontend dependency
 
 ```bash
-# Check frontend pod status
-kubectl get pods -n klinematrix-test -l app=frontend
-
-# Check frontend logs
-kubectl logs -f deployment/frontend -n klinematrix-test
-
-# Restart frontend pods
-kubectl rollout restart deployment/frontend -n klinematrix-test
+docker compose exec frontend npm install <pkg>
+# package.json + package-lock.json get updated inside the container,
+# but the bind mount surfaces them to your repo.
 ```
 
-### Database Connection Errors
+## Common Issues
 
-```bash
-# Check database pod status
-kubectl get pods -n klinematrix-test -l app=mongodb
-kubectl get pods -n klinematrix-test -l app=redis
-
-# Check database logs
-kubectl logs deployment/mongodb -n klinematrix-test
-kubectl logs deployment/redis -n klinematrix-test
-
-# Verify service endpoints
-kubectl get endpoints mongodb-service -n klinematrix-test
-kubectl get endpoints redis-service -n klinematrix-test
-
-# Restart backend after database restart
-kubectl rollout restart deployment/backend -n klinematrix-test
-```
-
-### Local Development Issues
-
-**Port conflicts:**
-```bash
-# Check for processes using ports
-lsof -i :5173  # Frontend dev server
-lsof -i :8000  # Backend
-lsof -i :27017 # MongoDB port-forward
-lsof -i :6379  # Redis port-forward
-```
-
-**Port-forward not working:**
-```bash
-# Kill existing port-forwards
-pkill -f "port-forward"
-
-# Restart port-forwards
-kubectl port-forward -n klinematrix-test svc/mongodb-service 27017:27017 &
-kubectl port-forward -n klinematrix-test svc/redis-service 6379:6379 &
-```
-
-### Hot Reload Not Working
-
-**If code changes aren't reflected:**
-
-**For local development:**
-1. Check if change requires restart (dependencies, module-level code)
-2. Stop and restart the dev server:
-   ```bash
-   # Backend: Ctrl+C, then restart uvicorn
-   # Frontend: Ctrl+C, then npm run dev
-   ```
-
-**For Kubernetes deployment:**
-```bash
-# Rebuild image with new version
-./scripts/bump-version.sh backend patch
-BACKEND_VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-az acr build --registry financialagent --image klinematrix/backend:test-v${BACKEND_VERSION} --file backend/Dockerfile backend/
-
-# Update deployment
-kubectl set image deployment/backend backend=financialagent-gxftdbbre4gtegea.azurecr.io/klinematrix/backend:test-v${BACKEND_VERSION} -n klinematrix-test
-
-# Or force pod restart
-kubectl rollout restart deployment/backend -n klinematrix-test
-```
+| Symptom | Likely cause |
+|---|---|
+| Chat returns 500 with `connection refused 23333` | Agent Maestro not running in VS Code |
+| Backend can't reach MongoDB | The `mongodb` service hasn't finished initializing — `docker compose logs mongodb` |
+| AkShare timeouts on first run | Some endpoints are slow / rate-limited; Redis cache catches up after the first call |
+| Pre-commit blocks commit with version error | You didn't bump the version. Run `./scripts/bump-version.sh [backend|frontend] [patch|minor|major]` |
+| Stale env after `.env` change | Use `--force-recreate`, not `restart` (see rule above) |
 
 ## Next Steps
 
-Once your development environment is running:
-
-1. **Explore the Interface** - Visit https://klinematrix.com
-2. **Review the Code** - Check out backend and frontend source code
-3. **Read the Architecture** - See [System Design](../architecture/system-design.md)
-4. **Review Coding Standards** - See [Coding Standards](coding-standards.md)
-5. **Review Deployment** - See [Deployment Workflow](../deployment/workflow.md)
-6. **Start Building** - Pick a task and start developing!
-
-## Resources
-
-- **API Documentation**: https://klinematrix.com/api/docs
-- **Complete Documentation**: [docs/README.md](../README.md)
-- **Project Specifications**: [docs/project/specifications.md](../project/specifications.md)
-- **12-Factor Agent Guide**: [docs/architecture/agent-12-factors.md](../architecture/agent-12-factors.md)
-- **Troubleshooting**: [docs/troubleshooting/README.md](../troubleshooting/README.md)
-- **Deployment Guide**: [docs/deployment/workflow.md](/Users/allenpan/Desktop/repos/projects/financial_agent/docs/deployment/workflow.md)
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) — full PR / branching / commit conventions
+- [docs/architecture/system-design.md](../architecture/system-design.md) — how the pieces fit together
+- [docs/architecture/agent-architecture.md](../architecture/agent-architecture.md) — LangGraph + sub-agents + tools
+- [docs/architecture/database-schema.md](../architecture/database-schema.md) — MongoDB collections

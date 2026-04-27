@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Financial Agent Version Validation Script
+# Fund Agent Version Validation Script
 # Ensures at least one component version has been incremented
 
 echo "🔍 Validating version increment..."

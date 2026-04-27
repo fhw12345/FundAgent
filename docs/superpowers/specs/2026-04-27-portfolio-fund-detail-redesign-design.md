@@ -1,7 +1,7 @@
 # Portfolio Dashboard & Fund Detail Page Redesign
 
 **Date:** 2026-04-27
-**Status:** Approved (brainstorming)
+**Status:** Shipped (commit 422fd4d, merged into main 2026-04-27)
 **Scope:** Frontend (PortfolioDashboard, FundDetailPage) + minor backend extensions
 
 ## Background
