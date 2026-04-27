@@ -5,8 +5,11 @@
 
 import { useCallback } from "react";
 import type { ChatMessage } from "../types/api";
-import type { TimeInterval } from "../services/market";
 import { parseBackendMessage } from "../utils/messageParser";
+
+// Inert vestige from the pre-rebrand chart UI; kept so existing callbacks
+// continue to type-check without dragging back the deleted market service.
+type TimeInterval = string;
 
 interface ChatRestoreCallbacks {
   setMessages: (messages: ChatMessage[]) => void;

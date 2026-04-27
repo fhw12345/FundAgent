@@ -39,8 +39,6 @@ i18n
       caches: ["localStorage"],
       // localStorage key
       lookupLocalStorage: "i18nextLng",
-      // Check localStorage for explicit selection only
-      checkWhitelist: true,
     },
 
     // Preload essential namespaces to avoid flash of untranslated content
