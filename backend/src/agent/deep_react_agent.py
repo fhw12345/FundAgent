@@ -206,18 +206,21 @@ class DeepReActAgent:
                 research_tasks = [
                     (
                         "technical",
-                        f"Analyze the technical setup for {symbol}. "
-                        f"Focus on trend, Fibonacci levels, and momentum.",
+                        f"分析基金 {symbol} 的净值走势。"
+                        f"重点关注：净值走势与趋势方向、最大回撤、近 1/3/6/12 个月收益、"
+                        f"同类四分位排名、估值百分位，以及当前盘中估值（如有）。",
                     ),
                     (
                         "news",
-                        f"Analyze recent news and sentiment for {symbol}. "
-                        f"Include catalyst assessment and market mood.",
+                        f"分析基金 {symbol} 近期相关资讯与舆情。"
+                        f"重点关注：基金经理任职稳定性、所投板块/行业近期热度、"
+                        f"相关监管动态、规模异常变动。",
                     ),
                     (
                         "financial",
-                        f"Analyze the fundamentals of {symbol}. "
-                        f"Focus on valuation, cash flow health, and earnings quality.",
+                        f"分析基金 {symbol} 的基本面。"
+                        f"重点关注：前十大重仓股与行业集中度、基金规模与费率"
+                        f"（管理费/托管费）、基金经理任职年限与代表作、近期调仓方向。",
                     ),
                 ]
 
@@ -284,30 +287,30 @@ class DeepReActAgent:
                 for c in all_concerns
             )
 
-            rebuttal_prompt = f"""The debater raised concerns about {symbol}:
+            rebuttal_prompt = f"""质疑者针对基金 {symbol} 提出了以下顾虑：
 
 {concern_lines}
 
-Your job is to DEFEND the thesis by addressing each concern with evidence:
-1. For each concern, use tools to gather SPECIFIC data that confirms or refutes it
-2. If the concern is valid, acknowledge it and explain why the thesis still holds
-3. If the concern is wrong, provide evidence that disproves it
+你的任务是基于证据回应每一条顾虑：
+1. 针对每条顾虑，调用工具获取**具体数据**来确认或反驳它
+2. 如果顾虑成立，承认它，并说明该基金为何依然值得持有/买入（或不值得）
+3. 如果顾虑不成立，给出能够反驳它的数据证据
 
-RESPONSE FORMAT: Include a JSON block in your response:
+回复格式：在回答中包含一段 JSON：
 ```json
 {{
   "rebuttals": [
     {{
       "concern_id": "C1",
       "status": "REFUTED|PARTIALLY_VALID|CONCEDED",
-      "defense": "Your defense with specific data",
-      "evidence": "Source of your evidence"
+      "defense": "基于具体数据的回应",
+      "evidence": "证据来源（如某 AkShare 接口、天天基金页面等）"
     }}
   ]
 }}
 ```
 
-Be concise — focus on DATA, not rhetoric."""
+精简作答——以**数据**为准，不要空泛论述。"""
 
             defense_parts: list[str] = []
             total_tool_count = 0
@@ -407,18 +410,18 @@ Be concise — focus on DATA, not rhetoric."""
                 if last_period > max_len // 2:
                     truncated_report = truncated_report[: last_period + 1]
 
-            critique_prompt = f"""Review the following investment thesis and challenge it:
+            critique_prompt = f"""请审视下面这份基金研究报告并提出质疑：
 
 {truncated_report}
 
-Your job is to:
-1. Use your fact-checking skills to verify key claims
-2. Search for counter-evidence and contradicting data
-3. Identify overlooked risks and stress-test assumptions
+你的任务：
+1. 利用核查能力，对报告中的关键论断进行事实校验
+2. 寻找反向证据与不一致的数据
+3. 识别被忽略的风险（净值走势是否过度乐观、持仓集中度、基金经理稳定性、规模与流动性、费率拖累、所投板块下行风险等），并对核心假设进行压力测试
 
-Be aggressive but fair. Use real evidence, not speculation.
+请犀利但克制：只基于真实数据，不要臆测。
 
-If after thorough review you genuinely have no concerns, respond with:
+如果在充分审视后你确实没有任何顾虑，请仅回复：
 "{TERMINATION_SIGNAL}"
 """
 
@@ -547,37 +550,32 @@ If after thorough review you genuinely have no concerns, respond with:
             parts = report.split("\n\n## Defense (Round")
             original_research = parts[0].strip()
 
-            verdict_prompt = f"""You are a Senior Investment Committee Judge delivering a final verdict.
+            verdict_prompt = f"""你是一位**基金投顾终审**，需要对本次基金研究给出最终判决。
 
 {verified_facts_block}
 
-## Research Report
+## 研究报告
 {original_research[:6000]}
 
-## Your Task
+## 你的任务
 
-Output a bilingual report. For every section, give Chinese first, then English on the next line, prefixed with `EN:`. Keep both versions concise; do not repeat data unnecessarily.
+针对质疑者提出的**每一条**顾虑，逐条标注其结论之一：
+- ✅ **已证实**
+- ⚠️ **证据不足**
+- ❌ **已反驳**
 
-For EACH concern raised by the Debater, categorize it as one of:
-- ✅ **VERIFIED / 已证实**
-- ⚠️ **NEEDS MORE EVIDENCE / 证据不足**
-- ❌ **CONTRADICTED / 已反驳**
+每条格式：
+- {{icon}} **{{标签}}**：一句话说明，引用具体数据。
 
-Format per concern:
-- {{icon}} **{{中文标签}}**: 中文一句话说明，引用具体数据
-  EN: One sentence in English citing the same data.
+随后输出最终判决，严格按以下格式：
 
-Then provide the final verdict in this exact bilingual format:
+### 最终判决
+- **操作建议**：买入 / 持有 / 卖出
+- **信心**：高 / 中 / 低
+- **风险等级**：高 / 中 / 低
+- **核心观点**：1-2 句最关键的结论。
 
-### 最终判决 / Final Verdict
-- **操作建议 / Action**: 买入 / 持有 / 卖出  (Buy / Hold / Sell)
-- **信心 / Conviction**: 高 / 中 / 低  (High / Medium / Low)
-- **风险等级 / Risk Level**: 高 / 中 / 低  (HIGH / MODERATE / LOW)
-- **核心观点 / Key Insight**:
-  中文 1-2 句最关键的结论。
-  EN: 1-2 English sentences with the same takeaway.
-
-Be decisive. Use the evidence from both sides. Do not hedge excessively."""
+果断给出结论，结合双方证据，避免模棱两可。全部使用中文输出。"""
 
             verdict_response = await self.llm.ainvoke(
                 [HumanMessage(content=verdict_prompt)],
